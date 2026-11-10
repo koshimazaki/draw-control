@@ -1,0 +1,18 @@
+{
+  "name": "@motion-studio/studio",
+  "version": "0.1.0",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@motion-studio/core": "0.1.0",
+    "fflate": "^0.8.3",
+    "mp4-muxer": "^5.2.2",
+    "three": "^0.187.0"
+  }
+}

@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "guide-bundle.schema.json",
+  "title": "Motion Studio guide bundle",
+  "description": "Pinned local copy. The owner of this schema is model-arena/packages/core; re-sync this file whenever its schemaVersion changes. Fields follow the table 'The guide bundle' in docs/plan.md.",
+  "type": "object",
+  "required": ["schemaVersion", "video", "firstFrame", "beats", "recipe", "meta"],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+    "video": { "type": "string", "pattern": "\\.mp4$", "description": "H.264 MP4, 24 fps, frame count 8k+1" },
+    "audio": { "type": "string", "description": "The track, trimmed to the clip" },
+    "firstFrame": { "type": "string", "pattern": "\\.png$" },
+    "firstFrameStyled": { "type": "string" },
+    "beats": { "type": "string", "pattern": "\\.json$" },
+    "recipe": { "type": "string", "pattern": "\\.json$" },
+    "meta": { "type": "string", "pattern": "\\.json$" }
+  },
+  "$defs": {
+    "beats": {
+      "type": "object",
+      "required": ["bpm", "offsetSeconds", "beatsPerBar", "source", "beats", "downbeats"],
+      "additionalProperties": false,
+      "properties": {
+        "bpm": { "type": "number", "minimum": 40, "maximum": 240 },
+        "offsetSeconds": { "type": "number", "minimum": 0 },
+        "beatsPerBar": { "type": "integer", "minimum": 1 },
+        "source": { "enum": ["manual", "analysis"] },
+        "beats": { "type": "array", "items": { "type": "number", "minimum": 0 } },
+        "downbeats": { "type": "array", "items": { "type": "number", "minimum": 0 } }
+      }
+    },
+    "meta": {
+      "type": "object",
+      "required": ["schemaVersion", "width", "height", "fps", "frames", "durationSeconds", "view", "character", "generator", "audioInVideo", "assets"],
+      "additionalProperties": false,
+      "properties": {
+        "schemaVersion": { "type": "string" },
+        "width": { "type": "integer", "minimum": 16 },
+        "height": { "type": "integer", "minimum": 16 },
+        "fps": { "const": 24 },
+        "frames": { "type": "integer", "minimum": 1, "description": "8k+1", "multipleOf": 1 },
+        "durationSeconds": { "type": "number", "minimum": 0 },
+        "view": { "type": "string" },
+        "character": {
+          "type": "object", "required": ["kind", "name"], "additionalProperties": false,
+          "properties": { "kind": { "enum": ["mannequin", "block", "file"] }, "name": { "type": "string" } }
+        },
+        "generator": {
+          "type": "object", "required": ["name", "version", "motion"], "additionalProperties": false,
+          "properties": { "name": { "type": "string" }, "version": { "type": "string" }, "motion": { "type": "string" } }
+        },
+        "audioInVideo": { "type": "boolean" },
+        "assets": {
+          "type": "array", "minItems": 1,
+          "items": {
+            "type": "object", "required": ["role", "name", "licence"], "additionalProperties": false,
+            "properties": {
+              "role": { "enum": ["video", "audio", "firstFrame", "character", "motion", "recipe", "beats"] },
+              "name": { "type": "string" },
+              "licence": { "type": "string", "minLength": 1 },
+              "file": { "type": "string" }
+            }
+          }
+        }
+      }
+    }
+  }
+}

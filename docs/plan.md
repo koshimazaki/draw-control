@@ -47,6 +47,8 @@ The Motion Studio MVP kit at `~/Downloads/genobi-motion-studio-mvp`: 12 files, 1
 
 `model-arena/packages/core` owns the JSON Schema. This repo's export tests validate against a pinned copy, re-synced whenever the schema version changes.
 
+The pinned copy is `schema/guide-bundle.schema.json` (version 0.1.0, written here from this table on 10 November 2026 while `model-arena` was being scaffolded). **To do:** re-sync it with `model-arena/packages/core` once that schema exists. The bundle also carries `bundle.json`, a manifest naming each file, and `meta.audioInVideo`.
+
 | Field | Meaning |
 | --- | --- |
 | `video` | MP4, H.264, 24 fps, frame count 8k+1 |
@@ -55,6 +57,10 @@ The Motion Studio MVP kit at `~/Downloads/genobi-motion-studio-mvp`: 12 files, 1
 | `beats` | beat and downbeat times, BPM |
 | `recipe` | the recipe that produced it |
 | `meta` | width, height, fps, frames, character, generator, licence per asset |
+
+## Status, 10 November 2026
+
+Built on `feat/ms-core`: MS-0 scaffold, MS-1 core, MS-2 viewport and characters, MS-5 export, and the pure commands of MS-4 (no CLI or MCP yet). The seed kit's validator, engine, RMS/BPM analysis and Three.js loader were adapted into `packages/core` and `packages/studio`; its React surface and Genobi installer were not used. MS-3 is a simple beat strip for now.
 
 ## Work packages
 

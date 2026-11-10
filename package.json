@@ -1,0 +1,35 @@
+{
+  "name": "motion-studio",
+  "private": true,
+  "version": "0.1.0",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "workspaces": [
+    "packages/core",
+    "packages/studio"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w @motion-studio/studio",
+    "build": "npm run build -w @motion-studio/studio",
+    "test": "vitest run",
+    "typecheck": "tsc -p packages/core && tsc -p packages/studio",
+    "lint": "eslint .",
+    "check": "npm run typecheck && npm run lint && npm test",
+    "smoke": "node scripts/smoke.mjs"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^24.19.2",
+    "@types/three": "^0.187.0",
+    "ajv": "^8.20.0",
+    "eslint": "^10.14.0",
+    "playwright-core": "^1.65.0",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.72.2",
+    "vite": "^8.3.7",
+    "vitest": "^5.1.0"
+  }
+}

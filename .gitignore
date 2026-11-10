@@ -1,11 +1,19 @@
 node_modules/
 dist/
+out/
+*.log
 .DS_Store
+# local characters, tracks and exports never enter the repo
+*.glb
+*.fbx
+*.mp3
+*.wav
+*.m4a
+*.mp4
+local/
 .env
 .env.*
-*.log
 coverage/
 .vite/
-# local media and keys never committed
 .local/
 *.key
