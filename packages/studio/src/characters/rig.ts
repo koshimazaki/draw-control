@@ -1,7 +1,8 @@
 /**
  * Procedural characters: the jointed mannequin and the block figure share one joint
- * hierarchy, so a recipe pose drives both. Neutral by design: plain light matte
- * surfaces, no texture, visible joints, so a video model reads them as a pose guide.
+ * hierarchy, so a recipe pose drives both. Neutral by design: plain light matte limbs,
+ * no texture, and dark slate joints, so a video model reads a jointed human placeholder
+ * against either background. Arms hang clear of the torso so the silhouette separates.
  */
 import * as THREE from "three";
 import { JOINTS, type FrameState, type JointName } from "@motion-studio/core";
@@ -9,13 +10,14 @@ import type { Character } from "./types";
 
 type Style = "mannequin" | "block";
 const DIMS = {
-  pelvisY: 1.0, spineUp: 0.1, torso: 0.46, neck: 0.56, shoulderX: 0.21, shoulderY: 0.44,
+  pelvisY: 1.0, spineUp: 0.1, torso: 0.46, neck: 0.56, shoulderX: 0.245, shoulderY: 0.44,
   upperArm: 0.29, forearm: 0.27, hipX: 0.1, hipY: -0.05, thigh: 0.44, shin: 0.44,
 };
 
 function materials(style: Style) {
-  const body = new THREE.MeshStandardMaterial({ color: style === "mannequin" ? 0xebe8e2 : 0xd6dbe0, roughness: 0.85, metalness: 0 });
-  const joint = new THREE.MeshStandardMaterial({ color: style === "mannequin" ? 0xa9a59d : 0x9aa3ad, roughness: 0.85, metalness: 0 });
+  // Limbs light, joints a dark slate: high contrast with each other and with mid grey.
+  const body = new THREE.MeshStandardMaterial({ color: style === "mannequin" ? 0xe6e2da : 0xd6dbe0, roughness: 0.62, metalness: 0 });
+  const joint = new THREE.MeshStandardMaterial({ color: style === "mannequin" ? 0x3b3f46 : 0x4a525c, roughness: 0.55, metalness: 0 });
   return { body, joint };
 }
 
@@ -54,8 +56,8 @@ export function createProceduralCharacter(style: Style): Character {
   const spine = group("spine", pelvis, 0, DIMS.spineUp);
   add(spine, jointBall(style, 0.075, joint));
   const torso = style === "mannequin"
-    ? new THREE.Mesh(new THREE.CapsuleGeometry(0.15, 0.2, 6, 16).scale(1.15, 1, 0.72), body)
-    : new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.46, 0.22), body);
+    ? new THREE.Mesh(new THREE.CapsuleGeometry(0.15, 0.2, 6, 16).scale(1.05, 1, 0.72), body)
+    : new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.46, 0.22), body);
   add(spine, torso, 0, DIMS.torso / 2 + 0.03);
   const head = group("head", spine, 0, DIMS.neck);
   add(head, style === "mannequin" ? new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.05, 0.08, 12), joint) : new THREE.Group(), 0, 0.02);
@@ -63,8 +65,9 @@ export function createProceduralCharacter(style: Style): Character {
     ? new THREE.Mesh(new THREE.SphereGeometry(0.115, 24, 16).scale(0.9, 1.12, 1), body)
     : new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.24, 0.22), body);
   add(head, skull, 0, 0.16);
-  // A small nose marks the facing direction without giving the figure a face.
-  add(head, new THREE.Mesh(new THREE.SphereGeometry(0.022, 10, 8), joint), 0, 0.15, 0.105);
+  // A small nose in the body colour marks the facing direction by shading alone, so it
+  // does not read as an eye or a face.
+  add(head, new THREE.Mesh(new THREE.SphereGeometry(0.022, 10, 8), body), 0, 0.15, 0.105);
 
   for (const [side, sign] of [["left", 1], ["right", -1]] as const) {
     const shoulder = group(`${side}Shoulder`, spine, sign * DIMS.shoulderX, DIMS.shoulderY);

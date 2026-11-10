@@ -40,7 +40,11 @@ const ARMS_RELAXED = { leftShoulder: [0, 0, 0.12], rightShoulder: [0, 0, -0.12],
 export const POSES = {
   neutral: neutralPose(),
   ready: pose(-0.04, { ...ARMS_RELAXED, leftHip: [-0.12, 0, 0], rightHip: [-0.12, 0, 0], leftKnee: [0.22, 0, 0], rightKnee: [0.22, 0, 0] }),
-  bounceDown: pose(-0.1, { ...ARMS_RELAXED, spine: [0.12, 0, 0], leftHip: [-0.3, 0, 0], rightHip: [-0.3, 0, 0], leftKnee: [0.55, 0, 0], rightKnee: [0.55, 0, 0], leftElbow: [-0.7, 0, 0], rightElbow: [-0.7, 0, 0] }),
+  // Bounce reads from the front as well as the side: the knees turn out (a plié, the leg's
+  // bend plane yawed 0.5 rad outwards, so the feet stay under the hips), the pelvis drops by
+  // the leg's lost height, and the arms open and pump. Hip Eulers are Ry(±0.5)·Rx(-0.5) in XYZ order.
+  bounceDown: pose(-0.105, { spine: [0.1, 0, 0], head: [0.12, 0, 0], leftHip: [-0.557, 0.434, 0.256], rightHip: [-0.557, -0.434, -0.256], leftKnee: [1.0, 0, 0], rightKnee: [1.0, 0, 0], leftShoulder: [0, 0, 0.5], rightShoulder: [0, 0, -0.5], leftElbow: [-1.2, 0, 0], rightElbow: [-1.2, 0, 0] }),
+  bounceUp: pose(0, { leftShoulder: [0, 0, 0.18], rightShoulder: [0, 0, -0.18], leftElbow: [-0.35, 0, 0], rightElbow: [-0.35, 0, 0], leftKnee: [0.05, 0, 0], rightKnee: [0.05, 0, 0] }),
   armsOut: pose(0, { leftShoulder: [0, 0, 1.5], rightShoulder: [0, 0, -1.5] }),
   armsUp: pose(0.02, { leftShoulder: [0, 0, 2.6], rightShoulder: [0, 0, -2.6], head: [-0.2, 0, 0] }),
   clapFront: pose(-0.03, { leftShoulder: [-1.35, 0, -0.25], rightShoulder: [-1.35, 0, 0.25], leftElbow: [-0.35, 0, 0], rightElbow: [-0.35, 0, 0], leftKnee: [0.15, 0, 0], rightKnee: [0.15, 0, 0], leftHip: [-0.08, 0, 0], rightHip: [-0.08, 0, 0] }),

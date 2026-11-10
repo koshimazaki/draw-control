@@ -12,7 +12,7 @@ export const MOVE_LIBRARY = {
   idle: { name: "Idle", summary: "Settle and breathe", blendBeats: 1, phases: [
     ["settle", "ready", 2, "Settle into the knees"], ["rise", "neutral", 2, "Rise back to standing"]] },
   bounce: { name: "Bounce", summary: "Knee bounce on every beat", blendBeats: 0.5, phases: [
-    ["down", "bounceDown", 0.5, "Drop on the beat"], ["up", "ready", 0.5, "Lift between beats"]] },
+    ["down", "bounceDown", 0.5, "Drop on the beat"], ["up", "bounceUp", 0.5, "Lift between beats"]] },
   stepTouch: { name: "Step touch", summary: "Side to side, two beats", blendBeats: 0.5, phases: [
     ["left", "stepLeft", 1, "Step to the left"], ["right", "stepRight", 1, "Step to the right"]] },
   clap: { name: "Clap", summary: "Clap on the beat", blendBeats: 0.5, phases: [

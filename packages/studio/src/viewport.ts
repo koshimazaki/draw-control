@@ -36,19 +36,24 @@ export class Viewport {
     this.controls.update();
     this.camera = cameraFor("front", 1);
 
-    this.scene.add(new THREE.HemisphereLight(0xffffff, 0x50525a, 1.9));
-    const key = new THREE.DirectionalLight(0xffffff, 2.4);
-    key.position.set(-2.5, 6, 4.5);
+    // Soft fill, a high frontal key (its shadow falls short and behind the figure, so it
+    // never reads as a second shape), and a back rim that separates the silhouette.
+    this.scene.add(new THREE.HemisphereLight(0xffffff, 0x50525a, 1.35));
+    const key = new THREE.DirectionalLight(0xffffff, 2.6);
+    key.position.set(0.2, 8, 2.2);
     key.castShadow = true;
     key.shadow.mapSize.set(1024, 1024);
     Object.assign(key.shadow.camera, { left: -4, right: 4, top: 4, bottom: -4 });
     key.shadow.radius = 4;
     this.scene.add(key);
-    const fill = new THREE.DirectionalLight(0xffffff, 0.8);
+    const fill = new THREE.DirectionalLight(0xffffff, 0.7);
     fill.position.set(3, 2.5, 3);
     this.scene.add(fill);
+    const rim = new THREE.DirectionalLight(0xffffff, 1.1);
+    rim.position.set(0.5, 3, -4);
+    this.scene.add(rim);
     // The floor shows only the contact shadow, so the background stays a flat colour.
-    const floor = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), new THREE.ShadowMaterial({ opacity: 0.28 }));
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), new THREE.ShadowMaterial({ opacity: 0.16 }));
     floor.rotation.x = -Math.PI / 2;
     floor.receiveShadow = true;
     this.scene.add(floor);
