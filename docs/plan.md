@@ -1,142 +1,141 @@
 ---
 tags: [plan, motion-studio, agents]
-summary: Implementation plan for Motion Studio as work packages MS-0 to MS-8, with files, tests and acceptance, for builder agents.
+summary: Implementation plan for Motion Studio as work packages MS-0 to MS-8, with the real state on 10 November 2026, the remaining packages for 11–14 November and a cut line.
 ---
 
 # Motion Studio: implementation plan
 
-Written 7 November 2026. Product scope is in [PRD.md](PRD.md). The cross-repo overview, covering both this repo and `model-arena`, is kept privately by the owner. This file is the build plan for this repo.
+Written 7 November 2026, brought up to date 10 November 2026. Product scope is in [PRD.md](PRD.md). The cross-repo overview, covering both this repo and `model-arena`, is kept privately by the owner. This file is the build plan for this repo.
 
 ## Milestones
 
 | Date | State |
 | --- | --- |
-| Sun 8 Nov | Repo scaffolded; the guide-bundle format agreed with `model-arena` |
-| Tue 10 Nov | MS-1 to MS-5 done: a mannequin guide edited by three agent commands, exported as a bundle |
-| Thu 12 Nov | Preview: repo public, README runnable in five minutes |
-| Sat 14 Nov | Final for the first milestone |
-| After | MS-7 MotionBricks (on a spike yes), MS-8 pose input, Genobi adaptation |
+| Sun 8 Nov | Done: repo scaffolded; guide-bundle format written down (pinned schema 0.1.0) |
+| Tue 10 Nov | Done: MS-0, MS-1, MS-2, MS-5 and the pure commands of MS-4; export size, range and target warnings; legible mannequin |
+| Wed 11 Nov | MS-4 CLI `apply`; MS-6 providers interface |
+| Thu 12 Nov | Preview: MS-3 phase blocks with drag-to-edit; repo public, README runnable in five minutes |
+| Fri 13 Nov | MS-4 `render` CLI and the remaining commands; schema re-sync with `model-arena` |
+| Sat 14 Nov | Final for the first milestone: a bundle loads in a `model-arena` record |
+| After | Everything below the cut line, then [Next](PRD.md#next-not-built) |
 
 ## Stack and layout
 
-TypeScript, Vite, Three.js (no React Three Fiber dependency in core), vitest. Node 24.
+TypeScript, Vite, Three.js (no React Three Fiber), vitest, ESLint. Node 24.
 
 ```
-packages/core/        recipe schema and validator, phase model, deterministic engine, applyMotionCommand
-packages/studio/      Vite app: viewport, timeline, views, export
-providers/            MotionGenerator interface; local (time-stretch, default); later motionbricks, runware-serverless, runpod
-serverless/motionbricks/   container.yaml, Dockerfile, batch handler (MS-7)
-cli/                  agent edit loop
-mcp/                  MCP server over the same commands (if time)
-examples/             mannequin move sets, an own-music beat track, sample bundles
-docs/                 PRD, plan, friction.md, costs.md, levels
+packages/core/        recipe and validator, poses and move library, deterministic engine, beat analysis,
+                      edit commands, bundle builders, export range and target model constraints
+packages/studio/      Vite app: viewport, characters, views, beat strip, export (MP4, WAV, zip)
+schema/               pinned copy of the guide-bundle JSON Schema (owner: model-arena)
+scripts/smoke.mjs     real headless Chrome run, ffprobe checks
+providers/            (MS-6, not yet) MotionGenerator interface; local time-stretch default
+cli/, mcp/            (MS-4, not yet) agent edit loop over the same commands
+docs/                 PRD, plan, friction.md, costs.md
 ```
-
-## Seed code
-
-The Motion Studio MVP kit at `~/Downloads/genobi-motion-studio-mvp`: 12 files, 1,452 lines.
-- **Contents:** recipe validator, deterministic engine, RMS/BPM analysis, Three.js preview with GLB/FBX import, control surface, vitest tests.
-- **How to use it:** mount it in this repo's Vite app. Do not run its Genobi installer.
-- **Known gaps:**
-  - no IK or foot locking;
-  - no cross-rig retargeting (an animation-only FBX will not import; it needs a skinned export);
-  - limbs react to energy only on the procedural mannequin;
-  - the PNG export is capped at 120 frames, and there is no MP4.
 
 ## The guide bundle (contract with model-arena)
 
-`model-arena/packages/core` owns the JSON Schema. This repo's export tests validate against a pinned copy, re-synced whenever the schema version changes.
-
-The pinned copy is `schema/guide-bundle.schema.json` (version 0.1.0, written here from this table on 10 November 2026 while `model-arena` was being scaffolded). **To do:** re-sync it with `model-arena/packages/core` once that schema exists. The bundle also carries `bundle.json`, a manifest naming each file, and `meta.audioInVideo`.
+`model-arena/packages/core` owns the JSON Schema. This repo validates against a pinned copy, `schema/guide-bundle.schema.json` (version 0.1.0, written here from this table on 10 November 2026 while `model-arena` was being scaffolded). **To do:** re-sync it once that schema exists.
 
 | Field | Meaning |
 | --- | --- |
-| `video` | MP4, H.264, 24 fps, frame count 8k+1 |
-| `audio` | the track |
-| `firstFrame` | PNG of frame 0; optional `firstFrameStyled` |
-| `beats` | beat and downbeat times, BPM |
-| `recipe` | the recipe that produced it |
-| `meta` | width, height, fps, frames, character, generator, licence per asset |
+| `video` | MP4, H.264, 24 fps, frame count 8k+1; 1280×720 by default |
+| `audio` | the track, trimmed to the exported range |
+| `firstFrame` | PNG of frame 0 of the export; optional `firstFrameStyled` |
+| `beats` | beat and downbeat times and BPM, re-based so times count from the export's frame 0 |
+| `recipe` | the recipe that produced it (whole recipe, not trimmed) |
+| `meta` | width, height, fps, frames, view, character, generator, licence per asset, `audioInVideo` |
 
-## Status, 10 November 2026
+The bundle also carries `bundle.json`, a manifest naming each file. **Schema gap:** the schema has no field for the exported section of the recipe, so a mid-track range is written into the video asset's `name` ("Rendered guide, recipe frames 107-211 (4.458-8.833 s)"). Proposal for the next schema version: `meta.range { startFrame, startSeconds }`.
 
-Built on `feat/ms-core`: MS-0 scaffold, MS-1 core, MS-2 viewport and characters, MS-5 export, and the pure commands of MS-4 (no CLI or MCP yet). The seed kit's validator, engine, RMS/BPM analysis and Three.js loader were adapted into `packages/core` and `packages/studio`; its React surface and Genobi installer were not used. MS-3 is a simple beat strip for now.
+**Target model constraints** (700–4553 px per side, 24–60 fps, 3–30 s) sit in one small table in `packages/core/src/export-target.ts`. The sibling repo `model-arena` holds the full per-model spec database; re-sync the table with it.
+
+## State, 10 November 2026
+
+Branch `feat/ms-core`. Three levels of evidence:
+
+**Built and browser-verified** (`npm run smoke`: real headless Chrome, synthetic fixtures, ffprobe):
+- loading a WAV track; BPM and first-beat detection (112.1 BPM, 0.20 s on a 112 BPM click track);
+- placing library moves on beats from the palette; the five views render (screenshots);
+- export at the 1280×720 default; a mid-track range (beats 8–16 of 20): 105 frames, H.264 1280×720 at 24 fps, AAC muxed, `audio.wav` trimmed so its first click lands on the first beat of the re-based `beats.json`;
+- the inline size warning (832×480) and clip-length warning (under 3 s), neither blocking the export;
+- portrait framing (720×1280) keeps outstretched arms in frame (screenshot, checked by eye);
+- loading a generated skinned GLB with three embedded clips; Mixamo bone names recognised; clips sequenced on beats and exported;
+- the inline confirm on switching to the loaded character: *Keep* leaves the library moves, *Clear* removes them; no browser dialog appears.
+
+**Unit-test-only** (`npm test`, 46 tests):
+- recipe validation and round trip; engine determinism and phase timing on the beat grid; pose speed classes;
+- the edit commands `insertMove`, `swapMove`, `removeMove`, `setAmplitude`, `extendPhase`, `applyMotionCommand` (the UI calls them, but the smoke run drives only `insertMove`);
+- beat analysis on synthetic click tracks; bundle JSON against the pinned schema; WAV encoding;
+- export range resolution and 8k+1 snapping; target constraint warnings; move compatibility on a character switch.
+
+**Built, not verified by any automated run:** FBX loading; drag and drop; audio playback; editing a selected move (amplitude, fps, blend, expression, swap, remove); applying recipe JSON by hand; the block figure; the dark background; exporting at 1920×1080 or 720×1280; custom sizes above 1920×1080 (H.264 level 5.1 is tried, untested).
+
+**Gaps:**
+- Library moves do not drive a loaded rig: recipe poses need rest-pose retargeting onto the file's skeleton. A loaded character plays only its own embedded clips; the switch confirm offers to clear the library moves.
+- No IK and no foot locking: feet can slide or sink slightly during blends; the bounce pose is solved by hand so the feet stay put.
+- The `expression` field is validated, stored and exported, not rendered.
+- MS-3 is a simple beat strip; there is no phase-block timeline, speed curve or before/after comparison yet.
+- No CLI or MCP yet; the commands are a library.
+- The range is not previewed: playback runs over the whole recipe.
 
 ## Work packages
 
 Rules for every package:
 - one worktree, one branch `feat/ms-<n>-<slug>`, one PR;
 - commits by Koshi only, no attribution lines;
-- typecheck and tests green;
+- typecheck, lint, tests and the smoke run green;
 - a docs section;
 - a hand-back of at most ten lines.
 
-### MS-0, scaffold (Sun 8 Nov, half a day)
+### Done: MS-0 scaffold, MS-1 core, MS-2 viewport and characters, MS-5 export
 
-- Vite, TypeScript and vitest workspace with `packages/core` and `packages/studio`; lint; `npm test` and `npm run dev` scripts.
-- `docs/friction.md` and `docs/costs.md`, each an empty table.
-- A pinned copy of the guide-bundle schema.
-- Acceptance: `npm test` green; `npm run dev` shows an empty viewport.
+As specified on 7 November, with these changes:
+- MS-1: `phase.ts` folded into `recipe.ts`; `expression` added per phase.
+- MS-2: the procedural mannequin is the default guide figure: light limbs, dark slate joints, a plié bounce that reads from the front, framing that fits any aspect ratio.
+- MS-5: sizes 1280×720 (default), 1920×1080, 720×1280 and custom; export range; inline target warnings.
 
-### MS-1, core: recipe, phases, engine (Mon 9 Nov)
+### MS-4a, CLI `apply` (Wed 11 Nov)
 
-Files: `packages/core/src/recipe.ts`, `phase.ts`, `engine.ts`, `commands.ts`, plus tests.
-
-- **Recipe schema.**
-  - Moves are made of phases. Each phase has a name, a caption, an amplitude, a length (frames or beats) and a preview fps.
-  - The recipe also holds a root path (x, z, yaw), scheduled jumps, the beat grid reference and the character reference.
-- **Validator** taken from the kit, extended for phases.
-- **Engine.** `frameAt(recipe, n)` returns the pose for any frame, deterministically, with no wall clock.
-- **Pose speed per frame**, which drives the hold, fast or move typing.
-- **Tests:** schema round trip, determinism (two renders give identical pose arrays), phase timing against the beat grid.
-
-### MS-2, studio: viewport, characters, views (Mon 9 Nov)
-
-Files: `packages/studio/src/viewport.ts`, `characters/`, `views.ts`.
-
-- Characters: the procedural mannequin, a block figure, and a local GLB or FBX with a skeleton (Mixamo bone names mapped). Nothing is bundled.
-- Views: Side, Front, Top, Orbit, and isometric (orthographic, about 35° pitch, 45° yaw).
-- Acceptance: each character plays a kit move in every view.
-
-### MS-3, timeline UI (Tue 10 Nov)
-
-Files: `packages/studio/src/timeline/`.
-
-- **Phase blocks**, one per phase, coloured by type: hold, fast or move. Each phase's caption shows in the viewport while that phase plays.
-- **Beat and downbeat ticks** over the blocks.
-- **Pose-speed curve** under the blocks.
-- **Previous, new, both** after an edit: the previous take beside the new one, both speed curves overlaid, then accept or revert.
-- **Transport:** frame step, play and pause, 1×, 1/4 and 1/8 playback, previews at 12, 18, 30 and 60 fps, and a readout of frame and seconds.
-- **Reference:** Tariq's Kesar tool ([post](https://x.com/trq212/status/2105849295580889208)). Credit him in the docs; copy none of his assets.
-- **Acceptance:** dragging a block edge changes the phase length through the same command the agent uses.
-
-### MS-4, agent edit loop (Tue 10 Nov)
-
-Files: `packages/core/src/commands.ts`, `cli/`, and `mcp/` if time allows.
-
-- **Commands:**
-  - `insertMove {move, atBeat}`
-  - `extendPhase {phase, by}` and `shortenPhase`
-  - `holdAt {marker, frames}`
-  - `swapMove {from, to}`
-  - `setAmplitude {phase, value}`
-  - `setPhaseFps`
-- **CLI:** `motion-studio apply recipe.json commands.json --out recipe.next.json` and `motion-studio render recipe.json --out bundle/`.
-- **Tests:** each command alone; a three-command script run twice gives identical frames; invalid commands are refused with a clear message.
-
-### MS-5, export the guide bundle (Tue 10 Nov)
-
-Files: `packages/studio/src/export/`.
-
-- MP4 via WebCodecs plus an MIT-licensed muxer, at 24 fps with the frame count snapped to 8k+1. A frame-0 PNG. Beats, recipe and meta JSON.
-- The licence of every asset goes into the meta.
-- Acceptance: a 4 to 5 second mannequin bundle validates against the schema and loads in a `model-arena` record.
+Files: `cli/`, `packages/core/src/commands.ts`.
+- `motion-studio apply recipe.json commands.json --out recipe.next.json`, over `applyMotionCommand`.
+- Add `shortenPhase` (sugar for a negative `extendPhase`), `holdAt {moveId, phase, beats}` and `setPhaseFps`.
+- Tests: each new command alone; a three-command script run twice gives identical frames; invalid commands refused with a clear message.
 
 ### MS-6, providers interface (Wed 11 Nov, small)
 
 - The `MotionGenerator` interface takes a recipe, beat keyframes and a root path, and returns a clip.
 - The local time-stretch generator implements it.
 - Folders for `runware-serverless` and `runpod` with README stubs only.
+
+### MS-3, timeline (Thu 12 Nov)
+
+Files: `packages/studio/src/timeline/`.
+- Phase blocks coloured by speed class (hold, move, fast), beat and downbeat ticks over them, the active caption in the viewport.
+- Drag a block edge: the phase length changes through `extendPhase`, the same command the agent uses (acceptance).
+- The export range shown on the strip.
+- Reference: Tariq's Kesar tool ([post](https://x.com/trq212/status/2105849295580889208)). Credit him in the docs; copy none of his assets.
+
+### MS-4b, CLI `render` and schema re-sync (Fri 13 Nov)
+
+- `motion-studio render recipe.json --out bundle/ [--size 1280x720] [--start 8 --length 8 --unit beats]`, driving the studio in headless Chrome as the smoke run does.
+- Re-sync `schema/guide-bundle.schema.json` with `model-arena/packages/core`; propose `meta.range`.
+- The target constraint table re-synced with the `model-arena` spec database.
+
+### Final (Sat 14 Nov)
+
+- A 1280×720 mannequin bundle loads in a `model-arena` record.
+- README walkthrough tried from a clean clone by someone outside the project.
+
+### Cut line
+
+Everything above is the first milestone. **Below the line, not in the first milestone:**
+- MS-3 pose-speed curve, previous/new/both comparison with accept or revert, 1/4 and 1/8 playback;
+- MCP server over the commands;
+- range preview and looping in the player;
+- recipe poses driving a loaded rig (rest-pose retargeting); IK and foot locking;
+- MS-7 MotionBricks and MS-8 pose input (below), and the [Next](PRD.md#next-not-built) items in the PRD.
 
 ### MS-7, MotionBricks (spike first; build only on a yes)
 
@@ -159,9 +158,3 @@ Files: `packages/studio/src/export/`.
 - A claim about a third-party model or API is written only after its schema or docs show it.
 - No paid call without the owner's approval. Every real run is a row in `docs/costs.md`; every platform friction is a row in `docs/friction.md`.
 - Hand-back: branch, head SHA, what was verified by which command, what was not run, open questions.
-
-## Order and cut lines
-
-- **Order:** MS-0 → MS-1 → MS-2 → MS-4 → MS-5 is the core. MS-3 makes it watchable. MS-6 is small.
-- **MS-7 and MS-8** are next steps unless the spike lands early.
-- **Not reached by Tuesday night?** The `model-arena` floor uses an existing guide clip, and this repo continues as "next".
