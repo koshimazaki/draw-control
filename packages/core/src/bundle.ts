@@ -3,7 +3,7 @@
  * the WAV, so tests can check them against `schema/guide-bundle.schema.json`.
  * The schema is a pinned local copy, to be re-synced with `model-arena/packages/core`.
  */
-import { beatGridJson, snapFrames8k1, type BeatsJson } from "./beats";
+import { beatAtSeconds, beatGridJson, secondsAtBeat, snapFrames8k1, type BeatsJson } from "./beats";
 import { recipeSeconds, type Recipe } from "./recipe";
 
 export const BUNDLE_SCHEMA_VERSION = "0.1.0";
@@ -36,16 +36,44 @@ export function exportFrameCount(recipe: Recipe): number {
   return snapFrames8k1(recipeSeconds(recipe) * recipe.fps);
 }
 
-export function buildBeats(recipe: Recipe, frames: number): BeatsJson {
-  const seconds = frames / recipe.fps;
-  const count = Math.max(0, Math.floor((seconds - recipe.beatGrid.offsetSeconds) * recipe.beatGrid.bpm / 60 + 1e-9) + 1);
-  return beatGridJson(recipe.beatGrid, count);
+/**
+ * Beats inside an exported clip of `frames` frames starting at recipe frame `startFrame`,
+ * re-based so times count from the clip's frame 0. `offsetSeconds` becomes the time of
+ * the first beat inside the clip; downbeats keep their place in the bar.
+ */
+export function buildBeats(recipe: Recipe, frames: number, startFrame = 0): BeatsJson {
+  const g = recipe.beatGrid;
+  if (startFrame === 0) {
+    const count = Math.max(0, Math.floor((frames / recipe.fps - g.offsetSeconds) * g.bpm / 60 + 1e-9) + 1);
+    return beatGridJson(g, count);
+  }
+  const from = startFrame / recipe.fps, to = (startFrame + frames) / recipe.fps;
+  const first = Math.max(0, Math.ceil(beatAtSeconds(g, from) - 1e-9));
+  const beats: number[] = [], downbeats: number[] = [];
+  for (let i = first; secondsAtBeat(g, i) <= to + 1e-9; i++) {
+    const t = Math.round((secondsAtBeat(g, i) - from) * 10000) / 10000;
+    beats.push(t);
+    if (i % g.beatsPerBar === 0) downbeats.push(t);
+  }
+  return { bpm: g.bpm, offsetSeconds: beats[0] ?? 0, beatsPerBar: g.beatsPerBar, source: g.source, beats, downbeats };
 }
 
-export function buildMeta(recipe: Recipe, opts: { width: number; height: number; frames: number; view: string; audioInVideo: boolean; hasAudio: boolean }): BundleMeta {
+/**
+ * The pinned schema has no field for the exported section yet, so a mid-recipe range is
+ * recorded in the video asset's name (proposed for the next schema version: `meta.range`).
+ */
+export function videoAssetName(recipe: Recipe, startFrame: number, frames: number): string {
+  if (startFrame === 0) return "Rendered guide";
+  const s = (f: number) => (f / recipe.fps).toFixed(3);
+  return `Rendered guide, recipe frames ${startFrame}-${startFrame + frames - 1} (${s(startFrame)}-${s(startFrame + frames)} s)`;
+}
+
+export function buildMeta(recipe: Recipe, opts: {
+  width: number; height: number; frames: number; view: string; audioInVideo: boolean; hasAudio: boolean; startFrame?: number;
+}): BundleMeta {
   const own = "MIT (motion-studio)";
   const assets: AssetLicence[] = [
-    { role: "video", name: "Rendered guide", licence: own, file: BUNDLE_FILES.video },
+    { role: "video", name: videoAssetName(recipe, opts.startFrame ?? 0, opts.frames), licence: own, file: BUNDLE_FILES.video },
     { role: "firstFrame", name: "Frame 0", licence: own, file: BUNDLE_FILES.firstFrame },
     { role: "character", name: recipe.character.name, licence: recipe.character.licence },
     { role: "motion", name: "Move library and engine", licence: own },

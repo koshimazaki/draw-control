@@ -1,8 +1,10 @@
 /** Static page layout. Behaviour lives in app.ts; elements are looked up by id. */
-import { EXPRESSIONS, MOVE_KEYS, MOVE_LIBRARY, PREVIEW_FPS } from "@motion-studio/core";
+import { DEFAULT_EXPORT_SIZE, EXPORT_SIZES, EXPRESSIONS, MOVE_KEYS, MOVE_LIBRARY, PREVIEW_FPS } from "@motion-studio/core";
 import { VIEWS, VIEW_LABELS } from "./views";
 
-export const RESOLUTIONS = ["832x480", "480x832", "1280x720", "720x1280", "768x768"] as const;
+const sizeKey = (s: { width: number; height: number }) => `${s.width}x${s.height}`;
+const SIZE_OPTIONS = EXPORT_SIZES.map(s => `<option value="${sizeKey(s)}"${s === DEFAULT_EXPORT_SIZE ? " selected" : ""}>${s.label}</option>`).join("")
+  + `<option value="custom">Custom…</option>`;
 
 const options = (values: readonly (string | number)[], selected?: string | number) =>
   values.map(v => `<option value="${v}"${v === selected ? " selected" : ""}>${v}</option>`).join("");
@@ -41,6 +43,10 @@ export const LAYOUT = `
       <label class="check"><input id="plainMaterial" type="checkbox" checked /> Plain light material on loaded files</label>
       <label>Character licence <input id="characterLicence" type="text" maxlength="120" value="unspecified" /></label>
       <p id="characterStatus" class="muted"></p>
+      <div id="switchConfirm" class="confirm" role="alert" hidden>
+        <p id="switchConfirmText"></p>
+        <div class="row"><button id="switchClear" type="button" class="primary">Clear them</button><button id="switchKeep" type="button">Keep them</button></div>
+      </div>
     </section>
     <section>
       <h2>Moves</h2>
@@ -71,7 +77,18 @@ export const LAYOUT = `
     </section>
     <section>
       <h2>Export guide</h2>
-      <label>Size <select id="resolution">${options(RESOLUTIONS, "832x480")}</select></label>
+      <label>Size <select id="resolution">${SIZE_OPTIONS}</select></label>
+      <div id="customSize" class="grid3" hidden>
+        <label>Width <input id="customW" type="number" min="16" max="8192" step="2" value="${DEFAULT_EXPORT_SIZE.width}" /></label>
+        <label>Height <input id="customH" type="number" min="16" max="8192" step="2" value="${DEFAULT_EXPORT_SIZE.height}" /></label>
+      </div>
+      <div class="grid3">
+        <label>Range in <select id="rangeUnit"><option value="beats">beats</option><option value="seconds">seconds</option></select></label>
+        <label>Start <input id="rangeStart" type="number" min="0" step="1" placeholder="0" /></label>
+        <label>Length <input id="rangeLength" type="number" min="0" step="1" placeholder="to end" /></label>
+      </div>
+      <p id="rangeInfo" class="mono"></p>
+      <p id="exportWarning" class="warn" hidden></p>
       <button id="export" type="button" class="primary">Export bundle (.zip)</button>
       <progress id="exportProgress" max="1" value="0" hidden></progress>
       <p id="exportStatus" class="muted"></p>

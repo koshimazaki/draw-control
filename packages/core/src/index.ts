@@ -5,3 +5,4 @@ export * from "./beats";
 export * from "./engine";
 export * from "./commands";
 export * from "./bundle";
+export * from "./export-target";

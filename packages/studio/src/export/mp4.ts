@@ -6,7 +6,8 @@
  */
 import { ArrayBufferTarget, Muxer } from "mp4-muxer";
 
-const AVC_CODECS = ["avc1.640028", "avc1.4d0028", "avc1.42002a", "avc1.42001f"];
+/** Level 4.0 covers up to 1920×1080; level 5.1 is tried for larger custom sizes. */
+const AVC_CODECS = ["avc1.640028", "avc1.4d0028", "avc1.42002a", "avc1.42001f", "avc1.640033", "avc1.4d0033"];
 
 export async function pickVideoConfig(width: number, height: number, fps: number): Promise<VideoEncoderConfig> {
   if (typeof VideoEncoder === "undefined") throw new Error("This browser has no WebCodecs VideoEncoder. Use a current Chrome or Edge.");
@@ -33,7 +34,8 @@ export type Mp4Writer = {
 
 export async function createMp4Writer(opts: {
   width: number; height: number; fps: number;
-  audio?: { channels: Float32Array[]; sampleRate: number; seconds: number };
+  /** `startSeconds` into the decoded track, `seconds` long: trimmed to the exported range. */
+  audio?: { channels: Float32Array[]; sampleRate: number; startSeconds: number; seconds: number };
 }): Promise<Mp4Writer> {
   const videoConfig = await pickVideoConfig(opts.width, opts.height, opts.fps);
   const channelCount = Math.min(2, opts.audio?.channels.length ?? 0);
@@ -74,19 +76,20 @@ export async function createMp4Writer(opts: {
   };
 }
 
-async function encodeAudio(audio: { channels: Float32Array[]; sampleRate: number; seconds: number },
+async function encodeAudio(audio: { channels: Float32Array[]; sampleRate: number; startSeconds: number; seconds: number },
   channelCount: number, config: AudioEncoderConfig, muxer: Muxer<ArrayBufferTarget>) {
   let failure: unknown = null;
   const encoder = new AudioEncoder({ output: (chunk, meta) => muxer.addAudioChunk(chunk, meta), error: e => { failure = e; } });
   encoder.configure(config);
   const total = Math.round(audio.seconds * audio.sampleRate);
+  const from = Math.round(audio.startSeconds * audio.sampleRate);
   const block = audio.sampleRate; // one second per AudioData
   for (let start = 0; start < total; start += block) {
     const n = Math.min(block, total - start);
     const planar = new Float32Array(n * channelCount);
     for (let c = 0; c < channelCount; c++) {
       const src = audio.channels[c];
-      for (let i = 0; i < n; i++) planar[c * n + i] = src[start + i] ?? 0;
+      for (let i = 0; i < n; i++) planar[c * n + i] = src[from + start + i] ?? 0;
     }
     const data = new AudioData({ format: "f32-planar", sampleRate: audio.sampleRate, numberOfFrames: n, numberOfChannels: channelCount,
       timestamp: Math.round(start / audio.sampleRate * 1_000_000), data: planar });

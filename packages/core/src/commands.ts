@@ -72,6 +72,21 @@ export function extendPhase(recipe: Recipe, args: { moveId: string; phase: numbe
   return validateRecipe(next);
 }
 
+/**
+ * Moves that have no effect on a character kind: library moves on a loaded file (its
+ * rig is not driven by recipe poses, so they show the rest pose), and clip moves on the
+ * procedural figures (they have no embedded clips).
+ */
+export function incompatibleMoves(recipe: Recipe, kind: Recipe["character"]["kind"]): Move[] {
+  return recipe.moves.filter(m => (kind === "file" ? !m.clip : !!m.clip));
+}
+
+/** Remove the moves `incompatibleMoves` lists. The result is a valid recipe, possibly with no moves. */
+export function clearIncompatibleMoves(recipe: Recipe, kind: Recipe["character"]["kind"]): Recipe {
+  const drop = new Set(incompatibleMoves(recipe, kind).map(m => m.id));
+  return validateRecipe({ ...clone(recipe), moves: recipe.moves.filter(m => !drop.has(m.id)).map(clone) });
+}
+
 export type MotionCommand =
   | { type: "insertMove"; move: MoveKey; atBeat: number }
   | { type: "swapMove"; moveId: string; to: MoveKey }

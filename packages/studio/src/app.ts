@@ -3,8 +3,9 @@
  * (or the validator), and keeps the preview, beat strip and JSON panel in sync.
  */
 import {
-  DEFAULT_RECIPE, clipCycleBeatsFor, exportFrameCount, frameAt, insertMove, makeClipMove, moveBeats,
-  removeMove, setAmplitude, swapMove, validateRecipe, type Expression, type MoveKey, type PreviewFps, type Recipe,
+  DEFAULT_RECIPE, clearIncompatibleMoves, clipCycleBeatsFor, exportFrameCount, frameAt, incompatibleMoves, insertMove,
+  makeClipMove, moveBeats, removeMove, setAmplitude, swapMove, validateRecipe,
+  type CharacterKind, type Expression, type MoveKey, type PreviewFps, type Recipe,
 } from "@motion-studio/core";
 import { createProceduralCharacter } from "./characters/rig";
 import { loadFileCharacter } from "./characters/file-character";
@@ -12,6 +13,7 @@ import type { Character } from "./characters/types";
 import { Player, loadTrack, type Track } from "./audio";
 import { beatFromStripX, drawBeatStrip } from "./beat-strip";
 import { exportBundle } from "./export/bundle";
+import { currentRange, exportSize, updateExportPanel } from "./export/panel";
 import { $, LAYOUT } from "./ui";
 import { Viewport, type Background } from "./viewport";
 import type { View } from "./views";
@@ -27,6 +29,8 @@ export function startApp(root: HTMLElement) {
   let frame = 0;
   let selectedId: string | null = null;
   let exporting = false;
+  /** Character kind the inline "clear incompatible moves?" question is about. */
+  let pendingClear: CharacterKind | null = null;
 
   const input = (id: string) => $<HTMLInputElement>(id);
   const say = (id: string, text: string) => { $(id).textContent = text; };
@@ -64,6 +68,7 @@ export function startApp(root: HTMLElement) {
     const isFile = recipe.character.kind === "file";
     $("palette").hidden = isFile;
     $("clipPalette").hidden = !isFile;
+    updateExportPanel(recipe);
   }
 
   function render() {
@@ -105,7 +110,27 @@ export function startApp(root: HTMLElement) {
     const licence = kind === "file" ? (input("characterLicence").value.trim() || "unspecified") : "MIT (motion-studio)";
     edit(r => validateRecipe({ ...r, character: { kind, name, licence } }));
     $<HTMLSelectElement>("character").value = kind;
+    askToClear(kind);
   }
+
+  /** After a switch, offer to clear moves the new character cannot play. Nothing is cleared without a yes. */
+  function askToClear(kind: CharacterKind) {
+    const bad = incompatibleMoves(recipe, kind);
+    pendingClear = bad.length ? kind : null;
+    $("switchConfirm").hidden = !bad.length;
+    if (!bad.length) return;
+    const list = bad.slice(0, 4).map(m => `${m.name} @ ${m.atBeat}`).join(", ") + (bad.length > 4 ? "…" : "");
+    say("switchConfirmText", kind === "file"
+      ? `${bad.length} library move(s) (${list}) do not drive a loaded character: it shows its rest pose during them. Clear them from the recipe?`
+      : `${bad.length} clip move(s) (${list}) need the loaded file: this figure stands at rest during them. Clear them from the recipe?`);
+  }
+  $("switchClear").onclick = () => {
+    const kind = pendingClear;
+    if (kind && kind === recipe.character.kind) edit(r => clearIncompatibleMoves(r, kind));
+    pendingClear = null;
+    $("switchConfirm").hidden = true;
+  };
+  $("switchKeep").onclick = () => { pendingClear = null; $("switchConfirm").hidden = true; };
 
   function renderClipPalette() {
     const pal = $("clipPalette");
@@ -227,11 +252,14 @@ export function startApp(root: HTMLElement) {
   $<HTMLSelectElement>("background").onchange = () => viewport.setBackground($<HTMLSelectElement>("background").value as Background);
   input("grid").onchange = () => viewport.setGrid(input("grid").checked);
   const applyResolution = () => {
-    const [w, h] = $<HTMLSelectElement>("resolution").value.split("x").map(Number);
+    const { width: w, height: h } = exportSize();
     $("viewport").style.aspectRatio = `${w} / ${h}`;
     $("viewport").style.setProperty("--ar", String(w / h));
+    updateExportPanel(recipe);
   };
   $<HTMLSelectElement>("resolution").onchange = applyResolution;
+  for (const id of ["customW", "customH"]) input(id).onchange = applyResolution;
+  for (const id of ["rangeUnit", "rangeStart", "rangeLength"]) $<HTMLInputElement>(id).oninput = () => updateExportPanel(recipe);
 
   // Transport
   $("play").onclick = () => setPlaying(!player.playing);
@@ -262,15 +290,17 @@ export function startApp(root: HTMLElement) {
     if (exporting) return;
     exporting = true;
     setPlaying(false);
-    const [width, height] = $<HTMLSelectElement>("resolution").value.split("x").map(Number);
+    const { width, height } = exportSize();
+    const range = currentRange(recipe);
+    if (range instanceof Error) { say("exportStatus", `Export range: ${range.message}`); exporting = false; return; }
     const bar = $<HTMLProgressElement>("exportProgress");
     bar.hidden = false;
     say("exportStatus", "Rendering frame by frame…");
     try {
-      const result = await exportBundle({ recipe, viewport, width, height, audio: track?.buffer ?? null,
+      const result = await exportBundle({ recipe, range, viewport, width, height, audio: track?.buffer ?? null,
         onProgress: (d, t) => { bar.value = d / t; } });
       download(result.zip, "guide-bundle.zip");
-      say("exportStatus", `Exported ${result.frames} frames (${(result.frames / recipe.fps).toFixed(2)} s, ${result.codec}), ` +
+      say("exportStatus", `Exported ${result.frames} frames from frame ${range.startFrame} (${(result.frames / recipe.fps).toFixed(2)} s, ${result.codec}), ` +
         `${(result.zip.length / 1e6).toFixed(1)} MB zip. Audio ${track ? (result.audioInVideo ? "muxed into the MP4 and" : "not muxed (no AAC encoder);") + " saved as audio.wav" : "none"}.`);
     } catch (e) { say("exportStatus", `Export failed: ${(e as Error).message}`); }
     finally { exporting = false; bar.hidden = true; render(); }
