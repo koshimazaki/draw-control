@@ -1,0 +1,72 @@
+import { describe, expect, it } from "vitest";
+import {
+  DEFAULT_CAMERA, DEFAULT_RECIPE, RIGGED_CHARACTER, applyMotionCommand, applyScript, beatAtSeconds, printScript, validateRecipe,
+  type BandAnalysis, type Recipe,
+} from "../src";
+
+// 120 BPM from 0 s: kicks on every beat, snares on 1, 3, 5, … (beat b = b / 2 s).
+const beats = (list: number[]) => list.map(b => ({ seconds: b / 2, strength: 1 }));
+const bands: BandAnalysis = { hopSeconds: 0.01, low: beats(Array.from({ length: 16 }, (_, i) => i)), mid: beats([1, 3, 5, 7, 9, 11, 13, 15]), high: [], peaks: [] };
+const base = (): Recipe => {
+  const r = validateRecipe({
+    ...structuredClone(DEFAULT_RECIPE), durationBeats: 16, moves: [],
+    character: { kind: "rigged", name: RIGGED_CHARACTER.name, licence: RIGGED_CHARACTER.licence },
+    camera: { ...DEFAULT_CAMERA, segments: [{ fromBeat: 0, toBeat: 16, modes: ["orbit"] }] },
+  });
+  return applyMotionCommand(r, { type: "setRootPath", points: [{ x: 0, z: 0 }, { x: 3, z: -2 }, { x: 6, z: -6 }], fromBeat: 0, toBeat: 8 });
+};
+
+/** The owner's spoken direction, as a script (there is no fall move: beats 10-12 rest under a top shot). */
+const SPOKEN = `
+# camera follows; the character jumps and the camera moves around it; it falls and the camera goes to the top; then it follows behind
+beats 0-8   | action: run on path lock kick 0.5 | camera: chase     | shot: wide
+beats 8-10  | action: jump @kick 2             | camera: orbit 360 | shot: medium
+beats 10-12 | action: rest                     | camera: top       | shot: wide
+beats 12-16 | action: run                      | camera: chase     | shot: close
+`;
+
+describe("shot script", () => {
+  const r = applyScript(base(), { script: SPOKEN }, { bands });
+  it("builds the Action and Camera tracks from the rows", () => {
+    expect(r.moves.map(m => [m.clip, m.atBeat, m.lengthBeats])).toEqual([["Jog_Fwd_Loop", 0, 8], ["Jog_Fwd_Loop", 12, 4]]);
+    expect(r.moves[0].lock).toBe("kick");
+    expect(r.travelLock).toEqual({ lock: "kick", strength: 0.5 });
+    expect(r.rootPath.at(-1)!.beat).toBe(8);
+    expect(r.reactive!.markers!.map(m => [m.accent, beatAtSeconds(r.beatGrid, m.seconds)])).toEqual([["jump", 9]]);
+    expect(r.camera!.segments).toEqual([
+      { fromBeat: 0, toBeat: 8, modes: ["chase"], shot: "wide" }, { fromBeat: 8, toBeat: 10, modes: ["orbit"], amount: 360, shot: "medium" },
+      { fromBeat: 10, toBeat: 12, modes: ["top"], shot: "wide" }, { fromBeat: 12, toBeat: 16, modes: ["chase"], shot: "close" },
+    ]);
+  });
+  it("round trip: script → recipe → script is stable", () => {
+    const once = printScript(r, bands);
+    expect(once.split("\n")[1]).toMatch(/^beats 8-10 +\| action: jump @kick 2 +\| camera: orbit 360 +\| shot: medium$/);
+    const again = applyScript(r, { script: once }, { bands });
+    expect(printScript(again, bands)).toBe(once);
+    expect(again).toEqual(r);
+  });
+  it("continue rows keep one block over several rows; amounts, locks and anchors read back", () => {
+    const s = applyScript(base(), { script: [
+      "beats 0-4 | action: walk | camera: dolly in 2m lock snare 0.8 punch 0.5m | shot: close cut",
+      "beats 4-6 | action: continue, spin @snare 1 | camera: truck left 1.5m",
+      "beats 6-8 | action: idle lock beat | camera: rise 0.3m to 2m + chase",
+      "beats 8-16 | action: glide on path | camera: jib down 1m",
+    ].join("\n") }, { bands });
+    expect(s.moves.map(m => [m.clip, m.atBeat, m.lengthBeats])).toEqual([["Walk_Loop", 0, 6], ["Idle_Loop", 6, 2]]);
+    expect(s.camera!.segments[0]).toMatchObject({ modes: ["pushIn"], amount: 2, lock: "snare", strength: 0.8, onHit: "punch", punch: 0.5, shot: "close", cut: true });
+    expect(s.camera!.segments[1]).toMatchObject({ modes: ["truck"], amount: -1.5 });
+    expect(s.camera!.segments[2]).toMatchObject({ modes: ["rise", "chase"], from: 0.3, to: 2 });
+    expect(s.camera!.segments[3]).toMatchObject({ modes: ["rise"], amount: -1 });
+    const text = printScript(s, bands);
+    expect(text).toContain("action: continue, spin @kick 2");   // the snare on beat 5 is also a kick: kicks name it first
+    expect(text).toContain("action: glide on path");
+    expect(printScript(applyScript(s, { script: text }, { bands }), bands)).toBe(text);
+  });
+  it("unknown words fail with the valid ones; there is no fall move", () => {
+    expect(() => applyScript(base(), { script: "beats 0-4 | action: fall" })).toThrow(/unknown action "fall".*walk, run/);
+    expect(() => applyScript(base(), { script: "beats 0-4 | action: run | camera: swoop" })).toThrow(/unknown camera move "swoop".*orbit/);
+    expect(() => applyScript(base(), { script: "beats 0-4 | action: run | camera: orbit | shot: extreme" })).toThrow(/wide, medium, close, low, top/);
+    expect(() => applyScript(base(), { script: "beats 0-2 | action: jump @kick 5" }, { bands })).toThrow(/have 2 kicks/);
+    expect(() => applyScript(base(), { script: "beats 0-2 | action: jump @kick 1" })).toThrow(/analyse a track first/);
+  });
+});

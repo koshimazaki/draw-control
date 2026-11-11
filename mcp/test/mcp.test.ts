@@ -1,4 +1,4 @@
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -47,6 +47,21 @@ describe("motion-studio MCP server", () => {
     expect(session.recipe.camera!.distance).toBe(6);
     expect((await call("undo")).text).toBe("Undone.");
     expect(session.recipe.camera!.distance).toBe(4.4);
+  });
+  it("shot script over MCP: apply_script and get_script", async () => {
+    const { call, session } = await connect();
+    await call("analyse_audio", { path: wav });
+    await call("new_recipe");
+    await call("apply", { commands: [{ type: "setRootPath", points: [{ x: 0, z: 0 }, { x: 2, z: -3 }, { x: 5, z: -5 }, { x: 8, z: -5 }], fromBeat: 0, toBeat: 8 }] });
+    const script = readFileSync(new URL("../../examples/scripts/follow-jump-top.txt", import.meta.url), "utf8");
+    const r = await call("apply_script", { script });
+    expect(r.error).toBe(false);
+    expect(r.text).toMatch(/beats 8-10 +\| action: jump @snare 1 +\| camera: orbit 360/);
+    expect(session.recipe.camera!.segments[1]).toMatchObject({ modes: ["orbit"], amount: 360, shot: "medium" });
+    expect((await call("get_script")).text).toBe(r.text);
+    const bad = await call("apply_script", { script: "beats 0-4 | camera: swoop" });
+    expect(bad.error).toBe(true);
+    expect(bad.text).toMatch(/unknown camera move "swoop"/);
   });
   it("reports a refused command as a tool error and keeps the recipe", async () => {
     const { call, session } = await connect();

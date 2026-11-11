@@ -3,13 +3,13 @@
  * holds one working recipe and, optionally, one track analysis; every edit goes through
  * the same `applyMotionCommand` the studio UI and the CLI use, and can be undone.
  * Tools: analyse_audio, load_analysis, new_recipe, load_recipe, save_recipe, get_recipe,
- * describe, list_commands, apply, set, undo, render.
+ * describe, get_script, apply_script, list_commands, apply, set, undo, render.
  * Files are read and written on this machine only.
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { applyCommands, commandHelp, describeRecipe, validateRecipe, type CommandContext, type MotionCommand, type Recipe } from "../../packages/core/src/index.ts";
+import { applyCommands, commandHelp, describeRecipe, printScript, validateRecipe, type CommandContext, type MotionCommand, type Recipe } from "../../packages/core/src/index.ts";
 import { analyse, driveFrom, parseAnalysis, type AnalysisJson } from "../../cli/src/analysis.ts";
 import { decodeAudioFile } from "../../cli/src/audio-file.ts";
 import { newRecipe } from "../../cli/src/main.ts";
@@ -61,6 +61,12 @@ export function createServer(session = new Session()): McpServer {
     guard(({ path }: { path: string }) => { writeFileSync(path, JSON.stringify(session.recipe, null, 2) + "\n"); return text(`Wrote ${path}.`); }));
   server.registerTool("get_recipe", { description: "The working recipe as JSON." }, guard(() => text(JSON.stringify(session.recipe, null, 2))));
   server.registerTool("describe", { description: "The timeline as text: moves (blocks), markers, camera, walk path, envelope, onsets in beats." }, guard(() => text(session.describe())));
+  server.registerTool("get_script", { description: "The working recipe as a shot script: one row per block, \"beats 0-8 | action: run on path | camera: chase | shot: wide\"." },
+    guard(() => text(printScript(session.recipe, session.analysis?.bands))));
+  server.registerTool("apply_script", {
+    description: "Replace the Action and Camera tracks from a shot script (the grammar get_script prints; see docs/recipe.md#shot-script). Unknown words fail with the valid ones. Returns the script as it now reads.",
+    inputSchema: { script: z.string().min(1).max(100_000) },
+  }, guard(({ script }: { script: string }) => { session.apply([{ type: "applyScript", script }]); return text(printScript(session.recipe, session.analysis?.bands)); }));
   server.registerTool("list_commands", { description: "Every edit command with its arguments." },
     guard(() => text(Object.entries(help).map(([k, v]) => `${k}: ${v}`).join("\n"))));
   server.registerTool("apply", {

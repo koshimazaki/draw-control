@@ -36,3 +36,5 @@ export * from "./lock";
 export { rootAt, travelRange, travelStations } from "./root-travel";
 export * from "./camera-shots";
 export * from "./camera-block-edits";
+export * from "./shot-script";
+export { applyScript, parseRows } from "./script-apply";

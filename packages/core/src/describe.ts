@@ -10,6 +10,7 @@ import { exportFrameCount } from "./bundle";
 import { moveEndBeat } from "./engine";
 import { envelopeValues } from "./envelope";
 import { recipeSeconds, type Recipe } from "./recipe";
+import { cameraWords } from "./shot-script";
 
 const f2 = (x: number) => (Math.round(x * 100) / 100).toString();
 const list = (xs: number[], max = 16) => xs.slice(0, max).map(f2).join(", ") + (xs.length > max ? `, … (${xs.length} in all)` : "");
@@ -25,7 +26,7 @@ export function describeRecipe(r: Recipe, bands?: BandAnalysis): string {
     const end = moveEndBeat(r, i);
     if (m.atBeat > cursor + 1e-6) out.push(`  - rest ${f2(cursor)}–${f2(m.atBeat)}`);
     const amp = m.phases[0]?.amplitude ?? 1;
-    out.push(`  ${i + 1}. id ${m.id}: ${m.clip ?? m.name} ${f2(m.atBeat)}–${f2(end)} (${f2(end - m.atBeat)} beats${m.lengthBeats !== undefined ? ", own length" : ", until the next"}), speed ×${f2(m.speed ?? 1)}, amplitude ${f2(amp)}, blend ${f2(m.blendBeats)} beats${m.phases.length > 1 ? `, phases ${m.phases.map(p => `${p.name}:${p.pose}`).join(" ")}` : ""}`);
+    out.push(`  ${i + 1}. id ${m.id}: ${m.clip ?? m.name} ${f2(m.atBeat)}–${f2(end)} (${f2(end - m.atBeat)} beats${m.lengthBeats !== undefined ? ", own length" : ", until the next"}), speed ×${f2(m.speed ?? 1)}, amplitude ${f2(amp)}, blend ${f2(m.blendBeats)} beats${m.lock ? `, lock ${m.lock} ${m.strength ?? 1}` : ""}${m.phases.length > 1 ? `, phases ${m.phases.map(p => `${p.name}:${p.pose}`).join(" ")}` : ""}`);
     cursor = end;
   });
   if (cursor < r.durationBeats - 1e-6 && r.moves.length) out.push(`  - rest ${f2(cursor)}–${r.durationBeats}`);
@@ -44,14 +45,20 @@ export function describeRecipe(r: Recipe, bands?: BandAnalysis): string {
   const c = r.camera;
   if (c) {
     out.push(`Camera rig: distance ${c.distance} m, height ${c.height} m, fov ${c.fov}°, intensity ${c.intensity}, orbit ${c.orbitDegreesPerBeat}°/beat, start yaw ${c.startYaw}°.`);
-    out.push(`  ranges: ${c.segments.map(s => `${s.modes.join("+")} ${f2(s.fromBeat)}–${f2(s.toBeat)}`).join("; ")}${c.path ? `; drawn path ${c.path.length} points` : ""}.`);
+    const extra = (s: (typeof c.segments)[number]) => {
+      const bits = [s.amount !== undefined || s.to !== undefined || s.from !== undefined || s.lock ? cameraWords(s) : "", s.shot ? `shot ${s.shot}${s.cut ? " cut" : ""}` : ""].filter(Boolean);
+      return bits.length ? ` (${bits.join(", ")})` : "";
+    };
+    out.push(`  ranges: ${c.segments.map(s => `${s.modes.join("+")} ${f2(s.fromBeat)}–${f2(s.toBeat)}${extra(s)}`).join("; ")}${c.path ? `; drawn path ${c.path.length} points` : ""}.`);
   } else out.push("Camera rig: off (fixed views only).");
   const p = r.rootPath;
   if (p.length > 1) {
     let len = 0;
     for (let i = 1; i < p.length; i++) len += Math.hypot(p[i].x - p[i - 1].x, p[i].z - p[i - 1].z);
     const moving = p.filter((q, i) => i === 0 || q.x !== p[i - 1].x || q.z !== p[i - 1].z);
-    out.push(`Walk path: ${p.length} points, travels beats ${f2(moving[1]?.beat ?? p[0].beat)}–${f2(p[p.length - 1].beat)}, ${f2(len)} m from (${f2(p[0].x)}, ${f2(p[0].z)}) to (${f2(p[p.length - 1].x)}, ${f2(p[p.length - 1].z)}).`);
+    const lock = r.travelLock ? `, travel locked to ${r.travelLock.lock} at strength ${r.travelLock.strength ?? 1}` : "";
+    const high = Math.max(...p.map(q => q.y ?? 0));
+    out.push(`Walk path${high > 0 ? ` (rises to ${f2(high)} m)` : ""}${lock}: ${p.length} points, travels beats ${f2(moving[1]?.beat ?? p[0].beat)}–${f2(p[p.length - 1].beat)}, ${f2(len)} m from (${f2(p[0].x)}, ${f2(p[0].z)}) to (${f2(p[p.length - 1].x)}, ${f2(p[p.length - 1].z)}).`);
   } else out.push(`Walk path: stands at (${f2(p[0].x)}, ${f2(p[0].z)}), facing ${p[0].yaw}°.`);
   if (r.jumps.length) out.push(`Scheduled jumps: ${r.jumps.map(j => `${f2(j.atBeat)} (${j.height} m)`).join(", ")}.`);
   if (bands) {

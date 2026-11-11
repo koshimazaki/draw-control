@@ -1,0 +1,7 @@
+# "Camera follows; the character jumps and the camera moves around it; it falls and the
+# camera goes to the top; then it follows behind."  There is no fall move in the library,
+# so beats 10-12 rest under the overhead shot.
+beats 0-8   | action: run on path lock kick 0.5 | camera: chase     | shot: wide
+beats 8-10  | action: jump @snare 1            | camera: orbit 360 | shot: medium
+beats 10-12 | action: rest                     | camera: top       | shot: wide
+beats 12-16 | action: run                      | camera: chase     | shot: close

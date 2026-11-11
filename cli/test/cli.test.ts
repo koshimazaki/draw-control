@@ -55,6 +55,21 @@ describe("motion-studio CLI", () => {
     const r2 = JSON.parse(readFileSync(again, "utf8")) as Recipe;
     expect([0, 40, 97, 180].map(n => frameAt(r2, n))).toEqual([0, 40, 97, 180].map(n => frameAt(recipe, n)));
   });
+  it("shot script: the spoken direction as a script, applied by the CLI and read back (docs/agents.md)", async () => {
+    const a = join(dir, "analysis.json"), r0 = join(dir, "recipe.json"), path = join(dir, "path.json"), rp = join(dir, "recipe.path.json"), rs = join(dir, "recipe.shot.json");
+    const script = new URL("../../examples/scripts/follow-jump-top.txt", import.meta.url).pathname;
+    writeFileSync(path, JSON.stringify([{ type: "setRootPath", points: [{ x: 0, z: 0 }, { x: 2, z: -3 }, { x: 5, z: -5 }, { x: 8, z: -5 }], fromBeat: 0, toBeat: 8 }]));
+    expect((await run("apply", r0, path, "--out", rp)).code).toBe(0);
+    const s = await run("script", rp, script, "--analysis", a, "--out", rs);
+    expect(s.err).toBe("");
+    const d = await run("describe", rs, "--analysis", a, "--script");
+    expect(d.out.split("\n")[0]).toMatch(/^beats 0-8 +\| action: run on path lock kick 0\.5 \| camera: chase +\| shot: wide$/);
+    expect(d.out).toMatch(/beats 8-10 +\| action: jump @snare 1 +\| camera: orbit 360 +\| shot: medium/);
+    const bad = await run("script", rp, join(dir, "nope.txt"));
+    expect(bad.code).toBe(1);
+    writeFileSync(join(dir, "fall.txt"), "beats 0-4 | action: fall\n");
+    expect((await run("script", rp, join(dir, "fall.txt"))).err).toMatch(/unknown action "fall"/);
+  });
   it("set by path, with readable errors", async () => {
     const r0 = join(dir, "recipe.json");
     const s = await run("set", r0, "moves[1].speed", "2");

@@ -36,9 +36,10 @@ export function setCamera(recipe: Recipe, args: Partial<Pick<CameraConfig, "dist
 
 /**
  * Put camera modes on a beat range, cutting the ranges it overlaps (the parts outside it
- * stay). Without a range it covers the whole recipe.
+ * stay). Without a range it covers the whole recipe. `fields` gives the new range its shot,
+ * amount and lock (camera.ts).
  */
-export function setCameraModes(recipe: Recipe, args: { modes: CameraMode[] | CameraMode; fromBeat?: number; toBeat?: number }): Recipe {
+export function setCameraModes(recipe: Recipe, args: { modes: CameraMode[] | CameraMode; fromBeat?: number; toBeat?: number; fields?: Omit<Partial<CameraSegment>, "fromBeat" | "toBeat" | "modes"> }): Recipe {
   const modes = checkModes(args.modes);
   const from = r3(Math.max(0, args.fromBeat ?? 0)), to = r3(Math.min(recipe.durationBeats, args.toBeat ?? recipe.durationBeats));
   if (!(to > from)) throw new RecipeError("setCameraModes: toBeat must be after fromBeat");
@@ -49,13 +50,13 @@ export function setCameraModes(recipe: Recipe, args: { modes: CameraMode[] | Cam
     if (s.fromBeat < from) kept.push({ ...s, toBeat: from });
     if (s.toBeat > to) kept.push({ ...s, fromBeat: to });
   }
-  kept.push({ fromBeat: from, toBeat: to, modes });
+  kept.push({ ...(args.fields ?? {}), fromBeat: from, toBeat: to, modes });
   cam.segments = kept.sort((a, b) => a.fromBeat - b.fromBeat).slice(0, 32);
   return validateRecipe({ ...clone(recipe), camera: cam });
 }
 
 /** Start camera move X on the Nth kick or snare (0-based; or a beat), for `lengthBeats` (default: until the next range or 8 beats). */
-export function startCameraMove(recipe: Recipe, args: { modes: CameraMode[] | CameraMode; target: string; index?: number; lengthBeats?: number }, bands?: BandAnalysis): Recipe {
+export function startCameraMove(recipe: Recipe, args: { modes: CameraMode[] | CameraMode; target: string; index?: number; lengthBeats?: number; fields?: Omit<Partial<CameraSegment>, "fromBeat" | "toBeat" | "modes"> }, bands?: BandAnalysis): Recipe {
   let at: number;
   if (args.target === "beat") at = args.index ?? 0;
   else {
@@ -66,7 +67,7 @@ export function startCameraMove(recipe: Recipe, args: { modes: CameraMode[] | Ca
     at = list[i];
   }
   const len = args.lengthBeats ?? 8;
-  return setCameraModes(recipe, { modes: args.modes, fromBeat: at, toBeat: Math.min(recipe.durationBeats, at + len) });
+  return setCameraModes(recipe, { modes: args.modes, fromBeat: at, toBeat: Math.min(recipe.durationBeats, at + len), fields: args.fields });
 }
 
 /** The camera path (top view), 2–32 points; y is the camera height (default: the rig height). Uses the path mode over the whole recipe unless `useMode` is false. */

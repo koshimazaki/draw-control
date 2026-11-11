@@ -11,6 +11,7 @@ import { deleteMove, deletePhase, deleteStep, restorePhase, type GapMode } from 
 import { moveMoveTo, placeOnEvery, resizeMove, setMoveFields, snapMoveTo } from "./move-edits";
 import { clearCameraPath, clearRootPath, setCamera, setCameraModes, setCameraPath, setRootPath, setTravelLock, startCameraMove } from "./camera-edits";
 import { moveCameraSegment, resizeCameraSegment, setCameraSegment } from "./camera-block-edits";
+import { applyScript } from "./script-apply";
 import type { CameraMode } from "./camera";
 import { STEP_DIVISIONS, type StepDivision } from "./performance-config";
 import {
@@ -84,6 +85,8 @@ export const COMMAND_TABLE: Record<string, TableCommand> = {
   },
   setTravelLock: { help: "{ lock: off|beat|kick|snare|hat, strength? } lock the travel along the walk path: stations on each locked hit", run: (r, a) => setTravelLock(r, { lock: str(a, "lock"), strength: optNum(a, "strength") }) },
   clearRootPath: { help: "{} the character stands at the origin", run: r => clearRootPath(r) },
+  // The shot script (shot-script.ts): the Action and Camera tracks as text.
+  applyScript: { help: "{ script } replace the Action and Camera tracks from a shot script (rows \"beats 0-8 | action: run on path | camera: chase | shot: wide\")", run: (r, a, c) => applyScript(r, { script: typeof a.script === "string" ? a.script : bad("script", "text") }, { bands: c.bands, drive: c.drive }) },
   // Hit markers (accents on the music).
   addMarker: { help: "{ seconds, accent } add a hit marker", run: (r, a, c) => addMarker(r, c.drive, num(a, "seconds"), accent(a, "accent")) },
   removeMarker: { help: "{ index } remove a hit marker", run: (r, a, c) => removeMarker(r, c.drive, int(a, "index")) },

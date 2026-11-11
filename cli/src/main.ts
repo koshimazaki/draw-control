@@ -4,7 +4,8 @@
  *   new [--character rigged|mannequin|block|stick|blob] [--analysis a.json] --out recipe.json
  *   apply <recipe.json> <commands.json> [--analysis a.json] [--out next.json]
  *   set <recipe.json> <path> <value> [--out next.json]
- *   describe <recipe.json> [--analysis a.json]
+ *   describe <recipe.json> [--analysis a.json] [--script]
+ *   script <recipe.json> <script.txt> [--analysis a.json] [--out next.json]
  *   commands
  *   render <recipe.json> [--audio track.wav] --out bundle/ [--view rig|front|side|top|orbit|iso] [--size 1280x720]
  *          [--start 8 --length 8 --unit beats|seconds] [--grid]
@@ -14,7 +15,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { basename } from "node:path";
 import {
-  DEFAULT_RECIPE, PROCEDURAL_KINDS, applyCommands, commandHelp, defaultRiggedRecipe, describeRecipe, validateRecipe, type CommandContext, type MotionCommand, type Recipe,
+  DEFAULT_RECIPE, PROCEDURAL_KINDS, applyCommands, commandHelp, defaultRiggedRecipe, describeRecipe, printScript, validateRecipe, type CommandContext, type MotionCommand, type Recipe,
 } from "../../packages/core/src/index.ts";
 import { decodeAudioFile } from "./audio-file.ts";
 import { analyse, driveFrom, parseAnalysis, type AnalysisJson } from "./analysis.ts";
@@ -104,8 +105,15 @@ export async function main(argv: string[], out: (s: string) => void = s => conso
         return 0;
       }
       case "describe": {
-        if (!rest[0]) throw new Error("describe <recipe.json> [--analysis a.json]");
-        out(describeRecipe(validateRecipe(readJson(rest[0])), contextFrom(flags).analysis?.bands));
+        if (!rest[0]) throw new Error("describe <recipe.json> [--analysis a.json] [--script]");
+        const r = validateRecipe(readJson(rest[0])), bands = contextFrom(flags).analysis?.bands;
+        out(flags.script ? printScript(r, bands).trimEnd() : describeRecipe(r, bands));
+        return 0;
+      }
+      case "script": {
+        if (!rest[0] || !rest[1]) throw new Error("script <recipe.json> <script.txt> [--analysis a.json] [--out next.json]");
+        const recipe = validateRecipe(readJson(rest[0]));
+        output(applyCommands(recipe, [{ type: "applyScript", script: readFileSync(rest[1], "utf8") }], contextFrom(flags).ctx), flags, out);
         return 0;
       }
       case "commands": {
