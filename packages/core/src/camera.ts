@@ -50,6 +50,11 @@ export const SHOT_PRESETS: Record<Shot, { distance: number; height: number; fov:
   low: { distance: 3.4, height: 0.35, fov: 42, aim: 1.1 },
   top: { distance: 1.4, height: 6.5, fov: 45, aim: 0.9 },
 };
+/**
+ * Highest the camera goes, metres. Every camera position is held under it: a top block, a
+ * shot, a rise, a drawn camera path, a height lane. Higher values are clamped (describe says so).
+ */
+export const CAMERA_MAX_HEIGHT = 8;
 /** Modes that take an amount; a range with an amount holds at most one of them. */
 export const AMOUNT_MODES = ["orbit", "pushIn", "pullOut", "truck", "rise"] as const;
 export const ON_HIT = ["hold", "punch"] as const;

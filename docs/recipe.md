@@ -114,6 +114,8 @@ The walk path drawn in the top view (or `setRootPath`) is stored here: up to 48 
 | `lock`, `strength` | `beat`, `kick`, `snare`, `hat`; 0–1 (default 1) | Beat lock on the block. A programmed move arrives at evenly spaced stations on each locked hit and holds briefly, still ending on its exact amount; an energy-driven move stops for the hold instead. Strength 0 is exactly the unlocked block. |
 | `onHit`, `punch` | `hold` (default) or `punch`; 0–3 m (default 0.4) | With `punch` each locked hit pushes the camera in by `punch` metres and back, instead of holding. |
 
+The camera never goes above 8 m (`CAMERA_MAX_HEIGHT` in `camera.ts`): a top block, a shot, a rise, a drawn camera path or a height lane that asks for more is held there, and `describe` names what asked.
+
 Which wins, per parameter and frame: an automation lane where it has points, then a programmed amount or shot, then the energy drive and the beat accents. The yaw lane is an offset in degrees added to the angle around the subject (held at its first and last value outside its points); the distance, height and fov lanes replace the value from their first point to their last. A block's shot, amount and lock stay in the recipe; `camera.json` in a bundle carries the resulting camera per frame and each range's beats and modes only.
 
 ## Shot script

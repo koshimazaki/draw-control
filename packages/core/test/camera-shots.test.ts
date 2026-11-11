@@ -118,3 +118,20 @@ describe("schema mode list", () => {
     }
   });
 });
+
+describe("camera height cap", () => {
+  it("holds a top block with a wide shot, a high lane and a high rise at CAMERA_MAX_HEIGHT, and describe says so", async () => {
+    const { CAMERA_MAX_HEIGHT, describeRecipe } = await import("../src");
+    const top = rig([{ fromBeat: 0, toBeat: 16, modes: ["top"], shot: "wide" }]);
+    const p = planCamera(top);
+    expect(Math.max(...p.samples.map(s => s.position[1]))).toBeLessThanOrEqual(CAMERA_MAX_HEIGHT);
+    expect(p.heightClamped).toBeGreaterThan(0);
+    expect(describeRecipe(top)).toMatch(/held at 8 m on \d+ frames \(a top block or a rise lifts it higher\)/);
+    const lane = applyMotionCommand(rig([{ fromBeat: 0, toBeat: 16, modes: ["static"] }]), { type: "setEnvelopePoints", lane: "height", points: [[0, 12], [100, 12]] });
+    expect(planCamera(lane).samples[50].position[1]).toBe(CAMERA_MAX_HEIGHT);
+    expect(describeRecipe(lane)).toMatch(/the height lane goes to 12 m/);
+    const rise = rig([{ fromBeat: 0, toBeat: 4, modes: ["rise"], from: 1, to: 10 }]);
+    expect(planCamera(rise).samples[at(4)].position[1]).toBe(CAMERA_MAX_HEIGHT);
+    expect(describeRecipe(rise)).toMatch(/rise 0–4 asks 10 m/);
+  });
+});

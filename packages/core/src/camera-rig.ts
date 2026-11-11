@@ -15,7 +15,7 @@
  */
 import { energyAtFrame, type AudioDrive } from "./audio-drive";
 import { beatAtSeconds, secondsAtBeat } from "./beats";
-import { FOLLOW_ANGLES, modesAt, type CameraConfig, type CameraMode } from "./camera";
+import { CAMERA_MAX_HEIGHT, FOLLOW_ANGLES, modesAt, type CameraConfig, type CameraMode } from "./camera";
 import type { Recipe } from "./recipe";
 import { buildSpline } from "./spline";
 import { subjectAt } from "./subject";
@@ -31,6 +31,8 @@ export type CameraPlan = {
   samples: CameraSample[]; accents: CameraAccent[]; channels: CameraChannels;
   /** Shots, programmed moves and beat locks per frame (camera-shots.ts). */
   programmed: ProgrammedCamera;
+  /** Frames whose camera was held at CAMERA_MAX_HEIGHT (it asked to go higher). */
+  heightClamped: number;
 };
 
 /** Acceleration clamps per channel (SI units). Exported so tests check against them. */
@@ -203,7 +205,7 @@ export function planCamera(recipe: Recipe, drive?: AudioDrive, frames = 0): Came
   const spline = usesPath ? buildSpline(config.path!) : null;
   const samples: CameraSample[] = new Array(total);
   // Top and fixed fade in and out over about half a second, so switching never cuts.
-  let topW = 0, fixW = 0, anchor: Vec3 | null = null;
+  let topW = 0, fixW = 0, anchor: Vec3 | null = null, heightClamped = 0;
   for (let n = 0; n < total; n++) {
     const modes = modesAt(config, beatAtSeconds(g, n * dt));
     topW = slew(topW, modes.includes("top") ? 1 : 0, 2 * dt);
@@ -241,6 +243,7 @@ export function planCamera(recipe: Recipe, drive?: AudioDrive, frames = 0): Came
       ch.distance[n] = Math.hypot(position[0] - target[0], position[2] - target[2]);
       ch.height[n] = position[1];
     }
+    if (position[1] > CAMERA_MAX_HEIGHT + 1e-9) { heightClamped++; position = [position[0], CAMERA_MAX_HEIGHT, position[2]]; ch.height[n] = CAMERA_MAX_HEIGHT; }
     samples[n] = { position, target, fov: fovAt(n), energy: energyAtFrame(drive, n) };
   }
   for (let n = 1; n < total; n++) {
@@ -248,7 +251,7 @@ export function planCamera(recipe: Recipe, drive?: AudioDrive, frames = 0): Came
     while (ch.yaw[n] - ch.yaw[n - 1] > Math.PI) ch.yaw[n] -= 2 * Math.PI;
     while (ch.yaw[n] - ch.yaw[n - 1] < -Math.PI) ch.yaw[n] += 2 * Math.PI;
   }
-  return { fps, frames: total, config, samples, accents, channels: ch, programmed: prog };
+  return { fps, frames: total, config, samples, accents, channels: ch, programmed: prog, heightClamped };
 }
 
 /** The camera at a frame (clamped to the plan). */

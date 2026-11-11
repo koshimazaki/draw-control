@@ -11,6 +11,8 @@ import { moveEndBeat } from "./engine";
 import { envelopeValues } from "./envelope";
 import { recipeSeconds, type Recipe } from "./recipe";
 import { cameraWords } from "./shot-script";
+import { CAMERA_MAX_HEIGHT } from "./camera";
+import { planCamera } from "./camera-rig";
 
 const f2 = (x: number) => (Math.round(x * 100) / 100).toString();
 const list = (xs: number[], max = 16) => xs.slice(0, max).map(f2).join(", ") + (xs.length > max ? `, … (${xs.length} in all)` : "");
@@ -53,6 +55,15 @@ export function describeRecipe(r: Recipe, bands?: BandAnalysis): string {
     for (const [k, env] of Object.entries(c.lanes ?? {})) {
       const pts = env!.points, vals = pts.map(p => p[1]);
       out.push(`  ${k} lane: ${pts.length} breakpoints, frames ${pts[0][0]}–${pts[pts.length - 1][0]}, ${f2(Math.min(...vals))}–${f2(Math.max(...vals))}${k === "yaw" ? "° offset" : k === "fov" ? "°, overrides the rig there" : " m, overrides the rig there"}; [frame, value]: ${pts.slice(0, 8).map(p => `[${p[0]}, ${p[1]}]`).join(" ")}${pts.length > 8 ? " …" : ""}.`);
+    }
+    const held = planCamera(r).heightClamped;
+    if (held) {
+      const asked = [
+        ...c.segments.flatMap(s => [s.from, s.to].filter((v): v is number => v !== undefined && s.modes.includes("rise") && v > CAMERA_MAX_HEIGHT).map(v => `rise ${f2(s.fromBeat)}–${f2(s.toBeat)} asks ${v} m`)),
+        ...(c.lanes?.height?.points.some(p => p[1] > CAMERA_MAX_HEIGHT) ? [`the height lane goes to ${Math.max(...c.lanes.height.points.map(p => p[1]))} m`] : []),
+        ...(c.path?.some(p => p.y > CAMERA_MAX_HEIGHT) ? [`the camera path goes to ${Math.max(...c.path.map(p => p.y))} m`] : []),
+      ];
+      out.push(`  height clamped: the camera is held at ${CAMERA_MAX_HEIGHT} m on ${held} frames${asked.length ? ` (${asked.join("; ")})` : " (a top block or a rise lifts it higher)"}.`);
     }
   } else out.push("Camera rig: off (fixed views only).");
   const p = r.rootPath;
