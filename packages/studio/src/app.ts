@@ -22,6 +22,7 @@ import { $, LAYOUT } from "./ui";
 import { Viewport } from "./viewport";
 import { History, bindUndo, sameRecipe } from "./history";
 import { bindSequencePanel } from "./sequence-panel";
+import { bindMixamo, importedMove } from "./app-mixamo";
 import { parseSequenceFile } from "./sequence-library";
 
 export function startApp(root: HTMLElement) {
@@ -87,6 +88,7 @@ export function startApp(root: HTMLElement) {
       say("jsonStatus", "");
     } catch (e) { say("jsonStatus", (e as Error).message); alertSoft((e as Error).message); }
   }
+  const mixamo = bindMixamo({ ensureRigged, changed: () => { renderClipPalette(); syncInputs(); render(); schedulePoseSpeed(); } });
   const history = new History();
   const syncUndo = bindUndo(history, { current: () => recipe, restore: r => setRecipe(r) });
   function alertSoft(message: string) { say("exportStatus", message); }
@@ -112,7 +114,7 @@ export function startApp(root: HTMLElement) {
     $("palette").hidden = clipDriven;
     $("clipPalette").hidden = !clipDriven;
     syncRigPanel(recipe);
-    timeline.setBrush(recipe.character.kind, fileCharacter?.clips.map(c => c.name) ?? []);
+    timeline.setBrush(recipe.character.kind, fileCharacter?.clips.map(c => c.name) ?? [], mixamo.names());
     updateExportPanel(recipe);
   }
 
@@ -197,6 +199,14 @@ export function startApp(root: HTMLElement) {
         b.textContent = name.replace(/_Loop$/, "").replace(/_/g, " ");
         b.title = `${name}: steps land on beats`;
         b.onclick = () => addAtCursor(r => insertMove(r, { move: riggedMove(name, cursor(), r.beatGrid.bpm), atBeat: cursor() }));
+        pal.appendChild(b);
+      }
+      for (const c of mixamo.clips()) {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.textContent = `${c.name} (${c.seconds.toFixed(1)} s)`;
+        b.title = "Your Mixamo clip, retargeted onto the mannequin, at its own speed";
+        b.onclick = () => addAtCursor(r => insertMove(r, { move: importedMove(c.name, cursor(), r)!, atBeat: cursor() }));
         pal.appendChild(b);
       }
       return;
@@ -315,7 +325,7 @@ export function startApp(root: HTMLElement) {
   const timeline = new Timeline({
     recipe: () => recipe, drive: () => (drive === FLAT ? undefined : drive),
     rms: () => (track ? { rms: track.features.rms, hop: track.features.hopSeconds } : null),
-    beat: () => currentBeat, poseSpeed: () => poseSpeedCurve, edit, seek: seekBeat,
+    beat: () => currentBeat, poseSpeed: () => poseSpeedCurve, edit, seek: seekBeat, importedMove,
   });
   /** Pose speed for the graph, recomputed shortly after the recipe or drive changes. */
   let poseSpeedCurve: Float32Array | null = null;
@@ -349,7 +359,7 @@ export function startApp(root: HTMLElement) {
   window.addEventListener("drop", e => {
     e.preventDefault();
     for (const f of e.dataTransfer?.files ?? []) {
-      if (/\.(glb|gltf|fbx)$/i.test(f.name)) void useCharacterFile(f);
+      if (/\.(glb|gltf|fbx)$/i.test(f.name)) void mixamo.tryDrop(f).then(done => { if (!done) void useCharacterFile(f); });
       else if (/\.json$/i.test(f.name)) void f.text().then(t => edit(() => parseSequenceFile(t)));
       else if (f.type.startsWith("audio/") || /\.(wav|mp3|m4a|ogg|flac|aac)$/i.test(f.name)) void useTrack(f);
     }

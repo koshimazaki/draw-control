@@ -41,6 +41,8 @@ export type TimelineHost = {
   poseSpeed(): Float32Array | null;
   edit(fn: (r: Recipe) => Recipe): void;
   seek(beat: number): void;
+  /** A move for an imported clip (Mixamo) at a beat, or null for library clips. */
+  importedMove?(clip: string, atBeat: number, recipe: Recipe): Recipe["moves"][number] | null;
 };
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -98,8 +100,8 @@ export class Timeline {
   private division = () => Number($<HTMLSelectElement>("tlDivision").value) as StepDivision;
 
   /** Fill the move brush with what the character can play. */
-  setBrush(kind: Recipe["character"]["kind"], fileClips: string[]) {
-    const options = kind === "rigged" ? Object.keys(LOOP_CLIPS) : kind === "file" ? fileClips : MOVE_KEYS.map(k => k);
+  setBrush(kind: Recipe["character"]["kind"], fileClips: string[], importedClips: string[] = []) {
+    const options = kind === "rigged" ? [...Object.keys(LOOP_CLIPS), ...importedClips] : kind === "file" ? fileClips : MOVE_KEYS.map(k => k);
     const label = (k: string) => (MOVE_LIBRARY as Record<string, { name: string }>)[k]?.name ?? k.replace(/_Loop$/, "").replace(/_/g, " ");
     $("tlBrush").innerHTML = options.map(k => `<option value="${k}">${label(k)}</option>`).join("") + `<option value="">(erase)</option>`;
   }
@@ -200,6 +202,8 @@ export class Timeline {
       // Move lane: paint the brush on the beat.
       const beat = Math.floor(beatAtX(e.clientX)), v = $<HTMLSelectElement>("tlBrush").value;
       this.host.edit(r => {
+        const own = v ? this.host.importedMove?.(v, beat, r) : null;
+        if (own) return insertMove(r, { move: own, atBeat: beat });
         if (r.character.kind === "rigged" || r.character.kind === "file") return setMoveAtBeat(r, beat, v || null);
         const at = r.moves.find(mv => mv.atBeat === beat);
         if (!v) return at ? removeMove(r, { moveId: at.id }) : r;

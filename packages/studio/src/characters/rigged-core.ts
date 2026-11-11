@@ -29,9 +29,10 @@ export type RiggedExtras = {
 };
 export type RiggedCharacter = Character & { rigged: RiggedExtras };
 
-const toLayers = (layers: FrameState["layers"], accent: boolean): Layer[] => layers.filter(l => !!l.accent === accent).map(l => {
-  const lib = LOOP_CLIPS[l.clip];
-  return { clip: l.clip, weight: l.weight, time: l.time ?? l.cyclePhase * (lib?.seconds ?? 1) };
+/** Engine layers to sampler layers; a clip without a library entry (an imported Mixamo clip) uses its own length. */
+const toLayers = (sampler: ClipSampler, layers: FrameState["layers"], accent: boolean): Layer[] => layers.filter(l => !!l.accent === accent).map(l => {
+  const seconds = LOOP_CLIPS[l.clip]?.seconds ?? sampler.clips.get(l.clip)?.seconds ?? 1;
+  return { clip: l.clip, weight: l.weight, time: l.time ?? l.cyclePhase * seconds };
 });
 
 /** Build the character from a scene of its own (clone it first when the GLB is shared). */
@@ -52,14 +53,14 @@ export function createRiggedCharacter(model: THREE.Object3D, clips: THREE.Animat
     const amp = state.amplitude ?? 1;
     const idle = new Map<THREE.Object3D, { q: THREE.Quaternion; p: THREE.Vector3 }>();
     sampler.blend([{ clip: "Idle_Loop", time: state.seconds % 2.5, weight: 1 }], idle);
-    const base = toLayers(state.layers, false);
+    const base = toLayers(sampler, state.layers, false);
     const loops = new Map<THREE.Object3D, { q: THREE.Quaternion; p: THREE.Vector3 }>();
     sampler.blend(base, loops);
     for (const lag of state.lagged ?? []) {
       const subset = new Set(sampler.bones.filter(b => groups.get(b) === lag.group));
-      sampler.blend(toLayers(lag.layers, false), loops, subset);
+      sampler.blend(toLayers(sampler, lag.layers, false), loops, subset);
     }
-    const accentLayers = toLayers(state.layers, true);
+    const accentLayers = toLayers(sampler, state.layers, true);
     const accents = new Map<THREE.Object3D, { q: THREE.Quaternion; p: THREE.Vector3 }>();
     let accentTotal = 0;
     for (const l of accentLayers) accentTotal += l.weight;

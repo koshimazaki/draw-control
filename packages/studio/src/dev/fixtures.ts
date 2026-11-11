@@ -86,3 +86,16 @@ export async function syntheticCharacterGlb(): Promise<Uint8Array> {
 
 /** Example recipes A, C, D for `scripts/examples.mjs`. */
 export { exampleRecipes } from "@motion-studio/core";
+
+/** Dev-only Mixamo check helpers for scripts/mixamo-check.mjs. */
+export async function mixamoCheck(name: string) {
+  const { importedClip } = await import("../characters/mixamo-import");
+  const { mixamoMetrics } = await import("../characters/mixamo-metrics");
+  const { riggedBindScene } = await import("../characters/rigged");
+  const c = importedClip(name);
+  if (!c) throw new Error(`not imported: ${name}`);
+  return mixamoMetrics(c, await riggedBindScene());
+}
+export async function mixamoNames() {
+  return (await import("../characters/mixamo-import")).importedClips();
+}

@@ -20,7 +20,8 @@
     "check": "npm run typecheck && npm run lint && npm test",
     "smoke": "node scripts/smoke.mjs",
     "examples": "node scripts/examples.mjs",
-    "peek": "node scripts/peek.mjs"
+    "peek": "node scripts/peek.mjs",
+    "mixamo-check": "node scripts/mixamo-check.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

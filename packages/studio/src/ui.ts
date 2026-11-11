@@ -47,6 +47,9 @@ export const LAYOUT = `
       <label class="file">Load GLB / FBX <input id="characterFile" type="file" accept=".glb,.gltf,.fbx" /></label>
       <label class="check"><input id="plainMaterial" type="checkbox" checked /> Plain light material on loaded files</label>
       <label>Character licence <input id="characterLicence" type="text" maxlength="120" value="unspecified" /></label>
+      <label class="file">Add Mixamo clips (FBX / GLB, animation only) <input id="mixamoFiles" type="file" accept=".fbx,.glb" multiple /></label>
+      <button id="mixamoLocal" type="button" hidden>Load local Mixamo clips</button>
+      <p id="mixamoStatus" class="muted"></p>
       <p id="characterStatus" class="muted"></p>
       <div id="switchConfirm" class="confirm" role="alert" hidden>
         <p id="switchConfirmText"></p>

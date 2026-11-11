@@ -67,3 +67,22 @@ describe("Mixamo retarget", () => {
     expect(sDelta.angleTo(new THREE.Quaternion())).toBeGreaterThan(0.5);
   });
 });
+
+describe("an imported clip on the rigged mannequin", () => {
+  it("plays at its own length (not the 1 s fallback), driven by a clip move", async () => {
+    const { GLTFLoader } = await import("three/addons/loaders/GLTFLoader.js");
+    const { createRiggedCharacter } = await import("../src/characters/rigged-core");
+    const { defaultRiggedRecipe, frameAt, makeClipMove, validateRecipe } = await import("@motion-studio/core");
+    const b = readFileSync(new URL("../../../assets/characters/AnimationLibrary.glb", import.meta.url));
+    const gltf = await new GLTFLoader().parseAsync(b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer, "");
+    const c = createRiggedCharacter(gltf.scene, gltf.animations);
+    const knee = c.rigged.sampler.bones.find(x => x.name === "DEF-shinL")!;
+    const bend = (a: number) => new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), a).toArray();
+    // A 2 s clip that bends the knee linearly from 0 to 1 rad.
+    c.rigged.sampler.add(new THREE.AnimationClip("mixamo/test", 2, [new THREE.QuaternionKeyframeTrack(`${knee.name}.quaternion`, [0, 2], [...bend(0), ...bend(1)])]));
+    const base = defaultRiggedRecipe();
+    const r = validateRecipe({ ...base, reactive: undefined, moves: [makeClipMove("mixamo/test", 0, 4, { id: "t" })] });   // 4 beats at 120 BPM = 2 s
+    c.apply(frameAt(r, 24));   // 1 s in: halfway
+    expect(knee.quaternion.angleTo(new THREE.Quaternion().fromArray(bend(0.5)))).toBeLessThan(0.02);
+  });
+});
