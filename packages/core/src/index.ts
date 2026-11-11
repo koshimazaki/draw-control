@@ -32,3 +32,7 @@ export * from "./command-table";
 export * from "./envelope";
 export * from "./camera-edits";
 export * from "./describe";
+export * from "./lock";
+export { rootAt, travelRange, travelStations } from "./root-travel";
+export * from "./camera-shots";
+export * from "./camera-block-edits";

@@ -19,6 +19,7 @@ import { FOLLOW_ANGLES, modesAt, type CameraConfig, type CameraMode } from "./ca
 import type { Recipe } from "./recipe";
 import { buildSpline } from "./spline";
 import { subjectAt } from "./subject";
+import { programCamera, type ProgrammedCamera } from "./camera-shots";
 
 export type Vec3 = [number, number, number];
 export type CameraSample = { position: Vec3; target: Vec3; /** vertical, degrees, at 16:9 */ fov: number; energy: number };
@@ -27,6 +28,8 @@ export type CameraChannels = { yaw: Float64Array; distance: Float64Array; height
 export type CameraPlan = {
   fps: number; frames: number; config: CameraConfig;
   samples: CameraSample[]; accents: CameraAccent[]; channels: CameraChannels;
+  /** Shots, programmed moves and beat locks per frame (camera-shots.ts). */
+  programmed: ProgrammedCamera;
 };
 
 /** Acceleration clamps per channel (SI units). Exported so tests check against them. */
@@ -77,7 +80,8 @@ export function planCamera(recipe: Recipe, drive?: AudioDrive, frames = 0): Came
     yaw: new Float64Array(total), distance: new Float64Array(total), height: new Float64Array(total),
     aimY: new Float64Array(total), cx: new Float64Array(total), cz: new Float64Array(total),
   };
-  const subject = (n: number) => subjectAt(recipe, beatAtSeconds(g, n * dt));
+  const subject = (n: number) => subjectAt(recipe, beatAtSeconds(g, n * dt), drive);
+  const prog = programCamera(config, g, drive?.bands, total, fps);
   const d0 = config.distance, dMin = d0 * 0.55, dMax = d0 * 1.7;
   const hMin = 0.3, hMax = config.height + RISE_METRES + 1;
   // State: base yaw (follow), orbit yaw, dolly, crane, aim, centre.
@@ -104,16 +108,17 @@ export function planCamera(recipe: Recipe, drive?: AudioDrive, frames = 0): Came
     const span = rangeSeconds(beat);
     if (n > 0) {
       // Orbit: yaw rate from the base speed and the energy, slew-limited.
-      const orbitWant = modes.includes("orbit") ? config.orbitDegreesPerBeat * Math.PI / 180 / beatSeconds * k : 0;
+      const free = 1 - prog.gate[n];   // a locked hold stops the energy-driven rates
+      const orbitWant = modes.includes("orbit") && !prog.owns.orbit[n] ? free * config.orbitDegreesPerBeat * Math.PI / 180 / beatSeconds * k : 0;
       orbitRate = slew(orbitRate, orbitWant, CAMERA_LIMITS.yawAccel * dt);
       orbit += orbitRate * dt;
       // Dolly and crane: cover their distance over the range, faster when loud, easing off near the limits.
       const dir = modes.includes("pushIn") ? -1 : modes.includes("pullOut") ? 1 : 0;
-      const dollyWant = dir === 0 ? 0 : dir * PUSH_FRACTION * d0 / span * k * room(d0 + dolly, dir, dMin, dMax, 0.8);
+      const dollyWant = dir === 0 || prog.owns.dolly[n] ? 0 : free * dir * PUSH_FRACTION * d0 / span * k * room(d0 + dolly, dir, dMin, dMax, 0.8);
       dollyRate = slew(dollyRate, dollyWant, CAMERA_LIMITS.linearAccel * dt);
       dolly += dollyRate * dt;
-      const rising = modes.includes("rise");
-      const craneWant = rising ? RISE_METRES / span * k * room(config.height + crane, 1, hMin, hMax, 0.6) : 0;
+      const rising = modes.includes("rise") && !prog.owns.crane[n];
+      const craneWant = rising ? free * RISE_METRES / span * k * room(config.height + crane, 1, hMin, hMax, 0.6) : 0;
       craneRate = slew(craneRate, craneWant, CAMERA_LIMITS.linearAccel * dt);
       crane += craneRate * dt;
       const aimWant = rising ? -AIM_DROP / span * k * room(AIM_Y + aim, -1, AIM_Y - AIM_DROP - 0.2, AIM_Y, 0.15) : 0;
@@ -135,9 +140,9 @@ export function planCamera(recipe: Recipe, drive?: AudioDrive, frames = 0): Came
         followYaw += followV * dt;
       }
     }
-    ch.yaw[n] = yaw0 + followYaw + orbit;
-    ch.distance[n] = d0 + dolly;
-    ch.height[n] = config.height + crane;
+    ch.yaw[n] = yaw0 + followYaw + orbit + prog.orbit[n];
+    ch.distance[n] = prog.distance[n] + dolly - prog.punch[n];
+    ch.height[n] = prog.height[n] + crane;
     ch.aimY[n] = AIM_Y + aim;
     ch.cx[n] = cx; ch.cz[n] = cz;
   }
@@ -159,9 +164,8 @@ export function planCamera(recipe: Recipe, drive?: AudioDrive, frames = 0): Came
       const from = Math.max(0, Math.floor((seconds - rise) * fps)), to = Math.min(total - 1, Math.ceil((seconds + release) * fps));
       for (let n = from; n <= to; n++) {
         const p = accentPulse(n * dt - seconds, rise, release) * amount;
-        ch.distance[n] -= pushMax * p;
-        push[n] += pushMax * p;
-        if (downbeat) ch.yaw[n] += yawMax * p * nudgeSign;   // yaw nudges on downbeats only: a calmer path
+        if (!prog.owns.dolly[n]) { ch.distance[n] -= pushMax * p; push[n] += pushMax * p; }
+        if (downbeat && !prog.owns.orbit[n]) ch.yaw[n] += yawMax * p * nudgeSign;   // yaw nudges on downbeats only: a calmer path
       }
     }
   }
@@ -198,6 +202,12 @@ export function planCamera(recipe: Recipe, drive?: AudioDrive, frames = 0): Came
     const tw = ease(topW), d = ch.distance[n] * (1 - 0.92 * tw);
     const target: Vec3 = [ch.cx[n], ch.aimY[n] - 0.15 * tw, ch.cz[n]];
     let position: Vec3 = [ch.cx[n] + Math.sin(yaw) * d, ch.height[n] + tw * (ch.distance[n] * 1.35 + 0.6), ch.cz[n] + Math.cos(yaw) * d];
+    if (prog.truck[n]) {
+      // Truck: camera and aim slide sideways together (right of the view is (cos yaw, -sin yaw)).
+      const tx = Math.cos(yaw) * prog.truck[n], tz = -Math.sin(yaw) * prog.truck[n];
+      position = [position[0] + tx, position[1], position[2] + tz];
+      target[0] += tx; target[2] += tz;
+    }
     const wasFixed = fixW > 0;
     fixW = slew(fixW, modes.includes("fixed") ? 1 : 0, 2 * dt);
     if (fixW > 0 && !wasFixed) anchor = position;
@@ -221,14 +231,14 @@ export function planCamera(recipe: Recipe, drive?: AudioDrive, frames = 0): Came
       ch.distance[n] = Math.hypot(position[0] - target[0], position[2] - target[2]);
       ch.height[n] = position[1];
     }
-    samples[n] = { position, target, fov: config.fov, energy: energyAtFrame(drive, n) };
+    samples[n] = { position, target, fov: prog.fov[n], energy: energyAtFrame(drive, n) };
   }
   for (let n = 1; n < total; n++) {
     // Unwrap yaw recomputed by atan2 so it stays continuous.
     while (ch.yaw[n] - ch.yaw[n - 1] > Math.PI) ch.yaw[n] -= 2 * Math.PI;
     while (ch.yaw[n] - ch.yaw[n - 1] < -Math.PI) ch.yaw[n] += 2 * Math.PI;
   }
-  return { fps, frames: total, config, samples, accents, channels: ch };
+  return { fps, frames: total, config, samples, accents, channels: ch, programmed: prog };
 }
 
 /** The camera at a frame (clamped to the plan). */

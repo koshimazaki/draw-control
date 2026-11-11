@@ -13,21 +13,54 @@
  *   the subject in view;
  * - path: along a drawn path (smoothed spline, a height per point), looking at the
  *   subject; the music sets the speed along it and adds the accents.
+ * - truck: sideways, camera and aim together (needs an amount, metres, + to the right).
  * Several modes may share a range ("orbit" + "pushIn"); one follow rig at a time; static,
  * fixed and path stand alone.
+ *
+ * A range may also carry (all optional, see camera-shots.ts):
+ * - `shot`: a framing preset (wide, medium, close, low, top) for distance, height and fov,
+ *   eased in over the first beat of the range (`cut`: switch on the range's first frame);
+ * - an `amount` in real units, which makes the move a deterministic programmed move that
+ *   ignores the energy: orbit degrees (signed), pushIn/pullOut metres, truck metres (signed),
+ *   rise metres (signed: jib up or down); or `from`/`to` heights for rise and `to` (end
+ *   distance) for pushIn/pullOut;
+ * - a beat lock (`lock`, `strength`, lock.ts) with `onHit` hold or punch (`punch` metres).
  */
+import { validateLock, type LockTarget } from "./lock";
 import { fail, isObject, num, only } from "./validate";
 
-export const CAMERA_MODES = ["static", "orbit", "pushIn", "pullOut", "rise", "lead", "chase", "side", "threeQuarter", "top", "fixed", "path"] as const;
+export const CAMERA_MODES = ["static", "orbit", "pushIn", "pullOut", "rise", "lead", "chase", "side", "threeQuarter", "top", "fixed", "path", "truck"] as const;
 export type CameraMode = (typeof CAMERA_MODES)[number];
 export const CAMERA_MODE_LABELS: Record<CameraMode, string> = {
   static: "Static", orbit: "Orbit", pushIn: "Push in", pullOut: "Pull out", rise: "Rise and tilt", lead: "Follow from the front", chase: "Follow from behind",
   side: "Follow from the side", threeQuarter: "Follow three-quarter", top: "Top (overhead)", fixed: "Fixed (tripod, pans)", path: "Drawn path",
+  truck: "Truck (sideways)",
 };
 /** Follow rigs: the camera sits at this angle from the subject's heading (0 = in front, π = behind) and turns with it. */
 export const FOLLOW_ANGLES: Partial<Record<CameraMode, number>> = { lead: 0, threeQuarter: Math.PI / 4, side: Math.PI / 2, chase: Math.PI };
 export const FOLLOW_MODES = Object.keys(FOLLOW_ANGLES) as CameraMode[];
-export type CameraSegment = { fromBeat: number; toBeat: number; modes: CameraMode[] };
+export const SHOTS = ["wide", "medium", "close", "low", "top"] as const;
+export type Shot = (typeof SHOTS)[number];
+/** Framing presets: distance and height in metres, vertical fov in degrees at 16:9. */
+export const SHOT_PRESETS: Record<Shot, { distance: number; height: number; fov: number }> = {
+  wide: { distance: 7, height: 1.6, fov: 40 },
+  medium: { distance: 4.2, height: 1.35, fov: 35 },
+  close: { distance: 2.2, height: 1.45, fov: 28 },
+  low: { distance: 3.4, height: 0.35, fov: 42 },
+  top: { distance: 1.4, height: 6.5, fov: 45 },
+};
+/** Modes that take an amount; a range with an amount holds at most one of them. */
+export const AMOUNT_MODES = ["orbit", "pushIn", "pullOut", "truck", "rise"] as const;
+export const ON_HIT = ["hold", "punch"] as const;
+export type OnHit = (typeof ON_HIT)[number];
+/** Punch-in depth when none is given, metres. */
+export const DEFAULT_PUNCH = 0.4;
+export type CameraSegment = {
+  fromBeat: number; toBeat: number; modes: CameraMode[];
+  shot?: Shot; cut?: boolean;
+  amount?: number; from?: number; to?: number;
+  lock?: LockTarget; strength?: number; onHit?: OnHit; punch?: number;
+};
 export type CameraConfig = {
   /** Modes per beat range, in order, not overlapping. Beats outside every range hold (static). */
   segments: CameraSegment[];
@@ -60,7 +93,7 @@ export function validateCamera(input: unknown, durationBeats: number): CameraCon
   const segments = (input.segments as unknown[]).map((s, i): CameraSegment => {
     const where = `camera.segments[${i}]`;
     if (!isObject(s)) return fail(`${where} must be an object`);
-    only(s, ["fromBeat", "toBeat", "modes"], where);
+    only(s, ["fromBeat", "toBeat", "modes", "shot", "cut", "amount", "from", "to", "lock", "strength", "onHit", "punch"], where);
     const fromBeat = num(s.fromBeat, 0, durationBeats, `${where}.fromBeat`);
     const toBeat = num(s.toBeat, 0, durationBeats, `${where}.toBeat`);
     if (toBeat <= fromBeat) fail(`${where}.toBeat must be after fromBeat`);
@@ -75,7 +108,9 @@ export function validateCamera(input: unknown, durationBeats: number): CameraCon
     if (modes.filter(m => FOLLOW_MODES.includes(m as CameraMode)).length > 1) fail(`${where}: one follow rig at a time (${FOLLOW_MODES.join(", ")})`);
     if (modes.includes("fixed") && modes.length > 1) fail(`${where}: fixed cannot share a range`);
     if (modes.includes("pushIn") && modes.includes("pullOut")) fail(`${where}: pushIn and pullOut exclude each other`);
-    return { fromBeat, toBeat, modes: [...modes] as CameraMode[] };
+    const seg: CameraSegment = { fromBeat, toBeat, modes: [...modes] as CameraMode[] };
+    validateSegmentExtras(s, where, seg);
+    return seg;
   });
   let path: CameraConfig["path"];
   if (input.path !== undefined) {
@@ -98,6 +133,36 @@ export function validateCamera(input: unknown, durationBeats: number): CameraCon
   };
   if (path) out.path = path;
   return out;
+}
+
+/** The optional shot, amount and lock fields of a range. */
+function validateSegmentExtras(s: Record<string, unknown>, where: string, seg: CameraSegment) {
+  if (s.shot !== undefined) {
+    if (!SHOTS.includes(s.shot as Shot)) fail(`${where}.shot must be one of ${SHOTS.join(", ")}`);
+    seg.shot = s.shot as Shot;
+  }
+  if (s.cut !== undefined) { if (typeof s.cut !== "boolean") fail(`${where}.cut must be true or false`); if (s.cut) seg.cut = true; }
+  const movers = seg.modes.filter(m => (AMOUNT_MODES as readonly string[]).includes(m));
+  const programmed = s.amount !== undefined || s.from !== undefined || s.to !== undefined;
+  if (programmed && movers.length !== 1) fail(`${where}: an amount needs exactly one of ${AMOUNT_MODES.join(", ")} in the range (give each move its own range)`);
+  const mover = movers[0];
+  if (s.amount !== undefined) {
+    const lim = mover === "orbit" ? [-1440, 1440] : mover === "truck" ? [-20, 20] : mover === "rise" ? [-10, 10] : [0, 20];
+    seg.amount = num(s.amount, lim[0], lim[1], `${where}.amount (${mover})`);
+  }
+  if (s.from !== undefined) { if (mover !== "rise") fail(`${where}.from is a start height, for rise only`); seg.from = num(s.from, 0.05, 30, `${where}.from`); }
+  if (s.to !== undefined) {
+    if (mover !== "rise" && mover !== "pushIn" && mover !== "pullOut") fail(`${where}.to is an end height (rise) or end distance (pushIn, pullOut)`);
+    seg.to = num(s.to, mover === "rise" ? 0.05 : 0.5, 30, `${where}.to`);
+  }
+  if (seg.amount !== undefined && seg.to !== undefined) fail(`${where}: give an amount or an end value (to), not both`);
+  if (seg.modes.includes("truck") && seg.amount === undefined) fail(`${where}: truck needs an amount in metres (+ right, - left)`);
+  validateLock(s, where, seg);
+  if (s.onHit !== undefined) {
+    if (!ON_HIT.includes(s.onHit as OnHit)) fail(`${where}.onHit must be hold or punch`);
+    if (seg.lock) seg.onHit = s.onHit as OnHit;
+  }
+  if (s.punch !== undefined) { const p = num(s.punch, 0, 3, `${where}.punch`); if (seg.lock) seg.punch = p; }
 }
 
 /** Modes active at a beat: those of the range that holds it, or static in a gap. */

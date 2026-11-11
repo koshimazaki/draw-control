@@ -80,7 +80,8 @@ export function buildCameraTrack(plan: CameraPlan, recipe: Recipe, startFrame: n
   return {
     schemaVersion, fps: recipe.fps, frames, startFrame, aspect: r4(aspect), fovAxis: "vertical", units: "metres",
     axes: "Y up, right-handed; the character faces +Z at yaw 0; position and target in world metres",
-    intensity: plan.config.intensity, modes: plan.config.segments.map(s => ({ ...s, modes: [...s.modes] })),
+    intensity: plan.config.intensity, // The bundle schema carries a range's beats and modes; shots, amounts and locks are already in the per-frame track.
+    modes: plan.config.segments.map(s => ({ fromBeat: s.fromBeat, toBeat: s.toBeat, modes: [...s.modes] })),
     accents: plan.accents.filter(a => a.seconds >= from && a.seconds < to).map(a => ({ seconds: r4(a.seconds - from), downbeat: a.downbeat })),
     track, ltx: suggestLtxCameraMovement(plan, startFrame, frames),
   };

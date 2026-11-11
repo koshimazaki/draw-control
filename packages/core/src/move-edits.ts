@@ -105,9 +105,10 @@ export function resizeMove(recipe: Recipe, args: { moveId: string; edge: "start"
 
 /**
  * The selected block's fields. `start` moves the block (as a drag), `length` resizes it from
- * its start (rescaling speed), `speed` sets the playback rate only, `amplitude` sets every phase.
+ * its start (rescaling speed), `speed` sets the playback rate only, `amplitude` sets every phase,
+ * `lock` (off, beat, kick, snare, hat) and `strength` (0–1) set its beat lock.
  */
-export function setMoveFields(recipe: Recipe, args: { moveId: string; start?: number; length?: number; speed?: number; amplitude?: number }): Recipe {
+export function setMoveFields(recipe: Recipe, args: { moveId: string; start?: number; length?: number; speed?: number; amplitude?: number; lock?: string; strength?: number }): Recipe {
   let r = recipe;
   if (args.start !== undefined) r = moveMoveTo(r, { moveId: args.moveId, toBeat: args.start });
   if (args.length !== undefined) r = resizeMove(r, { moveId: args.moveId, edge: "end", toBeat: blockSpan(r, args.moveId).start + args.length });
@@ -116,6 +117,16 @@ export function setMoveFields(recipe: Recipe, args: { moveId: string; start?: nu
     const m = r.moves[indexOf(r, args.moveId)];
     if (args.speed !== undefined) { m.speed = clampSpeed(args.speed); if (m.speed === 1) delete m.speed; }
     if (args.amplitude !== undefined) for (const p of m.phases) p.amplitude = r4(clamp(args.amplitude, 0, AMPLITUDE_MAX));
+    r = validateRecipe(r);
+  }
+  if (args.lock !== undefined || args.strength !== undefined) {
+    r = clone(r);
+    const m = r.moves[indexOf(r, args.moveId)];
+    if (args.lock === "off") { delete m.lock; delete m.strength; }
+    else {
+      if (args.lock !== undefined) m.lock = args.lock as Move["lock"];
+      if (args.strength !== undefined) m.strength = args.strength;
+    }
     r = validateRecipe(r);
   }
   return r;

@@ -188,5 +188,12 @@ export async function smokeCameraPath(page, { fail, OUT, checkBundle }) {
   const beats = JSON.parse(strFromU8(files["beats.json"]));
   console.log(`rig export: view ${meta.view}, camera.json ${files["camera.json"] ? "present" : "missing"}, beats.json onsets: ${beats.onsets?.low.length} kicks, ${beats.onsets?.mid.length} snares, ${beats.onsets?.high.length} hats`);
   if (meta.view !== "rig" || !files["camera.json"]) fail("export did not render through the rig camera");
+  // camera.json against the pinned schema's camera definition.
+  const { Ajv2020 } = await import("ajv/dist/2020.js");
+  const ajv = new Ajv2020({ strict: false });
+  ajv.addSchema(JSON.parse((await import("node:fs")).readFileSync(new URL("../schema/guide-bundle.schema.json", import.meta.url), "utf8")));
+  const camOk = ajv.validate("guide-bundle.schema.json#/$defs/camera", JSON.parse(strFromU8(files["camera.json"])));
+  console.log(`rig export: camera.json ${camOk ? "validates" : "does NOT validate"} against the pinned schema`);
+  if (!camOk) fail(`camera.json fails the schema: ${ajv.errorsText()}`);
   if (!beats.onsets || beats.onsets.low.length < 3) fail("beats.json has no band onsets");
 }

@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { Ajv2020 } from "ajv/dist/2020.js";
 import {
   BUNDLE_SCHEMA_VERSION, DEFAULT_RECIPE, buildBeats, buildCameraTrack, buildManifest, buildMeta, encodeWav, exportFrameCount, planCamera,
-  suggestLtxCameraMovement, validateRecipe,
+  suggestLtxCameraMovement, validateRecipe, CAMERA_MODES, type CameraSegment,
 } from "../src";
 
 const schema = JSON.parse(readFileSync(new URL("../../../schema/guide-bundle.schema.json", import.meta.url), "utf8"));
@@ -83,6 +83,13 @@ describe("camera track (schema 0.2.0)", () => {
     const s = suggestLtxCameraMovement(still, 0, 96);
     expect(s.settings.cameraMovement).toBe("static");
     expect(s.approximate).toBe(true);
+  });
+  it("every camera mode validates against the schema (0.4.0); shots, amounts and locks stay out of camera.json", () => {
+    const segments: CameraSegment[] = CAMERA_MODES.map((m, i) => ({ fromBeat: i, toBeat: i + 1, modes: [m], ...(m === "truck" ? { amount: 1 } : m === "orbit" ? { amount: 90, shot: "close", lock: "beat" } : {}) }));
+    const r = validateRecipe({ ...structuredClone(DEFAULT_RECIPE), camera: { ...recipe.camera!, segments, path: [{ x: 0, y: 1, z: 3 }, { x: 3, y: 1, z: 0 }] } });
+    const track = buildCameraTrack(planCamera(r), r, 0, 97, 16 / 9, BUNDLE_SCHEMA_VERSION);
+    expect(track.modes.map(s => s.modes[0])).toEqual([...CAMERA_MODES]);
+    expect(check("guide-bundle.schema.json#/$defs/camera", JSON.parse(JSON.stringify(track)))).toBe(true);
   });
   it("a bundle without the rig has no camera entry (0.1.0 readers see the same files)", () => {
     expect(buildManifest(true)).not.toHaveProperty("camera");

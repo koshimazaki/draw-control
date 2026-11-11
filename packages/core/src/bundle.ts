@@ -11,7 +11,7 @@ import type { BandAnalysis, BandOnset } from "./audio-bands";
  * 0.2.0 adds the optional camera track (manifest `camera`, asset role "camera");
  * 0.3.0 adds optional drum-band onsets and amplitude peaks to beats.json.
  */
-export const BUNDLE_SCHEMA_VERSION = "0.3.0";
+export const BUNDLE_SCHEMA_VERSION = "0.4.0";
 export const GENERATOR = { name: "motion-studio", version: "0.1.0", motion: "local-time-stretch" } as const;
 export const BUNDLE_FILES = {
   video: "guide.mp4", audio: "audio.wav", firstFrame: "frame0.png",

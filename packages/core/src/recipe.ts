@@ -10,6 +10,7 @@ import { validateReactive, type ReactiveConfig } from "./reactive-config";
 import { validateEnergyCurve, validateSteps, type EnergyCurve, type StepLane } from "./performance-config";
 import { RecipeError, fail, finite, isObject, only, text } from "./validate";
 import { validateEnvelope, type Envelope } from "./envelope";
+import { validateLock, type BeatLock } from "./lock";
 
 export const RECIPE_VERSION = 2;
 /** Upper bound of a phase amplitude and of the amplitude envelope. */
@@ -63,10 +64,14 @@ export type Move = {
   clip?: string;
   /** Beats one pass of the clip is stretched to. Defaults to the move's phase length. */
   clipCycleBeats?: number;
+  /** Beat lock (lock.ts): the move speeds up into each locked hit and slows after it. */
+  lock?: BeatLock["lock"];
+  strength?: number;
 };
 export type BeatGrid = { bpm: number; offsetSeconds: number; beatsPerBar: number; source: "manual" | "analysis" };
 export type CharacterRef = { kind: CharacterKind; name: string; licence: string };
-export type RootPoint = { beat: number; x: number; z: number; yaw: number };
+/** A point of the walk path; `y` (optional) lifts the root, for a glide that rises. */
+export type RootPoint = { beat: number; x: number; z: number; yaw: number; y?: number };
 export type Jump = { atBeat: number; durationBeats: number; height: number };
 export type AudioRef = { name: string; licence: string };
 export type Recipe = {
@@ -91,6 +96,8 @@ export type Recipe = {
   energyCurve?: EnergyCurve;
   /** Amplitude envelope: one value per frame (0–3) scaling every move, as [frame, value] breakpoints. */
   envelope?: Envelope;
+  /** Beat lock on the travel along the walk path (root-travel.ts): stations on each locked hit. */
+  travelLock?: BeatLock;
 };
 
 export { RecipeError };
@@ -129,7 +136,7 @@ function validatePhase(input: unknown, where: string): Phase {
 
 function validateMove(input: unknown, where: string, durationBeats: number): Move {
   if (!isObject(input)) return fail(`${where} must be an object`);
-  only(input, ["id", "name", "atBeat", "blendBeats", "loop", "phases", "clip", "clipCycleBeats", "lengthBeats", "speed"], where);
+  only(input, ["id", "name", "atBeat", "blendBeats", "loop", "phases", "clip", "clipCycleBeats", "lengthBeats", "speed", "lock", "strength"], where);
   if (!finite(input.atBeat, 0, durationBeats - 0.125)) fail(`${where}.atBeat must be a beat inside the recipe`);
   if (!finite(input.blendBeats, 0, 8)) fail(`${where}.blendBeats must be 0–8`);
   if (typeof input.loop !== "boolean") fail(`${where}.loop must be true or false`);
@@ -155,13 +162,14 @@ function validateMove(input: unknown, where: string, durationBeats: number): Mov
     if (!finite(input.clipCycleBeats, 0.25, 64)) fail(`${where}.clipCycleBeats must be 0.25–64`);
     move.clipCycleBeats = input.clipCycleBeats as number;
   }
+  validateLock(input, where, move);
   return move;
 }
 
 /** Strict validation for agent-supplied JSON and imported recipes. Returns a fresh copy. */
 export function validateRecipe(input: unknown): Recipe {
   if (!isObject(input)) return fail("expected an object");
-  only(input, ["version", "fps", "durationBeats", "beatGrid", "character", "energy", "moves", "rootPath", "jumps", "audio", "camera", "reactive", "steps", "energyCurve", "envelope"], "recipe");
+  only(input, ["version", "fps", "durationBeats", "beatGrid", "character", "energy", "moves", "rootPath", "jumps", "audio", "camera", "reactive", "steps", "energyCurve", "envelope", "travelLock"], "recipe");
   if (input.version !== RECIPE_VERSION) fail(`expected version ${RECIPE_VERSION}`);
   if (input.fps !== 24) fail("fps must be 24");
   if (!Number.isInteger(input.durationBeats) || !finite(input.durationBeats, 1, 512)) fail("durationBeats must be a whole number 1–512");
@@ -189,12 +197,15 @@ export function validateRecipe(input: unknown): Recipe {
   let last = -Infinity;
   const rootPath = (input.rootPath as unknown[]).map((p, i) => {
     if (!isObject(p)) return fail(`rootPath[${i}] must be an object`);
-    only(p, ["beat", "x", "z", "yaw"], `rootPath[${i}]`);
+    only(p, ["beat", "x", "z", "yaw", "y"], `rootPath[${i}]`);
+    if (p.y !== undefined && !finite(p.y, 0, 30)) fail(`rootPath[${i}].y must be a height 0–30 m`);
     if (!finite(p.beat, 0, durationBeats) || (p.beat as number) <= last ||
         !finite(p.x, -100, 100) || !finite(p.z, -100, 100) || !finite(p.yaw, -720, 720))
       fail(`rootPath[${i}] needs an increasing beat and finite x, z, yaw`);
     last = p.beat as number;
-    return { beat: p.beat as number, x: p.x as number, z: p.z as number, yaw: p.yaw as number };
+    const point: RootPoint = { beat: p.beat as number, x: p.x as number, z: p.z as number, yaw: p.yaw as number };
+    if (p.y !== undefined && p.y !== 0) point.y = p.y as number;
+    return point;
   });
   if (!Array.isArray(input.jumps) || input.jumps.length > 64) fail("jumps must be a list of up to 64");
   const jumps = (input.jumps as unknown[]).map((j, i) => {
@@ -225,6 +236,13 @@ export function validateRecipe(input: unknown): Recipe {
   if (input.energyCurve !== undefined) recipe.energyCurve = validateEnergyCurve(input.energyCurve);
   if (input.envelope !== undefined) recipe.envelope = validateEnvelope(input.envelope);
   if (input.reactive !== undefined) recipe.reactive = validateReactive(input.reactive);
+  if (input.travelLock !== undefined) {
+    if (!isObject(input.travelLock)) fail("travelLock must be an object");
+    only(input.travelLock as Record<string, unknown>, ["lock", "strength"], "travelLock");
+    const lock: BeatLock = {};
+    validateLock(input.travelLock as Record<string, unknown>, "travelLock", lock);
+    if (lock.lock) recipe.travelLock = lock;
+  }
   if (input.camera !== undefined) recipe.camera = validateCamera(input.camera, durationBeats);
   return recipe;
 }

@@ -9,7 +9,8 @@ import { setAnticipation, setImpact } from "./accent-feel";
 import type { CommandContext } from "./commands";
 import { deleteMove, deletePhase, deleteStep, restorePhase, type GapMode } from "./delete-edits";
 import { moveMoveTo, placeOnEvery, resizeMove, setMoveFields, snapMoveTo } from "./move-edits";
-import { clearCameraPath, clearRootPath, setCamera, setCameraModes, setCameraPath, setRootPath, startCameraMove } from "./camera-edits";
+import { clearCameraPath, clearRootPath, setCamera, setCameraModes, setCameraPath, setRootPath, setTravelLock, startCameraMove } from "./camera-edits";
+import { moveCameraSegment, resizeCameraSegment, setCameraSegment } from "./camera-block-edits";
 import type { CameraMode } from "./camera";
 import { STEP_DIVISIONS, type StepDivision } from "./performance-config";
 import {
@@ -37,7 +38,7 @@ export const COMMAND_TABLE: Record<string, TableCommand> = {
   // Blocks on the move track.
   moveMoveTo: { help: "{ moveId, toBeat } move a block, keeping its length and speed", run: (r, a) => moveMoveTo(r, { moveId: str(a, "moveId"), toBeat: num(a, "toBeat") }) },
   resizeMove: { help: "{ moveId, edge: start|end, toBeat } drag an edge; longer plays slower, shorter faster", run: (r, a) => resizeMove(r, { moveId: str(a, "moveId"), edge: edge(a), toBeat: num(a, "toBeat") }) },
-  setMoveFields: { help: "{ moveId, start?, length?, speed?, amplitude? } the selected block's fields", run: (r, a) => setMoveFields(r, { moveId: str(a, "moveId"), start: optNum(a, "start"), length: optNum(a, "length"), speed: optNum(a, "speed"), amplitude: optNum(a, "amplitude") }) },
+  setMoveFields: { help: "{ moveId, start?, length?, speed?, amplitude?, lock?: off|beat|kick|snare|hat, strength? } the selected block's fields", run: (r, a) => setMoveFields(r, { moveId: str(a, "moveId"), start: optNum(a, "start"), length: optNum(a, "length"), speed: optNum(a, "speed"), amplitude: optNum(a, "amplitude"), lock: a.lock === undefined ? undefined : str(a, "lock"), strength: optNum(a, "strength") }) },
   snapMoveTo: { help: "{ moveId, target: kick|snare|hat, index? } start a move on the nearest (or the index-th) kick or snare", run: (r, a, c) => snapMoveTo(r, { moveId: str(a, "moveId"), target: str(a, "target"), index: a.index === undefined ? undefined : int(a, "index") }, c.bands ?? c.drive?.bands) },
   placeOnEvery: {
     help: "{ move, target: kick|snare|hat, every?, offset?, fromBeat?, toBeat?, lengthBeats?, replace? } put a move (or an accent such as jump) on every Nth kick or snare",
@@ -68,9 +69,20 @@ export const COMMAND_TABLE: Record<string, TableCommand> = {
   setCamera: { help: "{ distance?, height?, fov?, intensity?, orbitDegreesPerBeat?, startYaw? } camera rig numbers (adds a rig if there is none)", run: (r, a) => setCamera(r, { distance: optNum(a, "distance"), height: optNum(a, "height"), fov: optNum(a, "fov"), intensity: optNum(a, "intensity"), orbitDegreesPerBeat: optNum(a, "orbitDegreesPerBeat"), startYaw: optNum(a, "startYaw") }) },
   setCameraModes: { help: "{ modes, fromBeat?, toBeat? } camera modes on a range: static, orbit, pushIn, pullOut, rise, lead, chase, side, threeQuarter, top, fixed, path", run: (r, a) => setCameraModes(r, { modes: a.modes as CameraMode[], fromBeat: optNum(a, "fromBeat"), toBeat: optNum(a, "toBeat") }) },
   startCameraMove: { help: "{ modes, target: kick|snare|hat|beat, index?, lengthBeats? } start a camera move on the Nth kick or snare (0-based)", run: (r, a, c) => startCameraMove(r, { modes: a.modes as CameraMode[], target: str(a, "target"), index: a.index === undefined ? undefined : num(a, "index"), lengthBeats: optNum(a, "lengthBeats") }, c.bands ?? c.drive?.bands) },
+  setCameraSegment: {
+    help: "{ index, modes?, shot?: wide|medium|close|low|top, cut?, amount?, from?, to?, lock?: off|beat|kick|snare|hat, strength?, onHit?: hold|punch, punch? } a camera block's fields (null clears one)",
+    run: (r, a) => { const { index, ...rest } = a; return setCameraSegment(r, { index: int({ index }, "index"), ...rest } as Parameters<typeof setCameraSegment>[1]); },
+  },
+  moveCameraSegment: { help: "{ index, toBeat } move a camera block, keeping its length (neighbours it runs into are trimmed)", run: (r, a) => moveCameraSegment(r, { index: int(a, "index"), toBeat: num(a, "toBeat") }) },
+  resizeCameraSegment: { help: "{ index, edge: start|end, toBeat } drag a camera block's edge (a shared edge rolls the cut)", run: (r, a) => resizeCameraSegment(r, { index: int(a, "index"), edge: edge(a), toBeat: num(a, "toBeat") }) },
   setCameraPath: { help: "{ points: [{ x, z, y? }], useMode? } the camera path seen from the top (x, z metres; y height)", run: (r, a) => setCameraPath(r, { points: a.points as { x: number; z: number; y?: number }[], useMode: a.useMode !== false }) },
   clearCameraPath: { help: "{} remove the camera path", run: r => clearCameraPath(r) },
-  setRootPath: { help: "{ points: [{ x, z }], fromBeat?, toBeat?, gait? } the floor path the character travels over a range (smoothed, steady speed, facing along it); gait adds a walk or run block", run: (r, a) => setRootPath(r, { points: a.points as { x: number; z: number }[], fromBeat: optNum(a, "fromBeat"), toBeat: optNum(a, "toBeat"), gait: a.gait === undefined ? undefined : str(a, "gait") }) },
+  setRootPath: {
+    help: "{ points: [{ x, z, y? }], fromBeat?, toBeat?, gait?, face?: path|hold, lock?, strength? } the floor path the character travels over a range (smoothed, steady speed); gait adds a walk or run block at the path's speed, gait glide slides the figure with no gait",
+    run: (r, a) => setRootPath(r, { points: a.points as { x: number; z: number; y?: number }[], fromBeat: optNum(a, "fromBeat"), toBeat: optNum(a, "toBeat"), gait: a.gait === undefined ? undefined : str(a, "gait"),
+      face: a.face === undefined ? undefined : a.face === "hold" ? "hold" : a.face === "path" ? "path" : bad("face", "path or hold"), lock: a.lock === undefined ? undefined : str(a, "lock"), strength: optNum(a, "strength") }),
+  },
+  setTravelLock: { help: "{ lock: off|beat|kick|snare|hat, strength? } lock the travel along the walk path: stations on each locked hit", run: (r, a) => setTravelLock(r, { lock: str(a, "lock"), strength: optNum(a, "strength") }) },
   clearRootPath: { help: "{} the character stands at the origin", run: r => clearRootPath(r) },
   // Hit markers (accents on the music).
   addMarker: { help: "{ seconds, accent } add a hit marker", run: (r, a, c) => addMarker(r, c.drive, num(a, "seconds"), accent(a, "accent")) },

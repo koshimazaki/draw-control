@@ -9,7 +9,8 @@ import { evaluateAccent, proceduralAccent } from "./accents";
 import { energyAtSeconds, type AudioDrive } from "./audio-drive";
 import { beatAtSeconds } from "./beats";
 import { clipFrameAt } from "./clip-perform";
-import { baseFrameAt, jumpHeight, poseAtBeat, sampleRootPath, type FrameState } from "./engine";
+import { baseFrameAt, jumpHeight, poseAtBeat, type FrameState } from "./engine";
+import { rootAt } from "./root-travel";
 import { JOINTS, mixPoses, poseDistance, scalePose, type Euler3, type JointName, type Pose } from "./poses";
 import { planReactive, type BarLevel, type ReactivePlan } from "./reactive";
 import { AMPLITUDE_MAX, type Recipe } from "./recipe";
@@ -35,7 +36,7 @@ export function reactivePlanFor(recipe: Recipe, drive?: AudioDrive): ReactivePla
 }
 
 function levelPose(recipe: Recipe, plan: ReactivePlan, level: BarLevel, beat: number): Pose {
-  return level === 0 ? poseAtBeat(plan.idle, beat).pose : poseAtBeat(recipe, beat, level).pose;
+  return level === 0 ? poseAtBeat(plan.idle, beat).pose : poseAtBeat(recipe, beat, level, plan.drive?.bands).pose;
 }
 
 /** The move layer at a time: tempo level per bar (cross-faded), amplitude by energy, seeded drift. */
@@ -102,13 +103,13 @@ export function frameAt(recipe: Recipe, frame: number, drive?: AudioDrive): Fram
 
 function movedFrameAt(recipe: Recipe, frame: number, drive?: AudioDrive): FrameState {
   if (recipe.character.kind === "rigged") return clipFrameAt(recipe, frame, drive);
-  if (!recipe.reactive) return baseFrameAt(recipe, frame);
+  if (!recipe.reactive) return baseFrameAt(recipe, frame, drive);
   const plan = reactivePlanFor(recipe, drive);
   const seconds = frame / recipe.fps;
   const beat = beatAtSeconds(recipe.beatGrid, seconds);
-  const path = sampleRootPath(recipe.rootPath, beat);
-  const root = { x: path.x, y: jumpHeight(recipe, beat), z: path.z, yawRadians: path.yaw * Math.PI / 180 };
-  const base = poseAtBeat(recipe, beat);
+  const path = rootAt(recipe, beat, drive);
+  const root = { x: path.x, y: path.y + jumpHeight(recipe, beat), z: path.z, yawRadians: path.yaw * Math.PI / 180 };
+  const base = poseAtBeat(recipe, beat, 1, drive?.bands);
   let pose = humanisedPoseAt(recipe, plan, seconds);
   let accent: FrameState["accent"];
   for (const hit of plan.hits) {

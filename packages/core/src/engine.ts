@@ -6,7 +6,12 @@
  */
 import { beatAtSeconds } from "./beats";
 import { POSES, mixPoses, neutralPose, scalePose, type Pose } from "./poses";
-import { moveBeats, phaseBeats, type Expression, type Recipe, type RootPoint } from "./recipe";
+import { moveBeats, phaseBeats, type Expression, type Recipe } from "./recipe";
+import type { AudioDrive } from "./audio-drive";
+import type { BandAnalysis } from "./audio-bands";
+import { DEFAULT_LOCK_STRENGTH, lockHits, pulseBeat } from "./lock";
+import { rootAt } from "./root-travel";
+export { sampleRootPath } from "./root-travel";
 
 export type ClipLayer = {
   moveId: string; clip: string; /** 0–1 through one clip cycle */ cyclePhase: number; weight: number;
@@ -49,23 +54,8 @@ export type FrameState = {
 
 const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
 const mod = (a: number, b: number) => ((a % b) + b) % b;
-const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 const easeInOut = (t: number) => 0.5 - 0.5 * Math.cos(Math.PI * clamp(t, 0, 1));
 const EPS = 1e-9;
-
-export function sampleRootPath(points: readonly RootPoint[], beat: number) {
-  const first = points[0];
-  if (beat <= first.beat) return { x: first.x, z: first.z, yaw: first.yaw };
-  for (let i = 1; i < points.length; i++) {
-    const a = points[i - 1], b = points[i];
-    if (beat <= b.beat) {
-      const t = clamp((beat - a.beat) / (b.beat - a.beat), 0, 1);
-      return { x: lerp(a.x, b.x, t), z: lerp(a.z, b.z, t), yaw: lerp(a.yaw, b.yaw, t) };
-    }
-  }
-  const end = points[points.length - 1];
-  return { x: end.x, z: end.z, yaw: end.yaw };
-}
 
 export function jumpHeight(recipe: Recipe, beat: number): number {
   let y = 0;
@@ -76,9 +66,22 @@ export function jumpHeight(recipe: Recipe, beat: number): number {
   return y;
 }
 
+/**
+ * The beat a move plays at under its beat lock: inside its block the phases or the clip
+ * speed up into each locked hit and slow after it (lock.ts `pulseBeat`); unlocked, the beat itself.
+ */
+export function lockedMoveBeat(recipe: Recipe, moveIndex: number, beat: number, bands?: BandAnalysis): number {
+  const m = recipe.moves[moveIndex];
+  if (!m.lock) return beat;
+  const strength = m.strength ?? DEFAULT_LOCK_STRENGTH, end = moveEndBeat(recipe, moveIndex);
+  if (strength <= 0 || beat <= m.atBeat || beat >= end) return beat;
+  return pulseBeat(beat, m.atBeat, end, lockHits(recipe.beatGrid, bands, m.lock, m.atBeat, end), strength);
+}
+
 /** Evaluate one move at a beat, as if it were the only move playing. */
-export function evaluateMove(recipe: Recipe, moveIndex: number, beat: number) {
+export function evaluateMove(recipe: Recipe, moveIndex: number, beatIn: number, bands?: BandAnalysis) {
   const move = recipe.moves[moveIndex];
+  const beat = lockedMoveBeat(recipe, moveIndex, beatIn, bands);
   const total = moveBeats(move, recipe);
   const raw = Math.max(0, beat - move.atBeat) * (move.speed ?? 1);
   const local = move.loop ? mod(raw, total) : Math.min(raw, total - EPS);
@@ -131,12 +134,12 @@ export function activeMoveIndex(recipe: Recipe, beat: number): number {
  * blend beats. `rate` plays the moves' phases faster or slower (2 = double time) while the
  * scheduling (which move is active, the blends) stays on the real beat.
  */
-export function poseAtBeat(recipe: Recipe, beat: number, rate = 1): { pose: Pose; layers: ClipLayer[]; active: ActivePhase | null } {
+export function poseAtBeat(recipe: Recipe, beat: number, rate = 1, bands?: BandAnalysis): { pose: Pose; layers: ClipLayer[]; active: ActivePhase | null } {
   if (recipe.moves.length === 0) return { pose: neutralPose(), layers: [], active: null };
   const k = activeMoveIndex(recipe, beat);
   const move = recipe.moves[k];
   const local = (m: { atBeat: number }) => m.atBeat + (beat - m.atBeat) * rate;
-  const cur = evaluateMove(recipe, k, local(move));
+  const cur = evaluateMove(recipe, k, local(move), bands);
   const rest = restWeight(recipe, k, beat);
   let weight = 1;
   if (k > 0 && move.blendBeats > 0) weight = easeInOut((beat - move.atBeat) / move.blendBeats);
@@ -144,7 +147,7 @@ export function poseAtBeat(recipe: Recipe, beat: number, rate = 1): { pose: Pose
   const layers: ClipLayer[] = [];
   if (weight < 1) {
     const pm = recipe.moves[k - 1];
-    const prev = evaluateMove(recipe, k - 1, local(pm));
+    const prev = evaluateMove(recipe, k - 1, local(pm), bands);
     pose = mixPoses(prev.pose, cur.pose, weight);
     if (pm.clip) layers.push({ moveId: pm.id, clip: pm.clip, cyclePhase: prev.cyclePhase, weight: 1 - weight });
   }
@@ -160,12 +163,12 @@ export function poseAtBeat(recipe: Recipe, beat: number, rate = 1): { pose: Pose
 }
 
 /** The time-stretch path: moves on the beat grid, root path and jumps, no audio input. */
-export function baseFrameAt(recipe: Recipe, frame: number): FrameState {
+export function baseFrameAt(recipe: Recipe, frame: number, drive?: AudioDrive): FrameState {
   const seconds = frame / recipe.fps;
   const beat = beatAtSeconds(recipe.beatGrid, seconds);
-  const path = sampleRootPath(recipe.rootPath, beat);
-  const root = { x: path.x, y: jumpHeight(recipe, beat), z: path.z, yawRadians: path.yaw * Math.PI / 180 };
-  return { frame, seconds, beat, root, ...poseAtBeat(recipe, beat) };
+  const path = rootAt(recipe, beat, drive);
+  const root = { x: path.x, y: path.y + jumpHeight(recipe, beat), z: path.z, yawRadians: path.yaw * Math.PI / 180 };
+  return { frame, seconds, beat, root, ...poseAtBeat(recipe, beat, 1, drive?.bands) };
 }
 
 export type SpeedClass = "hold" | "move" | "fast";
