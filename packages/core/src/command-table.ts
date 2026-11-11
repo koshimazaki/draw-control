@@ -19,7 +19,7 @@ import {
 } from "./performance-edits";
 import { RecipeError, validateRecipe, type Recipe } from "./recipe";
 import {
-  ENVELOPE_SOURCES, clearEnvelope, drawEnvelope, envelopeFromAudio, paintEnvelope, removeEnvelopePoint, setEnvelopePoint, setEnvelopePoints, type EnvelopePoint, type EnvelopeSource,
+  ENVELOPE_LANES, ENVELOPE_SOURCES, clearEnvelope, type EnvelopeLane, drawEnvelope, envelopeFromAudio, paintEnvelope, removeEnvelopePoint, setEnvelopePoint, setEnvelopePoints, type EnvelopePoint, type EnvelopeSource,
 } from "./envelope";
 
 type Args = Record<string, unknown>;
@@ -33,6 +33,7 @@ const str = (a: Args, k: string) => (typeof a[k] === "string" && (a[k] as string
 const accent = (a: Args, k: string): AccentKey => (isAccentKey(a[k]) ? a[k] as AccentKey : bad(k, "an accent move (hit, point, strike, kick, jump, spin, …)"));
 const gap = (a: Args): GapMode => (a.mode === undefined || a.mode === "close" ? "close" : a.mode === "hold" ? "hold" : bad("mode", "close or hold"));
 const division = (a: Args): StepDivision => (STEP_DIVISIONS.includes(a.division as StepDivision) ? a.division as StepDivision : bad("division", "4, 8 or 16"));
+const lane = (a: Args): EnvelopeLane | undefined => (a.lane === undefined ? undefined : ENVELOPE_LANES.includes(a.lane as EnvelopeLane) ? a.lane as EnvelopeLane : bad("lane", ENVELOPE_LANES.join(", ")));
 const edge = (a: Args) => (a.edge === "start" || a.edge === "end" ? a.edge : bad("edge", "start or end"));
 
 export const COMMAND_TABLE: Record<string, TableCommand> = {
@@ -56,16 +57,16 @@ export const COMMAND_TABLE: Record<string, TableCommand> = {
   paintEnergy: { help: "{ fromSeconds, toSeconds, from, to } draw the energy curve linearly between two times, 0–1", run: (r, a, c) => paintEnergy(r, c.drive, num(a, "fromSeconds"), num(a, "toSeconds"), num(a, "from"), num(a, "to")) },
   clearEnergyCurve: { help: "{} back to the analysed energy", run: r => clearEnergyCurve(r) },
   // The amplitude envelope (one value per frame, 0–3, scaling every move).
-  paintEnvelope: { help: "{ fromFrame, toFrame, from, to } draw a straight segment of the amplitude envelope, values 0–3", run: (r, a) => validateRecipe(paintEnvelope(r, { fromFrame: num(a, "fromFrame"), toFrame: num(a, "toFrame"), from: num(a, "from"), to: num(a, "to") })) },
-  drawEnvelope: { help: "{ startFrame, values: [..] } a freehand stroke, one value per frame (simplified to breakpoints)", run: (r, a) => validateRecipe(drawEnvelope(r, { startFrame: num(a, "startFrame"), values: a.values as number[] })) },
-  setEnvelopePoints: { help: "{ points: [[frame, value], ..] } replace the envelope's breakpoints", run: (r, a) => validateRecipe(setEnvelopePoints(r, { points: Array.isArray(a.points) ? a.points as EnvelopePoint[] : bad("points", "a list of [frame, value]") })) },
-  setEnvelopePoint: { help: "{ index?, frame, value } move a breakpoint (no index: add one)", run: (r, a) => validateRecipe(setEnvelopePoint(r, { index: a.index === undefined ? undefined : int(a, "index"), frame: num(a, "frame"), value: num(a, "value") })) },
-  removeEnvelopePoint: { help: "{ index } remove a breakpoint", run: (r, a) => validateRecipe(removeEnvelopePoint(r, { index: int(a, "index") })) },
+  paintEnvelope: { help: "{ fromFrame, toFrame, from, to, lane? } draw a straight segment of a lane (amplitude 0–3, or camera distance, height, yaw, fov)", run: (r, a) => validateRecipe(paintEnvelope(r, { fromFrame: num(a, "fromFrame"), toFrame: num(a, "toFrame"), from: num(a, "from"), to: num(a, "to"), lane: lane(a) })) },
+  drawEnvelope: { help: "{ startFrame, values: [..], lane? } a freehand stroke, one value per frame (simplified to breakpoints)", run: (r, a) => validateRecipe(drawEnvelope(r, { startFrame: num(a, "startFrame"), values: a.values as number[], lane: lane(a) })) },
+  setEnvelopePoints: { help: "{ points: [[frame, value], ..], lane? } replace a lane's breakpoints", run: (r, a) => validateRecipe(setEnvelopePoints(r, { points: Array.isArray(a.points) ? a.points as EnvelopePoint[] : bad("points", "a list of [frame, value]"), lane: lane(a) })) },
+  setEnvelopePoint: { help: "{ index?, frame, value, lane? } move a breakpoint (no index: add one)", run: (r, a) => validateRecipe(setEnvelopePoint(r, { index: a.index === undefined ? undefined : int(a, "index"), frame: num(a, "frame"), value: num(a, "value"), lane: lane(a) })) },
+  removeEnvelopePoint: { help: "{ index, lane? } remove a breakpoint", run: (r, a) => validateRecipe(removeEnvelopePoint(r, { index: int(a, "index"), lane: lane(a) })) },
   envelopeFromAudio: {
-    help: `{ source: ${ENVELOPE_SOURCES.join("|")}, min?, max?, decayBeats? } start the envelope from the loudness or from a band's onsets`,
+    help: `{ source: ${ENVELOPE_SOURCES.join("|")}, min?, max?, decayBeats? } start the amplitude envelope from the loudness or from a band's onsets`,
     run: (r, a, c) => validateRecipe(envelopeFromAudio(r, { source: str(a, "source") as EnvelopeSource, min: optNum(a, "min"), max: optNum(a, "max"), decayBeats: optNum(a, "decayBeats") }, { drive: c.drive, bands: c.bands })),
   },
-  clearEnvelope: { help: "{} remove the envelope (every frame at 1)", run: r => validateRecipe(clearEnvelope(r)) },
+  clearEnvelope: { help: "{ lane? } remove a lane's points (amplitude: every frame at 1; a camera lane: the rig runs as programmed)", run: (r, a) => validateRecipe(clearEnvelope(r, { lane: lane(a) })) },
   // Camera rig and paths.
   setCamera: { help: "{ distance?, height?, fov?, intensity?, orbitDegreesPerBeat?, startYaw? } camera rig numbers (adds a rig if there is none)", run: (r, a) => setCamera(r, { distance: optNum(a, "distance"), height: optNum(a, "height"), fov: optNum(a, "fov"), intensity: optNum(a, "intensity"), orbitDegreesPerBeat: optNum(a, "orbitDegreesPerBeat"), startYaw: optNum(a, "startYaw") }) },
   setCameraModes: { help: "{ modes, fromBeat?, toBeat? } camera modes on a range: static, orbit, pushIn, pullOut, rise, lead, chase, side, threeQuarter, top, fixed, path", run: (r, a) => setCameraModes(r, { modes: a.modes as CameraMode[], fromBeat: optNum(a, "fromBeat"), toBeat: optNum(a, "toBeat") }) },

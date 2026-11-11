@@ -50,6 +50,10 @@ export function describeRecipe(r: Recipe, bands?: BandAnalysis): string {
       return bits.length ? ` (${bits.join(", ")})` : "";
     };
     out.push(`  ranges: ${c.segments.map(s => `${s.modes.join("+")} ${f2(s.fromBeat)}–${f2(s.toBeat)}${extra(s)}`).join("; ")}${c.path ? `; drawn path ${c.path.length} points` : ""}.`);
+    for (const [k, env] of Object.entries(c.lanes ?? {})) {
+      const pts = env!.points, vals = pts.map(p => p[1]);
+      out.push(`  ${k} lane: ${pts.length} breakpoints, frames ${pts[0][0]}–${pts[pts.length - 1][0]}, ${f2(Math.min(...vals))}–${f2(Math.max(...vals))}${k === "yaw" ? "° offset" : k === "fov" ? "°, overrides the rig there" : " m, overrides the rig there"}; [frame, value]: ${pts.slice(0, 8).map(p => `[${p[0]}, ${p[1]}]`).join(" ")}${pts.length > 8 ? " …" : ""}.`);
+    }
   } else out.push("Camera rig: off (fixed views only).");
   const p = r.rootPath;
   if (p.length > 1) {

@@ -20,6 +20,7 @@ import type { Recipe } from "./recipe";
 import { buildSpline } from "./spline";
 import { subjectAt } from "./subject";
 import { programCamera, type ProgrammedCamera } from "./camera-shots";
+import { inLane, laneAt } from "./automation";
 
 export type Vec3 = [number, number, number];
 export type CameraSample = { position: Vec3; target: Vec3; /** vertical, degrees, at 16:9 */ fov: number; energy: number };
@@ -170,6 +171,15 @@ export function planCamera(recipe: Recipe, drive?: AudioDrive, frames = 0): Came
     }
   }
 
+  // Automation lanes win over everything above for their parameter, where they have points; yaw adds an offset.
+  const lanes = config.lanes;
+  if (lanes) for (let n = 0; n < total; n++) {
+    if (inLane(lanes.distance, n)) ch.distance[n] = laneAt(lanes.distance, n);
+    if (inLane(lanes.height, n)) ch.height[n] = laneAt(lanes.height, n);
+    if (lanes.yaw) ch.yaw[n] += laneAt(lanes.yaw, n, 0) * Math.PI / 180;
+  }
+  const fovAt = (n: number) => (inLane(lanes?.fov, n) ? laneAt(lanes!.fov, n) : prog.fov[n]);
+
   // Drawn path: the camera travels the spline over the path ranges, faster when loud,
   // cross-fading from and to the other modes; accents push along the view.
   const usesPath = !!config.path && config.segments.some(s => s.modes.includes("path"));
@@ -231,7 +241,7 @@ export function planCamera(recipe: Recipe, drive?: AudioDrive, frames = 0): Came
       ch.distance[n] = Math.hypot(position[0] - target[0], position[2] - target[2]);
       ch.height[n] = position[1];
     }
-    samples[n] = { position, target, fov: prog.fov[n], energy: energyAtFrame(drive, n) };
+    samples[n] = { position, target, fov: fovAt(n), energy: energyAtFrame(drive, n) };
   }
   for (let n = 1; n < total; n++) {
     // Unwrap yaw recomputed by atan2 so it stays continuous.

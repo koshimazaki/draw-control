@@ -26,6 +26,7 @@
  *   distance) for pushIn/pullOut;
  * - a beat lock (`lock`, `strength`, lock.ts) with `onHit` hold or punch (`punch` metres).
  */
+import { validateCameraLanes, type CameraLane, type Envelope } from "./automation";
 import { validateLock, type LockTarget } from "./lock";
 import { fail, isObject, num, only } from "./validate";
 
@@ -78,6 +79,8 @@ export type CameraConfig = {
   startYaw: number;
   /** Drawn camera path for the "path" mode: 2–32 points, world metres, y = camera height. */
   path?: { x: number; y: number; z: number }[];
+  /** Automation lanes (automation.ts): distance, height, fov override the rig where they have points; yaw adds an offset. */
+  lanes?: Partial<Record<CameraLane, Envelope>>;
 };
 
 export const DEFAULT_CAMERA: CameraConfig = {
@@ -87,7 +90,7 @@ export const DEFAULT_CAMERA: CameraConfig = {
 
 export function validateCamera(input: unknown, durationBeats: number): CameraConfig {
   if (!isObject(input)) return fail("camera must be an object");
-  only(input, ["segments", "intensity", "orbitDegreesPerBeat", "distance", "height", "fov", "startYaw", "path"], "camera");
+  only(input, ["segments", "intensity", "orbitDegreesPerBeat", "distance", "height", "fov", "startYaw", "path", "lanes"], "camera");
   if (!Array.isArray(input.segments) || input.segments.length < 1 || input.segments.length > 32) fail("camera.segments needs 1–32 ranges");
   let last = -Infinity;
   const segments = (input.segments as unknown[]).map((s, i): CameraSegment => {
@@ -132,6 +135,7 @@ export function validateCamera(input: unknown, durationBeats: number): CameraCon
     startYaw: num(input.startYaw, -360, 360, "camera.startYaw"),
   };
   if (path) out.path = path;
+  if (input.lanes !== undefined) { const lanes = validateCameraLanes(input.lanes); if (Object.keys(lanes).length) out.lanes = lanes; }
   return out;
 }
 
