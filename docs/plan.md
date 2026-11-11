@@ -170,7 +170,7 @@ Follow-up, same day (`npm run check` 210 tests, `npm run smoke`, `npm run mcp-ch
 - **Paths in the script.** `on path (x,z) (x,z,height) …` and `camera: path (x,z,height) …` give the walk path and the camera path in metres, through `setRootPath` (`smooth: false`: the points as given) and `setCameraPath`; the script reads back with the points. CLI and MCP tested; `npm run mcp-check` runs the real MCP server over stdio through `apply_script` and `render` (headless Chrome, about 3–5 s for 193 frames), the first run of MCP `render`.
 - **Public core.** `packages/core/src/index.ts` is the public entry (exports map `.`); every module stays under `./internal` for the studio; the core typechecks without the DOM library; `public-api.test.ts` imports only `@motion-studio/core` and computes frames and a camera in Node. README rewritten for a newcomer.
 
-Known limits: the script's `on path` re-times the drawn walk path and does not draw one; one path per script; a script anchor names the first band an onset sits on (kick before snare).
+Known limits: one walk path and one camera path per script; a drawn walk path of more than 16 points prints as `on path` without its points; a script anchor names the first band an onset sits on (kick before snare).
 
 ### MS-9b, after D (next, in this order)
 
