@@ -11,13 +11,15 @@ import {
   ACCENT_KEYS, LOOP_CLIPS, MOVE_KEYS, MOVE_LIBRARY, addMarker, beatAtSeconds, clearEnergyCurve, clearSteps, currentMarkers,
   currentSteps, effectiveDrive, insertMove, markerPhases, moveMarker, paintEnergy, removeMarker, removeMove, retimePhase,
   CLIP_ACCENTS, setAnticipation, beatsToFrames, blendBeatsOf, playedBoundaries, secondsAtBeat, setMarkerAccent, setMoveAtBeat, setMoveBlend, setStepAmplitude, snapSeconds,
-  type AccentKey, type AudioDrive, type CommandContext, type MotionCommand, type MoveKey, type Recipe, type SnapTarget, type StepDivision,
+  type AccentKey, type AudioDrive, type CameraPlan, type CommandContext, type MotionCommand, type MoveKey, type Recipe, type SnapTarget, type StepDivision,
 } from "@motion-studio/core";
-import { LANES, TIMELINE_HEIGHT, drawTimeline, laneTop, type TimelineModel } from "./draw";
+import { CAMERA_LANE_OF, COLLAPSIBLE, LANES, TIMELINE_HEIGHT, drawTimeline, laneAtY, laneHeight, laneTop, layoutLanes, openLanes, type CollapsibleLane, type TimelineModel } from "./draw";
+import { CAMERA_INSPECTOR, bindCameraInspector, cameraBlockAt, startCameraDrag } from "./camera-lane";
 import { MARKER_LAYOUT, bindMarkerInspector } from "./marker-inspector";
 import { closeMenu, deleteFocus, menuFor, showMenu, targetAt, type Focus } from "./focus";
 import { blockAt, startBlockDrag, type BlockHit, type MoveLaneHost } from "./move-lane";
-import { ENVELOPE_TOOLS, EnvelopeEditor } from "./envelope-lane";
+import { ENVELOPE_TOOLS, EnvelopeTools, LaneEditor } from "./envelope-lane";
+import { LaneRecorder, RECORD_TOOLS } from "./record-lane";
 
 export const TIMELINE_LAYOUT = `
     <div class="tl-tools">
@@ -36,6 +38,8 @@ export const TIMELINE_LAYOUT = `
       <span class="muted">Alt: no snapping</span>
     </div>
     <div class="tl-tools">${ENVELOPE_TOOLS}</div>
+    <div class="tl-tools">${RECORD_TOOLS}</div>
+${CAMERA_INSPECTOR}
 ${MARKER_LAYOUT}
     <canvas id="strip" class="strip timeline-canvas" style="height:${TIMELINE_HEIGHT}px"></canvas>`;
 
@@ -58,6 +62,8 @@ export type TimelineHost = {
   log?(command: { type: string } & Record<string, unknown>): void;
   /** Run a core command (logged). */
   command(c: MotionCommand): void;
+  /** The camera plan (the camera lanes draw it as their reference curve). */
+  cameraPlan?(): CameraPlan | null;
   /** A move for an imported clip (Mixamo) at a beat, or null for library clips. */
   importedMove?(clip: string, atBeat: number, recipe: Recipe): Recipe["moves"][number] | null;
 };
@@ -72,26 +78,47 @@ export class Timeline {
   private drawing = false;
   private points = false;
   private hover: TimelineModel["hover"] = null;
-  private cache: { recipe: Recipe; drive?: AudioDrive; division: number; model: Omit<TimelineModel, "beat" | "selectedMarker" | "selectedBlend" | "focus" | "poseSpeed" | "handles" | "hover" | "envelopePoints" | "envelopeHover"> } | null = null;
+  private cache: { recipe: Recipe; drive?: AudioDrive; division: number; model: Omit<TimelineModel, "beat" | "selectedMarker" | "selectedBlend" | "focus" | "poseSpeed" | "handles" | "hover" | "lanePoints" | "laneHover" | "cameraSelected" | "plan"> } | null = null;
 
-  private envelope: EnvelopeEditor;
+  private tools: EnvelopeTools;
+  /** One editor per automation lane: the amplitude envelope and the camera lanes. */
+  private editors = new Map<string, LaneEditor>();
+  /** The selected camera block (-1: none). */
+  cameraSelected = -1;
+  private syncCameraInspector: () => void;
+  private recorder: LaneRecorder;
 
   constructor(private host: TimelineHost) {
-    this.envelope = new EnvelopeEditor({
-      recipe: () => host.recipe(), ctx: () => host.ctx(), edit: fn => host.edit(fn), log: c => host.log?.(c), command: c => host.command(c), redraw: () => this.draw(),
-    }, () => laneTop.envelope, LANES.envelope);
+    const envHost = {
+      recipe: () => host.recipe(), ctx: () => host.ctx(), edit: (fn: (r: Recipe) => Recipe) => host.edit(fn), log: (c: MotionCommand) => host.log?.(c), command: (c: MotionCommand) => host.command(c),
+      redraw: () => this.draw(), snapTarget: () => this.snapTarget(), toggleLane: (k: string) => this.toggleLane(k as CollapsibleLane),
+    };
+    this.tools = new EnvelopeTools(envHost);
+    this.editors.set("envelope", new LaneEditor(envHost, this.tools, "amplitude", () => laneTop.envelope, () => laneHeight.envelope));
+    for (const [k, lane] of Object.entries(CAMERA_LANE_OF)) this.editors.set(k, new LaneEditor(envHost, this.tools, lane, () => laneTop[k as keyof typeof CAMERA_LANE_OF], () => laneHeight[k as keyof typeof CAMERA_LANE_OF]));
+    this.tools.syncToggles(openLanes);
+    this.recorder = new LaneRecorder({
+      command: c => host.command(c), plan: () => host.cameraPlan?.() ?? null,
+      frame: () => Math.round(secondsAtBeat(host.recipe().beatGrid, host.beat()) * host.recipe().fps),
+      showLane: lane => { const k = (Object.entries(CAMERA_LANE_OF).find(([, v]) => v === lane)?.[0]) as CollapsibleLane | undefined; if (k && !openLanes.has(k)) this.toggleLane(k); },
+    });
+    this.syncCameraInspector = bindCameraInspector({ recipe: () => host.recipe(), selected: () => this.cameraSelected, command: c => host.command(c) });
+    this.canvas.style.height = `${TIMELINE_HEIGHT}px`;
     $("tlDrawEnergy").onclick = () => { this.drawing = !this.drawing; if (this.drawing) this.points = false; this.syncModes(); };
     $("tlPoints").onclick = () => { this.points = !this.points; if (this.points) this.drawing = false; this.syncModes(); this.draw(); };
     this.canvas.addEventListener("pointermove", e => {
       if (e.buttons) return;
       const rect = this.canvas.getBoundingClientRect(), y = e.clientY - rect.top;
-      const h = y >= laneTop.move && y < laneTop.move + LANES.move && !this.paintMode() ? blockAt(this.host.recipe(), e.clientX - rect.left, rect.width) : null;
-      this.canvas.style.cursor = h ? (h.kind === "body" ? "grab" : "ew-resize") : y >= laneTop.envelope && y < laneTop.steps ? "crosshair" : "";
-      const inEnv = y >= laneTop.envelope && y < laneTop.steps;
-      if (inEnv || this.envelope.hover) { this.envelope.hoverAt(rect, inEnv ? e : null); this.draw(); }
+      const lane = laneAtY(y), x = e.clientX - rect.left;
+      const h = lane === "move" && !this.paintMode() ? blockAt(this.host.recipe(), x, rect.width) : lane === "camera" ? cameraBlockAt(this.host.recipe(), x, rect.width) : null;
+      const editor = lane ? this.editors.get(lane) : undefined;
+      this.canvas.style.cursor = h ? (h.kind === "body" ? "grab" : "ew-resize") : editor ? "crosshair" : "";
+      let redraw = false;
+      for (const ed of this.editors.values()) if (ed === editor || ed.hover) { ed.hoverAt(rect, ed === editor ? e : null); redraw = true; }
+      if (redraw) this.draw();
       this.hoverAt(e);
     });
-    this.canvas.addEventListener("pointerleave", () => { this.hover = null; this.envelope.hoverAt(this.canvas.getBoundingClientRect(), null); this.draw(); });
+    this.canvas.addEventListener("pointerleave", () => { this.hover = null; for (const ed of this.editors.values()) ed.hoverAt(this.canvas.getBoundingClientRect(), null); this.draw(); });
     $("tlResetEnergy").onclick = () => host.edit(clearEnergyCurve);
     $("tlResetSteps").onclick = () => host.edit(clearSteps);
     $("tlDeleteMarker").onclick = () => this.deleteSelected();
@@ -113,6 +140,20 @@ export class Timeline {
       showMenu(e.pageX, e.pageY, menuFor(f, m, fn => { this.focus = null; this.selected = -1; host.edit(fn); this.draw(); }, host.drive(), this.division()));
     });
   }
+
+  /** Show or hide a collapsible lane; the canvas grows or shrinks to fit. */
+  toggleLane(k: CollapsibleLane) {
+    if (!(COLLAPSIBLE as readonly string[]).includes(k)) return;
+    if (openLanes.has(k)) openLanes.delete(k); else openLanes.add(k);
+    layoutLanes();
+    this.canvas.style.height = `${TIMELINE_HEIGHT}px`;
+    this.tools.syncToggles(openLanes);
+    this.draw();
+  }
+  /** One played frame (the recorder writes the armed lane). */
+  recordTick(frame: number, playing: boolean) { this.recorder.tick(frame, playing); }
+  /** Select a camera block (the inspector shows it). */
+  selectCamera(i: number) { this.cameraSelected = i; this.draw(); }
 
   private syncModes() { $("tlDrawEnergy").classList.toggle("on", this.drawing); $("tlPoints").classList.toggle("on", this.points); }
 
@@ -170,14 +211,16 @@ export class Timeline {
         energyEdited: !!recipe.energyCurve,
       } };
       if (this.selected >= markers.length) this.selected = -1;
+      if (this.cameraSelected >= (recipe.camera?.segments.length ?? 0)) this.cameraSelected = -1;
       const f = this.focus;
       if (f && (((f.kind === "marker" || f.kind === "phase") && f.marker >= markers.length) || (f.kind === "move" && !recipe.moves.some(mv => mv.id === f.id)))) this.focus = null;
     }
     return { ...this.cache.model, beat: this.host.beat(), selectedMarker: this.selected, selectedBlend: this.blendDrag, focus: this.focus, poseSpeed: this.host.poseSpeed(), handles: this.points, hover: this.hover,
-      envelopePoints: this.envelope?.mode === "points", envelopeHover: this.envelope?.hover ?? null };
+      lanePoints: this.tools?.mode === "points", laneHover: [...(this.editors?.values() ?? [])].find(ed => ed.hover)?.hover ?? null,
+      cameraSelected: this.cameraSelected, plan: this.host.cameraPlan?.() ?? null };
   }
 
-  draw() { drawTimeline(this.canvas, this.model()); this.syncInspector(); }
+  draw() { drawTimeline(this.canvas, this.model()); this.syncInspector(); this.syncCameraInspector?.(); }
   private syncInspector = bindMarkerInspector({
     recipe: () => this.host.recipe(), drive: () => this.host.drive(), edit: fn => this.host.edit(fn),
     selected: () => this.selected, division: () => this.division(),
@@ -203,11 +246,21 @@ export class Timeline {
     let move: ((ev: PointerEvent) => void) | null = null;
     let hit: BlockHit | null = null;
 
+    const laneKey = laneAtY(y), editor = laneKey ? this.editors.get(laneKey) : undefined;
     if (y >= laneTop.audio) {
       // Audio lane: seek (scrub while held).
       this.focus = null;
       this.host.seek(beatAtX(e.clientX));
       move = ev => this.host.seek(beatAtX(ev.clientX));
+    } else if (y >= laneTop.cameraHead) {
+      // Camera track: drag a camera block or its edges; the automation lanes edit like the envelope.
+      this.focus = null;
+      if (laneKey === "camera") {
+        const ch = cameraBlockAt(recipe, x, rect.width);
+        this.cameraSelected = ch ? ch.index : -1;
+        if (ch) move = startCameraDrag({ recipe: () => this.host.recipe(), ctx: () => this.host.ctx(), edit: fn => this.host.edit(fn), snapTarget: this.snapTarget, log: c => this.host.log?.(c) }, ch, beatAtX(e.clientX), beatAtX);
+        else this.host.seek(beatAtX(e.clientX));
+      } else if (editor) move = editor.down(e, rect);
     } else if (y < laneTop.move) {
       // Phase lane: grab the nearest boundary edge, or select the block's marker.
       let best: { i: number; k: number; d: number } | null = null;
@@ -270,7 +323,7 @@ export class Timeline {
     } else if (y < laneTop.steps) {
       // Envelope lane: pencil (freehand) or points.
       this.focus = null;
-      move = this.envelope.down(e, rect);
+      move = this.editors.get("envelope")!.down(e, rect);
     } else if (y < laneTop.graph) {
       // Amplitude lane: drag the bars.
       const division = this.division();

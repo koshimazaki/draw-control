@@ -6,14 +6,42 @@
  */
 import type { Focus } from "./focus";
 import { drawAudioLane, type Wave } from "./audio-lane";
-import { drawEnvelopeLane } from "./envelope-lane";
-import { CLIP_ACCENTS, accentSpan, beatsToFrames, blendBeatsOf, moveEndBeat, proceduralAccent, type AudioDrive, type HitMarker, type Recipe } from "@motion-studio/core";
+import { drawEnvelopeLane, type LaneHover } from "./envelope-lane";
+import { drawCameraLane } from "./camera-lane";
+import { CLIP_ACCENTS, accentSpan, beatsToFrames, blendBeatsOf, moveEndBeat, proceduralAccent, type AudioDrive, type CameraPlan, type HitMarker, type Recipe } from "@motion-studio/core";
 
-export const LANES = { phase: 26, move: 34, envelope: 130, steps: 54, graph: 230, audio: 84, gap: 4, markerStrip: 16 } as const;
-const ORDER = ["phase", "move", "envelope", "steps", "graph", "audio"] as const;
-/** Top of each lane, in CSS pixels from the canvas top, in ORDER with a gap between lanes. */
-export const laneTop = Object.fromEntries(ORDER.map((k, i) => [k, ORDER.slice(0, i).reduce((y, l) => y + LANES[l] + LANES.gap, 0)])) as Record<(typeof ORDER)[number], number>;
-export const TIMELINE_HEIGHT = laneTop.audio + LANES.audio;
+export const LANES = {
+  actionHead: 16, phase: 26, move: 34, envelope: 130, steps: 54, graph: 230,
+  cameraHead: 16, camera: 34, camDistance: 70, camHeight: 70, camYaw: 70, camFov: 70, audio: 84, gap: 4, markerStrip: 16,
+} as const;
+/**
+ * Two tracks, top to bottom: Action (phase blocks, move blocks, the amplitude envelope, the
+ * amplitude per step, the energy graph) and Camera (camera blocks and its automation lanes),
+ * then the audio lane. Automation lanes collapse to nothing (`openLanes`).
+ */
+export const ORDER = ["actionHead", "phase", "move", "envelope", "steps", "graph", "cameraHead", "camera", "camDistance", "camHeight", "camYaw", "camFov", "audio"] as const;
+export type LaneKey = (typeof ORDER)[number];
+export const COLLAPSIBLE = ["envelope", "camDistance", "camHeight", "camYaw", "camFov"] as const;
+export type CollapsibleLane = (typeof COLLAPSIBLE)[number];
+/** Camera automation lane per timeline lane. */
+export const CAMERA_LANE_OF = { camDistance: "distance", camHeight: "height", camYaw: "yaw", camFov: "fov" } as const;
+export const openLanes = new Set<CollapsibleLane>(["envelope"]);
+/** Top and height of each lane, in CSS pixels from the canvas top (a collapsed lane has height 0). */
+export const laneTop = {} as Record<LaneKey, number>;
+export const laneHeight = {} as Record<LaneKey, number>;
+export let TIMELINE_HEIGHT = 0;
+export function layoutLanes() {
+  let y = 0;
+  for (const k of ORDER) {
+    const h = (COLLAPSIBLE as readonly string[]).includes(k) && !openLanes.has(k as CollapsibleLane) ? 0 : LANES[k];
+    laneTop[k] = y; laneHeight[k] = h;
+    y += h ? h + LANES.gap : 0;
+  }
+  TIMELINE_HEIGHT = laneTop.audio + LANES.audio;
+}
+layoutLanes();
+/** The lane under y (CSS pixels), or null between lanes. */
+export const laneAtY = (y: number): LaneKey | null => ORDER.find(k => laneHeight[k] > 0 && y >= laneTop[k] && y < laneTop[k] + laneHeight[k]) ?? null;
 export const PHASE_COLOURS: Record<string, string> = { hold: "#4a7fd6", fast: "#d9534f", move: "#c8a26b", recover: "#6f9a83" };
 const CLIP_COLOURS = ["#5b8def", "#e0895a", "#5fb47a", "#c46fd0", "#d2b84a", "#4fb3c4", "#d0606e", "#8f8f8f"];
 export const clipColour = (name: string) => CLIP_COLOURS[[...name].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7) % CLIP_COLOURS.length];
@@ -38,9 +66,12 @@ export type TimelineModel = {
   energyEdited: boolean;
   /** Point handles on the energy curve (one per step) when editing points. */
   handles: boolean;
-  /** Envelope lane: the point handles are shown (points mode) and the readout under the pointer. */
-  envelopePoints: boolean;
-  envelopeHover: { x: number; frame: number; value: number } | null;
+  /** Automation lanes: the point handles are shown (points mode) and the readout under the pointer. */
+  lanePoints: boolean;
+  laneHover: LaneHover | null;
+  /** Camera track: the selected camera block (-1: none) and the camera plan (the lanes' reference curves). */
+  cameraSelected: number;
+  plan: CameraPlan | null;
   /** Value readout under the pointer. */
   hover: { x: number; seconds: number; beat: number; energy: number } | null;
 };
@@ -60,16 +91,21 @@ export function drawTimeline(canvas: HTMLCanvasElement, m: TimelineModel) {
   const X = (beat: number) => beat / total * w;
   const beatOfSec = (s: number) => (s - gb.offsetSeconds) * gb.bpm / 60;
   g.clearRect(0, 0, w, TIMELINE_HEIGHT);
+  // Track headers.
+  for (const [k, label] of [["actionHead", "ACTION"], ["cameraHead", "CAMERA"]] as const) {
+    g.fillStyle = "#24272d"; g.fillRect(0, laneTop[k], w, LANES[k]);
+    g.fillStyle = "rgba(231,232,234,0.75)"; g.font = "bold 10px system-ui, sans-serif"; g.fillText(label, 6, laneTop[k] + LANES[k] / 2 + 1); g.font = "10px system-ui, sans-serif";
+  }
   g.font = "10px system-ui, sans-serif";
   g.textBaseline = "middle";
   const lane = (top: number, h: number) => { g.fillStyle = "#1c1e22"; g.fillRect(0, top, w, h); };
-  for (const [top, h] of [[laneTop.phase, LANES.phase], [laneTop.move, LANES.move], [laneTop.envelope, LANES.envelope], [laneTop.steps, LANES.steps], [laneTop.graph, LANES.graph]]) lane(top, h);
+  for (const k of ORDER) if (k !== "actionHead" && k !== "cameraHead" && k !== "audio" && laneHeight[k]) lane(laneTop[k], laneHeight[k]);
 
   // Beat and bar grid through every lane.
   for (let b = 0; b <= total; b++) {
     const down = b % gb.beatsPerBar === 0;
     g.fillStyle = down ? "rgba(255,255,255,0.16)" : "rgba(255,255,255,0.06)";
-    g.fillRect(Math.round(X(b)), 0, 1, TIMELINE_HEIGHT);
+    for (const k of ORDER) if (laneHeight[k] && k !== "actionHead" && k !== "cameraHead") g.fillRect(Math.round(X(b)), laneTop[k], 1, laneHeight[k]);
   }
 
   // Phase lane.
@@ -122,7 +158,8 @@ export function drawTimeline(canvas: HTMLCanvasElement, m: TimelineModel) {
     const sp = mv.speed && mv.speed !== 1 ? ` ×${mv.speed.toFixed(2).replace(/\.?0+$/, "")}` : "";
     if (x1 - x0 > 24) g.fillText(name.replace(/_Loop$/, "").replace(/_/g, " ") + sp, x0 + 4, laneTop.move + LANES.move / 2 - 5);
     const amp = mv.phases[0]?.amplitude ?? 1;
-    if (x1 - x0 > 40 && amp !== 1) g.fillText(`amp ${amp.toFixed(2)}`, x0 + 4, laneTop.move + LANES.move / 2 + 7);
+    const lock = mv.lock ? `lock ${mv.lock}${mv.strength !== undefined ? ` ${mv.strength}` : ""}` : "";
+    if (x1 - x0 > 40 && (amp !== 1 || lock)) g.fillText([amp !== 1 ? `amp ${amp.toFixed(2)}` : "", lock].filter(Boolean).join(" · "), x0 + 4, laneTop.move + LANES.move / 2 + 7, x1 - x0 - 8);
   });
   const fm = m.focus;
   if (fm?.kind === "move") {
@@ -217,12 +254,20 @@ export function drawTimeline(canvas: HTMLCanvasElement, m: TimelineModel) {
   });
 
   drawAudioLane(g, w, laneTop.audio, LANES.audio, r, m.wave, m.analysed?.bands);
-  drawEnvelopeLane(g, w, laneTop.envelope, LANES.envelope, r, m.envelopeHover, m.envelopePoints);
+  drawEnvelopeLane(g, w, laneTop.envelope, laneHeight.envelope, r, "amplitude", m.laneHover, m.lanePoints);
+  drawCameraLane(g, w, laneTop.camera, LANES.camera, r, m.cameraSelected, m.analysed?.bands);
+  const plan = m.plan, ch = plan?.channels;
+  const at = (a: ArrayLike<number> | undefined, f: number) => (a ? a[Math.max(0, Math.min(a.length - 1, Math.round(f)))] : NaN);
+  const refs = {
+    camDistance: (f: number) => at(ch?.distance, f), camHeight: (f: number) => at(ch?.height, f),
+    camYaw: () => 0, camFov: (f: number) => (plan ? plan.samples[Math.max(0, Math.min(plan.frames - 1, Math.round(f)))].fov : NaN),
+  };
+  for (const k of Object.keys(CAMERA_LANE_OF) as (keyof typeof CAMERA_LANE_OF)[]) drawEnvelopeLane(g, w, laneTop[k], laneHeight[k], r, CAMERA_LANE_OF[k], m.laneHover, m.lanePoints, plan ? refs[k] : undefined);
 
   // Lane labels and the playhead.
   g.fillStyle = "rgba(231,232,234,0.55)";
   g.textAlign = "right";
-  for (const [label, t, h] of [["phases", laneTop.phase, LANES.phase], ["moves", laneTop.move, LANES.move], ["amplitude envelope 0–3", laneTop.envelope, 12], ["amplitude per step", laneTop.steps, 12], ["energy · pose speed", laneTop.graph + LANES.markerStrip + 6, 0]] as const) g.fillText(label, w - 4, t + (h ? h / 2 : 0));
+  for (const [label, t, h] of [["phases", laneTop.phase, LANES.phase], ["moves", laneTop.move, LANES.move], ["camera blocks", laneTop.camera, 12], ["amplitude per step", laneTop.steps, 12], ["energy · pose speed", laneTop.graph + LANES.markerStrip + 6, 0]] as const) g.fillText(label, w - 4, t + (h ? h / 2 : 0));
   g.textAlign = "left";
   g.fillStyle = "#ffd34d";
   g.fillRect(Math.round(X(m.beat)) - 1, 0, 2, TIMELINE_HEIGHT);

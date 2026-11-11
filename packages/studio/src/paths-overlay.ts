@@ -1,7 +1,10 @@
 /**
  * Path overlay for the top and orbit views: the rig's camera path as a solid line, a
  * small camera frustum at each downbeat accent (and a brighter one at the live camera),
- * and the character's floor path as a dotted line. Preview only: hidden in exports.
+ * and the character's floor path as a dotted line. During playback the part of each path
+ * that belongs to the current block (the camera block, the action block) is drawn brighter,
+ * and the stations of a beat-locked travel or camera block are marked as ticks. Preview
+ * only: hidden in exports.
  */
 import * as THREE from "three";
 import { Line2 } from "three/addons/lines/Line2.js";
@@ -9,9 +12,12 @@ import { LineGeometry } from "three/addons/lines/LineGeometry.js";
 import { LineMaterial } from "three/addons/lines/LineMaterial.js";
 import { LineSegments2 } from "three/addons/lines/LineSegments2.js";
 import { LineSegmentsGeometry } from "three/addons/lines/LineSegmentsGeometry.js";
-import { cameraAtFrame, frameAt, type AudioDrive, type CameraPlan, type CameraSample, type Recipe } from "@motion-studio/core";
+import {
+  activeMoveIndex, beatAtSeconds, cameraAtFrame, frameAt, moveEndBeat, secondsAtBeat, travelStations,
+  type AudioDrive, type CameraPlan, type CameraSample, type Recipe,
+} from "@motion-studio/core";
 
-const CAMERA_COLOUR = 0xffa040, FRUSTUM_COLOUR = 0xffd34d, LIVE_COLOUR = 0xffffff, FLOOR_COLOUR = 0x46c2ff;
+const CAMERA_COLOUR = 0xffa040, FRUSTUM_COLOUR = 0xffd34d, LIVE_COLOUR = 0xffffff, FLOOR_COLOUR = 0x46c2ff, CURRENT_COLOUR = 0xffffff, STATION_COLOUR = 0xff4d6d;
 
 /** Edges of a small camera frustum (apex at the camera, a 16:9 frame towards the target). */
 function frustumEdges(s: CameraSample, size: number): number[] {
@@ -40,6 +46,9 @@ export class PathsOverlay {
   private selectedPoint = -1;
   private plan: CameraPlan | null = null;
   private resolution = new THREE.Vector2(1, 1);
+  private recipe: Recipe | null = null;
+  private floorAt: { x: number; y: number; z: number }[] = [];
+  private current?: { key: string; lines: Line2[] };
   bounds = new THREE.Box3();
 
   constructor() { this.group.renderOrder = 10; }
@@ -55,10 +64,14 @@ export class PathsOverlay {
   update(recipe: Recipe, plan: CameraPlan | null, drive: AudioDrive | undefined, frames: number) {
     this.clear();
     this.plan = plan;
+    this.recipe = recipe;
     this.bounds.makeEmpty();
     const floor: number[] = [];
-    for (let n = 0; n < frames; n += 2) {
+    this.floorAt = [];
+    for (let n = 0; n < frames; n++) {
       const r = frameAt(recipe, n, drive).root;
+      this.floorAt.push({ x: r.x, y: 0.015, z: r.z });
+      if (n % 2) continue;
       floor.push(r.x, 0.015, r.z);
       this.bounds.expandByPoint(new THREE.Vector3(r.x, 0, r.z));
     }
@@ -77,6 +90,12 @@ export class PathsOverlay {
     }
     this.points = recipe.camera?.path ?? [];
     this.drawHandles();
+    // Stations of a locked travel: a short red post at each.
+    const ticks: number[] = [];
+    const post = (p: { x: number; z: number }, y0: number, y1: number) => ticks.push(p.x, y0, p.z, p.x, y1, p.z);
+    for (const b of travelStations(recipe, drive)) { const p = this.floorAt[Math.round(secondsAtBeat(recipe.beatGrid, b) * recipe.fps)]; if (p) post(p, 0.02, 0.35); }
+    if (plan) plan.programmed.hits.forEach(list => list.forEach(b => { const s = plan.samples[Math.round(secondsAtBeat(recipe.beatGrid, b) * plan.fps)]; if (s) post({ x: s.position[0], z: s.position[2] }, s.position[1] - 0.15, s.position[1] + 0.15); }));
+    if (ticks.length) this.group.add(new LineSegments2(new LineSegmentsGeometry().setPositions(ticks), this.material(STATION_COLOUR, 3)));
     if (!plan) return;
     const path: number[] = [];
     for (let n = 0; n < Math.min(frames, plan.frames); n++) {
@@ -116,9 +135,38 @@ export class PathsOverlay {
     this.group.add(this.stroke);
   }
 
-  /** Move the live frustum to the camera at a frame. */
+  /** Move the live frustum to the camera at a frame, and brighten the current blocks' parts of the paths. */
   showFrame(frame: number) {
     if (this.plan && this.live) (this.live.geometry as LineSegmentsGeometry).setPositions(frustumEdges(cameraAtFrame(this.plan, frame), 0.5));
+    this.highlight(frame);
+  }
+
+  /** The camera block and the action block playing at a frame, drawn over their paths. */
+  private highlight(frame: number) {
+    const r = this.recipe;
+    if (!r) return;
+    const beat = beatAtSeconds(r.beatGrid, frame / r.fps), toFrame = (b: number) => Math.round(secondsAtBeat(r.beatGrid, b) * r.fps);
+    const seg = r.camera?.segments.find(s => beat >= s.fromBeat && beat < s.toBeat);
+    const k = r.moves.length ? activeMoveIndex(r, beat) : -1, mv = k >= 0 && r.moves[k].atBeat <= beat && beat < moveEndBeat(r, k) ? [r.moves[k].atBeat, moveEndBeat(r, k)] : null;
+    const key = `${seg ? `${seg.fromBeat}-${seg.toBeat}` : ""}|${mv?.join("-") ?? ""}`;
+    if (this.current?.key === key) return;
+    for (const l of this.current?.lines ?? []) {
+      this.group.remove(l); l.geometry.dispose();
+      const m = l.material as LineMaterial;
+      this.materials = this.materials.filter(x => x !== m); m.dispose();
+    }
+    const lines: Line2[] = [];
+    const add = (pts: { x: number; y: number; z: number }[], colour: number) => {
+      if (pts.length < 2) return;
+      const l = new Line2(new LineGeometry().setPositions(pts.flatMap(p => [p.x, p.y + 0.01, p.z])), this.material(colour, 5));
+      this.group.add(l); lines.push(l);
+    };
+    if (seg && this.plan) add(this.plan.samples.slice(toFrame(seg.fromBeat), toFrame(seg.toBeat) + 1).map(s => ({ x: s.position[0], y: s.position[1], z: s.position[2] })), CURRENT_COLOUR);
+    if (mv) {
+      const part = this.floorAt.slice(toFrame(mv[0]), toFrame(mv[1]) + 1);
+      if (part.some(p => Math.hypot(p.x - part[0].x, p.z - part[0].z) > 0.05)) add(part, CURRENT_COLOUR);
+    }
+    this.current = { key, lines };
   }
 
   setResolution(width: number, height: number) {
@@ -131,6 +179,7 @@ export class PathsOverlay {
     for (const m of this.materials) m.dispose();
     this.materials = [];
     this.live = undefined;
+    this.current = undefined;
     this.stroke = undefined;
     this.handles = undefined;
   }

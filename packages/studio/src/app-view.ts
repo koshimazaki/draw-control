@@ -101,6 +101,9 @@ export function bindViewControls(host: ViewHost): ViewControls {
     const gait = $<HTMLSelectElement>("walkGait").value;
     return { fromBeat: Number.isFinite(from) ? from : 0, ...(to !== undefined && Number.isFinite(to) ? { toBeat: to } : {}), ...(gait ? { gait } : {}) };
   };
+  const travelLock = () => host.command({ type: "setTravelLock", lock: $<HTMLSelectElement>("walkLock").value, strength: Math.max(0, Math.min(1, Number(input("walkLockStrength").value) || 0)) });
+  $("walkLock").onchange = travelLock;
+  input("walkLockStrength").onchange = () => { if ($<HTMLSelectElement>("walkLock").value !== "off") travelLock(); };
   const pathDrawer = new PathDrawer(viewport, host.recipe, host.command, () => {
     $("drawPath").classList.toggle("on", pathDrawer.drawing && pathDrawer.target === "camera");
     $("drawWalk").classList.toggle("on", pathDrawer.drawing && pathDrawer.target === "root");

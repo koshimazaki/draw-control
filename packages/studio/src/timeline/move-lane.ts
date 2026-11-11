@@ -7,26 +7,30 @@
  */
 import { applyMotionCommand, moveEndBeat, snapBeat, type CommandContext, type Recipe, type SnapTarget } from "@motion-studio/core";
 
-export type BlockHit = { kind: "start" | "end" | "body"; index: number; id: string };
+export type SpanHit = { kind: "start" | "end" | "body"; index: number };
+export type BlockHit = SpanHit & { id: string };
 const EDGE_PX = 5;
 
-/** What is under x on the move lane: an edge (within 5 px) or a block's body. */
-export function blockAt(recipe: Recipe, x: number, width: number): BlockHit | null {
-  const X = (b: number) => b / recipe.durationBeats * width;
-  let best: BlockHit | null = null, bd = EDGE_PX;
-  recipe.moves.forEach((m, i) => {
-    const s = X(m.atBeat), e = X(moveEndBeat(recipe, i));
+/** What is under x on a lane of blocks: an edge (within 5 px) or a block's body. Shared by the move and camera lanes. */
+export function spanAt(spans: readonly { start: number; end: number }[], x: number, width: number, total: number): SpanHit | null {
+  const X = (b: number) => b / total * width;
+  let best: SpanHit | null = null, bd = EDGE_PX;
+  spans.forEach((sp, i) => {
+    const s = X(sp.start), e = X(sp.end);
     // At a shared cut, the left half picks the end of the earlier block and the right half the start of the later one.
     const ds = Math.abs(x - s) + (x < s ? 0.5 : 0), de = Math.abs(x - e) + (x > e ? 0.5 : 0);
-    if (ds < bd) { bd = ds; best = { kind: "start", index: i, id: m.id }; }
-    if (de < bd) { bd = de; best = { kind: "end", index: i, id: m.id }; }
+    if (ds < bd) { bd = ds; best = { kind: "start", index: i }; }
+    if (de < bd) { bd = de; best = { kind: "end", index: i }; }
   });
   if (best) return best;
-  for (let i = recipe.moves.length - 1; i >= 0; i--) {
-    const m = recipe.moves[i];
-    if (x >= X(m.atBeat) && x <= X(moveEndBeat(recipe, i))) return { kind: "body", index: i, id: m.id };
-  }
+  for (let i = spans.length - 1; i >= 0; i--) if (x >= X(spans[i].start) && x <= X(spans[i].end)) return { kind: "body", index: i };
   return null;
+}
+
+/** What is under x on the move lane. */
+export function blockAt(recipe: Recipe, x: number, width: number): BlockHit | null {
+  const hit = spanAt(recipe.moves.map((m, i) => ({ start: m.atBeat, end: moveEndBeat(recipe, i) })), x, width, recipe.durationBeats);
+  return hit && { ...hit, id: recipe.moves[hit.index].id };
 }
 
 export type MoveLaneHost = {
@@ -38,23 +42,32 @@ export type MoveLaneHost = {
   /** Record the gesture's final command (the command log). */
   log?(command: { type: string } & Record<string, unknown>): void;
 };
+type Command = { type: string } & Record<string, unknown>;
 
-/** Start a drag on the move lane; returns the pointer-move handler, or null when nothing was hit. */
-export function startBlockDrag(host: MoveLaneHost, hit: BlockHit, downBeat: number, beatAtX: (clientX: number) => number): ((ev: PointerEvent) => void) & { finish(): void } {
-  host.select(hit.id);
-  const r0 = host.recipe(), m0 = r0.moves[hit.index];
-  const grab = downBeat - m0.atBeat;   // where in the block the pointer took hold
-  let last = NaN, lastCommand: ({ type: string } & Record<string, unknown>) | null = null;
+/**
+ * Drag a block or an edge, snapped to the chosen target (Alt: free). Each step re-applies the
+ * command to the recipe as it was when the drag began, so one press is one undo step.
+ */
+export function startSpanDrag(host: Omit<MoveLaneHost, "select">, hit: SpanHit, blockStart: number, downBeat: number, beatAtX: (clientX: number) => number,
+  commandFor: (kind: SpanHit["kind"], beat: number) => Command): ((ev: PointerEvent) => void) & { finish(): void } {
+  const r0 = host.recipe(), grab = downBeat - blockStart;
+  let last = NaN, lastCommand: Command | null = null;
   const onMove = (ev: PointerEvent) => {
     const target: SnapTarget = ev.altKey ? "free" : host.snapTarget();
     const raw = beatAtX(ev.clientX);
     const beat = snapBeat(host.recipe(), hit.kind === "body" ? raw - grab : raw, target, host.ctx().bands);
     if (beat === last) return;
     last = beat;
-    // Each step re-applies the edit to the recipe as it was when the drag began, so one press is one undo step.
-    const command = hit.kind === "body" ? { type: "moveMoveTo", moveId: hit.id, toBeat: beat } : { type: "resizeMove", moveId: hit.id, edge: hit.kind, toBeat: beat };
+    const command = commandFor(hit.kind, beat);
     host.edit(() => applyMotionCommand(r0, command, host.ctx()));
     lastCommand = command;
   };
   return Object.assign(onMove, { finish: () => { if (lastCommand) host.log?.(lastCommand); } });
+}
+
+/** Start a drag on the move lane (moveMoveTo, resizeMove). */
+export function startBlockDrag(host: MoveLaneHost, hit: BlockHit, downBeat: number, beatAtX: (clientX: number) => number): ((ev: PointerEvent) => void) & { finish(): void } {
+  host.select(hit.id);
+  return startSpanDrag(host, hit, host.recipe().moves[hit.index].atBeat, downBeat, beatAtX,
+    (kind, beat) => (kind === "body" ? { type: "moveMoveTo", moveId: hit.id, toBeat: beat } : { type: "resizeMove", moveId: hit.id, edge: kind, toBeat: beat }));
 }

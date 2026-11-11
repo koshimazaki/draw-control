@@ -15,6 +15,7 @@ import { createServer } from "vite";
 import { chromium } from "playwright-core";
 import { unzipSync, strFromU8 } from "fflate";
 import { smokeBands, smokeBlocks, smokeCameraPath, smokeEnvelope } from "./smoke-features.mjs";
+import { smokeCameraTrack } from "./smoke-camera.mjs";
 
 const OUT = new URL("../out/smoke/", import.meta.url).pathname;
 mkdirSync(OUT, { recursive: true });
@@ -213,6 +214,7 @@ try {
   await smokeBlocks(page, { fail, OUT });
   await smokeEnvelope(page, { fail, OUT });
   await smokeCameraPath(page, { fail, OUT, checkBundle });
+  await smokeCameraTrack(page, { fail, OUT });
 
   if (errors.length) fail(`page errors: ${errors.join(" | ")}`);
 } finally {

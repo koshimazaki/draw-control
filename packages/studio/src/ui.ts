@@ -72,6 +72,10 @@ export const LAYOUT = `
           <label title="How big the move is: 0 rest, 1 as authored, up to 3">Amplitude <input id="selAmpNum" type="number" min="0" max="3" step="0.05" /></label>
         </div>
         <input id="selAmp" type="range" min="0" max="3" step="0.01" aria-label="Amplitude" />
+        <div class="row" title="Beat lock: the move speeds up into each locked hit and slows after it, keeping its length">
+          <span class="muted">Lock</span><select id="selLock"><option value="off">off</option><option value="beat">beat</option><option value="kick">kick</option><option value="snare">snare</option><option value="hat">hat</option></select>
+          <span class="muted">strength</span><input id="selLockStrength" class="tiny" type="number" min="0" max="1" step="0.05" placeholder="1" />
+        </div>
         <div class="row">
           <button id="selOnKick" type="button" title="Start this move on the nearest kick">On nearest kick</button>
           <button id="selOnSnare" type="button" title="Start this move on the nearest snare">On nearest snare</button>
@@ -127,6 +131,12 @@ ${SEQUENCE_LAYOUT}
         <summary>Command log</summary>
         <p class="muted">Every timeline and panel edit as a core command: paste into <code>motion-studio apply</code> or send over MCP to replay it.</p>
         <textarea id="commandLog" spellcheck="false" rows="8" readonly></textarea>
+      </details>
+      <details id="scriptPanel" open>
+        <summary>Shot script</summary>
+        <p class="muted">The Action and Camera tracks as text, one row per block: <code>beats 0-8 | action: run on path | camera: chase | shot: wide</code>. Edit and apply, or let an agent send it (<code>motion-studio script</code>, MCP <code>apply_script</code>).</p>
+        <textarea id="shotScript" spellcheck="false" rows="8" class="mono"></textarea>
+        <div class="row"><button id="applyScript" type="button">Apply script</button><span id="scriptStatus" class="muted"></span></div>
       </details>
       <details>
         <summary>Recipe JSON</summary>

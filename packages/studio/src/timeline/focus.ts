@@ -21,6 +21,7 @@ export type FocusModel = { recipe: Recipe; markers: HitMarker[]; phases: (number
 export function targetAt(m: FocusModel, x: number, y: number, width: number): Focus | null {
   const r = m.recipe, total = r.durationBeats, beat = Math.max(0, Math.min(total, x / width * total));
   const markerBeat = (i: number) => beatAtSeconds(r.beatGrid, m.markers[i].seconds);
+  if (y >= laneTop.cameraHead) return null;   // the Camera track selects blocks itself
   if (y < laneTop.move) {
     for (let i = m.markers.length - 1; i >= 0; i--) {
       const b = m.phases[i];

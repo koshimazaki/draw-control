@@ -4,7 +4,7 @@
  */
 import {
   LOOP_CLIPS, RIGGED_CHARACTER, defaultRiggedRecipe, riggedMove, clearIncompatibleMoves, clipCycleBeatsFor, exportFrameCount, frameAt, incompatibleMoves, insertMove,
-  makeClipMove, beatsToFrames, blendBeatsOf, removeMove, swapMove, setMoveBlend, validateRecipe, MOVE_KEYS, MOVE_LIBRARY, buildDrive, flatDrive, planCamera, applyMotionCommand, blockSpan,
+  makeClipMove, printScript, beatsToFrames, blendBeatsOf, removeMove, swapMove, setMoveBlend, validateRecipe, MOVE_KEYS, MOVE_LIBRARY, buildDrive, flatDrive, planCamera, applyMotionCommand, blockSpan,
   type AudioDrive, type CharacterKind, type CommandContext, type Expression, type MotionCommand, type MoveKey, type PreviewFps, type Recipe,
 } from "@motion-studio/core";
 import { createProceduralCharacter } from "./characters/rig";
@@ -66,6 +66,7 @@ export function startApp(root: HTMLElement) {
   /** Rebuild the camera plan and the path overlay from the recipe and the drive. */
   function refreshRig() {
     const plan = recipe.camera ? planCamera(recipe, drive, totalFrames()) : null;
+    cameraPlan = plan;
     viewport.setRig(plan, recipe, drive, totalFrames());
     if (!plan && viewport.view === "rig") { viewport.setView("front"); markView("front"); }
   }
@@ -116,6 +117,7 @@ export function startApp(root: HTMLElement) {
     input("lengthBeats").value = String(recipe.durationBeats);
     input("cursorBeat").max = String(recipe.durationBeats - 1);
     $<HTMLTextAreaElement>("recipeJson").value = JSON.stringify(recipe, null, 2);
+    if (document.activeElement !== $("shotScript")) $<HTMLTextAreaElement>("shotScript").value = printScript(recipe, drive.bands);
     const move = recipe.moves.find(m => m.id === selectedId);
     $("selected").hidden = !move;
     if (move) {
@@ -128,6 +130,9 @@ export function startApp(root: HTMLElement) {
       $<HTMLSelectElement>("selFps").value = String(move.phases[0].previewFps);
       input("selBlend").value = String(Math.round(beatsToFrames(blendBeatsOf(move, recipe), recipe.beatGrid.bpm)));
       $<HTMLSelectElement>("selExpr").value = move.phases[0].expression ?? "";
+      $<HTMLSelectElement>("selLock").value = move.lock ?? "off";
+      input("selLockStrength").value = move.strength === undefined ? "" : String(move.strength);
+      input("selLockStrength").disabled = !move.lock;
     }
     const clipDriven = recipe.character.kind === "file" || recipe.character.kind === "rigged";
     $("palette").hidden = clipDriven;
@@ -149,10 +154,12 @@ export function startApp(root: HTMLElement) {
     timeline.draw();
   }
   let currentBeat = 0;
+  let cameraPlan: ReturnType<typeof planCamera> | null = null;
   const rate = () => Number($<HTMLSelectElement>("rate").value) || 1;
   const previewFps = () => Number($<HTMLSelectElement>("previewFps").value) || 24;
 
   function tick() {
+    timeline.recordTick(frame, player.playing && !exporting);
     if (player.playing && !exporting) {
       const t = player.position();
       frame = Math.floor(t * recipe.fps);
@@ -321,6 +328,8 @@ export function startApp(root: HTMLElement) {
     input(id).onchange = () => { const v = Number(input(id).value); if (selectedId && Number.isFinite(v)) command({ type: "setMoveFields", moveId: selectedId, [key]: v }); };
   };
   field("selStart", "start"); field("selLength", "length"); field("selSpeed", "speed"); field("selAmpNum", "amplitude");
+  $<HTMLSelectElement>("selLock").onchange = () => { if (selectedId) command({ type: "setMoveFields", moveId: selectedId, lock: $<HTMLSelectElement>("selLock").value }); };
+  input("selLockStrength").onchange = () => { const v = Number(input("selLockStrength").value); if (selectedId && input("selLockStrength").value !== "" && Number.isFinite(v)) command({ type: "setMoveFields", moveId: selectedId, strength: v }); };
   input("selAmp").oninput = () => { if (selectedId) command({ type: "setMoveFields", moveId: selectedId, amplitude: Number(input("selAmp").value) }); };
   const onBand = (target: string) => () => { if (selectedId) command({ type: "snapMoveTo", moveId: selectedId, target }); };
   $("selOnKick").onclick = onBand("kick");
@@ -361,7 +370,7 @@ export function startApp(root: HTMLElement) {
     rms: () => (track ? { rms: track.features.rms, hop: track.features.hopSeconds } : null),
     wave: () => track?.wave ?? null,
     beat: () => currentBeat, poseSpeed: () => poseSpeedCurve, edit, seek: seekBeat, importedMove, ctx,
-    select: id => { selectedId = id; syncInputs(); }, log: logCommand, command,
+    select: id => { selectedId = id; syncInputs(); }, log: logCommand, command, cameraPlan: () => cameraPlan,
   });
   /** Pose speed for the graph, recomputed shortly after the recipe or drive changes. */
   let poseSpeedCurve: Float32Array | null = null;
@@ -411,6 +420,12 @@ export function startApp(root: HTMLElement) {
   bindSequencePanel({ recipe: () => recipe, load: r => edit(() => r) });
 
   // Recipe JSON
+  $("applyScript").onclick = () => {
+    const before = recipe;
+    command({ type: "applyScript", script: $<HTMLTextAreaElement>("shotScript").value });
+    say("scriptStatus", recipe === before ? $("jsonStatus").textContent ?? "" : "Applied.");
+    $<HTMLTextAreaElement>("shotScript").value = printScript(recipe, drive.bands);
+  };
   $("applyJson").onclick = () => edit(() => validateRecipe(JSON.parse($<HTMLTextAreaElement>("recipeJson").value)));
 
   // Export

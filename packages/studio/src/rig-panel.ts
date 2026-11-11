@@ -41,7 +41,11 @@ export const RIG_LAYOUT = `
       <div class="grid3">
         <label>From beat <input id="walkFrom" type="number" min="0" step="1" value="0" /></label>
         <label>To beat <input id="walkTo" type="number" min="1" step="1" placeholder="end" /></label>
-        <label>Gait <select id="walkGait"><option value="">keep moves</option><option value="Walk_Loop">walk (rigged)</option><option value="Jog_Fwd_Loop">jog (rigged)</option><option value="Sprint_Loop">sprint (rigged)</option><option value="walk">walk (procedural)</option><option value="run">run (procedural)</option></select></label>
+        <label>Gait <select id="walkGait"><option value="">keep moves</option><option value="Walk_Loop">walk (rigged)</option><option value="Jog_Fwd_Loop">jog (rigged)</option><option value="Sprint_Loop">sprint (rigged)</option><option value="walk">walk (procedural)</option><option value="run">run (procedural)</option><option value="glide">glide (slide, no gait)</option></select></label>
+      </div>
+      <div class="row" title="Travel lock: the figure arrives at evenly spaced stations on each locked hit, eases in, holds, goes again">
+        <span class="muted">Travel lock</span><select id="walkLock"><option value="off">off</option><option value="beat">beat</option><option value="kick">kick</option><option value="snare">snare</option><option value="hat">hat</option></select>
+        <span class="muted">strength</span><input id="walkLockStrength" class="tiny" type="number" min="0" max="1" step="0.05" value="1" />
       </div>
       <label class="check"><input id="showPaths" type="checkbox" checked /> Draw camera and floor paths (top and orbit views)</label>
     </section>
@@ -131,6 +135,8 @@ export function bindRigPanel(edit: Edit, onRigToggle: (on: boolean) => void) {
 
 /** Read the recipe's rig and reactive fields back into the controls. */
 export function syncRigPanel(recipe: Recipe) {
+  $<HTMLSelectElement>("walkLock").value = recipe.travelLock?.lock ?? "off";
+  if (recipe.travelLock?.strength !== undefined && document.activeElement !== input("walkLockStrength")) input("walkLockStrength").value = String(recipe.travelLock.strength);
   const c = recipe.camera;
   input("rigOn").checked = !!c;
   $("rigControls").hidden = !c;
