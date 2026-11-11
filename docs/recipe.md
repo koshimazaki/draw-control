@@ -24,7 +24,7 @@ Units: metres, seconds, musical beats. Frame rate is fixed at 24.
 | `durationBeats` | whole number, 1–512 | Length in beats. Frame count = (offset + beats × 60 / bpm) × 24. |
 | `beatGrid` | object | Tempo and phase of the beat grid (below). |
 | `character` | object | Who performs (below). |
-| `energy` | 0–2 | Global multiplier on every phase amplitude (procedural figures). |
+| `energy` | 0–3 | Global multiplier on every move's amplitude (every character). |
 | `moves` | list, up to 128 | Moves on the beat grid, in strictly increasing `atBeat` (below). |
 | `rootPath` | list, 1–64 points | Where the character stands and faces over time (below). |
 | `jumps` | list, up to 64 | Programmed root lifts (below). Accent jumps on markers are separate. |
@@ -47,7 +47,7 @@ Units: metres, seconds, musical beats. Frame rate is fixed at 24.
 
 | Field | Meaning |
 | --- | --- |
-| `kind` | `rigged` (the bundled rigged mannequin, clip-driven, the default), `mannequin` (procedural fallback), `block` (procedural block figure) or `file` (a GLB or FBX loaded from disk, never bundled). |
+| `kind` | `rigged` (the bundled rigged mannequin, clip-driven, the default), the procedural figures on one skeleton `mannequin`, `block`, `stick` (lines and joint dots) and `blob` (capsules, no visible joints), or `file` (a GLB or FBX loaded from disk, never bundled). Switching between the procedural figures keeps every move. |
 | `name`, `licence` | Up to 120 characters each; travel into the bundle metadata. |
 
 ## `moves[]`
@@ -56,7 +56,9 @@ Units: metres, seconds, musical beats. Frame rate is fixed at 24.
 | --- | --- | --- |
 | `id` | up to 40 characters, unique | Stable handle for edits and agents. |
 | `name` | up to 60 characters | Shown on the move lane. |
-| `atBeat` | whole beat inside the recipe | Where the move starts. A move plays until the next one starts. |
+| `atBeat` | a beat inside the recipe (fractional allowed, e.g. on a kick) | Where the block starts. |
+| `lengthBeats` | optional, 0.125–512 | The block's length. Missing: the move plays until the next one starts. Present: it ends there (or where the next starts, if earlier) and the figure settles to rest in the gap. |
+| `speed` | optional, 0.25–4 (default 1) | Playback rate of the phases or the clip. Dragging a block's edge rescales it with the length: twice as long plays at half the speed. |
 | `blendBeats` | 0–8 | Crossfade from the move before, in beats. The rigged mannequin never blends faster than 6 frames (so 0 means "the shortest blend", not a cut); the move lane's handle and the inspector edit it in frames, 6–24. |
 | `loop` | true or false | Repeat the phases until the next move. |
 | `phases` | 1–32 | The move's phases (below). Clip moves carry one phase, the clip's cycle. |
@@ -71,12 +73,15 @@ Transitions between rigged loops: a gait (walk, jog, sprint, crouch walk) that f
 | --- | --- | --- |
 | `name`, `caption` | up to 40 and 120 characters | Shown in the caption and the beat strip. |
 | `pose` | a pose name from `packages/core/src/poses.ts` | Target pose reached at the end of the phase (procedural figures). |
-| `amplitude` | 0–2 | 0 rest, 1 as authored, 2 doubled. |
+| `amplitude` | 0–3 | 0 rest, 1 as authored, 2 doubled. It scales the rigged mannequin's clip amplitude too (it was ignored there before 11 November). |
 | `length` | `{ "beats": 0.125–64 }` or `{ "frames": 1–2400 }` | Phase length. |
 | `previewFps` | 12, 18, 24, 30 or 60 | Below 24 the phase steps (held frames) for a stop-motion look. |
 | `expression` | optional: neutral, smile, surprised, angry, sad, focused | Reserved for faces; validated and exported, not rendered yet. |
 
 ## `rootPath[]` and `jumps[]`
+
+The walk path drawn in the top view (or `setRootPath`) is stored here: up to 48 points resampled evenly along a smoothed spline, so the speed along it is steady, each with a facing (`yaw`) along the path.
+
 
 - `rootPath[]`: `{ beat, x, z, yaw }`. Beats strictly increase, inside the recipe; `x` and `z` from -100 to 100 metres; `yaw` from -720 to 720 degrees. Linear between points, held after the last. The rigged mannequin's clips stay in place, so travel comes only from here.
 - `jumps[]`: `{ atBeat, durationBeats 0.125–16, height 0–3 }`: a programmed lift of the root.
@@ -85,7 +90,7 @@ Transitions between rigged loops: a gait (walk, jog, sprint, crouch walk) that f
 
 | Field | Limits | Meaning |
 | --- | --- | --- |
-| `segments[]` | 1–32, in order, not overlapping | `{ fromBeat, toBeat, modes }`. Modes: `static`, `orbit`, `pushIn`, `pullOut`, `rise`, `lead`, `chase`, `path`. Several may share a range, except: `static` and `path` stand alone, `lead` excludes `chase`, `pushIn` excludes `pullOut`. Beats outside every range hold. |
+| `segments[]` | 1–32, in order, not overlapping | `{ fromBeat, toBeat, modes }`. Modes: `static`, `orbit`, `pushIn`, `pullOut`, `rise`, the follow rigs `lead` (front), `threeQuarter`, `side` and `chase` (behind), `top` (overhead), `fixed` (a tripod that pans) and `path`. Several may share a range, except: `static`, `fixed` and `path` stand alone, one follow rig at a time, `pushIn` excludes `pullOut`. Beats outside every range hold. |
 | `intensity` | 0–1 | How strongly the music drives speed and accents (0: a plain programmed move). |
 | `orbitDegreesPerBeat` | -45 to 45 | Orbit speed at mid energy; the sign is the direction. |
 | `distance` | 1.5–12 m | Starting distance from the subject. |
@@ -134,3 +139,7 @@ The wind-up ("anticipation") has no field of its own: it is the span from the ac
 ## `energyCurve`
 
 `{ rate: 1–60, values: [...] }`: energy (0–1) sampled `rate` times a second from time 0, 2 values up to ten minutes. Replaces the analysed energy for tempo, amplitude, accents and the camera. Drawn with the timeline's pencil or point handles; "Reset energy" removes it.
+
+## `envelope`
+
+`{ points: [[frame, value], ...] }`: the amplitude envelope, 1–8192 breakpoints with straight lines between them, frames whole and increasing, values 0–3 (1 = as authored). Before the first point and after the last the value holds. It multiplies every move's size on that frame: the pose angles of the procedural figures, the clip amplitude of the rigged mannequin. A freehand stroke is stored as the fewest breakpoints within 0.01 of it. Missing: 1 on every frame.

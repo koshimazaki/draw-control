@@ -5,7 +5,7 @@ summary: Product requirements for Motion Studio, a browser motion studio that tu
 
 # Motion Studio: product requirements
 
-Status: first working slice built, 10 November 2026 (written 7 November). Owner: Koshi. What is built and how it was verified: [plan, State](plan.md#state-10-november-2026).
+Status: first working slice built, 10 November 2026; the owner's six asks (audio lane, clip editing, envelope, camera and paths, CLI and MCP, abstract figures) built 11 November (written 7 November). Owner: Koshi. What is built and how it was verified: [plan, State](plan.md#state-10-november-2026).
 
 ## One line
 
@@ -44,20 +44,20 @@ Nobody offers a per-beat recipe that an agent edits move by move and renders as 
 - **Provider-agnostic.** Motion generation and any cloud call sit behind adapters in `providers/`.
 - **Licence-clean.** No Mixamo files, SMPL, AIST++ or other restricted data in the repo. Every exported guide records the licence of each asset it used.
 
-## State, 10 November 2026
+## State, 11 November 2026
 
 | Feature | State |
 | --- | --- |
-| F1 Characters | Built. Mannequin and loaded GLB browser-verified; block figure and FBX built, not verified by an automated run |
+| F1 Characters | Built. Rigged mannequin (default), procedural mannequin, block, stick and capsule figures, loaded GLB browser-verified; FBX built, not verified by an automated run |
 | F2 Beat grid | Built and browser-verified on a click track; editable by hand |
 | F3 Phase recipe | Built; validator and engine unit-tested. `expression` stored and exported, not rendered |
-| F4 Agent edit loop | Commands built and unit-tested; no CLI or MCP yet |
-| F5 Timeline | Not built: a beat strip stands in |
+| F4 Agent edit loop | Built: one command entry point for every UI edit, the `motion-studio` CLI (with a headless `render`) and an MCP server; see [agents.md](agents.md) |
+| F5 Timeline | Built: phases, move blocks (drag, edges, snap to beats, kicks or snares), amplitude envelope, steps, energy, and an audio lane with the waveform and kick, snare and hat markers |
 | F6 Views | Built; all five browser-verified by screenshot |
 | F7 Export | Built and browser-verified, including size, range and target warnings |
 | F8 Providers | Not built |
 
-Gaps: library moves do not drive a loaded rig (it plays its own clips only); no IK or foot locking; the `expression` field is not rendered.
+Gaps: library moves do not drive a loaded rig (it plays its own clips only); no IK or foot locking (feet slide when a walk path's speed differs from the clip's); the `expression` field is not rendered; drum-band detection is checked on synthetic patterns only. Detail: [plan](plan.md#owners-six-asks-after-trying-the-studio-11-november-branch-featms-core).
 
 ## Features, first milestone (final 14 November)
 
@@ -100,7 +100,6 @@ None of this exists yet. It is the direction after the first milestone.
 - **Facial expressions.** Render the per-phase `expression` field (neutral, smile, surprised, angry, sad, focused) on the mannequin's head, kept abstract enough that the figure stays a neutral placeholder.
 - **Pose and expression from video.** Extract body pose and facial expression from a reference video into a recipe: phases, poses, amplitudes and expressions on the beat grid, editable like any other recipe.
 - **MotionBricks on serverless.** MotionBricks as a `MotionGenerator`: keyframes and a root path go in, continuous motion comes out, run on serverless GPUs with one batch call per move set.
-- **Agent CLI and MCP.** A CLI and an MCP server over the edit commands, so an agent edits, renders and exports without the UI.
 
 ## Later
 
@@ -140,7 +139,7 @@ None of this exists yet. It is the direction after the first milestone.
 
 ## Open questions
 
-1. CLI only, or CLI and MCP, for the first milestone?
+1. Answered 11 November: both, the CLI and the MCP server are built.
 2. Does the first milestone carry a depth pass?
 3. MotionBricks: which skeleton, which input format, which licence? (The spike answers these.)
 4. Should the guide-bundle schema gain `meta.range { startFrame, startSeconds }`? Until it does, a mid-track range is recorded in the video asset's name.
