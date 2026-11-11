@@ -3,7 +3,7 @@
  * (or the validator), and keeps the preview, beat strip and JSON panel in sync.
  */
 import {
-  LOOP_CLIPS, RIGGED_CHARACTER, defaultRiggedRecipe, riggedMove, clearIncompatibleMoves, setMoveAtBeat, setMarkerAccent, addMarker, clipCycleBeatsFor, exportFrameCount, frameAt, incompatibleMoves, insertMove,
+  LOOP_CLIPS, RIGGED_CHARACTER, defaultRiggedRecipe, riggedMove, clearIncompatibleMoves, clipCycleBeatsFor, exportFrameCount, frameAt, incompatibleMoves, insertMove,
   makeClipMove, moveBeats, removeMove, setAmplitude, swapMove, validateRecipe, buildDrive, flatDrive, planCamera,
   type AudioDrive, type CharacterKind, type Expression, type MoveKey, type PreviewFps, type Recipe,
 } from "@motion-studio/core";
@@ -14,15 +14,12 @@ import type { Character } from "./characters/types";
 import { Player, loadTrack, type Track } from "./audio";
 import { Timeline } from "./timeline/timeline";
 import { computePoseSpeed } from "./timeline/pose-speed";
-import { exportBundle } from "./export/bundle";
-import { currentRange, exportSize, updateExportPanel } from "./export/panel";
-import { bindRigPanel, setRecipeSource, syncRigPanel } from "./rig-panel";
-import { PathDrawer } from "./path-draw";
-import { MoveGizmo, previewState } from "./move-gizmo";
-import { boneList } from "./viewing-aids";
+import { bindExport } from "./export/button";
+import { updateExportPanel } from "./export/panel";
+import { syncRigPanel } from "./rig-panel";
+import { bindViewControls } from "./app-view";
 import { $, LAYOUT } from "./ui";
-import { Viewport, type Background } from "./viewport";
-import type { View } from "./views";
+import { Viewport } from "./viewport";
 
 export function startApp(root: HTMLElement) {
   root.innerHTML = LAYOUT;
@@ -36,8 +33,6 @@ export function startApp(root: HTMLElement) {
   let fileCharacter: Character | null = null;
   /** The bundled rigged mannequin, loaded once and kept (it is the default character). */
   let rigged: RiggedCharacter | null = null;
-  let gizmo: MoveGizmo | null = null;
-  let previewStart = performance.now();
   let bonesFor: Character | undefined;
   let riggedLoading: Promise<RiggedCharacter> | null = null;
   const ensureRigged = () => (riggedLoading ??= loadRiggedCharacter().then(c => { rigged = c; return c; }));
@@ -112,9 +107,8 @@ export function startApp(root: HTMLElement) {
 
   /** Render the recipe at a frame (fractional while previewing above 24 fps). */
   function render(shown: number = frame) {
-    let state = frameAt(recipe, shown, drive);
-    if (gizmo?.preview) state = previewState(gizmo.preview, (performance.now() - previewStart) / 1000, state);
-    if (viewport.getCharacter() !== bonesFor) { bonesFor = viewport.getCharacter(); fillBones(); }
+    const state = view.overlay(frameAt(recipe, shown, drive));
+    if (viewport.getCharacter() !== bonesFor) { bonesFor = viewport.getCharacter(); view.fillBones(); }
     viewport.show(state);
     const a = state.active;
     $("caption").textContent = state.phase ? `${state.phase.accent.toUpperCase()} · ${state.phase.name}` : a ? `${a.moveName} · ${a.phaseName}: ${a.caption}` : "";
@@ -327,26 +321,6 @@ export function startApp(root: HTMLElement) {
   $("tStart").onclick = () => { setPlaying(false); frame = 0; render(); };
   $("tEnd").onclick = () => { setPlaying(false); frame = totalFrames() - 1; render(); };
 
-  // View
-  $("views").onclick = e => {
-    const v = (e.target as HTMLElement).dataset.view as View | undefined;
-    if (!v) return;
-    if (v === "rig" && !recipe.camera) { say("exportStatus", "Turn on the audio-reactive camera (Camera rig section) first."); return; }
-    viewport.setView(v); markView(v); render();
-  };
-  const markView = (v: View) => $("views").querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.view === v));
-  $<HTMLSelectElement>("background").onchange = () => viewport.setBackground($<HTMLSelectElement>("background").value as Background);
-  input("grid").onchange = () => viewport.setGrid(input("grid").checked);
-  const applyResolution = () => {
-    const { width: w, height: h } = exportSize();
-    $("viewport").style.aspectRatio = `${w} / ${h}`;
-    $("viewport").style.setProperty("--ar", String(w / h));
-    updateExportPanel(recipe);
-  };
-  $<HTMLSelectElement>("resolution").onchange = applyResolution;
-  for (const id of ["customW", "customH"]) input(id).onchange = applyResolution;
-  for (const id of ["rangeUnit", "rangeStart", "rangeLength"]) $<HTMLInputElement>(id).oninput = () => updateExportPanel(recipe);
-
   // Transport
   $("play").onclick = () => setPlaying(!player.playing);
   $("prev").onclick = () => { setPlaying(false); frame = Math.max(0, frame - 1); render(); };
@@ -368,79 +342,19 @@ export function startApp(root: HTMLElement) {
     }
   });
 
-  // Viewing aids and the move gizmo
   viewport.setFrameSource(f => frameAt(recipe, Math.max(0, f), drive));
-  $("aids").onclick = e => {
-    const b = (e.target as HTMLElement).closest("button") as HTMLButtonElement | null;
-    const aid = b?.dataset.aid as "bones" | "xray" | "onion" | "arcs" | undefined;
-    if (!b || !aid) return;
-    b.classList.toggle("on");
-    viewport.setAids({ [aid]: b.classList.contains("on") });
-    render();
-  };
-  $<HTMLSelectElement>("boneSelect").onchange = () => { viewport.setAids({ bone: $<HTMLSelectElement>("boneSelect").value || null }); render(); };
-  function fillBones() {
-    const names = boneList(viewport.getCharacter()).map(b => b.name);
-    $("boneSelect").innerHTML = `<option value="">none</option>` + names.map(n => `<option value="${n}">${n}</option>`).join("");
-  }
-  let previewing = false;
-  gizmo = new MoveGizmo(() => {
-    previewStart = performance.now();
-    if (gizmo?.preview && !previewing) { previewing = true; const loop = () => { if (!gizmo?.preview) { previewing = false; render(); return; } render(); requestAnimationFrame(loop); }; requestAnimationFrame(loop); }
-  }, item => {
-    if (item.kind === "loop") edit(r => setMoveAtBeat(r, cursor(), item.clip));
-    else if (timeline.selectedMarker() >= 0) edit(r => setMarkerAccent(r, drive === FLAT ? undefined : drive, timeline.selectedMarker(), item.key));
-    else edit(r => addMarker(r, drive === FLAT ? undefined : drive, frame / r.fps, item.key));
+  const view = bindViewControls({
+    viewport, recipe: () => recipe, edit, render: () => render(), say,
+    drive: () => (drive === FLAT ? undefined : drive), frame: () => frame, cursor, selectedMarker: () => timeline.selectedMarker(),
   });
-  $("gizmoToggle").onclick = () => {
-    const on = !$("gizmoToggle").classList.contains("on");
-    $("gizmoToggle").classList.toggle("on", on);
-    gizmo?.setVisible(on && recipe.character.kind === "rigged");
-    render();
-  };
-
-  // Camera rig and reactive moves
-  setRecipeSource(() => recipe);
-  const pathDrawer = new PathDrawer(viewport, () => recipe, edit, () => {
-    $("drawPath").classList.toggle("on", pathDrawer.drawing);
-    viewport.setSelectedPathPoint(pathDrawer.selected);
-    const p = recipe.camera?.path?.[pathDrawer.selected];
-    $("pointHeightRow").hidden = !p;
-    if (p) input("pointHeight").value = String(p.y);
-  });
-  $("drawPath").onclick = () => {
-    pathDrawer.drawing = !pathDrawer.drawing;
-    $("drawPath").classList.toggle("on", pathDrawer.drawing);
-    if (pathDrawer.drawing) { viewport.setView("top"); markView("top"); render(); say("exportStatus", "Click-drag in the top view to draw the camera path."); }
-  };
-  $("clearPath").onclick = () => { pathDrawer.clear(); $("pointHeightRow").hidden = true; };
-  input("pointHeight").onchange = () => pathDrawer.setHeight(Number(input("pointHeight").value));
-  bindRigPanel(edit, on => { const v = on ? "rig" : "front"; viewport.setView(v); markView(v); render(); });
-  input("showPaths").onchange = () => { viewport.setShowPaths(input("showPaths").checked); render(); };
+  const { markView, applyResolution } = view;
 
   // Recipe JSON
   $("applyJson").onclick = () => edit(() => validateRecipe(JSON.parse($<HTMLTextAreaElement>("recipeJson").value)));
 
   // Export
-  $("export").onclick = async () => {
-    if (exporting) return;
-    exporting = true;
-    setPlaying(false);
-    const { width, height } = exportSize();
-    const range = currentRange(recipe);
-    if (range instanceof Error) { say("exportStatus", `Export range: ${range.message}`); exporting = false; return; }
-    const bar = $<HTMLProgressElement>("exportProgress");
-    bar.hidden = false;
-    say("exportStatus", "Rendering frame by frame…");
-    try {
-      const result = await exportBundle({ recipe, range, viewport, width, height, audio: track?.buffer ?? null, drive,
-        onProgress: (d, t) => { bar.value = d / t; } });
-      download(result.zip, "guide-bundle.zip");
-      say("exportStatus", `Exported ${result.frames} frames from frame ${range.startFrame} (${(result.frames / recipe.fps).toFixed(2)} s, ${result.codec}), ` +
-        `${(result.zip.length / 1e6).toFixed(1)} MB zip. Audio ${track ? (result.audioInVideo ? "muxed into the MP4 and" : "not muxed (no AAC encoder);") + " saved as audio.wav" : "none"}.`);
-    } catch (e) { say("exportStatus", `Export failed: ${(e as Error).message}`); }
-    finally { exporting = false; bar.hidden = true; render(); }
-  };
+  bindExport({ recipe: () => recipe, viewport, say, render: () => render(), track: () => track, drive: () => drive,
+    setExporting: on => { exporting = on; if (on) setPlaying(false); } });
 
   applyResolution();
   markView("front");
@@ -452,13 +366,4 @@ export function startApp(root: HTMLElement) {
   render();
   requestAnimationFrame(tick);
   window.addEventListener("resize", () => render());
-}
-
-function download(bytes: Uint8Array, name: string) {
-  const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: "application/zip" }));
-  const a = Object.assign(document.createElement("a"), { href: url, download: name });
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }
