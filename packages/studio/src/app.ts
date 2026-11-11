@@ -401,7 +401,7 @@ export function startApp(root: HTMLElement) {
 
   viewport.setFrameSource(f => frameAt(recipe, Math.max(0, f), drive));
   const view = bindViewControls({
-    viewport, recipe: () => recipe, edit, render: () => render(), say,
+    viewport, recipe: () => recipe, edit, command, render: () => render(), say,
     drive: () => (drive === FLAT ? undefined : drive), frame: () => frame, cursor, selectedMarker: () => timeline.selectedMarker(),
   });
   const { markView, applyResolution } = view;

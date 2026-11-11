@@ -138,3 +138,55 @@ export async function smokeEnvelope(page, { fail, OUT }) {
   if (!(p.recipe.envelope?.points.length > 10)) fail("envelope from kicks is empty");
   await page.locator("#strip").screenshot({ path: `${OUT}timeline-envelope.png` });
 }
+
+/** Feature 4: draw a walk path in the top view, start a camera move on the first snare, export through the rig with the grid. */
+export async function smokeCameraPath(page, { fail, OUT, checkBundle }) {
+  await page.evaluate(() => window.scrollTo(0, 0));
+  if (!(await page.isChecked("#rigOn"))) await page.click("#rigOn");
+  await page.fill("#walkFrom", "4"); await page.fill("#walkTo", "20");
+  await page.selectOption("#walkGait", "Walk_Loop");
+  await page.click("#drawWalk");
+  const vp = await page.locator("#viewport canvas").boundingBox();
+  const cx = vp.x + vp.width / 2, cy = vp.y + vp.height / 2;
+  await page.mouse.move(cx, cy);
+  await page.mouse.down();
+  for (let k = 1; k <= 24; k++) await page.mouse.move(cx + Math.sin(k / 24 * Math.PI) * vp.width * 0.18, cy - k / 24 * vp.height * 0.35);
+  await page.mouse.up();
+  let p = await probe(page);
+  const path = p.recipe.rootPath;
+  const a = await page.evaluate(() => window.__msFrame(2 * 12)), b = await page.evaluate(() => window.__msFrame(16 * 12));
+  console.log(`walk path: ${path.length} root points, beats ${path[1]?.beat}–${path.at(-1)?.beat}; root at beat 2 (${a.root.x.toFixed(2)}, ${a.root.z.toFixed(2)}), at beat 16 (${b.root.x.toFixed(2)}, ${b.root.z.toFixed(2)})`);
+  if (path.length < 3 || Math.hypot(b.root.x - a.root.x, b.root.z - a.root.z) < 0.5) fail("the drawn walk path does not move the character");
+  if (!p.recipe.moves.some(m => m.clip === "Walk_Loop")) fail("no walk block over the path range");
+  await page.locator("#viewport").screenshot({ path: `${OUT}walk-path-top.png` });
+  // Camera: follow three-quarter, distance 5, then a push-in starting on the first snare.
+  await page.selectOption("#camMoveMode", "threeQuarter");
+  await page.selectOption("#camMoveTarget", "beat");
+  await page.fill("#camMoveIndex", "0"); await page.fill("#camMoveLen", "32");
+  await page.click("#camMoveGo");
+  await page.selectOption("#camMoveMode", "pushIn");
+  await page.selectOption("#camMoveTarget", "snare");
+  await page.fill("#camMoveIndex", "0"); await page.fill("#camMoveLen", "4");
+  await page.click("#camMoveGo");
+  p = await probe(page);
+  const segs = p.recipe.camera?.segments ?? [];
+  console.log(`camera ranges: ${segs.map(s => `${s.modes.join("+")} ${s.fromBeat}-${s.toBeat}`).join(", ")}`);
+  const push = segs.find(s => s.modes.includes("pushIn"));
+  const firstSnare = (p.bands.mid[0] - p.recipe.beatGrid.offsetSeconds) * p.recipe.beatGrid.bpm / 60;
+  if (!push || Math.abs(push.fromBeat - firstSnare) > 0.01) fail("camera push-in does not start on the first snare");
+  // Export a short section through the rig camera, with the grid rendered.
+  await page.click('[data-view="rig"]');
+  await page.check("#grid"); await page.check("#gridExport");
+  await page.selectOption("#rangeUnit", "beats");
+  await page.fill("#rangeStart", "4"); await page.fill("#rangeLength", "8"); await page.dispatchEvent("#rangeLength", "input");
+  const dl = page.waitForEvent("download", { timeout: 180_000 });
+  await page.click("#export");
+  const file = await (await dl).path();
+  const meta = checkBundle((await import("node:fs")).readFileSync(file), "rig-walk", { kind: "rigged", audio: true, width: 1280, height: 720, sheet: [0, 12, 24, 36, 48, 60, 72, 96] });
+  const { unzipSync, strFromU8 } = await import("fflate");
+  const files = unzipSync(new Uint8Array((await import("node:fs")).readFileSync(file)));
+  const beats = JSON.parse(strFromU8(files["beats.json"]));
+  console.log(`rig export: view ${meta.view}, camera.json ${files["camera.json"] ? "present" : "missing"}, beats.json onsets: ${beats.onsets?.low.length} kicks, ${beats.onsets?.mid.length} snares, ${beats.onsets?.high.length} hats`);
+  if (meta.view !== "rig" || !files["camera.json"]) fail("export did not render through the rig camera");
+  if (!beats.onsets || beats.onsets.low.length < 3) fail("beats.json has no band onsets");
+}

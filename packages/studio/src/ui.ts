@@ -95,7 +95,8 @@ export const LAYOUT = `
       <div class="palette" id="views">${VIEWS.map(v => `<button type="button" data-view="${v}">${VIEW_LABELS[v]}</button>`).join("")}</div>
       <div class="grid3">
         <label>Background <select id="background"><option value="grey">Mid grey</option><option value="dark">Dark</option></select></label>
-        <label class="check"><input id="grid" type="checkbox" /> Floor grid</label>
+        <label class="check" title="A blocked-out ground grid: 1 m lines, bolder every 4 m"><input id="grid" type="checkbox" /> Floor grid</label>
+        <label class="check" title="Render the grid into the exported guide"><input id="gridExport" type="checkbox" /> Grid in export</label>
         <label>Highlight bone <select id="boneSelect"><option value="">none</option></select></label>
       </div>
     </section>

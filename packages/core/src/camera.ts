@@ -6,19 +6,27 @@
  * - orbit: continuous yaw around the subject (a carousel), speed scaled by energy;
  * - pushIn / pullOut: dolly towards or away from the subject over the range;
  * - rise: crane up while the aim tilts down;
- * - lead: in front of the subject, facing it as it travels (leading the runner);
- * - chase: behind the subject, following it;
+ * - lead, threeQuarter, side, chase: follow rigs, in front of the subject, at 45°, at its
+ *   side or behind it, turning with its heading as it travels;
+ * - top: overhead, looking down on the subject (combines with a follow rig or orbit);
+ * - fixed: a tripod: the camera stays where it was when the range began and pans to keep
+ *   the subject in view;
  * - path: along a drawn path (smoothed spline, a height per point), looking at the
  *   subject; the music sets the speed along it and adds the accents.
- * Several modes may share a range ("orbit" + "pushIn"); lead and chase exclude each other.
+ * Several modes may share a range ("orbit" + "pushIn"); one follow rig at a time; static,
+ * fixed and path stand alone.
  */
 import { fail, isObject, num, only } from "./validate";
 
-export const CAMERA_MODES = ["static", "orbit", "pushIn", "pullOut", "rise", "lead", "chase", "path"] as const;
+export const CAMERA_MODES = ["static", "orbit", "pushIn", "pullOut", "rise", "lead", "chase", "side", "threeQuarter", "top", "fixed", "path"] as const;
 export type CameraMode = (typeof CAMERA_MODES)[number];
 export const CAMERA_MODE_LABELS: Record<CameraMode, string> = {
-  static: "Static", orbit: "Orbit", pushIn: "Push in", pullOut: "Pull out", rise: "Rise and tilt", lead: "Lead (front)", chase: "Chase (back)", path: "Drawn path",
+  static: "Static", orbit: "Orbit", pushIn: "Push in", pullOut: "Pull out", rise: "Rise and tilt", lead: "Follow from the front", chase: "Follow from behind",
+  side: "Follow from the side", threeQuarter: "Follow three-quarter", top: "Top (overhead)", fixed: "Fixed (tripod, pans)", path: "Drawn path",
 };
+/** Follow rigs: the camera sits at this angle from the subject's heading (0 = in front, π = behind) and turns with it. */
+export const FOLLOW_ANGLES: Partial<Record<CameraMode, number>> = { lead: 0, threeQuarter: Math.PI / 4, side: Math.PI / 2, chase: Math.PI };
+export const FOLLOW_MODES = Object.keys(FOLLOW_ANGLES) as CameraMode[];
 export type CameraSegment = { fromBeat: number; toBeat: number; modes: CameraMode[] };
 export type CameraConfig = {
   /** Modes per beat range, in order, not overlapping. Beats outside every range hold (static). */
@@ -64,7 +72,8 @@ export function validateCamera(input: unknown, durationBeats: number): CameraCon
     if (new Set(modes).size !== modes.length) fail(`${where}.modes repeats a mode`);
     if (modes.includes("static") && modes.length > 1) fail(`${where}: static cannot share a range`);
     if (modes.includes("path") && modes.length > 1) fail(`${where}: path cannot share a range`);
-    if (modes.includes("lead") && modes.includes("chase")) fail(`${where}: lead and chase exclude each other`);
+    if (modes.filter(m => FOLLOW_MODES.includes(m as CameraMode)).length > 1) fail(`${where}: one follow rig at a time (${FOLLOW_MODES.join(", ")})`);
+    if (modes.includes("fixed") && modes.length > 1) fail(`${where}: fixed cannot share a range`);
     if (modes.includes("pushIn") && modes.includes("pullOut")) fail(`${where}: pushIn and pullOut exclude each other`);
     return { fromBeat, toBeat, modes: [...modes] as CameraMode[] };
   });

@@ -15,7 +15,7 @@
  */
 import { energyAtFrame, type AudioDrive } from "./audio-drive";
 import { beatAtSeconds, secondsAtBeat } from "./beats";
-import { modesAt, type CameraConfig } from "./camera";
+import { FOLLOW_ANGLES, modesAt, type CameraConfig, type CameraMode } from "./camera";
 import type { Recipe } from "./recipe";
 import { buildSpline } from "./spline";
 import { subjectAt } from "./subject";
@@ -86,7 +86,7 @@ export function planCamera(recipe: Recipe, drive?: AudioDrive, frames = 0): Came
   let dolly = 0, dollyRate = 0, crane = 0, craneRate = 0, aim = 0, aimRate = 0;
   let cx = s0.x, cz = s0.z, cvx = 0, cvz = 0;
   const startModes = modesAt(config, beatAtSeconds(g, 0));
-  const followOffset = (m: readonly string[]) => m.includes("lead") ? 0 : m.includes("chase") ? Math.PI : null;
+  const followOffset = (m: readonly CameraMode[]) => { for (const k of m) if (FOLLOW_ANGLES[k] !== undefined) return FOLLOW_ANGLES[k]!; return null; };
   const yaw0 = config.startYaw * Math.PI / 180;
   const off0 = followOffset(startModes);
   if (off0 !== null) followYaw = s0.heading + off0 - yaw0;
@@ -188,10 +188,28 @@ export function planCamera(recipe: Recipe, drive?: AudioDrive, frames = 0): Came
   }
   const spline = usesPath ? buildSpline(config.path!) : null;
   const samples: CameraSample[] = new Array(total);
+  // Top and fixed fade in and out over about half a second, so switching never cuts.
+  let topW = 0, fixW = 0, anchor: Vec3 | null = null;
   for (let n = 0; n < total; n++) {
-    const yaw = ch.yaw[n], d = ch.distance[n];
-    const target: Vec3 = [ch.cx[n], ch.aimY[n], ch.cz[n]];
-    let position: Vec3 = [ch.cx[n] + Math.sin(yaw) * d, ch.height[n], ch.cz[n] + Math.cos(yaw) * d];
+    const modes = modesAt(config, beatAtSeconds(g, n * dt));
+    topW = slew(topW, modes.includes("top") ? 1 : 0, 2 * dt);
+    const yaw = ch.yaw[n];
+    const ease = (w: number) => 0.5 - 0.5 * Math.cos(Math.PI * w);
+    const tw = ease(topW), d = ch.distance[n] * (1 - 0.92 * tw);
+    const target: Vec3 = [ch.cx[n], ch.aimY[n] - 0.15 * tw, ch.cz[n]];
+    let position: Vec3 = [ch.cx[n] + Math.sin(yaw) * d, ch.height[n] + tw * (ch.distance[n] * 1.35 + 0.6), ch.cz[n] + Math.cos(yaw) * d];
+    const wasFixed = fixW > 0;
+    fixW = slew(fixW, modes.includes("fixed") ? 1 : 0, 2 * dt);
+    if (fixW > 0 && !wasFixed) anchor = position;
+    if (anchor && fixW > 0) {
+      const w = ease(fixW);
+      position = [position[0] + (anchor[0] - position[0]) * w, position[1] + (anchor[1] - position[1]) * w, position[2] + (anchor[2] - position[2]) * w];
+    }
+    if (tw > 0 || fixW > 0) {
+      ch.yaw[n] = Math.atan2(position[0] - target[0], position[2] - target[2]);
+      ch.distance[n] = Math.hypot(position[0] - target[0], position[2] - target[2]);
+      ch.height[n] = position[1];
+    }
     if (spline && pathW[n] > 0) {
       const p = spline.at(pathS[n]);
       const dir = [target[0] - p[0], target[1] - p[1], target[2] - p[2]], len = Math.hypot(dir[0], dir[1], dir[2]) || 1;
@@ -205,7 +223,7 @@ export function planCamera(recipe: Recipe, drive?: AudioDrive, frames = 0): Came
     }
     samples[n] = { position, target, fov: config.fov, energy: energyAtFrame(drive, n) };
   }
-  if (usesPath) for (let n = 1; n < total; n++) {
+  for (let n = 1; n < total; n++) {
     // Unwrap yaw recomputed by atan2 so it stays continuous.
     while (ch.yaw[n] - ch.yaw[n - 1] > Math.PI) ch.yaw[n] -= 2 * Math.PI;
     while (ch.yaw[n] - ch.yaw[n - 1] < -Math.PI) ch.yaw[n] += 2 * Math.PI;

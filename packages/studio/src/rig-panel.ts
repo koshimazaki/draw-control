@@ -7,7 +7,7 @@ import {
   type AccentKey, type CameraMode, type Recipe,
 } from "@motion-studio/core";
 
-const PICKABLE: CameraMode[] = ["orbit", "pushIn", "pullOut", "rise", "lead", "chase", "path"];
+const PICKABLE: CameraMode[] = ["orbit", "pushIn", "pullOut", "rise", "lead", "threeQuarter", "side", "chase", "top", "fixed", "path"];
 export const ACCENT_SETS: Record<string, { label: string; accents: AccentKey[] }> = {
   dance: { label: "Dance: jump, spin, cross", accents: ["jump", "spin", "cross"] },
   dancePose: { label: "Procedural dance: hit, point, jump, spin", accents: ["hit", "point", "jump", "spin"] },
@@ -31,6 +31,18 @@ export const RIG_LAYOUT = `
       </div>
       <div class="row"><button id="drawPath" type="button" title="Switches to the top view; click-drag a path around the character">Draw camera path</button><button id="clearPath" type="button">Clear path</button></div>
       <label id="pointHeightRow" hidden>Selected point height m <input id="pointHeight" type="number" min="0.1" max="30" step="0.05" /></label>
+      <div class="row camstart"><span class="muted">Start</span><select id="camMoveMode">${PICKABLE.filter(m => m !== "path").map(m => `<option value="${m}">${CAMERA_MODE_LABELS[m]}</option>`).join("")}</select>
+        <span class="muted">on</span><select id="camMoveTarget"><option value="snare">snare</option><option value="kick">kick</option><option value="hat">hat</option><option value="beat">beat</option></select>
+        <input id="camMoveIndex" class="tiny" type="number" min="0" step="1" value="0" title="Which one (0 = the first)" />
+        <span class="muted">for</span><input id="camMoveLen" class="tiny" type="number" min="0.25" step="0.25" value="8" title="Beats" />
+        <button id="camMoveGo" type="button">Start</button></div>
+      <h2>Floor path</h2>
+      <div class="row"><button id="drawWalk" type="button" title="Switches to the top view (the field); click-drag the path the character travels">Draw walk path</button><button id="clearWalk" type="button">Clear walk path</button></div>
+      <div class="grid3">
+        <label>From beat <input id="walkFrom" type="number" min="0" step="1" value="0" /></label>
+        <label>To beat <input id="walkTo" type="number" min="1" step="1" placeholder="end" /></label>
+        <label>Gait <select id="walkGait"><option value="">keep moves</option><option value="Walk_Loop">walk (rigged)</option><option value="Jog_Fwd_Loop">jog (rigged)</option><option value="Sprint_Loop">sprint (rigged)</option><option value="walk">walk (procedural)</option><option value="run">run (procedural)</option></select></label>
+      </div>
       <label class="check"><input id="showPaths" type="checkbox" checked /> Draw camera and floor paths (top and orbit views)</label>
     </section>
     <section>

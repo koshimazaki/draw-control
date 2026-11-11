@@ -9,6 +9,8 @@ import { setAnticipation, setImpact } from "./accent-feel";
 import type { CommandContext } from "./commands";
 import { deleteMove, deletePhase, deleteStep, restorePhase, type GapMode } from "./delete-edits";
 import { moveMoveTo, placeOnEvery, resizeMove, setMoveFields, snapMoveTo } from "./move-edits";
+import { clearCameraPath, clearRootPath, setCamera, setCameraModes, setCameraPath, setRootPath, startCameraMove } from "./camera-edits";
+import type { CameraMode } from "./camera";
 import { STEP_DIVISIONS, type StepDivision } from "./performance-config";
 import {
   addMarker, clearEnergyCurve, clearSteps, moveMarker, paintEnergy, removeMarker, retimePhase, setMarkerAccent, setMoveAtBeat, setMoveBlend, setStepAmplitude,
@@ -62,6 +64,14 @@ export const COMMAND_TABLE: Record<string, TableCommand> = {
     run: (r, a, c) => validateRecipe(envelopeFromAudio(r, { source: str(a, "source") as EnvelopeSource, min: optNum(a, "min"), max: optNum(a, "max"), decayBeats: optNum(a, "decayBeats") }, { drive: c.drive, bands: c.bands })),
   },
   clearEnvelope: { help: "{} remove the envelope (every frame at 1)", run: r => validateRecipe(clearEnvelope(r)) },
+  // Camera rig and paths.
+  setCamera: { help: "{ distance?, height?, fov?, intensity?, orbitDegreesPerBeat?, startYaw? } camera rig numbers (adds a rig if there is none)", run: (r, a) => setCamera(r, { distance: optNum(a, "distance"), height: optNum(a, "height"), fov: optNum(a, "fov"), intensity: optNum(a, "intensity"), orbitDegreesPerBeat: optNum(a, "orbitDegreesPerBeat"), startYaw: optNum(a, "startYaw") }) },
+  setCameraModes: { help: "{ modes, fromBeat?, toBeat? } camera modes on a range: static, orbit, pushIn, pullOut, rise, lead, chase, side, threeQuarter, top, fixed, path", run: (r, a) => setCameraModes(r, { modes: a.modes as CameraMode[], fromBeat: optNum(a, "fromBeat"), toBeat: optNum(a, "toBeat") }) },
+  startCameraMove: { help: "{ modes, target: kick|snare|hat|beat, index?, lengthBeats? } start a camera move on the Nth kick or snare (0-based)", run: (r, a, c) => startCameraMove(r, { modes: a.modes as CameraMode[], target: str(a, "target"), index: a.index === undefined ? undefined : num(a, "index"), lengthBeats: optNum(a, "lengthBeats") }, c.bands ?? c.drive?.bands) },
+  setCameraPath: { help: "{ points: [{ x, z, y? }], useMode? } the camera path seen from the top (x, z metres; y height)", run: (r, a) => setCameraPath(r, { points: a.points as { x: number; z: number; y?: number }[], useMode: a.useMode !== false }) },
+  clearCameraPath: { help: "{} remove the camera path", run: r => clearCameraPath(r) },
+  setRootPath: { help: "{ points: [{ x, z }], fromBeat?, toBeat?, gait? } the floor path the character travels over a range (smoothed, steady speed, facing along it); gait adds a walk or run block", run: (r, a) => setRootPath(r, { points: a.points as { x: number; z: number }[], fromBeat: optNum(a, "fromBeat"), toBeat: optNum(a, "toBeat"), gait: a.gait === undefined ? undefined : str(a, "gait") }) },
+  clearRootPath: { help: "{} the character stands at the origin", run: r => clearRootPath(r) },
   // Hit markers (accents on the music).
   addMarker: { help: "{ seconds, accent } add a hit marker", run: (r, a, c) => addMarker(r, c.drive, num(a, "seconds"), accent(a, "accent")) },
   removeMarker: { help: "{ index } remove a hit marker", run: (r, a, c) => removeMarker(r, c.drive, int(a, "index")) },

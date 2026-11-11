@@ -14,7 +14,7 @@ import { execFileSync } from "node:child_process";
 import { createServer } from "vite";
 import { chromium } from "playwright-core";
 import { unzipSync, strFromU8 } from "fflate";
-import { smokeBands, smokeBlocks, smokeEnvelope } from "./smoke-features.mjs";
+import { smokeBands, smokeBlocks, smokeCameraPath, smokeEnvelope } from "./smoke-features.mjs";
 
 const OUT = new URL("../out/smoke/", import.meta.url).pathname;
 mkdirSync(OUT, { recursive: true });
@@ -202,6 +202,7 @@ try {
   await smokeBands(page, { fail, OUT });
   await smokeBlocks(page, { fail, OUT });
   await smokeEnvelope(page, { fail, OUT });
+  await smokeCameraPath(page, { fail, OUT, checkBundle });
 
   if (errors.length) fail(`page errors: ${errors.join(" | ")}`);
 } finally {

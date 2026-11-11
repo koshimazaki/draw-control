@@ -100,7 +100,7 @@ describe("camera rig", () => {
   it("builds a combination timeline from chosen modes", () => {
     expect(cameraTimeline(["orbit", "pushIn"], 16, { sequence: true, beatsEach: 8 })).toEqual([
       { fromBeat: 0, toBeat: 8, modes: ["orbit"] }, { fromBeat: 8, toBeat: 16, modes: ["pushIn"] }]);
-    expect(() => withCamera({ segments: [{ fromBeat: 0, toBeat: 8, modes: ["lead", "chase"] }] })).toThrow(/exclude/);
+    expect(() => withCamera({ segments: [{ fromBeat: 0, toBeat: 8, modes: ["lead", "chase"] }] })).toThrow(/one follow rig/);
   });
 });
 

@@ -22,7 +22,9 @@ export class Viewport {
   private camera: THREE.Camera;
   private actor = new THREE.Group();
   private character?: Character;
-  private grid: THREE.GridHelper;
+  private grid: THREE.Group;
+  private gridOn = false;
+  private exportGrid = false;
   private observer: ResizeObserver;
   private rigCam = new THREE.PerspectiveCamera(32, 1, 0.1, 200);
   private rigPlan: CameraPlan | null = null;
@@ -69,8 +71,11 @@ export class Viewport {
     floor.rotation.x = -Math.PI / 2;
     floor.receiveShadow = true;
     this.scene.add(floor);
-    this.grid = new THREE.GridHelper(20, 20, 0x9a9ca0, 0x8a8c90);
-    this.grid.position.y = 0.002;
+    // Blocked-out ground grid: 1 m lines, bolder every 4 m, the two axes darker.
+    this.grid = new THREE.Group();
+    const fine = new THREE.GridHelper(40, 40, 0x8e9196, 0x8e9196), coarse = new THREE.GridHelper(40, 10, 0x55585e, 0x6a6d72);
+    fine.position.y = 0.002; coarse.position.y = 0.003;
+    this.grid.add(fine, coarse);
     this.grid.visible = false;
     this.scene.add(this.grid);
     this.scene.add(this.actor);
@@ -127,6 +132,7 @@ export class Viewport {
   /** Hide preview-only helpers (paths) while exporting. */
   setExporting(on: boolean) {
     this.exporting = on;
+    this.grid.visible = on ? this.exportGrid : this.gridOn;
     this.overlay.group.visible = !on && this.overlayWanted();
     this.aids.group.visible = !on;
   }
@@ -139,7 +145,9 @@ export class Viewport {
     return cameraFor(view, aspect, this.orbitCam);
   }
   setBackground(bg: Background) { this.scene.background = new THREE.Color(BACKGROUNDS[bg]); this.redraw(); }
-  setGrid(on: boolean) { this.grid.visible = on; this.redraw(); }
+  setGrid(on: boolean) { this.gridOn = on; this.grid.visible = on; this.redraw(); }
+  /** Whether the exported guide shows the grid (whatever the preview shows). */
+  setExportGrid(on: boolean) { this.exportGrid = on; }
 
   /** Pose the scene for one frame. Pure function of `state`. */
   pose(state: FrameState) {
