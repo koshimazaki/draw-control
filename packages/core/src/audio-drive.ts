@@ -14,8 +14,14 @@ export type AudioDrive = {
   onsets: Onset[];
   /** "audio" when built from a track, "flat" when no track is loaded. */
   source: "audio" | "flat";
+  /** Low-band (kick and bass) loudness per frame, 0–1, with a fast attack and release. */
+  low?: Float32Array;
 };
-export type EnvelopeOptions = { attackSeconds?: number; releaseSeconds?: number };
+export type EnvelopeOptions = {
+  attackSeconds?: number; releaseSeconds?: number;
+  /** Normalise to at least this share of the peak (sparse signals: a lone kick should not make every tick loud). */
+  minRefOfPeak?: number;
+};
 
 /**
  * Per-frame energy: the mean RMS inside each frame, normalised to the 95th percentile,
@@ -32,7 +38,7 @@ export function energyEnvelope(rms: Float32Array, hopSeconds: number, fps: numbe
     raw[n] = count ? sum / count : 0;
   }
   const sorted = Array.from(raw).sort((a, b) => a - b);
-  const ref = sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))] || 1;
+  const ref = Math.max(sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))], (sorted[sorted.length - 1] ?? 0) * (opts.minRefOfPeak ?? 0)) || 1;
   const up = 1 - Math.exp(-1 / (fps * attack)), down = 1 - Math.exp(-1 / (fps * release));
   const out = new Float32Array(frames);
   let y = Math.min(1, (raw[0] ?? 0) / ref);
@@ -71,8 +77,10 @@ export function detectOnsets(rms: Float32Array, hopSeconds: number, opts: { k?: 
   return found.map(f => ({ seconds: Math.round(f.i * hopSeconds * 10000) / 10000, strength: peak ? f.v / peak : 0 }));
 }
 
-export function buildDrive(features: { rms: Float32Array; hopSeconds: number }, fps: number, frames: number): AudioDrive {
-  return { fps, energy: energyEnvelope(features.rms, features.hopSeconds, fps, frames), onsets: detectOnsets(features.rms, features.hopSeconds), source: "audio" };
+export function buildDrive(features: { rms: Float32Array; hopSeconds: number; lowRms?: Float32Array }, fps: number, frames: number): AudioDrive {
+  const drive: AudioDrive = { fps, energy: energyEnvelope(features.rms, features.hopSeconds, fps, frames), onsets: detectOnsets(features.rms, features.hopSeconds), source: "audio" };
+  if (features.lowRms) drive.low = energyEnvelope(features.lowRms, features.hopSeconds, fps, frames, { attackSeconds: 0.02, releaseSeconds: 0.15, minRefOfPeak: 0.5 });
+  return drive;
 }
 
 /** No track: constant mid energy and no onsets, so the rig and the layer still run. */

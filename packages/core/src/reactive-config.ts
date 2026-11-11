@@ -55,7 +55,17 @@ export type ReactiveConfig = {
    * movement when loud, softer towards idle when quiet).
    */
   drive?: number;
+  /** Per-bone sync for dance: additive layers that move body parts to the music, amounts 0–1 each. */
+  sync?: BoneSync;
 };
+/**
+ * - head: nods down onto every beat, bigger when loud;
+ * - shoulders: shrug on onsets (snares, claps), or on the backbeat (2 and 4) without a track;
+ * - arms: pump forward with the shoulders, a frame later (follow-through);
+ * - hips: drop and sway on each beat, as strong as the kick and bass (the low band) there.
+ */
+export type BoneSync = { head: number; shoulders: number; arms: number; hips: number };
+export const BONE_SYNC_PARTS = ["head", "shoulders", "arms", "hips"] as const;
 
 export const DEFAULT_REACTIVE: ReactiveConfig = {
   seed: 1, speed: 0.7, amplitude: 0.8, drive: 1, accents: ["hit", "point", "jump"], accentOn: "both",
@@ -64,7 +74,7 @@ export const DEFAULT_REACTIVE: ReactiveConfig = {
 
 export function validateReactive(input: unknown): ReactiveConfig {
   if (!isObject(input)) return fail("reactive must be an object");
-  only(input, ["seed", "speed", "amplitude", "accents", "accentOn", "accentGapBeats", "onsetThreshold", "idleBelow", "humanise", "markers", "drive"], "reactive");
+  only(input, ["seed", "speed", "amplitude", "accents", "accentOn", "accentGapBeats", "onsetThreshold", "idleBelow", "humanise", "markers", "drive", "sync"], "reactive");
   if (!Number.isInteger(input.seed) || !num(input.seed, 0, 2147483647, "reactive.seed")) fail("reactive.seed must be a whole number 0–2147483647");
   if (!Array.isArray(input.accents) || input.accents.length > 8) fail("reactive.accents must be a list of up to 8 accent moves");
   for (const a of input.accents as unknown[]) if (!isAccentKey(a)) fail(`reactive.accents: ${String(a)} is not an accent move`);
@@ -81,6 +91,13 @@ export function validateReactive(input: unknown): ReactiveConfig {
     humanise: num(input.humanise, 0, 1, "reactive.humanise"),
   };
   if (input.drive !== undefined) out.drive = num(input.drive, 0, 1.5, "reactive.drive");
+  if (input.sync !== undefined) {
+    const s = input.sync;
+    if (!isObject(s)) return fail("reactive.sync must be an object");
+    only(s, [...BONE_SYNC_PARTS], "reactive.sync");
+    out.sync = { head: num(s.head, 0, 1, "reactive.sync.head"), shoulders: num(s.shoulders, 0, 1, "reactive.sync.shoulders"),
+      arms: num(s.arms, 0, 1, "reactive.sync.arms"), hips: num(s.hips, 0, 1, "reactive.sync.hips") };
+  }
   if (input.markers !== undefined) {
     if (!Array.isArray(input.markers) || input.markers.length > 512) fail("reactive.markers must be a list of up to 512 markers");
     let last = -Infinity;

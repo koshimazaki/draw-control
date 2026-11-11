@@ -24,6 +24,7 @@ import { STEP_AMPLITUDE_MAX, type StepLane } from "./performance-config";
 import type { Recipe } from "./recipe";
 import { smoothNoise } from "./rng";
 import type { AccentKey } from "./accents";
+import { syncAt } from "./bone-sync";
 import { MIN_BLEND_FRAMES, SWITCH_FRAMES, blendBeatsOf, gaitOffsets, layeredWeights, playedBoundaries } from "./transitions";
 
 const TEMPO_FADE_BEATS = 0.5;
@@ -54,7 +55,9 @@ export function effectiveDrive(recipe: Recipe, drive?: AudioDrive): AudioDrive |
     const x = Math.min(curve.values.length - 1, n / fps * curve.rate), i = Math.floor(x), f = x - i;
     energy[n] = curve.values[i] + ((curve.values[Math.min(curve.values.length - 1, i + 1)]) - curve.values[i]) * f;
   }
-  return { fps, energy, onsets: drive?.onsets ?? [], source: drive?.source ?? "flat" };
+  const out: AudioDrive = { fps, energy, onsets: drive?.onsets ?? [], source: drive?.source ?? "flat" };
+  if (drive?.low) out.low = drive.low;
+  return out;
 }
 
 /** How strongly energy drives tempo and amplitude (the config amounts times the master drive). */
@@ -268,5 +271,7 @@ export function clipFrameAt(recipe: Recipe, frame: number, drive?: AudioDrive): 
     state.phase = { name: a.phase.name, kind: a.phase.kind, accent: a.hit.accent.name };
   });
   state.accentWeight = accentWeight;
+  const sync = syncAt(recipe, plan.drive, seconds);
+  if (sync) state.sync = sync;
   return state;
 }

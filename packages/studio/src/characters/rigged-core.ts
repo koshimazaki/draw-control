@@ -99,9 +99,77 @@ export function createRiggedCharacter(model: THREE.Object3D, clips: THREE.Animat
         const a = hips.parent.worldToLocal(new THREE.Vector3(0, after, 0)), b = hips.parent.worldToLocal(new THREE.Vector3(0, before, 0));
         hips.position.sub(a.sub(b));   // the parent may be rotated (Z-up armature): move along world up
       }
-      return;
+    } else applyBones(accents);
+    if (state.sync) addSync(state.sync);
+  }
+
+  /**
+   * Per-bone sync, added on top of the posed clip in the character's own frame (it faces +Z,
+   * its left is +X): the head nods forward, the shoulders shrug, the arms pump forward and
+   * the hips drop and tilt to alternate sides.
+   */
+  const SYNC = { head: 14, neck: 5, shoulder: 10, arm: 16, hipsDrop: 0.04, hipsTilt: 5 };
+  const byName = (n: string) => sampler.bones.find(b => b.name === n);
+  const syncBones = {
+    head: byName("DEF-head"), neck: byName("DEF-neck"), shoulderL: byName("DEF-shoulderL"), shoulderR: byName("DEF-shoulderR"),
+    armL: byName("DEF-upper_armL"), armR: byName("DEF-upper_armR"),
+  };
+  const legs = (["L", "R"] as const).map(k => ({ thigh: byName(`DEF-thigh${k}`), shin: byName(`DEF-shin${k}`), foot: byName(`DEF-foot${k}`) }))
+    .filter((l): l is { thigh: THREE.Object3D; shin: THREE.Object3D; foot: THREE.Object3D } => !!(l.thigh && l.shin && l.foot));
+  /** Turn a bone about a world axis through its own origin (its joint). */
+  function rotateWorld(bone: THREE.Object3D, worldAxis: THREE.Vector3, radians: number) {
+    if (!Number.isFinite(radians) || Math.abs(radians) < 1e-6 || worldAxis.lengthSq() < 1e-12) return;
+    const world = bone.getWorldQuaternion(new THREE.Quaternion());
+    const turned = new THREE.Quaternion().setFromAxisAngle(worldAxis.clone().normalize(), radians).multiply(world);
+    const parent = bone.parent ? bone.parent.getWorldQuaternion(new THREE.Quaternion()) : new THREE.Quaternion();
+    bone.quaternion.copy(parent.invert().multiply(turned));
+    bone.updateMatrixWorld(true);
+  }
+  /** Analytic two-bone IK: bend the knee to reach `target`, aim the thigh at it, keep the foot's world rotation. */
+  function twoBoneIk(thigh: THREE.Object3D, shin: THREE.Object3D, foot: THREE.Object3D, target: THREE.Vector3, footQ: THREE.Quaternion) {
+    const p = (o: THREE.Object3D) => o.getWorldPosition(new THREE.Vector3());
+    const H = p(thigh), K = p(shin), A = p(foot);
+    const l1 = H.distanceTo(K), l2 = K.distanceTo(A), d = Math.min(l1 + l2 - 1e-4, Math.max(Math.abs(l1 - l2) + 1e-4, H.distanceTo(target)));
+    const now = H.clone().sub(K).angleTo(A.clone().sub(K));
+    const want = Math.acos(Math.max(-1, Math.min(1, (l1 * l1 + l2 * l2 - d * d) / (2 * l1 * l2))));
+    rotateWorld(shin, A.clone().sub(K).cross(H.clone().sub(K)), now - want);
+    const A2 = p(foot);
+    rotateWorld(thigh, A2.clone().sub(H).cross(target.clone().sub(H)), A2.clone().sub(H).angleTo(target.clone().sub(H)));
+    const parent = foot.parent ? foot.parent.getWorldQuaternion(new THREE.Quaternion()) : new THREE.Quaternion();
+    foot.quaternion.copy(parent.invert().multiply(footQ));
+    foot.updateMatrixWorld(true);
+  }
+  const X = new THREE.Vector3(1, 0, 0), Z = new THREE.Vector3(0, 0, 1), deg = Math.PI / 180;
+  function rotateInCharacterFrame(bone: THREE.Object3D | undefined, axis: THREE.Vector3, degrees: number) {
+    if (!bone || Math.abs(degrees) < 1e-4) return;
+    model.updateMatrixWorld(true);
+    const frame = model.getWorldQuaternion(new THREE.Quaternion());
+    const worldAxis = axis.clone().applyQuaternion(frame);
+    const world = bone.getWorldQuaternion(new THREE.Quaternion());
+    const turned = new THREE.Quaternion().setFromAxisAngle(worldAxis, degrees * deg).multiply(world);
+    const parent = bone.parent ? bone.parent.getWorldQuaternion(new THREE.Quaternion()) : new THREE.Quaternion();
+    bone.quaternion.copy(parent.invert().multiply(turned));
+  }
+  function addSync(s: NonNullable<FrameState["sync"]>) {
+    if (hips && hips.parent && (s.hips > 0 || s.sway !== 0)) {
+      model.updateMatrixWorld(true);
+      const planted = legs.map(l => ({ ...l, at: l.foot.getWorldPosition(new THREE.Vector3()), q: l.foot.getWorldQuaternion(new THREE.Quaternion()) }));
+      model.updateMatrixWorld(true);
+      const up = new THREE.Vector3(0, 1, 0).applyQuaternion(model.getWorldQuaternion(new THREE.Quaternion()));
+      const p0 = hips.getWorldPosition(new THREE.Vector3());
+      const scale = model.getWorldScale(new THREE.Vector3()).y || 1;
+      const p1 = p0.clone().addScaledVector(up, -SYNC.hipsDrop * s.hips * scale);
+      hips.position.add(hips.parent.worldToLocal(p1).sub(hips.parent.worldToLocal(p0.clone())));
+      rotateInCharacterFrame(hips, Z, SYNC.hipsTilt * s.sway);
+      // The knees take the drop: each foot goes back where the clip planted it.
+      for (const l of planted) twoBoneIk(l.thigh, l.shin, l.foot, l.at, l.q);
     }
-    applyBones(accents);
+    rotateInCharacterFrame(syncBones.neck, X, SYNC.neck * s.head);
+    rotateInCharacterFrame(syncBones.head, X, SYNC.head * s.head);
+    rotateInCharacterFrame(syncBones.shoulderL, Z, SYNC.shoulder * s.shoulders);
+    rotateInCharacterFrame(syncBones.shoulderR, Z, -SYNC.shoulder * s.shoulders);
+    rotateInCharacterFrame(syncBones.armL, X, -SYNC.arm * s.arms);
+    rotateInCharacterFrame(syncBones.armR, X, -SYNC.arm * s.arms);
   }
   /** World height of the lower foot, after updating the skeleton's matrices. */
   function lowestFoot(): number | null {

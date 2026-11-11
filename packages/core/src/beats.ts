@@ -16,7 +16,23 @@ export type AudioFeatures = {
   waveform: number[];
   estimatedBpm: number | null;
   estimatedOffsetSeconds: number;
+  /** RMS envelope of the low band (below about 150 Hz: kick and bass), on the same hops as `rms`. */
+  lowRms?: Float32Array;
 };
+
+/** Mono, low-passed twice at `hz` (two one-pole filters): the kick and bass band. */
+export function lowBand(channels: readonly Float32Array[], sampleRate: number, hz = 150): Float32Array {
+  const length = channels[0]?.length ?? 0, out = new Float32Array(length);
+  const a = 1 - Math.exp(-2 * Math.PI * hz / sampleRate);
+  let y1 = 0, y2 = 0;
+  for (let j = 0; j < length; j++) {
+    let v = 0;
+    for (const ch of channels) v += ch[j] / channels.length;
+    y1 += a * (v - y1); y2 += a * (y1 - y2);
+    out[j] = y2;
+  }
+  return out;
+}
 
 export type BeatsJson = {
   bpm: number;
@@ -134,6 +150,7 @@ export function analyseSamples(channels: readonly Float32Array[], sampleRate: nu
     waveform: waveformPeaks(rms),
     estimatedBpm,
     estimatedOffsetSeconds: estimatedBpm ? estimateBeatOffset(rms, hopSeconds, estimatedBpm) : 0,
+    lowRms: rmsEnvelope([lowBand(channels, sampleRate)], sampleRate).rms,
   };
 }
 

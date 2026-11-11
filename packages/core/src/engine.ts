@@ -39,6 +39,8 @@ export type FrameState = {
   lagged?: { group: string; layers: ClipLayer[] }[];
   /** Rigged mannequin: the total weight of accent clips (0–1). */
   accentWeight?: number;
+  /** Rigged mannequin: per-bone sync signals added on top of the clips (reactive.sync). */
+  sync?: { head: number; shoulders: number; arms: number; hips: number; sway: number };
   /** Rigged mannequin: the accent phase playing, for the caption and the phase lane. */
   phase?: { name: string; kind: string; accent: string };
 };

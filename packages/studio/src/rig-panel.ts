@@ -49,6 +49,13 @@ export const RIG_LAYOUT = `
           <label>Seed <input id="reactSeed" type="number" min="0" step="1" /></label>
           <label>Idle below <input id="reactIdle" type="number" min="0" max="1" step="0.05" /></label>
         </div>
+        <label class="check" title="Additive layers on top of the clips (rigged mannequin)"><input id="syncOn" type="checkbox" /> Per-bone sync: body parts move to the music</label>
+        <div id="syncControls" class="grid2" hidden>
+          <label title="Nods onto every beat, bigger when loud">Head on beats <input id="syncHead" type="range" min="0" max="1" step="0.05" /></label>
+          <label title="Shrug on onsets (snares, claps), or the backbeat without a track">Shoulders on hits <input id="syncShoulders" type="range" min="0" max="1" step="0.05" /></label>
+          <label title="Pump forward with the shoulders, a frame later">Arms on hits <input id="syncArms" type="range" min="0" max="1" step="0.05" /></label>
+          <label title="Drop and sway on each beat, as strong as the kick and bass">Hips on the kick <input id="syncHips" type="range" min="0" max="1" step="0.05" /></label>
+        </div>
       </div>
     </section>`;
 
@@ -98,6 +105,16 @@ export function bindRigPanel(edit: Edit, onRigToggle: (on: boolean) => void) {
     return validateRecipe(next);
   });
   for (const id of ["reactDrive", "reactSet", "reactAmp", "reactSpeed", "reactHuman", "reactOnWhat", "reactSeed", "reactIdle"]) $(id).onchange = writeReactive;
+  const SYNC_IDS = { head: "syncHead", shoulders: "syncShoulders", arms: "syncArms", hips: "syncHips" } as const;
+  const writeSync = () => edit(r => {
+    if (!r.reactive) return r;
+    const next = structuredClone(r);
+    if (input("syncOn").checked) next.reactive!.sync = { head: Number(input(SYNC_IDS.head).value), shoulders: Number(input(SYNC_IDS.shoulders).value), arms: Number(input(SYNC_IDS.arms).value), hips: Number(input(SYNC_IDS.hips).value) };
+    else delete next.reactive!.sync;
+    return validateRecipe(next);
+  });
+  input("syncOn").onchange = writeSync;   // starts every part at the sliders' middle (0.5)
+  for (const id of Object.values(SYNC_IDS)) input(id).oninput = writeSync;
 }
 
 /** Read the recipe's rig and reactive fields back into the controls. */
@@ -127,5 +144,8 @@ export function syncRigPanel(recipe: Recipe) {
     $<HTMLSelectElement>("reactOnWhat").value = r.accentOn;
     input("reactSeed").value = String(r.seed);
     input("reactIdle").value = String(r.idleBelow);
+    input("syncOn").checked = !!r.sync;
+    $("syncControls").hidden = !r.sync;
+    if (r.sync) { input("syncHead").value = String(r.sync.head); input("syncShoulders").value = String(r.sync.shoulders); input("syncArms").value = String(r.sync.arms); input("syncHips").value = String(r.sync.hips); }
   }
 }

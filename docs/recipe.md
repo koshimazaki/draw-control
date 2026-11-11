@@ -109,6 +109,7 @@ Transitions between rigged loops: a gait (walk, jog, sprint, crouch walk) that f
 | `idleBelow` | 0–1 | Bars quieter than this settle to idle (0 = never). |
 | `humanise` | 0–1 | Overlapping action (spine, head and arms trail the hips) and small seeded variation. |
 | `markers[]` | optional, up to 512 | Edited hits. When present they replace detection entirely (below). |
+| `sync` | optional object | Per-bone sync for dance: additive layers on top of the rigged mannequin's clips, each an amount 0–1: `head` (nods onto every beat, bigger when loud), `shoulders` (shrug on onsets such as snares and claps, or on the backbeat without a track), `arms` (pump forward with the shoulders, a frame later), `hips` (drop and sway on each beat, as strong as the kick and bass there; the knees take the drop so the feet stay planted). Added 11 November 2026. |
 
 ### `reactive.markers[]`
 

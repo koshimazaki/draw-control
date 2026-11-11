@@ -63,3 +63,5 @@ progress { width: 100%; }
 .ctx-menu button { display: flex; justify-content: space-between; gap: 16px; text-align: left; border: 0; background: transparent; padding: 6px 8px; }
 .ctx-menu button:hover, .ctx-menu button:focus { background: rgba(255,255,255,0.08); }
 .ctx-menu kbd { opacity: 0.6; font: 11px ui-monospace, Menlo, monospace; }
+.grid2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; align-items: end; }
+.grid2[hidden] { display: none; }
