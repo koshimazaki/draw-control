@@ -5,7 +5,7 @@ export type ClipInfo = { name: string; seconds: number };
 
 /** Anything the viewport can pose from a frame state. */
 export interface Character {
-  kind: "mannequin" | "block" | "file" | "rigged";
+  kind: "mannequin" | "block" | "stick" | "blob" | "file" | "rigged";
   object: THREE.Object3D;
   clips: ClipInfo[];
   /** Pose the character for one frame. Must depend on `state` only. */

@@ -53,7 +53,7 @@ export function createServer(session = new Session()): McpServer {
     guard(({ path }: { path: string }) => { session.analysis = parseAnalysis(readFileSync(path, "utf8")); return text(`Loaded ${path}: ${summary(session.analysis)}.`); }));
   server.registerTool("new_recipe", {
     description: "Start a new working recipe (rigged mannequin by default), fitted to the analysed track's tempo and length when there is one.",
-    inputSchema: { character: z.enum(["rigged", "mannequin", "block"]).optional() },
+    inputSchema: { character: z.enum(["rigged", "mannequin", "block", "stick", "blob"]).optional() },
   }, guard(({ character }: { character?: string }) => { session.replace(newRecipe(character ?? "rigged", session.analysis)); return text(session.describe()); }));
   server.registerTool("load_recipe", { description: "Load a recipe JSON file as the working recipe.", inputSchema: { path: z.string() } },
     guard(({ path }: { path: string }) => { session.replace(JSON.parse(readFileSync(path, "utf8"))); return text(session.describe()); }));

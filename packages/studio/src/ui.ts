@@ -42,6 +42,8 @@ export const LAYOUT = `
         <option value="rigged">Rigged mannequin (clips)</option>
         <option value="mannequin">Procedural mannequin</option>
         <option value="block">Block figure</option>
+        <option value="stick">Stick figure (lines and joint dots)</option>
+        <option value="blob">Capsule figure (no visible joints)</option>
         <option value="file">Loaded file (GLB / FBX)</option>
       </select>
       <label class="file">Load GLB / FBX <input id="characterFile" type="file" accept=".glb,.gltf,.fbx" /></label>

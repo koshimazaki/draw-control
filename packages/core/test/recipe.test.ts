@@ -39,3 +39,14 @@ describe("recipe schema", () => {
     expect(() => validateRecipe(withMoves([makeMove("clap", 0, { id: "a" }), makeMove("bounce", 2, { id: "a" })]))).toThrow(/unique/);
   });
 });
+
+describe("abstract figures", () => {
+  it("stick and capsule figures are procedural kinds that keep every library move", async () => {
+    const { incompatibleMoves, PROCEDURAL_KINDS } = await import("../src");
+    for (const kind of PROCEDURAL_KINDS) {
+      const r = validateRecipe({ ...structuredClone(DEFAULT_RECIPE), character: { kind, name: kind, licence: "MIT (motion-studio)" } });
+      expect(incompatibleMoves(r, kind)).toEqual([]);
+      expect(r.moves).toEqual(DEFAULT_RECIPE.moves);
+    }
+  });
+});

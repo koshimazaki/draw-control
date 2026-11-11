@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "guide-bundle.schema.json",
   "title": "Motion Studio guide bundle",
-  "description": "Pinned local copy, version 0.3.0. The owner of this schema is model-arena/packages/core; re-sync this file whenever its schemaVersion changes. 0.2.0 (proposed here, 11 November 2026, not yet in model-arena) adds the optional camera track: manifest 'camera', $defs/camera the asset role 'camera', and the character kind 'rigged' (the bundled rigged mannequin). Fields follow the table 'The guide bundle' in docs/plan.md. 0.3.0 (proposed here, 11 November 2026, not yet in model-arena) adds optional drum-band onsets (beats.onsets.low/mid/high: kick, snare, hat) and amplitude peaks (beats.peaks), each a list of { seconds, strength }, re-based like the beats. A reader that refuses unknown keys in beats.json must be re-synced before it reads 0.3.0 bundles with onsets.",
+  "description": "Pinned local copy, version 0.3.0. The owner of this schema is model-arena/packages/core; re-sync this file whenever its schemaVersion changes. 0.2.0 (proposed here, 11 November 2026, not yet in model-arena) adds the optional camera track: manifest 'camera', $defs/camera the asset role 'camera', and the character kind 'rigged' (the bundled rigged mannequin). Fields follow the table 'The guide bundle' in docs/plan.md. 0.3.0 (proposed here, 11 November 2026, not yet in model-arena) adds optional drum-band onsets (beats.onsets.low/mid/high: kick, snare, hat) and amplitude peaks (beats.peaks), each a list of { seconds, strength }, re-based like the beats. A reader that refuses unknown keys in beats.json must be re-synced before it reads 0.3.0 bundles with onsets. 0.3.0 also adds the character kinds 'stick' (lines and joint dots) and 'blob' (capsules, no visible joints).",
   "type": "object",
   "required": [
     "schemaVersion",
@@ -181,6 +181,8 @@
               "enum": [
                 "mannequin",
                 "block",
+                "stick",
+                "blob",
                 "file",
                 "rigged"
               ]

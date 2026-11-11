@@ -26,6 +26,8 @@ import { bindSequencePanel } from "./sequence-panel";
 import { bindMixamo, importedMove } from "./app-mixamo";
 import { parseSequenceFile } from "./sequence-library";
 
+const PROCEDURAL_NAMES: Partial<Record<CharacterKind, string>> = { mannequin: "Procedural mannequin", block: "Block figure", stick: "Stick figure", blob: "Capsule figure" };
+
 export function startApp(root: HTMLElement) {
   root.innerHTML = LAYOUT;
   const viewport = new Viewport($("viewport"));
@@ -180,7 +182,7 @@ export function startApp(root: HTMLElement) {
     } else c = createProceduralCharacter(kind);
     // Keep the loaded file alive when switching away, so it can be switched back.
     if (c && c !== viewport.getCharacter()) viewport.setCharacter(c, !keep(viewport.getCharacter()));
-    const name = kind === "mannequin" ? "Procedural mannequin" : kind === "block" ? "Block figure" : kind === "rigged" ? RIGGED_CHARACTER.name : recipe.character.name;
+    const name = PROCEDURAL_NAMES[kind] ?? (kind === "rigged" ? RIGGED_CHARACTER.name : recipe.character.name);
     const licence = kind === "file" ? (input("characterLicence").value.trim() || "unspecified") : kind === "rigged" ? RIGGED_CHARACTER.licence : "MIT (motion-studio)";
     edit(r => validateRecipe({ ...r, character: { kind, name, licence } }));
     $<HTMLSelectElement>("character").value = kind;

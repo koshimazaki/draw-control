@@ -144,6 +144,16 @@ try {
     await page.locator("#viewport").screenshot({ path: `${OUT}view-${v}.png` });
   }
   await page.click('[data-view="front"]');
+  // 2b. The abstract figures play the same recipe: switching keeps every move (no confirm).
+  await page.fill("#cursorBeat", "13"); await page.dispatchEvent("#cursorBeat", "change");
+  for (const figure of ["stick", "blob", "block", "mannequin"]) {
+    await page.selectOption("#character", figure);
+    const r = JSON.parse(await page.inputValue("#recipeJson"));
+    if (await page.isVisible("#switchConfirm") || r.character.kind !== figure || JSON.stringify(r.moves) !== JSON.stringify(recipe.moves)) fail(`switching to ${figure} changed the moves`);
+    await page.click("#next");
+    await page.locator("#viewport").screenshot({ path: `${OUT}figure-${figure}.png` });
+  }
+  console.log("figures: stick, blob, block, mannequin play the same moves (screenshots figure-*.png)");
 
   // 3. Export a mid-track section of the mannequin at 1280×720: beats 8–16 of 20.
   //    Beat 8 is at 0.2 + 8 × 60/112 = 4.486 s → frame 107; 8 beats = 102.9 frames → 105 (8k+1).

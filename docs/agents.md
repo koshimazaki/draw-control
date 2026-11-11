@@ -20,7 +20,7 @@ npm run cli -- commands                   # or: node cli/bin/motion-studio.mjs c
 | Command | What it does |
 | --- | --- |
 | `analyse <audio> --out analysis.json` | Tempo, first beat, kick, snare and hat onsets with strengths, amplitude peaks, and the loudness envelopes. WAV is read directly; MP3, M4A, FLAC and OGG need ffmpeg. |
-| `new [--character rigged\|mannequin\|block] [--analysis a.json] --out recipe.json` | A starting recipe (the rigged mannequin dancing), fitted to the track's tempo and length. |
+| `new [--character rigged\|mannequin\|block\|stick\|blob] [--analysis a.json] --out recipe.json` | A starting recipe (the rigged mannequin dancing), fitted to the track's tempo and length. |
 | `apply <recipe.json> <commands.json> [--analysis a.json] [--out next.json]` | Apply a list of commands in order. All or nothing: a refused command names its index and the reason. |
 | `set <recipe.json> <path> <value> [--out next.json]` | Set any recipe field by path: `beatGrid.bpm 98`, `moves#Dance_Loop-4.speed 2`, `moves[0].phases[0].amplitude 2.5`, `camera.distance 5`, `reactive.amplitude 1`. The value is JSON when it parses, text otherwise; `null` deletes the field. |
 | `describe <recipe.json> [--analysis a.json]` | The timeline as text: move blocks with start, end, speed and amplitude, rests, hit markers, the camera ranges and paths, the walk path, the envelope, and the kicks, snares and hats in beats. |

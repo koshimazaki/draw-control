@@ -7,12 +7,10 @@
 import * as THREE from "three";
 import { JOINTS, type FrameState, type JointName } from "@motion-studio/core";
 import type { Character } from "./types";
+import { createAbstractFigure } from "./abstract";
+import { DIMS } from "./dims";
 
 type Style = "mannequin" | "block";
-const DIMS = {
-  pelvisY: 1.0, spineUp: 0.1, torso: 0.46, neck: 0.56, shoulderX: 0.245, shoulderY: 0.44,
-  upperArm: 0.29, forearm: 0.27, hipX: 0.1, hipY: -0.05, thigh: 0.44, shin: 0.44,
-};
 
 function materials(style: Style) {
   // Limbs light, joints a dark slate: high contrast with each other and with mid grey.
@@ -36,7 +34,8 @@ function jointBall(style: Style, radius: number, mat: THREE.Material): THREE.Obj
   return new THREE.Mesh(new THREE.SphereGeometry(radius, 16, 12), mat);
 }
 
-export function createProceduralCharacter(style: Style): Character {
+export function createProceduralCharacter(style: Style | "stick" | "blob"): Character {
+  if (style === "stick" || style === "blob") return createAbstractFigure(style);
   const { body, joint } = materials(style);
   const root = new THREE.Group();
   root.name = style;

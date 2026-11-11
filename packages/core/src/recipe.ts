@@ -20,8 +20,14 @@ export type PreviewFps = (typeof PREVIEW_FPS)[number];
 /** Validated and exported, not yet rendered (reserved for facial expressions). */
 export const EXPRESSIONS = ["neutral", "smile", "surprised", "angry", "sad", "focused"] as const;
 export type Expression = (typeof EXPRESSIONS)[number];
-/** "rigged" is the bundled rigged mannequin (clip-driven); "mannequin" the procedural fallback. */
-export const CHARACTER_KINDS = ["mannequin", "block", "file", "rigged"] as const;
+/**
+ * "rigged" is the bundled rigged mannequin (clip-driven); "mannequin" the procedural fallback.
+ * "block", "stick" (lines and joint dots) and "blob" (capsules, no visible joints) are more
+ * abstract procedural figures on the same skeleton, for testing which a video model follows.
+ */
+export const CHARACTER_KINDS = ["mannequin", "block", "stick", "blob", "file", "rigged"] as const;
+/** The procedural figures: they play the recipe's poses (library moves), not clips. */
+export const PROCEDURAL_KINDS = ["mannequin", "block", "stick", "blob"] as const;
 export type CharacterKind = (typeof CHARACTER_KINDS)[number];
 
 export type PhaseLength = { beats: number } | { frames: number };
