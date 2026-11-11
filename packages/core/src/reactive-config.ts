@@ -15,7 +15,11 @@ export const MARKER_SOURCES = ["onset", "downbeat", "manual"] as const;
  * delete hits and pick each accent. They are also the keyframe list a future in-between
  * generator (MotionBricks) fills motion between.
  */
-export type HitMarker = { seconds: number; accent: AccentKey; source: (typeof MARKER_SOURCES)[number] };
+export type HitMarker = {
+  seconds: number; accent: AccentKey; source: (typeof MARKER_SOURCES)[number];
+  /** Phase boundaries in beats from the hit (rigged clips): retimed phases, key frame at 0. */
+  phases?: number[];
+};
 export type ReactiveConfig = {
   /** Whole number; the same seed gives the same performance. */
   seed: number;
@@ -67,13 +71,25 @@ export function validateReactive(input: unknown): ReactiveConfig {
     out.markers = (input.markers as unknown[]).map((m, i) => {
       const where = `reactive.markers[${i}]`;
       if (!isObject(m)) return fail(`${where} must be an object`);
-      only(m, ["seconds", "accent", "source"], where);
+      only(m, ["seconds", "accent", "source", "phases"], where);
       const seconds = num(m.seconds, 0, 3600, `${where}.seconds`);
       if (seconds < last) fail(`${where}.seconds must not be before the marker before it`);
       last = seconds;
       if (!isAccentKey(m.accent)) fail(`${where}.accent is not an accent move`);
       if (!MARKER_SOURCES.includes(m.source as HitMarker["source"])) fail(`${where}.source must be one of ${MARKER_SOURCES.join(", ")}`);
-      return { seconds, accent: m.accent as AccentKey, source: m.source as HitMarker["source"] };
+      const marker: HitMarker = { seconds, accent: m.accent as AccentKey, source: m.source as HitMarker["source"] };
+      if (m.phases !== undefined) {
+        if (!Array.isArray(m.phases) || m.phases.length < 2 || m.phases.length > 16) fail(`${where}.phases needs 2–16 boundaries`);
+        let prev = -Infinity;
+        marker.phases = (m.phases as unknown[]).map((b, k) => {
+          const v = num(b, -16, 16, `${where}.phases[${k}]`);
+          if (v <= prev) fail(`${where}.phases must increase`);
+          prev = v;
+          return v;
+        });
+        if (!marker.phases.includes(0)) fail(`${where}.phases must keep the key frame at 0`);
+      }
+      return marker;
     });
   }
   return out;

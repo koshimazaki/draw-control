@@ -9,7 +9,7 @@
  *   a few frames), and small seeded variation so repeats differ.
  * `planReactive` precomputes the bar levels and the hits; perform.ts evaluates frames.
  */
-import { ACCENT_MOVES, accentSpan, type AccentKey } from "./accents";
+import { accentSpan, proceduralAccent, type AccentKey } from "./accents";
 import { energyAtFrame, type AudioDrive } from "./audio-drive";
 import { beatAtSeconds, secondsAtBeat } from "./beats";
 import { activeMoveIndex } from "./engine";
@@ -42,7 +42,11 @@ function barLevel(recipe: Recipe, cfg: ReactiveConfig, bar: number, energy: numb
   return 1;
 }
 
-export function planReactive(recipe: Recipe, drive?: AudioDrive): ReactivePlan {
+/** Beats an accent reaches before and after its hit, or null when this character cannot play it. */
+export type AccentSpanFn = (key: AccentKey) => [number, number] | null;
+const proceduralSpan: AccentSpanFn = key => { const a = proceduralAccent(key); return a ? accentSpan(a) : null; };
+
+export function planReactive(recipe: Recipe, drive?: AudioDrive, span: AccentSpanFn = proceduralSpan): ReactivePlan {
   const cfg = recipe.reactive;
   if (!cfg) throw new Error("planReactive: the recipe has no reactive layer");
   const g = recipe.beatGrid, fps = recipe.fps;
@@ -73,18 +77,21 @@ export function planReactive(recipe: Recipe, drive?: AudioDrive): ReactivePlan {
     // Edited markers are taken as they are (only the recipe bounds still apply).
     for (const m of cfg.markers) {
       const beat = beatAtSeconds(g, m.seconds);
-      const [lo, hi] = accentSpan(ACCENT_MOVES[m.accent]);
+      const sp = span(m.accent);
+      if (!sp) continue;
+      const [lo, hi] = sp;
       if (beat + lo >= 0 && beat + hi <= recipe.durationBeats) hits.push({ seconds: m.seconds, beat, key: m.accent, source: m.source === "downbeat" ? "downbeat" : "onset" });
     }
-  } else if (cfg.accents.length) {
+  } else if (cfg.accents.some(k => span(k))) {
+    const playable = cfg.accents.filter(k => span(k));
     let last = -Infinity, lastKey: AccentKey | null = null;
     for (const c of candidates) {
       if (c.beat - last < cfg.accentGapBeats) continue;
       const bar = Math.floor(c.beat / g.beatsPerBar);
       if (levels[bar] === 0) continue;
-      let key = cfg.accents[hash32(cfg.seed, 7, hits.length) % cfg.accents.length];
-      if (key === lastKey && cfg.accents.length > 1) key = cfg.accents[(cfg.accents.indexOf(key) + 1) % cfg.accents.length];
-      const [lo, hi] = accentSpan(ACCENT_MOVES[key]);
+      let key = playable[hash32(cfg.seed, 7, hits.length) % playable.length];
+      if (key === lastKey && playable.length > 1) key = playable[(playable.indexOf(key) + 1) % playable.length];
+      const [lo, hi] = span(key)!;
       if (c.beat + lo < 0 || c.beat + hi > recipe.durationBeats) continue;
       hits.push({ ...c, key });
       last = c.beat;
@@ -96,7 +103,7 @@ export function planReactive(recipe: Recipe, drive?: AudioDrive): ReactivePlan {
 }
 
 /** The detected hits as editable markers: the starting point for hand edits. */
-export function detectedMarkers(recipe: Recipe, drive?: AudioDrive): HitMarker[] {
+export function detectedMarkers(recipe: Recipe, drive?: AudioDrive, span?: AccentSpanFn): HitMarker[] {
   const r = recipe.reactive ? { ...recipe, reactive: { ...recipe.reactive, markers: undefined } } : recipe;
-  return planReactive(r, drive).hits.map(h => ({ seconds: Math.round(h.seconds * 10000) / 10000, accent: h.key, source: h.source }));
+  return planReactive(r, drive, span).hits.map(h => ({ seconds: Math.round(h.seconds * 10000) / 10000, accent: h.key, source: h.source }));
 }

@@ -101,6 +101,12 @@ try {
   await page.goto("http://127.0.0.1:5181/");
   await page.waitForSelector("#viewport canvas");
   console.log("WebCodecs:", await page.evaluate(() => ({ video: typeof VideoEncoder, audio: typeof AudioEncoder })));
+  // The rigged mannequin is the default; this run covers the procedural figure's library moves.
+  await page.waitForFunction(() => document.querySelector("#clipPalette button"), null, { timeout: 30_000 });
+  if (await page.inputValue("#character") !== "rigged") fail(`default character ${await page.inputValue("#character")}`);
+  await page.screenshot({ path: `${OUT}rigged-default.png` });
+  await page.selectOption("#character", "mannequin");
+  if (await page.isVisible("#switchConfirm")) await page.click("#switchClear");
   const warning = async () => (await page.isVisible("#exportWarning")) ? await page.textContent("#exportWarning") : "";
 
   // 0. Export size: 1280×720 by default; a small custom size and a short clip warn but do not block.

@@ -78,7 +78,7 @@ export function extendPhase(recipe: Recipe, args: { moveId: string; phase: numbe
  * procedural figures (they have no embedded clips).
  */
 export function incompatibleMoves(recipe: Recipe, kind: Recipe["character"]["kind"]): Move[] {
-  return recipe.moves.filter(m => (kind === "file" ? !m.clip : !!m.clip));
+  return recipe.moves.filter(m => (kind === "file" || kind === "rigged" ? !m.clip : !!m.clip));
 }
 
 /** Remove the moves `incompatibleMoves` lists. The result is a valid recipe, possibly with no moves. */

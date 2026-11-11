@@ -36,7 +36,8 @@ export const LAYOUT = `
     <section>
       <h2>Character</h2>
       <select id="character">
-        <option value="mannequin">Mannequin</option>
+        <option value="rigged">Rigged mannequin (clips)</option>
+        <option value="mannequin">Procedural mannequin</option>
         <option value="block">Block figure</option>
         <option value="file">Loaded file (GLB / FBX)</option>
       </select>

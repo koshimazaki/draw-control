@@ -20,3 +20,7 @@ coverage/
 
 # example exports (regenerate with npm run examples)
 examples/bundles/
+# the bundled rigged mannequin ships (MIT / CC0, see assets/characters/NOTICE.md)
+!assets/characters/AnimationLibrary.glb
+# the user's own Mixamo clips: never committed (not redistributable)
+assets-local/

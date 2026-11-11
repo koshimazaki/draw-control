@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Headless export of the example recipes (A, C, D) on a generated 48-beat track:
+ * Headless export of the example recipes (A, C, D, D8) on a generated 48-beat track:
  * quiet intro, a build, the drop on beat 16, a loud section with off-grid hits, a quiet
  * outro. Drives the studio in headless Chrome exactly as a person would (load the track,
  * apply the recipe JSON, pick the Camera rig view, export), then checks each bundle.
@@ -63,6 +63,7 @@ try {
   page.on("console", m => { if (m.type() === "error") errors.push(m.text()); });
   await page.goto("http://127.0.0.1:5183/");
   await page.waitForSelector("#viewport canvas");
+  await page.waitForFunction(() => document.querySelector("#clipPalette button"), null, { timeout: 30_000 });
   const track = exampleTrack();
   mkdirSync(`${ROOT}bundles`, { recursive: true });
   writeFileSync(`${ROOT}bundles/example-track.wav`, track);

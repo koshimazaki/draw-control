@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  ACCENT_MOVES, DEFAULT_REACTIVE, DEFAULT_RECIPE, POSES, detectOnsets, frameAt, makeMove, planReactive, poseDistance,
+  ACCENT_MOVES, proceduralAccent, DEFAULT_REACTIVE, DEFAULT_RECIPE, POSES, detectOnsets, frameAt, makeMove, planReactive, poseDistance,
   validateRecipe, type AudioDrive, type ReactiveConfig, type Recipe,
 } from "../src";
 
@@ -41,7 +41,7 @@ describe("reactive animation layer", () => {
     expect(plan.hits.some(h => h.source === "onset")).toBe(true);
     expect(plan.hits.some(h => h.source === "downbeat")).toBe(true);
     for (const hit of plan.hits) {
-      const accent = ACCENT_MOVES[hit.key];
+      const accent = proceduralAccent(hit.key)!;
       const key = POSES[accent.keys.find(k => k.at === 0)!.pose];
       // First frame where the overlay is fully on and the figure holds the hit pose.
       let landed = -1;
@@ -100,7 +100,7 @@ describe("example recipes", () => {
   it("A, C and D validate as recipes; D carries the reactive layer and the rig", async () => {
     const { exampleRecipes } = await import("../src");
     const list = exampleRecipes();
-    expect(list.map(e => e.id)).toEqual(["A", "C", "D"]);
+    expect(list.map(e => e.id)).toEqual(["A", "C", "D", "D8"]);
     for (const e of list) expect(validateRecipe(JSON.parse(JSON.stringify(e.recipe)))).toEqual(e.recipe);
     const d = list.find(e => e.id === "D")!.recipe;
     expect(d.reactive && d.camera).toBeTruthy();

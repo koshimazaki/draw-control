@@ -38,9 +38,14 @@ export const ACCENT_MOVES = {
     fadeIn: [-1.0, -0.75], fadeOut: [0.3, 0.9], spin: { from: -0.8, turns: 1 },
   },
 } satisfies Record<string, AccentMove>;
-export type AccentKey = keyof typeof ACCENT_MOVES;
-export const ACCENT_KEYS = Object.keys(ACCENT_MOVES) as AccentKey[];
-export const isAccentKey = (x: unknown): x is AccentKey => typeof x === "string" && Object.prototype.hasOwnProperty.call(ACCENT_MOVES, x);
+/** Accents that exist only as clips of the rigged mannequin (clip-library.ts). */
+export const CLIP_ONLY_ACCENTS = ["jab", "cross", "sword", "roll"] as const;
+export type ProceduralAccentKey = keyof typeof ACCENT_MOVES;
+export type AccentKey = ProceduralAccentKey | (typeof CLIP_ONLY_ACCENTS)[number];
+export const ACCENT_KEYS = [...Object.keys(ACCENT_MOVES), ...CLIP_ONLY_ACCENTS] as AccentKey[];
+export const isAccentKey = (x: unknown): x is AccentKey => typeof x === "string" && (ACCENT_KEYS as string[]).includes(x);
+/** The procedural accent for a key, if the procedural figures have one. */
+export const proceduralAccent = (key: AccentKey): AccentMove | undefined => (ACCENT_MOVES as Record<string, AccentMove>)[key];
 
 const clamp01 = (t: number) => Math.max(0, Math.min(1, t));
 const EASES: Record<AccentEase, (t: number) => number> = {

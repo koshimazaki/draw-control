@@ -8,7 +8,13 @@ import { beatAtSeconds } from "./beats";
 import { POSES, mixPoses, neutralPose, scalePose, type Pose } from "./poses";
 import { moveBeats, phaseBeats, type Expression, type Recipe, type RootPoint } from "./recipe";
 
-export type ClipLayer = { moveId: string; clip: string; /** 0–1 through one clip cycle */ cyclePhase: number; weight: number };
+export type ClipLayer = {
+  moveId: string; clip: string; /** 0–1 through one clip cycle */ cyclePhase: number; weight: number;
+  /** Clip time in seconds; when set it wins over cyclePhase (rigged mannequin). */
+  time?: number;
+  /** An accent clip (never lagged, mixed over the loops by its weight). */
+  accent?: boolean;
+};
 export type ActivePhase = {
   moveIndex: number; moveId: string; moveName: string;
   phaseIndex: number; phaseName: string; caption: string; expression?: Expression;
@@ -25,6 +31,14 @@ export type FrameState = {
   accent?: { key: string; hitSeconds: number; weight: number };
   /** Reactive layer only: the smoothed audio energy at this frame. */
   energy?: number;
+  /** Rigged mannequin: amplitude of the loops relative to idle (0–1.5). */
+  amplitude?: number;
+  /** Rigged mannequin: loop layers sampled late for each bone group (overlapping action). */
+  lagged?: { group: string; layers: ClipLayer[] }[];
+  /** Rigged mannequin: the total weight of accent clips (0–1). */
+  accentWeight?: number;
+  /** Rigged mannequin: the accent phase playing, for the caption and the phase lane. */
+  phase?: { name: string; kind: string; accent: string };
 };
 
 const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));

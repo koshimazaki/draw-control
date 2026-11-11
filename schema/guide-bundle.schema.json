@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "guide-bundle.schema.json",
   "title": "Motion Studio guide bundle",
-  "description": "Pinned local copy, version 0.2.0. The owner of this schema is model-arena/packages/core; re-sync this file whenever its schemaVersion changes. 0.2.0 (proposed here, 11 November 2026, not yet in model-arena) adds the optional camera track: manifest 'camera', $defs/camera and the asset role 'camera'. Fields follow the table 'The guide bundle' in docs/plan.md.",
+  "description": "Pinned local copy, version 0.2.0. The owner of this schema is model-arena/packages/core; re-sync this file whenever its schemaVersion changes. 0.2.0 (proposed here, 11 November 2026, not yet in model-arena) adds the optional camera track: manifest 'camera', $defs/camera the asset role 'camera', and the character kind 'rigged' (the bundled rigged mannequin). Fields follow the table 'The guide bundle' in docs/plan.md.",
   "type": "object",
   "required": [
     "schemaVersion",
@@ -156,7 +156,8 @@
               "enum": [
                 "mannequin",
                 "block",
-                "file"
+                "file",
+                "rigged"
               ]
             },
             "name": {

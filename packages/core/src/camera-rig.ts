@@ -3,6 +3,7 @@
  * grid and the audio drive into one camera sample per frame. The plan is built once and
  * then read per frame (`cameraAtFrame`), so any frame can be seeked and exported alone.
  *
+ * Off-beats get a small push only and downbeats a push plus a yaw nudge, so the path stays calm.
  * Every channel is smooth by construction:
  * - rates (orbit yaw, dolly, crane) pass through a slew limiter, so their acceleration
  *   never exceeds the channel's clamp and nothing overshoots;
@@ -41,7 +42,7 @@ export const ACCENT_RELEASE_BEATS = 0.55;
 const PUSH_FRACTION = 0.3;    // a push-in range covers this share of the start distance
 const RISE_METRES = 1.6;
 const AIM_DROP = 0.35;
-const DOWNBEAT_PUSH = 0.32, BEAT_PUSH_SHARE = 0.25, DOWNBEAT_YAW = 3.2 * Math.PI / 180;
+const DOWNBEAT_PUSH = 0.1,  BEAT_PUSH_SHARE = 0.12, DOWNBEAT_YAW = 0.6 * Math.PI / 180;
 const AIM_Y = 1.0;
 
 const clamp = (x: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, x));
@@ -157,7 +158,7 @@ export function planCamera(recipe: Recipe, drive?: AudioDrive, frames = 0): Came
       for (let n = from; n <= to; n++) {
         const p = accentPulse(n * dt - seconds, rise, release) * amount;
         ch.distance[n] -= pushMax * p;
-        ch.yaw[n] += yawMax * p * nudgeSign;
+        if (downbeat) ch.yaw[n] += yawMax * p * nudgeSign;   // yaw nudges on downbeats only: a calmer path
       }
     }
   }

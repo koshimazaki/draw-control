@@ -17,3 +17,6 @@ export * from "./reactive";
 export * from "./perform";
 export * from "./camera-track";
 export * from "./examples";
+export * from "./clip-library";
+export * from "./clip-perform";
+export * from "./performance-config";

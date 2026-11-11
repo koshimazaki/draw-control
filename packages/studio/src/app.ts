@@ -3,11 +3,12 @@
  * (or the validator), and keeps the preview, beat strip and JSON panel in sync.
  */
 import {
-  DEFAULT_RECIPE, clearIncompatibleMoves, clipCycleBeatsFor, exportFrameCount, frameAt, incompatibleMoves, insertMove,
+  LOOP_CLIPS, RIGGED_CHARACTER, defaultRiggedRecipe, riggedMove, clearIncompatibleMoves, clipCycleBeatsFor, exportFrameCount, frameAt, incompatibleMoves, insertMove,
   makeClipMove, moveBeats, removeMove, setAmplitude, swapMove, validateRecipe, buildDrive, flatDrive, planCamera,
   type AudioDrive, type CharacterKind, type Expression, type MoveKey, type PreviewFps, type Recipe,
 } from "@motion-studio/core";
 import { createProceduralCharacter } from "./characters/rig";
+import { loadRiggedCharacter, type RiggedCharacter } from "./characters/rigged";
 import { loadFileCharacter } from "./characters/file-character";
 import type { Character } from "./characters/types";
 import { Player, loadTrack, type Track } from "./audio";
@@ -24,12 +25,17 @@ export function startApp(root: HTMLElement) {
   const viewport = new Viewport($("viewport"));
   const player = new Player();
   const strip = $<HTMLCanvasElement>("strip");
-  let recipe: Recipe = structuredClone(DEFAULT_RECIPE);
+  let recipe: Recipe = defaultRiggedRecipe();
   let track: Track | null = null;
   /** What the music hands to the rig and the reactive layer; flat (mid energy) without a track. */
   const FLAT = flatDrive(24, 1);
   let drive: AudioDrive = FLAT;
   let fileCharacter: Character | null = null;
+  /** The bundled rigged mannequin, loaded once and kept (it is the default character). */
+  let rigged: RiggedCharacter | null = null;
+  let riggedLoading: Promise<RiggedCharacter> | null = null;
+  const ensureRigged = () => (riggedLoading ??= loadRiggedCharacter().then(c => { rigged = c; return c; }));
+  const keep = (c: Character | undefined) => c === fileCharacter || c === rigged;
   let frame = 0;
   let selectedId: string | null = null;
   let exporting = false;
@@ -57,10 +63,14 @@ export function startApp(root: HTMLElement) {
   /** A recipe applied as JSON may name another procedural character: show it. */
   function syncCharacter() {
     const kind = recipe.character.kind;
-    if (kind !== "file" && viewport.getCharacter()?.kind !== kind) {
-      viewport.setCharacter(createProceduralCharacter(kind), viewport.getCharacter() !== fileCharacter);
-      $<HTMLSelectElement>("character").value = kind;
-    }
+    $<HTMLSelectElement>("character").value = kind;
+    if (kind === "rigged") renderClipPalette();
+    if (kind === "file" || viewport.getCharacter()?.kind === kind) return;
+    if (kind === "rigged") {
+      if (rigged) viewport.setCharacter(rigged, !keep(viewport.getCharacter()));
+      else void ensureRigged().then(c => { if (recipe.character.kind === "rigged") { viewport.setCharacter(c, !keep(viewport.getCharacter())); renderClipPalette(); render(); } })
+        .catch(e => say("characterStatus", `Could not load the rigged mannequin: ${(e as Error).message}`));
+    } else viewport.setCharacter(createProceduralCharacter(kind), !keep(viewport.getCharacter()));
   }
   function edit(fn: (r: Recipe) => Recipe) {
     try { setRecipe(fn(recipe)); say("jsonStatus", ""); }
@@ -85,9 +95,9 @@ export function startApp(root: HTMLElement) {
       input("selBlend").value = String(move.blendBeats);
       $<HTMLSelectElement>("selExpr").value = move.phases[0].expression ?? "";
     }
-    const isFile = recipe.character.kind === "file";
-    $("palette").hidden = isFile;
-    $("clipPalette").hidden = !isFile;
+    const clipDriven = recipe.character.kind === "file" || recipe.character.kind === "rigged";
+    $("palette").hidden = clipDriven;
+    $("clipPalette").hidden = !clipDriven;
     syncRigPanel(recipe);
     updateExportPanel(recipe);
   }
@@ -121,14 +131,20 @@ export function startApp(root: HTMLElement) {
 
   function setCharacter(kind: Recipe["character"]["kind"]) {
     let c: Character | null;
-    if (kind === "file") {
+    if (kind === "rigged" && !rigged) {
+      say("characterStatus", "Loading the rigged mannequin…");
+      void ensureRigged().then(() => { say("characterStatus", ""); setCharacter("rigged"); });
+      return;
+    }
+    if (kind === "rigged") c = rigged;
+    else if (kind === "file") {
       c = fileCharacter;
       if (!c) { say("characterStatus", "Load a GLB or FBX file first."); $<HTMLSelectElement>("character").value = recipe.character.kind; return; }
     } else c = createProceduralCharacter(kind);
     // Keep the loaded file alive when switching away, so it can be switched back.
-    if (c !== viewport.getCharacter()) viewport.setCharacter(c, viewport.getCharacter() !== fileCharacter);
-    const name = kind === "mannequin" ? "Procedural mannequin" : kind === "block" ? "Block figure" : recipe.character.name;
-    const licence = kind === "file" ? (input("characterLicence").value.trim() || "unspecified") : "MIT (motion-studio)";
+    if (c && c !== viewport.getCharacter()) viewport.setCharacter(c, !keep(viewport.getCharacter()));
+    const name = kind === "mannequin" ? "Procedural mannequin" : kind === "block" ? "Block figure" : kind === "rigged" ? RIGGED_CHARACTER.name : recipe.character.name;
+    const licence = kind === "file" ? (input("characterLicence").value.trim() || "unspecified") : kind === "rigged" ? RIGGED_CHARACTER.licence : "MIT (motion-studio)";
     edit(r => validateRecipe({ ...r, character: { kind, name, licence } }));
     $<HTMLSelectElement>("character").value = kind;
     askToClear(kind);
@@ -141,7 +157,7 @@ export function startApp(root: HTMLElement) {
     $("switchConfirm").hidden = !bad.length;
     if (!bad.length) return;
     const list = bad.slice(0, 4).map(m => `${m.name} @ ${m.atBeat}`).join(", ") + (bad.length > 4 ? "…" : "");
-    say("switchConfirmText", kind === "file"
+    say("switchConfirmText", kind === "file" || kind === "rigged"
       ? `${bad.length} library move(s) (${list}) do not drive a loaded character: it shows its rest pose during them. Clear them from the recipe?`
       : `${bad.length} clip move(s) (${list}) need the loaded file: this figure stands at rest during them. Clear them from the recipe?`);
   }
@@ -156,6 +172,17 @@ export function startApp(root: HTMLElement) {
   function renderClipPalette() {
     const pal = $("clipPalette");
     pal.innerHTML = "";
+    if (recipe.character.kind === "rigged") {
+      for (const name of Object.keys(LOOP_CLIPS)) {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.textContent = name.replace(/_Loop$/, "").replace(/_/g, " ");
+        b.title = `${name}: steps land on beats`;
+        b.onclick = () => addAtCursor(r => insertMove(r, { move: riggedMove(name, cursor(), r.beatGrid.bpm), atBeat: cursor() }));
+        pal.appendChild(b);
+      }
+      return;
+    }
     for (const clip of fileCharacter?.clips ?? []) {
       const b = document.createElement("button");
       b.type = "button";
@@ -340,6 +367,8 @@ export function startApp(root: HTMLElement) {
   applyResolution();
   markView("front");
   viewport.setCharacter(createProceduralCharacter("mannequin"));
+  syncCharacter();
+  renderClipPalette();
   refreshRig();
   syncInputs();
   render();

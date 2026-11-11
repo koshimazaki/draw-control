@@ -1,0 +1,150 @@
+{
+  "version": 2,
+  "fps": 24,
+  "durationBeats": 48,
+  "beatGrid": {
+    "bpm": 120,
+    "offsetSeconds": 0.25,
+    "beatsPerBar": 4,
+    "source": "manual"
+  },
+  "character": {
+    "kind": "rigged",
+    "name": "Rigged mannequin (Ecctrl AnimationLibrary)",
+    "licence": "MIT (c) 2023-2026 Erdong Chen (Ecctrl); animations based on Quaternius Universal Animation Library (CC0)"
+  },
+  "energy": 1,
+  "moves": [
+    {
+      "id": "Idle_Loop-0",
+      "name": "Idle_Loop",
+      "atBeat": 0,
+      "blendBeats": 1,
+      "loop": true,
+      "phases": [
+        {
+          "name": "clip",
+          "caption": "Idle_Loop",
+          "pose": "neutral",
+          "amplitude": 1,
+          "length": {
+            "beats": 4
+          },
+          "previewFps": 24
+        }
+      ],
+      "clip": "Idle_Loop",
+      "clipCycleBeats": 4
+    },
+    {
+      "id": "Dance_Loop-8",
+      "name": "Dance_Loop",
+      "atBeat": 8,
+      "blendBeats": 1,
+      "loop": true,
+      "phases": [
+        {
+          "name": "clip",
+          "caption": "Dance_Loop",
+          "pose": "neutral",
+          "amplitude": 1,
+          "length": {
+            "beats": 2
+          },
+          "previewFps": 24
+        }
+      ],
+      "clip": "Dance_Loop",
+      "clipCycleBeats": 2
+    },
+    {
+      "id": "Idle_Loop-40",
+      "name": "Idle_Loop",
+      "atBeat": 40,
+      "blendBeats": 2,
+      "loop": true,
+      "phases": [
+        {
+          "name": "clip",
+          "caption": "Idle_Loop",
+          "pose": "neutral",
+          "amplitude": 1,
+          "length": {
+            "beats": 4
+          },
+          "previewFps": 24
+        }
+      ],
+      "clip": "Idle_Loop",
+      "clipCycleBeats": 4
+    }
+  ],
+  "rootPath": [
+    {
+      "beat": 0,
+      "x": 0,
+      "z": 0,
+      "yaw": 0
+    }
+  ],
+  "jumps": [],
+  "audio": {
+    "name": "example-track.wav",
+    "licence": "Generated test signal (MIT, motion-studio)"
+  },
+  "reactive": {
+    "seed": 7,
+    "speed": 0.5,
+    "amplitude": 0.7,
+    "accents": [
+      "jump",
+      "spin",
+      "cross"
+    ],
+    "accentOn": "both",
+    "accentGapBeats": 2,
+    "onsetThreshold": 0.6,
+    "idleBelow": 0.12,
+    "humanise": 0.8
+  },
+  "camera": {
+    "segments": [
+      {
+        "fromBeat": 0,
+        "toBeat": 14,
+        "modes": [
+          "orbit"
+        ]
+      },
+      {
+        "fromBeat": 14,
+        "toBeat": 18,
+        "modes": [
+          "orbit",
+          "pushIn"
+        ]
+      },
+      {
+        "fromBeat": 18,
+        "toBeat": 40,
+        "modes": [
+          "orbit"
+        ]
+      },
+      {
+        "fromBeat": 40,
+        "toBeat": 48,
+        "modes": [
+          "pullOut",
+          "rise"
+        ]
+      }
+    ],
+    "intensity": 0.85,
+    "orbitDegreesPerBeat": 7,
+    "distance": 4.4,
+    "height": 1.15,
+    "fov": 38,
+    "startYaw": -20
+  }
+}

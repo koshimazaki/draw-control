@@ -5,9 +5,10 @@
  * variation. Still a pure function of (recipe, drive, n): no state carries between
  * frames, so any frame can be seeked, exported or tested alone.
  */
-import { ACCENT_MOVES, evaluateAccent } from "./accents";
+import { evaluateAccent, proceduralAccent } from "./accents";
 import { energyAtSeconds, type AudioDrive } from "./audio-drive";
 import { beatAtSeconds } from "./beats";
+import { clipFrameAt } from "./clip-perform";
 import { baseFrameAt, jumpHeight, poseAtBeat, sampleRootPath, type FrameState } from "./engine";
 import { JOINTS, mixPoses, poseDistance, scalePose, type Euler3, type JointName, type Pose } from "./poses";
 import { planReactive, type BarLevel, type ReactivePlan } from "./reactive";
@@ -84,6 +85,7 @@ export function humanisedPoseAt(recipe: Recipe, plan: ReactivePlan, seconds: num
 }
 
 export function frameAt(recipe: Recipe, frame: number, drive?: AudioDrive): FrameState {
+  if (recipe.character.kind === "rigged") return clipFrameAt(recipe, frame, drive);
   if (!recipe.reactive) return baseFrameAt(recipe, frame);
   const plan = reactivePlanFor(recipe, drive);
   const seconds = frame / recipe.fps;
@@ -94,7 +96,8 @@ export function frameAt(recipe: Recipe, frame: number, drive?: AudioDrive): Fram
   let pose = humanisedPoseAt(recipe, plan, seconds);
   let accent: FrameState["accent"];
   for (const hit of plan.hits) {
-    const s = evaluateAccent(ACCENT_MOVES[hit.key], beat - hit.beat);
+    const accentMove = proceduralAccent(hit.key);
+    const s = accentMove ? evaluateAccent(accentMove, beat - hit.beat) : null;
     if (!s) continue;
     pose = mixPoses(pose, s.pose, s.weight);
     root.y += s.lift;

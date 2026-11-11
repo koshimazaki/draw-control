@@ -15,6 +15,8 @@ try {
   page.on("console", m => { if (m.type() === "error") errors.push(m.text()); });
   await page.goto("http://127.0.0.1:5182/");
   await page.waitForSelector("#viewport canvas");
+  await page.waitForFunction(() => document.querySelector("#clipPalette button"), null, { timeout: 30_000 });
+  await page.waitForTimeout(1500);
   await page.check("#rigOn");
   await page.check('#rigModes input[value="pushIn"]');
   await page.check("#reactOn");

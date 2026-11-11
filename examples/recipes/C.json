@@ -9,243 +9,74 @@
     "source": "manual"
   },
   "character": {
-    "kind": "mannequin",
-    "name": "Procedural mannequin",
-    "licence": "MIT (motion-studio)"
+    "kind": "rigged",
+    "name": "Rigged mannequin (Ecctrl AnimationLibrary)",
+    "licence": "MIT (c) 2023-2026 Erdong Chen (Ecctrl); animations based on Quaternius Universal Animation Library (CC0)"
   },
   "energy": 1,
   "moves": [
     {
-      "id": "stepTouch-0",
-      "name": "Step touch",
+      "id": "Idle_Loop-0",
+      "name": "Idle_Loop",
       "atBeat": 0,
-      "blendBeats": 0.5,
-      "loop": true,
-      "phases": [
-        {
-          "name": "left",
-          "caption": "Step to the left",
-          "pose": "stepLeft",
-          "amplitude": 1,
-          "length": {
-            "beats": 1
-          },
-          "previewFps": 24
-        },
-        {
-          "name": "right",
-          "caption": "Step to the right",
-          "pose": "stepRight",
-          "amplitude": 1,
-          "length": {
-            "beats": 1
-          },
-          "previewFps": 24
-        }
-      ]
-    },
-    {
-      "id": "disco-8",
-      "name": "Disco point",
-      "atBeat": 8,
-      "blendBeats": 0.5,
-      "loop": true,
-      "phases": [
-        {
-          "name": "up",
-          "caption": "Point up to the right",
-          "pose": "pointUpRight",
-          "amplitude": 1,
-          "length": {
-            "beats": 1
-          },
-          "previewFps": 24
-        },
-        {
-          "name": "down",
-          "caption": "Point down to the left",
-          "pose": "pointDownLeft",
-          "amplitude": 1,
-          "length": {
-            "beats": 1
-          },
-          "previewFps": 24
-        }
-      ]
-    },
-    {
-      "id": "bounce-16",
-      "name": "Bounce",
-      "atBeat": 16,
-      "blendBeats": 0.5,
-      "loop": true,
-      "phases": [
-        {
-          "name": "down",
-          "caption": "Drop on the beat",
-          "pose": "bounceDown",
-          "amplitude": 1,
-          "length": {
-            "beats": 0.5
-          },
-          "previewFps": 24
-        },
-        {
-          "name": "up",
-          "caption": "Lift between beats",
-          "pose": "bounceUp",
-          "amplitude": 1,
-          "length": {
-            "beats": 0.5
-          },
-          "previewFps": 24
-        }
-      ]
-    },
-    {
-      "id": "armsUp-20",
-      "name": "Arms up",
-      "atBeat": 20,
       "blendBeats": 1,
       "loop": true,
       "phases": [
         {
-          "name": "out",
-          "caption": "Arms out to the sides",
-          "pose": "armsOut",
+          "name": "clip",
+          "caption": "Idle_Loop",
+          "pose": "neutral",
           "amplitude": 1,
           "length": {
-            "beats": 1
-          },
-          "previewFps": 24
-        },
-        {
-          "name": "up",
-          "caption": "Arms overhead",
-          "pose": "armsUp",
-          "amplitude": 1,
-          "length": {
-            "beats": 1
+            "beats": 4
           },
           "previewFps": 24
         }
-      ]
+      ],
+      "clip": "Idle_Loop",
+      "clipCycleBeats": 4
     },
     {
-      "id": "stepTouch-24",
-      "name": "Step touch",
-      "atBeat": 24,
-      "blendBeats": 0.5,
+      "id": "Dance_Loop-8",
+      "name": "Dance_Loop",
+      "atBeat": 8,
+      "blendBeats": 1,
       "loop": true,
       "phases": [
         {
-          "name": "left",
-          "caption": "Step to the left",
-          "pose": "stepLeft",
+          "name": "clip",
+          "caption": "Dance_Loop",
+          "pose": "neutral",
           "amplitude": 1,
           "length": {
-            "beats": 1
-          },
-          "previewFps": 24
-        },
-        {
-          "name": "right",
-          "caption": "Step to the right",
-          "pose": "stepRight",
-          "amplitude": 1,
-          "length": {
-            "beats": 1
+            "beats": 2
           },
           "previewFps": 24
         }
-      ]
+      ],
+      "clip": "Dance_Loop",
+      "clipCycleBeats": 2
     },
     {
-      "id": "punches-28",
-      "name": "Punches",
-      "atBeat": 28,
-      "blendBeats": 0.5,
-      "loop": true,
-      "phases": [
-        {
-          "name": "left",
-          "caption": "Punch left",
-          "pose": "punchLeft",
-          "amplitude": 1,
-          "length": {
-            "beats": 1
-          },
-          "previewFps": 24
-        },
-        {
-          "name": "right",
-          "caption": "Punch right",
-          "pose": "punchRight",
-          "amplitude": 1,
-          "length": {
-            "beats": 1
-          },
-          "previewFps": 24
-        }
-      ]
-    },
-    {
-      "id": "disco-32",
-      "name": "Disco point",
-      "atBeat": 32,
-      "blendBeats": 0.5,
-      "loop": true,
-      "phases": [
-        {
-          "name": "up",
-          "caption": "Point up to the right",
-          "pose": "pointUpRight",
-          "amplitude": 1,
-          "length": {
-            "beats": 1
-          },
-          "previewFps": 24
-        },
-        {
-          "name": "down",
-          "caption": "Point down to the left",
-          "pose": "pointDownLeft",
-          "amplitude": 1,
-          "length": {
-            "beats": 1
-          },
-          "previewFps": 24
-        }
-      ]
-    },
-    {
-      "id": "stepTouch-40",
-      "name": "Step touch",
+      "id": "Idle_Loop-40",
+      "name": "Idle_Loop",
       "atBeat": 40,
-      "blendBeats": 0.5,
+      "blendBeats": 2,
       "loop": true,
       "phases": [
         {
-          "name": "left",
-          "caption": "Step to the left",
-          "pose": "stepLeft",
+          "name": "clip",
+          "caption": "Idle_Loop",
+          "pose": "neutral",
           "amplitude": 1,
           "length": {
-            "beats": 1
-          },
-          "previewFps": 24
-        },
-        {
-          "name": "right",
-          "caption": "Step to the right",
-          "pose": "stepRight",
-          "amplitude": 1,
-          "length": {
-            "beats": 1
+            "beats": 4
           },
           "previewFps": 24
         }
-      ]
+      ],
+      "clip": "Idle_Loop",
+      "clipCycleBeats": 4
     }
   ],
   "rootPath": [
