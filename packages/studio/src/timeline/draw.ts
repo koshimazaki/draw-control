@@ -5,16 +5,18 @@
  * was edited), pose speed, beat ticks and the hit markers.
  */
 import type { Focus } from "./focus";
+import { drawAudioLane, type Wave } from "./audio-lane";
 import { CLIP_ACCENTS, accentSpan, beatsToFrames, blendBeatsOf, proceduralAccent, type AudioDrive, type HitMarker, type Recipe } from "@motion-studio/core";
 
-export const LANES = { phase: 26, move: 22, steps: 54, graph: 230, gap: 4, markerStrip: 16 } as const;
+export const LANES = { phase: 26, move: 22, steps: 54, graph: 230, audio: 84, gap: 4, markerStrip: 16 } as const;
 export const laneTop = {
   phase: 0,
   move: LANES.phase + LANES.gap,
   steps: LANES.phase + LANES.move + LANES.gap * 2,
   graph: LANES.phase + LANES.move + LANES.steps + LANES.gap * 3,
+  audio: LANES.phase + LANES.move + LANES.steps + LANES.graph + LANES.gap * 4,
 };
-export const TIMELINE_HEIGHT = laneTop.graph + LANES.graph;
+export const TIMELINE_HEIGHT = laneTop.audio + LANES.audio;
 export const PHASE_COLOURS: Record<string, string> = { hold: "#4a7fd6", fast: "#d9534f", move: "#c8a26b", recover: "#6f9a83" };
 const CLIP_COLOURS = ["#5b8def", "#e0895a", "#5fb47a", "#c46fd0", "#d2b84a", "#4fb3c4", "#d0606e", "#8f8f8f"];
 export const clipColour = (name: string) => CLIP_COLOURS[[...name].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7) % CLIP_COLOURS.length];
@@ -24,6 +26,8 @@ export type TimelineModel = {
   /** Effective drive (edited energy curve applied) and the analysed one. */
   drive?: AudioDrive; analysed?: AudioDrive;
   rms: Float32Array | null; rmsHop: number;
+  /** Waveform of the track (min and max per bucket), for the audio lane. */
+  wave: Wave | null;
   beat: number;
   markers: HitMarker[];
   phases: (number[] | null)[];
@@ -205,6 +209,8 @@ export function drawTimeline(canvas: HTMLCanvasElement, m: TimelineModel) {
     g.globalAlpha = 1;
     if (i === m.selectedMarker) { g.strokeStyle = "#fff"; g.strokeRect(x - 6, laneTop.graph, 12, LANES.markerStrip); }
   });
+
+  drawAudioLane(g, w, laneTop.audio, LANES.audio, r, m.wave, m.analysed?.bands);
 
   // Lane labels and the playhead.
   g.fillStyle = "rgba(231,232,234,0.55)";

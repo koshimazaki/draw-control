@@ -39,6 +39,8 @@ export type TimelineHost = {
   /** The analysed drive (before any edited energy curve). */
   drive(): AudioDrive | undefined;
   rms(): { rms: Float32Array; hop: number } | null;
+  /** The track's waveform for the audio lane. */
+  wave?(): { min: Float32Array; max: Float32Array; bucketSeconds: number } | null;
   beat(): number;
   poseSpeed(): Float32Array | null;
   edit(fn: (r: Recipe) => Recipe): void;
@@ -131,7 +133,7 @@ export class Timeline {
       const markers = currentMarkers(recipe, drive);
       const rms = this.host.rms();
       this.cache = { recipe, drive, division, model: {
-        recipe, drive: effectiveDrive(recipe, drive), analysed: drive, rms: rms?.rms ?? null, rmsHop: rms?.hop ?? 1,
+        recipe, drive: effectiveDrive(recipe, drive), analysed: drive, rms: rms?.rms ?? null, rmsHop: rms?.hop ?? 1, wave: this.host.wave?.() ?? null,
         markers, phases: markers.map(m => { const b = markerPhases(recipe, m); return b && playedBoundaries(b, m.skip); }), steps: currentSteps(recipe, drive, division), division,
         energyEdited: !!recipe.energyCurve,
       } };
@@ -167,7 +169,12 @@ export class Timeline {
       { division: this.division(), onsets: $<HTMLInputElement>("tlSnapHits").checked, free: ev.altKey });
     let move: ((ev: PointerEvent) => void) | null = null;
 
-    if (y < laneTop.move) {
+    if (y >= laneTop.audio) {
+      // Audio lane: seek (scrub while held).
+      this.focus = null;
+      this.host.seek(beatAtX(e.clientX));
+      move = ev => this.host.seek(beatAtX(ev.clientX));
+    } else if (y < laneTop.move) {
       // Phase lane: grab the nearest boundary edge, or select the block's marker.
       let best: { i: number; k: number; d: number } | null = null;
       m.phases.forEach((b, i) => b?.forEach((v, k) => {

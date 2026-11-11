@@ -1,7 +1,7 @@
 /** Local-only audio: decode the user's track, analyse it, and play it in sync with the preview. */
-import { analyseSamples, type AudioFeatures } from "@motion-studio/core";
+import { analyseSamples, waveformMinMax, type AudioFeatures } from "@motion-studio/core";
 
-export type Track = { name: string; buffer: AudioBuffer; features: AudioFeatures };
+export type Track = { name: string; buffer: AudioBuffer; features: AudioFeatures; wave: ReturnType<typeof waveformMinMax> };
 
 export async function loadTrack(file: File): Promise<Track> {
   if (file.size > 150 * 1024 * 1024) throw new Error("Keep the track below 150 MB.");
@@ -9,7 +9,7 @@ export async function loadTrack(file: File): Promise<Track> {
   try {
     const buffer = await ctx.decodeAudioData(await file.arrayBuffer());
     const channels = Array.from({ length: buffer.numberOfChannels }, (_, i) => buffer.getChannelData(i));
-    return { name: file.name, buffer, features: analyseSamples(channels, buffer.sampleRate) };
+    return { name: file.name, buffer, features: analyseSamples(channels, buffer.sampleRate), wave: waveformMinMax(channels, buffer.sampleRate) };
   } finally { await ctx.close().catch(() => {}); }
 }
 

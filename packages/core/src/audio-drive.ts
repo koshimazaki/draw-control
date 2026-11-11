@@ -5,6 +5,7 @@
  * always gives the same drive, so preview, export and tests agree.
  */
 import { onsetNovelty } from "./beats";
+import type { BandAnalysis } from "./audio-bands";
 
 export type Onset = { seconds: number; /** 0–1, relative to the strongest onset */ strength: number };
 export type AudioDrive = {
@@ -16,6 +17,8 @@ export type AudioDrive = {
   source: "audio" | "flat";
   /** Low-band (kick and bass) loudness per frame, 0–1, with a fast attack and release. */
   low?: Float32Array;
+  /** Drum-band onsets and amplitude peaks (kick, snare, hat), when analysed. */
+  bands?: BandAnalysis;
 };
 export type EnvelopeOptions = {
   attackSeconds?: number; releaseSeconds?: number;
@@ -77,8 +80,9 @@ export function detectOnsets(rms: Float32Array, hopSeconds: number, opts: { k?: 
   return found.map(f => ({ seconds: Math.round(f.i * hopSeconds * 10000) / 10000, strength: peak ? f.v / peak : 0 }));
 }
 
-export function buildDrive(features: { rms: Float32Array; hopSeconds: number; lowRms?: Float32Array }, fps: number, frames: number): AudioDrive {
+export function buildDrive(features: { rms: Float32Array; hopSeconds: number; lowRms?: Float32Array; bands?: BandAnalysis }, fps: number, frames: number): AudioDrive {
   const drive: AudioDrive = { fps, energy: energyEnvelope(features.rms, features.hopSeconds, fps, frames), onsets: detectOnsets(features.rms, features.hopSeconds), source: "audio" };
+  if (features.bands) drive.bands = features.bands;
   if (features.lowRms) drive.low = energyEnvelope(features.lowRms, features.hopSeconds, fps, frames, { attackSeconds: 0.02, releaseSeconds: 0.15, minRefOfPeak: 0.5 });
   return drive;
 }

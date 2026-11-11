@@ -5,6 +5,7 @@
  * The RMS envelope and BPM estimator come from the seed kit; offset estimation is new.
  */
 import type { BeatGrid } from "./recipe";
+import { analyseBands, type BandAnalysis, type BandOnset } from "./audio-bands";
 
 export type AudioFeatures = {
   lengthSeconds: number;
@@ -18,6 +19,8 @@ export type AudioFeatures = {
   estimatedOffsetSeconds: number;
   /** RMS envelope of the low band (below about 150 Hz: kick and bass), on the same hops as `rms`. */
   lowRms?: Float32Array;
+  /** Drum-band onsets (kick, snare, hat) and amplitude peaks. */
+  bands?: BandAnalysis;
 };
 
 /** Mono, low-passed twice at `hz` (two one-pole filters): the kick and bass band. */
@@ -43,6 +46,10 @@ export type BeatsJson = {
   beats: number[];
   /** The subset of beats that start a bar. */
   downbeats: number[];
+  /** Optional (0.3.0): drum-band onsets, re-based like the beats. low = kick, mid = snare, high = hat. */
+  onsets?: { low: BandOnset[]; mid: BandOnset[]; high: BandOnset[] };
+  /** Optional (0.3.0): overall amplitude peaks, re-based like the beats. */
+  peaks?: BandOnset[];
 };
 
 function normalise(input: Float32Array): Float32Array {
@@ -139,9 +146,32 @@ function waveformPeaks(rms: Float32Array, count = 100): number[] {
   });
 }
 
+/**
+ * Octave check with the drum onsets: the RMS estimate can lock to half the tempo when the
+ * kick and snare alternate (the bar-long pattern correlates better than the beat). When the
+ * double tempo's grid still lands on a kick or snare at least 75% of the time, take it.
+ */
+export function refineTempo(bpm: number | null, bands: BandAnalysis | undefined, lengthSeconds: number): number | null {
+  if (!bpm || !bands || bpm * 2 > 180) return bpm;
+  const hits = [...bands.low, ...bands.mid].map(o => o.seconds).sort((a, b) => a - b);
+  if (hits.length < 8) return bpm;
+  const rate = (b: number) => {
+    const period = 60 / b;
+    let best = 0;
+    for (const anchor of hits.slice(0, 8)) {
+      let n = 0, hit = 0;
+      for (let t = anchor % period; t < lengthSeconds; t += period, n++) if (hits.some(h => Math.abs(h - t) < 0.035)) hit++;
+      best = Math.max(best, n ? hit / n : 0);
+    }
+    return best;
+  };
+  return rate(bpm * 2) >= 0.75 ? Math.round(bpm * 20) / 10 : bpm;
+}
+
 export function analyseSamples(channels: readonly Float32Array[], sampleRate: number): AudioFeatures {
   const { rms, hopSeconds } = rmsEnvelope(channels, sampleRate);
-  const estimatedBpm = estimateBpm(rms, hopSeconds);
+  const bands = analyseBands(channels, sampleRate);
+  const estimatedBpm = refineTempo(estimateBpm(rms, hopSeconds), bands, (channels[0]?.length ?? 0) / sampleRate);
   return {
     lengthSeconds: (channels[0]?.length ?? 0) / sampleRate,
     sampleRate,
@@ -151,6 +181,7 @@ export function analyseSamples(channels: readonly Float32Array[], sampleRate: nu
     estimatedBpm,
     estimatedOffsetSeconds: estimatedBpm ? estimateBeatOffset(rms, hopSeconds, estimatedBpm) : 0,
     lowRms: rmsEnvelope([lowBand(channels, sampleRate)], sampleRate).rms,
+    bands,
   };
 }
 

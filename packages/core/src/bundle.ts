@@ -5,9 +5,13 @@
  */
 import { beatAtSeconds, beatGridJson, secondsAtBeat, snapFrames8k1, type BeatsJson } from "./beats";
 import { recipeSeconds, type Recipe } from "./recipe";
+import type { BandAnalysis, BandOnset } from "./audio-bands";
 
-/** 0.2.0 adds the optional camera track (manifest `camera`, asset role "camera"). */
-export const BUNDLE_SCHEMA_VERSION = "0.2.0";
+/**
+ * 0.2.0 adds the optional camera track (manifest `camera`, asset role "camera");
+ * 0.3.0 adds optional drum-band onsets and amplitude peaks to beats.json.
+ */
+export const BUNDLE_SCHEMA_VERSION = "0.3.0";
 export const GENERATOR = { name: "motion-studio", version: "0.1.0", motion: "local-time-stretch" } as const;
 export const BUNDLE_FILES = {
   video: "guide.mp4", audio: "audio.wav", firstFrame: "frame0.png",
@@ -44,7 +48,19 @@ export function exportFrameCount(recipe: Recipe): number {
  * re-based so times count from the clip's frame 0. `offsetSeconds` becomes the time of
  * the first beat inside the clip; downbeats keep their place in the bar.
  */
-export function buildBeats(recipe: Recipe, frames: number, startFrame = 0): BeatsJson {
+export function buildBeats(recipe: Recipe, frames: number, startFrame = 0, bands?: BandAnalysis): BeatsJson {
+  const out = gridBeats(recipe, frames, startFrame);
+  if (bands) {
+    const from = startFrame / recipe.fps, to = (startFrame + frames) / recipe.fps;
+    const clip = (list: BandOnset[]) => list.filter(o => o.seconds >= from - 1e-9 && o.seconds < to)
+      .map(o => ({ seconds: Math.round((o.seconds - from) * 10000) / 10000, strength: o.strength }));
+    out.onsets = { low: clip(bands.low), mid: clip(bands.mid), high: clip(bands.high) };
+    out.peaks = clip(bands.peaks);
+  }
+  return out;
+}
+
+function gridBeats(recipe: Recipe, frames: number, startFrame: number): BeatsJson {
   const g = recipe.beatGrid;
   if (startFrame === 0) {
     const count = Math.max(0, Math.floor((frames / recipe.fps - g.offsetSeconds) * g.bpm / 60 + 1e-9) + 1);

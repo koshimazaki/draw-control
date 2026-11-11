@@ -64,7 +64,7 @@ export async function exportBundle(o: ExportOptions): Promise<ExportResult> {
   const files: Record<string, Uint8Array> = {
     [BUNDLE_FILES.video]: mp4.bytes,
     [BUNDLE_FILES.firstFrame]: firstFrame!,
-    [BUNDLE_FILES.beats]: json(buildBeats(recipe, frames, startFrame)),
+    [BUNDLE_FILES.beats]: json(buildBeats(recipe, frames, startFrame, o.drive?.bands)),
     [BUNDLE_FILES.recipe]: json(recipe),
     [BUNDLE_FILES.meta]: json(buildMeta(recipe, { width, height, frames, view: viewport.view, audioInVideo: mp4.audioInVideo, hasAudio, startFrame, hasCamera: !!plan })),
     [BUNDLE_FILES.manifest]: json(buildManifest(hasAudio, !!plan)),

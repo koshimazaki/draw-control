@@ -13,6 +13,7 @@ import { loadFileCharacter } from "./characters/file-character";
 import type { Character } from "./characters/types";
 import { Player, loadTrack, type Track } from "./audio";
 import { Timeline } from "./timeline/timeline";
+import { TIMELINE_HEIGHT, laneTop } from "./timeline/draw";
 import { computePoseSpeed } from "./timeline/pose-speed";
 import { bindExport } from "./export/button";
 import { updateExportPanel } from "./export/panel";
@@ -249,7 +250,8 @@ export function startApp(root: HTMLElement) {
       $<HTMLButtonElement>("useDetected").disabled = !f.estimatedBpm;
       $<HTMLButtonElement>("fitTrack").disabled = false;
       say("trackStatus", `${file.name} · ${f.lengthSeconds.toFixed(1)} s · ` +
-        (f.estimatedBpm ? `detected ${f.estimatedBpm} BPM, first beat at ${f.estimatedOffsetSeconds.toFixed(2)} s (approximate: check by ear)` : "no clear tempo found; set BPM by hand"));
+        (f.estimatedBpm ? `detected ${f.estimatedBpm} BPM, first beat at ${f.estimatedOffsetSeconds.toFixed(2)} s (approximate: check by ear)` : "no clear tempo found; set BPM by hand") +
+        (f.bands ? ` · ${f.bands.low.length} kicks, ${f.bands.mid.length} snares, ${f.bands.high.length} hats` : ""));
       const audio = { name: file.name.slice(0, 120).replace(/[<>{}\\]/g, ""), licence: input("audioLicence").value.trim() || "unspecified" };
       edit(r => {
         const beatGrid = f.estimatedBpm ? { ...r.beatGrid, bpm: f.estimatedBpm, offsetSeconds: f.estimatedOffsetSeconds, source: "analysis" as const } : r.beatGrid;
@@ -325,6 +327,7 @@ export function startApp(root: HTMLElement) {
   const timeline = new Timeline({
     recipe: () => recipe, drive: () => (drive === FLAT ? undefined : drive),
     rms: () => (track ? { rms: track.features.rms, hop: track.features.hopSeconds } : null),
+    wave: () => track?.wave ?? null,
     beat: () => currentBeat, poseSpeed: () => poseSpeedCurve, edit, seek: seekBeat, importedMove,
   });
   /** Pose speed for the graph, recomputed shortly after the recipe or drive changes. */
@@ -391,4 +394,11 @@ export function startApp(root: HTMLElement) {
   render();
   requestAnimationFrame(tick);
   window.addEventListener("resize", () => render());
+  if (import.meta.env.DEV) {
+    // Dev-only probe for the smoke script: the live recipe, the analysed bands and the lane geometry.
+    (window as unknown as { __msProbe: unknown }).__msProbe = () => ({
+      recipe, frame, lanes: { ...laneTop, height: TIMELINE_HEIGHT },
+      bands: drive.bands ? { low: drive.bands.low.map(o => o.seconds), mid: drive.bands.mid.map(o => o.seconds), high: drive.bands.high.map(o => o.seconds), peaks: drive.bands.peaks.length } : null,
+    });
+  }
 }

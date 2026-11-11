@@ -36,6 +36,16 @@ describe("guide bundle", () => {
     expect(b.beats).toHaveLength(17);
     expect(b.downbeats).toEqual([0, 2, 4, 6, 8]);
   });
+  it("beats carry drum-band onsets and peaks, re-based to the range (schema 0.3.0)", () => {
+    const bands = { hopSeconds: 0.01, low: [{ seconds: 0.5, strength: 1 }, { seconds: 4.2, strength: 0.8 }], mid: [{ seconds: 4.7, strength: 0.6 }], high: [], peaks: [{ seconds: 4.2, strength: 1 }] };
+    const whole = buildBeats(recipe, frames, 0, bands);
+    expect(whole.onsets?.low).toHaveLength(2);
+    expect(check("guide-bundle.schema.json#/$defs/beats", whole)).toBe(true);
+    const part = buildBeats(recipe, 49, 96, bands);   // 4.0 s to 6.04 s
+    expect(part.onsets).toEqual({ low: [{ seconds: 0.2, strength: 0.8 }], mid: [{ seconds: 0.7, strength: 0.6 }], high: [] });
+    expect(part.peaks).toEqual([{ seconds: 0.2, strength: 1 }]);
+    expect(check("guide-bundle.schema.json#/$defs/beats", part)).toBe(true);
+  });
   it("the recipe file validates as a recipe", () => {
     expect(validateRecipe(JSON.parse(JSON.stringify(recipe)))).toEqual(recipe);
   });
