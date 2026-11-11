@@ -24,7 +24,7 @@ import { STEP_AMPLITUDE_MAX, type StepLane } from "./performance-config";
 import type { Recipe } from "./recipe";
 import { smoothNoise } from "./rng";
 import type { AccentKey } from "./accents";
-import { MIN_BLEND_FRAMES, SWITCH_FRAMES, blendBeatsOf, gaitOffsets, layeredWeights } from "./transitions";
+import { MIN_BLEND_FRAMES, SWITCH_FRAMES, blendBeatsOf, gaitOffsets, layeredWeights, playedBoundaries } from "./transitions";
 
 const TEMPO_FADE_BEATS = 0.5;
 /** Frames each bone group trails the hips at humanise 1 (the studio maps DEF bones to groups). */
@@ -41,7 +41,7 @@ export const clipSpan = (beatSeconds: number): AccentSpanFn => (key: AccentKey) 
   return [b[0], b[b.length - 1]];
 };
 
-export type ScheduledHit = Hit & { accent: ClipAccent; boundaries: number[] };
+export type ScheduledHit = Hit & { accent: ClipAccent; boundaries: number[]; /** held phase indices */ holds?: number[] };
 export type ClipPlan = { levels: number[]; hits: ScheduledHit[]; drive?: AudioDrive; /** cycle offset per move (gait foot matching) */ offsets: number[] };
 
 /** The drive with the recipe's hand-edited energy curve, when it has one. */
@@ -93,9 +93,12 @@ export function clipPlanFor(recipe: Recipe, drive?: AudioDrive): ClipPlan {
     const markers = recipe.reactive.markers;
     for (const h of reactive.hits) {
       const accent = CLIP_ACCENTS[h.key]!;
-      const own = markers?.find(m => Math.abs(m.seconds - h.seconds) < 1e-6 && m.accent === h.key)?.phases;
-      const boundaries = own && own.length === accent.phases.length + 1 ? own : defaultPhaseBoundaries(accent, beatSeconds);
-      hits.push({ ...h, accent, boundaries });
+      const marker = markers?.find(m => Math.abs(m.seconds - h.seconds) < 1e-6 && m.accent === h.key);
+      const own = marker?.phases;
+      const authored = own && own.length === accent.phases.length + 1 ? own : defaultPhaseBoundaries(accent, beatSeconds);
+      const hit: ScheduledHit = { ...h, accent, boundaries: playedBoundaries(authored, marker?.skip) };
+      if (marker?.hold) hit.holds = marker.hold;
+      hits.push(hit);
     }
   }
   hits.sort((a, b) => a.seconds - b.seconds);
@@ -177,7 +180,8 @@ export function evaluateClipAccent(hit: ScheduledHit, u: number, beatSeconds: nu
   const uc = Math.max(b[0], Math.min(b[n] - 1e-9, u));
   let i = 0;
   while (i < n - 1 && uc >= b[i + 1]) i++;
-  const p = accent.phases[i], t = Math.max(0, Math.min(1, (uc - b[i]) / (b[i + 1] - b[i])));
+  const p = accent.phases[i], held = !!hit.holds?.includes(i);
+  const t = held ? 0 : Math.max(0, Math.min(1, (uc - b[i]) / Math.max(1e-9, b[i + 1] - b[i])));
   const weight = Math.min(ease((u - start) / (b[1] - start)), 1 - ease((u - b[n - 1]) / (end - b[n - 1])));
   const layers: ClipLayer[] = [];
   const id = `accent-${hit.seconds}`;
@@ -201,7 +205,7 @@ export function evaluateClipAccent(hit: ScheduledHit, u: number, beatSeconds: nu
     }
   }
   let spin = 0;
-  if (accent.spin) {
+  if (accent.spin && !hit.holds?.some(k => k >= accent.spin!.from && k <= accent.contact)) {
     const from = b[accent.spin.from];
     if (u > from) spin = 2 * Math.PI * accent.spin.turns * (u >= 0 ? 1 : ease((u - from) / -from));
   }

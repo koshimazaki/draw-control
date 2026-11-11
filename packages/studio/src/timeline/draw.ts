@@ -4,6 +4,7 @@
  * and a graph with the waveform, the energy curve (dashed: the analysed original when it
  * was edited), pose speed, beat ticks and the hit markers.
  */
+import type { Focus } from "./focus";
 import { CLIP_ACCENTS, accentSpan, beatsToFrames, blendBeatsOf, proceduralAccent, type AudioDrive, type HitMarker, type Recipe } from "@motion-studio/core";
 
 export const LANES = { phase: 26, move: 22, steps: 54, graph: 230, gap: 4, markerStrip: 16 } as const;
@@ -30,6 +31,8 @@ export type TimelineModel = {
   selectedMarker: number;
   /** Move index whose blend handle is being dragged (-1: none). */
   selectedBlend: number;
+  /** What Delete and the context menu act on. */
+  focus: Focus | null;
   poseSpeed: Float32Array | null;
   energyEdited: boolean;
   /** Point handles on the energy curve (one per step) when editing points. */
@@ -72,11 +75,16 @@ export function drawTimeline(canvas: HTMLCanvasElement, m: TimelineModel) {
     if (b && accent) {
       accent.phases.forEach((p, k) => {
         const x0 = X(hb + b[k]), x1 = X(hb + b[k + 1]);
+        if (x1 - x0 < 0.5) return;   // deleted (closed up)
+        const held = !!mk.hold?.includes(k);
         g.fillStyle = PHASE_COLOURS[p.kind];
-        g.globalAlpha = i === m.selectedMarker ? 1 : 0.8;
+        g.globalAlpha = held ? 0.35 : i === m.selectedMarker ? 1 : 0.8;
         g.fillRect(x0, laneTop.phase + 3, Math.max(1, x1 - x0 - 1), LANES.phase - 6);
         g.globalAlpha = 1;
-        if (x1 - x0 > 30) { g.fillStyle = "#101114"; g.fillText(p.name, x0 + 3, laneTop.phase + LANES.phase / 2); }
+        if (x1 - x0 > 30) { g.fillStyle = held ? "#e7e8ea" : "#101114"; g.fillText(held ? `${p.name} (hold)` : p.name, x0 + 3, laneTop.phase + LANES.phase / 2); }
+        if (m.focus?.kind === "phase" && m.focus.marker === i && m.focus.phase === k) {
+          g.strokeStyle = "#ffffff"; g.lineWidth = 2; g.strokeRect(x0 + 1, laneTop.phase + 2, Math.max(2, x1 - x0 - 3), LANES.phase - 4); g.lineWidth = 1;
+        }
       });
       // The key frame edge.
       g.fillStyle = "#ffffff";
@@ -101,6 +109,14 @@ export function drawTimeline(canvas: HTMLCanvasElement, m: TimelineModel) {
     g.fillStyle = "#101114";
     g.fillText(name.replace(/_Loop$/, "").replace(/_/g, " "), X(mv.atBeat) + 3, laneTop.move + LANES.move / 2);
   });
+  const fm = m.focus;
+  if (fm?.kind === "move") {
+    const i = r.moves.findIndex(v => v.id === fm.id);
+    if (i >= 0) {
+      const end = Math.min(r.moves[i + 1]?.atBeat ?? total, total);
+      g.strokeStyle = "#ffffff"; g.lineWidth = 2; g.strokeRect(X(r.moves[i].atBeat) + 1, laneTop.move + 1, X(end) - X(r.moves[i].atBeat) - 3, LANES.move - 2); g.lineWidth = 1;
+    }
+  }
   // Blend wedges: the crossfade into each move; drag the right edge to change its length.
   r.moves.forEach((mv, i) => {
     if (i === 0) return;
@@ -120,6 +136,7 @@ export function drawTimeline(canvas: HTMLCanvasElement, m: TimelineModel) {
     g.fillStyle = Math.floor(beat) % gb.beatsPerBar === 0 && beat % 1 === 0 ? "#ffd34d" : "#c9a83a";
     g.fillRect(i * stepW + 1, laneTop.steps + LANES.steps - 3 - h, Math.max(1, stepW - 2), h);
   });
+  if (m.focus?.kind === "step") { g.strokeStyle = "#ffffff"; g.strokeRect(m.focus.index * stepW + 0.5, laneTop.steps + 0.5, Math.max(2, stepW - 1), LANES.steps - 1); }
   g.fillStyle = "rgba(255,255,255,0.25)";
   g.fillRect(0, laneTop.steps + LANES.steps - 3 - (LANES.steps - 6) / 1.5, w, 1); // amplitude 1
 

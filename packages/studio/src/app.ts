@@ -20,6 +20,7 @@ import { syncRigPanel } from "./rig-panel";
 import { bindViewControls } from "./app-view";
 import { $, LAYOUT } from "./ui";
 import { Viewport } from "./viewport";
+import { History, bindUndo, sameRecipe } from "./history";
 
 export function startApp(root: HTMLElement) {
   root.innerHTML = LAYOUT;
@@ -74,10 +75,18 @@ export function startApp(root: HTMLElement) {
         .catch(e => say("characterStatus", `Could not load the rigged mannequin: ${(e as Error).message}`));
     } else viewport.setCharacter(createProceduralCharacter(kind), !keep(viewport.getCharacter()));
   }
+  /** Every recipe change goes through here, so each one can be undone. */
   function edit(fn: (r: Recipe) => Recipe) {
-    try { setRecipe(fn(recipe)); say("jsonStatus", ""); }
-    catch (e) { say("jsonStatus", (e as Error).message); alertSoft((e as Error).message); }
+    try {
+      const before = recipe, next = fn(recipe);
+      if (!sameRecipe(before, next)) history.record(before);
+      setRecipe(next);
+      syncUndo();
+      say("jsonStatus", "");
+    } catch (e) { say("jsonStatus", (e as Error).message); alertSoft((e as Error).message); }
   }
+  const history = new History();
+  const syncUndo = bindUndo(history, { current: () => recipe, restore: r => setRecipe(r) });
   function alertSoft(message: string) { say("exportStatus", message); }
 
   function syncInputs() {
@@ -295,6 +304,7 @@ export function startApp(root: HTMLElement) {
     input("cursorBeat").value = String(Math.min(recipe.durationBeats - 1, Math.floor(beat)));
     const hit = [...recipe.moves].reverse().find(m => m.atBeat <= beat);
     selectedId = hit?.id ?? null;
+    timeline.setFocus(hit ? { kind: "move", id: hit.id } : null);
     frame = Math.max(0, Math.round((recipe.beatGrid.offsetSeconds + beat * 60 / recipe.beatGrid.bpm) * recipe.fps));
     if (player.playing) player.play(track, frame / recipe.fps, rate());
     syncInputs();

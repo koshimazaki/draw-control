@@ -124,6 +124,8 @@ ${RIG_LAYOUT}
       <button id="play" type="button" class="primary">Play</button>
       <button id="next" type="button" title="Next frame">▶</button>
       <button id="tEnd" type="button" title="End">⏭</button>
+      <button id="undo" type="button" title="Undo (Cmd-Z)" disabled>Undo</button>
+      <button id="redo" type="button" title="Redo (Shift-Cmd-Z)" disabled>Redo</button>
       <select id="rate" title="Playback rate (below 1×: silent slow motion)"><option value="1">1×</option><option value="0.5">½</option><option value="0.25">¼</option><option value="0.1">1/10</option></select>
       <select id="previewFps" title="Preview frame rate (exports are always 24 fps)"><option value="24">24 fps</option><option value="12">12</option><option value="15">15</option><option value="30">30</option><option value="60">60</option></select>
       <span id="readout" class="mono"></span>

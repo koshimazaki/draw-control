@@ -10,10 +10,11 @@
 import {
   ACCENT_KEYS, LOOP_CLIPS, MOVE_KEYS, MOVE_LIBRARY, addMarker, beatAtSeconds, clearEnergyCurve, clearSteps, currentMarkers,
   currentSteps, effectiveDrive, insertMove, markerPhases, moveMarker, paintEnergy, removeMarker, removeMove, retimePhase,
-  beatsToFrames, blendBeatsOf, secondsAtBeat, setMarkerAccent, setMoveAtBeat, setMoveBlend, setStepAmplitude, snapSeconds,
+  beatsToFrames, blendBeatsOf, playedBoundaries, secondsAtBeat, setMarkerAccent, setMoveAtBeat, setMoveBlend, setStepAmplitude, snapSeconds,
   type AccentKey, type AudioDrive, type MoveKey, type Recipe, type StepDivision,
 } from "@motion-studio/core";
 import { LANES, TIMELINE_HEIGHT, drawTimeline, laneTop, type TimelineModel } from "./draw";
+import { closeMenu, deleteFocus, menuFor, showMenu, targetAt, type Focus } from "./focus";
 
 export const TIMELINE_LAYOUT = `
     <div class="tl-tools">
@@ -48,10 +49,11 @@ export class Timeline {
   private canvas = $<HTMLCanvasElement>("strip");
   private selected = -1;
   private blendDrag = -1;
+  private focus: Focus | null = null;
   private drawing = false;
   private points = false;
   private hover: TimelineModel["hover"] = null;
-  private cache: { recipe: Recipe; drive?: AudioDrive; division: number; model: Omit<TimelineModel, "beat" | "selectedMarker" | "selectedBlend" | "poseSpeed" | "handles" | "hover"> } | null = null;
+  private cache: { recipe: Recipe; drive?: AudioDrive; division: number; model: Omit<TimelineModel, "beat" | "selectedMarker" | "selectedBlend" | "focus" | "poseSpeed" | "handles" | "hover"> } | null = null;
 
   constructor(private host: TimelineHost) {
     $("tlDrawEnergy").onclick = () => { this.drawing = !this.drawing; if (this.drawing) this.points = false; this.syncModes(); };
@@ -67,9 +69,17 @@ export class Timeline {
     };
     window.addEventListener("keydown", e => {
       if ((e.target as HTMLElement).closest("input, textarea, select")) return;
-      if ((e.key === "Delete" || e.key === "Backspace") && this.selected >= 0) { e.preventDefault(); this.deleteSelected(); }
+      if ((e.key === "Delete" || e.key === "Backspace") && this.focus) { e.preventDefault(); this.deleteFocused(e.shiftKey ? "hold" : "close"); }
     });
-    this.canvas.addEventListener("pointerdown", e => this.down(e));
+    this.canvas.addEventListener("pointerdown", e => { if (e.button === 0) this.down(e); });
+    this.canvas.addEventListener("contextmenu", e => {
+      e.preventDefault();
+      const rect = this.canvas.getBoundingClientRect(), m = this.model();
+      const f = targetAt(m, e.clientX - rect.left, e.clientY - rect.top, rect.width);
+      if (!f) { closeMenu(); return; }
+      this.setFocus(f);
+      showMenu(e.pageX, e.pageY, menuFor(f, m, fn => { this.focus = null; this.selected = -1; host.edit(fn); this.draw(); }, host.drive(), this.division()));
+    });
   }
 
   private syncModes() { $("tlDrawEnergy").classList.toggle("on", this.drawing); $("tlPoints").classList.toggle("on", this.points); }
@@ -96,6 +106,20 @@ export class Timeline {
   /** The clip or move the brush paints (the move gizmo sets it too). */
   setBrushValue(v: string) { $<HTMLSelectElement>("tlBrush").value = v; }
   selectedMarker() { return this.selected; }
+  /** Focus a move, phase, marker or step (Delete and the context menu act on it). */
+  setFocus(f: Focus | null) {
+    this.focus = f;
+    if (f?.kind === "marker" || f?.kind === "phase") { this.selected = f.marker; this.syncAccent(); }
+    this.draw();
+  }
+  getFocus() { return this.focus; }
+  private deleteFocused(mode: "close" | "hold") {
+    const f = this.focus;
+    if (!f) return;
+    this.focus = null;
+    this.selected = -1;
+    this.host.edit(deleteFocus(f, mode, this.host.drive(), this.division()));
+  }
 
   private model(): TimelineModel {
     const recipe = this.host.recipe(), drive = this.host.drive(), division = this.division();
@@ -104,12 +128,14 @@ export class Timeline {
       const rms = this.host.rms();
       this.cache = { recipe, drive, division, model: {
         recipe, drive: effectiveDrive(recipe, drive), analysed: drive, rms: rms?.rms ?? null, rmsHop: rms?.hop ?? 1,
-        markers, phases: markers.map(m => markerPhases(recipe, m)), steps: currentSteps(recipe, drive, division), division,
+        markers, phases: markers.map(m => { const b = markerPhases(recipe, m); return b && playedBoundaries(b, m.skip); }), steps: currentSteps(recipe, drive, division), division,
         energyEdited: !!recipe.energyCurve,
       } };
       if (this.selected >= markers.length) this.selected = -1;
+      const f = this.focus;
+      if (f && (((f.kind === "marker" || f.kind === "phase") && f.marker >= markers.length) || (f.kind === "move" && !recipe.moves.some(mv => mv.id === f.id)))) this.focus = null;
     }
-    return { ...this.cache.model, beat: this.host.beat(), selectedMarker: this.selected, selectedBlend: this.blendDrag, poseSpeed: this.host.poseSpeed(), handles: this.points, hover: this.hover };
+    return { ...this.cache.model, beat: this.host.beat(), selectedMarker: this.selected, selectedBlend: this.blendDrag, focus: this.focus, poseSpeed: this.host.poseSpeed(), handles: this.points, hover: this.hover };
   }
 
   draw() { drawTimeline(this.canvas, this.model()); }
@@ -157,7 +183,9 @@ export class Timeline {
           this.selected = currentMarkers(this.host.recipe(), this.host.drive()).findIndex(mk => Math.abs(mk.seconds - seconds) < 1e-6);
         };
       } else {
-        this.selected = m.phases.findIndex((b, i) => !!b && beatAtX(e.clientX) >= markerBeat(i) + b[0] && beatAtX(e.clientX) <= markerBeat(i) + b[b.length - 1]);
+        const f = targetAt(m, x, y, rect.width);
+        this.selected = f?.kind === "phase" ? f.marker : -1;
+        this.focus = f;
         this.syncAccent();
       }
     } else if (y < laneTop.steps && this.blendHandleAt(recipe, x, xOfBeat) > 0) {
@@ -180,6 +208,7 @@ export class Timeline {
     } else if (y < laneTop.graph) {
       // Amplitude lane: drag the bars.
       const division = this.division();
+      this.focus = { kind: "step", index: Math.floor(beatAtX(e.clientX) * division / 4) };
       move = ev => {
         const yy = ev.clientY - rect.top - laneTop.steps;
         const value = Math.max(0, Math.min(1.5, (LANES.steps - 3 - yy) / (LANES.steps - 6) * 1.5));
@@ -214,6 +243,7 @@ export class Timeline {
         };
       } else if (near >= 0) {
         this.selected = near;
+        this.focus = { kind: "marker", marker: near };
         this.syncAccent();
         let seconds = m.markers[near].seconds;
         move = ev => {
@@ -232,6 +262,7 @@ export class Timeline {
         this.selected = currentMarkers(this.host.recipe(), this.host.drive()).findIndex(mk => Math.abs(mk.seconds - t) < 1e-6);
       } else {
         this.selected = -1;
+        this.focus = null;
         this.host.seek(beatAtX(e.clientX));
       }
     }

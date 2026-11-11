@@ -61,3 +61,21 @@ export function layeredWeights(weights: readonly number[]): number[] {
   for (let j = weights.length - 1; j >= 0; j--) { out[j] = weights[j] * cover; cover *= 1 - weights[j]; }
   return out;
 }
+
+/**
+ * Phase boundaries as played, with skipped phases removed and their neighbours closing
+ * the gap: a phase before the key frame pulls the earlier phases later, a phase after it
+ * pulls the later phases earlier, so the key frame (0) stays on the hit.
+ */
+export function playedBoundaries(boundaries: readonly number[], skip?: readonly number[]): number[] {
+  const out = [...boundaries];
+  if (!skip?.length) return out;
+  const key = out.indexOf(0);
+  for (const i of skip) {
+    if (i < 0 || i >= out.length - 1) continue;
+    const len = out[i + 1] - out[i];
+    if (i < key) for (let k = 0; k <= i; k++) out[k] += len;
+    else for (let k = i + 1; k < out.length; k++) out[k] -= len;
+  }
+  return out;
+}

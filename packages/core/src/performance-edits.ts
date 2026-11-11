@@ -68,7 +68,7 @@ export function currentMarkers(recipe: Recipe, drive?: AudioDrive): HitMarker[] 
   return detectedMarkers(recipe, effectiveDrive(recipe, drive), span);
 }
 
-function withMarkers(recipe: Recipe, markers: HitMarker[]): Recipe {
+export function withMarkers(recipe: Recipe, markers: HitMarker[]): Recipe {
   if (!recipe.reactive) throw new Error("markers need the reactive layer");
   markers.sort((a, b) => a.seconds - b.seconds);
   return validateRecipe({ ...clone(recipe), reactive: { ...recipe.reactive, markers } });
@@ -90,7 +90,7 @@ export function moveMarker(recipe: Recipe, drive: AudioDrive | undefined, index:
 export function setMarkerAccent(recipe: Recipe, drive: AudioDrive | undefined, index: number, accent: AccentKey): Recipe {
   const markers = currentMarkers(recipe, drive);
   if (!markers[index]) return recipe;
-  markers[index] = { seconds: markers[index].seconds, accent, source: markers[index].source };
+  markers[index] = { seconds: markers[index].seconds, accent, source: markers[index].source };   // phases, skip and hold belong to the old accent
   return withMarkers(recipe, markers);
 }
 

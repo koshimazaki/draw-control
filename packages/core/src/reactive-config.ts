@@ -19,6 +19,10 @@ export type HitMarker = {
   seconds: number; accent: AccentKey; source: (typeof MARKER_SOURCES)[number];
   /** Phase boundaries in beats from the hit (rigged clips): retimed phases, key frame at 0. */
   phases?: number[];
+  /** Phases removed with their neighbours closing the gap (indices into the accent's phases). */
+  skip?: number[];
+  /** Phases held: the clip freezes on the phase's first frame and the root does not turn. */
+  hold?: number[];
 };
 export type ReactiveConfig = {
   /** Whole number; the same seed gives the same performance. */
@@ -78,7 +82,7 @@ export function validateReactive(input: unknown): ReactiveConfig {
     out.markers = (input.markers as unknown[]).map((m, i) => {
       const where = `reactive.markers[${i}]`;
       if (!isObject(m)) return fail(`${where} must be an object`);
-      only(m, ["seconds", "accent", "source", "phases"], where);
+      only(m, ["seconds", "accent", "source", "phases", "skip", "hold"], where);
       const seconds = num(m.seconds, 0, 3600, `${where}.seconds`);
       if (seconds < last) fail(`${where}.seconds must not be before the marker before it`);
       last = seconds;
@@ -95,6 +99,13 @@ export function validateReactive(input: unknown): ReactiveConfig {
           return v;
         });
         if (!marker.phases.includes(0)) fail(`${where}.phases must keep the key frame at 0`);
+      }
+      for (const key of ["skip", "hold"] as const) {
+        const v = m[key];
+        if (v === undefined) continue;
+        if (!Array.isArray(v) || v.length > 16 || v.some(k => !Number.isInteger(k) || k < 0 || k > 15) || new Set(v).size !== v.length)
+          fail(`${where}.${key} must be a list of distinct phase indices 0–15`);
+        if ((v as number[]).length) marker[key] = [...(v as number[])].sort((a, b) => a - b);
       }
       return marker;
     });

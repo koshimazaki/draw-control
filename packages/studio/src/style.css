@@ -59,3 +59,7 @@ progress { width: 100%; }
 .gizmo[hidden] { display: none; }
 .gizmo-list { display: flex; flex-wrap: wrap; gap: 4px; max-height: 150px; overflow-y: auto; }
 .gizmo-list button.accent { border-color: #7a4040; }
+.ctx-menu { position: absolute; z-index: 50; display: grid; min-width: 220px; padding: 4px; background: #202227; border: 1px solid var(--line); border-radius: 6px; box-shadow: 0 6px 20px rgba(0,0,0,0.45); }
+.ctx-menu button { display: flex; justify-content: space-between; gap: 16px; text-align: left; border: 0; background: transparent; padding: 6px 8px; }
+.ctx-menu button:hover, .ctx-menu button:focus { background: rgba(255,255,255,0.08); }
+.ctx-menu kbd { opacity: 0.6; font: 11px ui-monospace, Menlo, monospace; }
