@@ -29,3 +29,4 @@ export * from "./accent-feel";
 export * from "./bone-sync";
 export * from "./move-edits";
 export * from "./command-table";
+export * from "./envelope";

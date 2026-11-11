@@ -6,16 +6,13 @@
  */
 import type { Focus } from "./focus";
 import { drawAudioLane, type Wave } from "./audio-lane";
+import { drawEnvelopeLane } from "./envelope-lane";
 import { CLIP_ACCENTS, accentSpan, beatsToFrames, blendBeatsOf, moveEndBeat, proceduralAccent, type AudioDrive, type HitMarker, type Recipe } from "@motion-studio/core";
 
-export const LANES = { phase: 26, move: 34, steps: 54, graph: 230, audio: 84, gap: 4, markerStrip: 16 } as const;
-export const laneTop = {
-  phase: 0,
-  move: LANES.phase + LANES.gap,
-  steps: LANES.phase + LANES.move + LANES.gap * 2,
-  graph: LANES.phase + LANES.move + LANES.steps + LANES.gap * 3,
-  audio: LANES.phase + LANES.move + LANES.steps + LANES.graph + LANES.gap * 4,
-};
+export const LANES = { phase: 26, move: 34, envelope: 130, steps: 54, graph: 230, audio: 84, gap: 4, markerStrip: 16 } as const;
+const ORDER = ["phase", "move", "envelope", "steps", "graph", "audio"] as const;
+/** Top of each lane, in CSS pixels from the canvas top, in ORDER with a gap between lanes. */
+export const laneTop = Object.fromEntries(ORDER.map((k, i) => [k, ORDER.slice(0, i).reduce((y, l) => y + LANES[l] + LANES.gap, 0)])) as Record<(typeof ORDER)[number], number>;
 export const TIMELINE_HEIGHT = laneTop.audio + LANES.audio;
 export const PHASE_COLOURS: Record<string, string> = { hold: "#4a7fd6", fast: "#d9534f", move: "#c8a26b", recover: "#6f9a83" };
 const CLIP_COLOURS = ["#5b8def", "#e0895a", "#5fb47a", "#c46fd0", "#d2b84a", "#4fb3c4", "#d0606e", "#8f8f8f"];
@@ -41,6 +38,9 @@ export type TimelineModel = {
   energyEdited: boolean;
   /** Point handles on the energy curve (one per step) when editing points. */
   handles: boolean;
+  /** Envelope lane: the point handles are shown (points mode) and the readout under the pointer. */
+  envelopePoints: boolean;
+  envelopeHover: { x: number; frame: number; value: number } | null;
   /** Value readout under the pointer. */
   hover: { x: number; seconds: number; beat: number; energy: number } | null;
 };
@@ -63,7 +63,7 @@ export function drawTimeline(canvas: HTMLCanvasElement, m: TimelineModel) {
   g.font = "10px system-ui, sans-serif";
   g.textBaseline = "middle";
   const lane = (top: number, h: number) => { g.fillStyle = "#1c1e22"; g.fillRect(0, top, w, h); };
-  for (const [top, h] of [[laneTop.phase, LANES.phase], [laneTop.move, LANES.move], [laneTop.steps, LANES.steps], [laneTop.graph, LANES.graph]]) lane(top, h);
+  for (const [top, h] of [[laneTop.phase, LANES.phase], [laneTop.move, LANES.move], [laneTop.envelope, LANES.envelope], [laneTop.steps, LANES.steps], [laneTop.graph, LANES.graph]]) lane(top, h);
 
   // Beat and bar grid through every lane.
   for (let b = 0; b <= total; b++) {
@@ -217,11 +217,12 @@ export function drawTimeline(canvas: HTMLCanvasElement, m: TimelineModel) {
   });
 
   drawAudioLane(g, w, laneTop.audio, LANES.audio, r, m.wave, m.analysed?.bands);
+  drawEnvelopeLane(g, w, laneTop.envelope, LANES.envelope, r, m.envelopeHover, m.envelopePoints);
 
   // Lane labels and the playhead.
   g.fillStyle = "rgba(231,232,234,0.55)";
   g.textAlign = "right";
-  for (const [label, t, h] of [["phases", laneTop.phase, LANES.phase], ["moves", laneTop.move, LANES.move], ["amplitude", laneTop.steps, 12], ["energy · pose speed", laneTop.graph + LANES.markerStrip + 6, 0]] as const) g.fillText(label, w - 4, t + (h ? h / 2 : 0));
+  for (const [label, t, h] of [["phases", laneTop.phase, LANES.phase], ["moves", laneTop.move, LANES.move], ["amplitude envelope 0–3", laneTop.envelope, 12], ["amplitude per step", laneTop.steps, 12], ["energy · pose speed", laneTop.graph + LANES.markerStrip + 6, 0]] as const) g.fillText(label, w - 4, t + (h ? h / 2 : 0));
   g.textAlign = "left";
   g.fillStyle = "#ffd34d";
   g.fillRect(Math.round(X(m.beat)) - 1, 0, 2, TIMELINE_HEIGHT);

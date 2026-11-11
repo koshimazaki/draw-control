@@ -359,7 +359,7 @@ export function startApp(root: HTMLElement) {
     rms: () => (track ? { rms: track.features.rms, hop: track.features.hopSeconds } : null),
     wave: () => track?.wave ?? null,
     beat: () => currentBeat, poseSpeed: () => poseSpeedCurve, edit, seek: seekBeat, importedMove, ctx,
-    select: id => { selectedId = id; syncInputs(); }, log: logCommand,
+    select: id => { selectedId = id; syncInputs(); }, log: logCommand, command,
   });
   /** Pose speed for the graph, recomputed shortly after the recipe or drive changes. */
   let poseSpeedCurve: Float32Array | null = null;
@@ -427,6 +427,7 @@ export function startApp(root: HTMLElement) {
   window.addEventListener("resize", () => render());
   if (import.meta.env.DEV) {
     // Dev-only probe for the smoke script: the live recipe, the analysed bands and the lane geometry.
+    (window as unknown as { __msFrame: unknown }).__msFrame = (n: number) => { const f = frameAt(recipe, n, drive); return { amplitude: f.amplitude, envelope: f.envelope, root: f.root }; };
     (window as unknown as { __msProbe: unknown }).__msProbe = () => ({
       recipe, frame, lanes: { ...laneTop, height: TIMELINE_HEIGHT },
       bands: drive.bands ? { low: drive.bands.low.map(o => o.seconds), mid: drive.bands.mid.map(o => o.seconds), high: drive.bands.high.map(o => o.seconds), peaks: drive.bands.peaks.length } : null,

@@ -30,10 +30,11 @@ export function targetAt(m: FocusModel, x: number, y: number, width: number): Fo
     }
     return null;
   }
-  if (y < laneTop.steps) {
+  if (y < laneTop.envelope) {
     const mv = [...r.moves].reverse().find(v => v.atBeat <= beat);
     return mv ? { kind: "move", id: mv.id } : null;
   }
+  if (y < laneTop.steps) return null;
   if (y < laneTop.graph) return { kind: "step", index: Math.floor(beat * m.division / 4) };
   const near = m.markers.findIndex((_, i) => Math.abs(markerBeat(i) / total * width - x) < (y < laneTop.graph + LANES.markerStrip ? 7 : 4));
   return near >= 0 ? { kind: "marker", marker: near } : null;

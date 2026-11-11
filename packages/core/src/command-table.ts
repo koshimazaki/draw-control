@@ -13,7 +13,10 @@ import { STEP_DIVISIONS, type StepDivision } from "./performance-config";
 import {
   addMarker, clearEnergyCurve, clearSteps, moveMarker, paintEnergy, removeMarker, retimePhase, setMarkerAccent, setMoveAtBeat, setMoveBlend, setStepAmplitude,
 } from "./performance-edits";
-import { RecipeError, type Recipe } from "./recipe";
+import { RecipeError, validateRecipe, type Recipe } from "./recipe";
+import {
+  ENVELOPE_SOURCES, clearEnvelope, drawEnvelope, envelopeFromAudio, paintEnvelope, removeEnvelopePoint, setEnvelopePoint, setEnvelopePoints, type EnvelopePoint, type EnvelopeSource,
+} from "./envelope";
 
 type Args = Record<string, unknown>;
 export type TableCommand = { help: string; run: (r: Recipe, a: Args, ctx: CommandContext) => Recipe };
@@ -48,6 +51,17 @@ export const COMMAND_TABLE: Record<string, TableCommand> = {
   deleteStep: { help: "{ division, index, mode?: close|hold } delete a step", run: (r, a, c) => deleteStep(r, c.drive, { division: division(a), index: int(a, "index"), mode: gap(a) }) },
   paintEnergy: { help: "{ fromSeconds, toSeconds, from, to } draw the energy curve linearly between two times, 0–1", run: (r, a, c) => paintEnergy(r, c.drive, num(a, "fromSeconds"), num(a, "toSeconds"), num(a, "from"), num(a, "to")) },
   clearEnergyCurve: { help: "{} back to the analysed energy", run: r => clearEnergyCurve(r) },
+  // The amplitude envelope (one value per frame, 0–3, scaling every move).
+  paintEnvelope: { help: "{ fromFrame, toFrame, from, to } draw a straight segment of the amplitude envelope, values 0–3", run: (r, a) => validateRecipe(paintEnvelope(r, { fromFrame: num(a, "fromFrame"), toFrame: num(a, "toFrame"), from: num(a, "from"), to: num(a, "to") })) },
+  drawEnvelope: { help: "{ startFrame, values: [..] } a freehand stroke, one value per frame (simplified to breakpoints)", run: (r, a) => validateRecipe(drawEnvelope(r, { startFrame: num(a, "startFrame"), values: a.values as number[] })) },
+  setEnvelopePoints: { help: "{ points: [[frame, value], ..] } replace the envelope's breakpoints", run: (r, a) => validateRecipe(setEnvelopePoints(r, { points: Array.isArray(a.points) ? a.points as EnvelopePoint[] : bad("points", "a list of [frame, value]") })) },
+  setEnvelopePoint: { help: "{ index?, frame, value } move a breakpoint (no index: add one)", run: (r, a) => validateRecipe(setEnvelopePoint(r, { index: a.index === undefined ? undefined : int(a, "index"), frame: num(a, "frame"), value: num(a, "value") })) },
+  removeEnvelopePoint: { help: "{ index } remove a breakpoint", run: (r, a) => validateRecipe(removeEnvelopePoint(r, { index: int(a, "index") })) },
+  envelopeFromAudio: {
+    help: `{ source: ${ENVELOPE_SOURCES.join("|")}, min?, max?, decayBeats? } start the envelope from the loudness or from a band's onsets`,
+    run: (r, a, c) => validateRecipe(envelopeFromAudio(r, { source: str(a, "source") as EnvelopeSource, min: optNum(a, "min"), max: optNum(a, "max"), decayBeats: optNum(a, "decayBeats") }, { drive: c.drive, bands: c.bands })),
+  },
+  clearEnvelope: { help: "{} remove the envelope (every frame at 1)", run: r => validateRecipe(clearEnvelope(r)) },
   // Hit markers (accents on the music).
   addMarker: { help: "{ seconds, accent } add a hit marker", run: (r, a, c) => addMarker(r, c.drive, num(a, "seconds"), accent(a, "accent")) },
   removeMarker: { help: "{ index } remove a hit marker", run: (r, a, c) => removeMarker(r, c.drive, int(a, "index")) },

@@ -7,7 +7,7 @@
 import { energyAtSeconds, type AudioDrive } from "./audio-drive";
 import { beatAtSeconds, secondsAtBeat } from "./beats";
 import { CLIP_ACCENTS, defaultPhaseBoundaries } from "./clip-library";
-import { amplitudeAt, clipPlanFor, clipSpan, effectiveDrive } from "./clip-perform";
+import { clipPlanFor, clipSpan, effectiveDrive, laneAmplitudeAt } from "./clip-perform";
 import { riggedMove } from "./examples";
 import { stepCount, type StepDivision } from "./performance-config";
 import { detectedMarkers } from "./reactive";
@@ -24,7 +24,7 @@ export function currentSteps(recipe: Recipe, drive: AudioDrive | undefined, divi
   if (recipe.steps && recipe.steps.division === division) return [...recipe.steps.amplitude];
   const plan = clipPlanFor({ ...recipe, steps: undefined }, drive);
   return Array.from({ length: stepCount(recipe.durationBeats, division) }, (_, i) =>
-    r4(amplitudeAt({ ...recipe, steps: undefined, reactive: recipe.reactive && { ...recipe.reactive, humanise: 0 } }, plan, secondsAtBeat(recipe.beatGrid, i * 4 / division))));
+    r4(laneAmplitudeAt({ ...recipe, steps: undefined, reactive: recipe.reactive && { ...recipe.reactive, humanise: 0 } }, plan, secondsAtBeat(recipe.beatGrid, i * 4 / division))));
 }
 
 export function setStepAmplitude(recipe: Recipe, args: { division: StepDivision; index: number; value: number; drive?: AudioDrive }): Recipe {

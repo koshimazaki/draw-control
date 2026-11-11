@@ -21,7 +21,7 @@ import { activeMoveIndex, jumpHeight, poseAtBeat, restWeight, sampleRootPath, ty
 import { neutralPose } from "./poses";
 import { planReactive, type AccentSpanFn, type Hit } from "./reactive";
 import { STEP_AMPLITUDE_MAX, type StepLane } from "./performance-config";
-import type { Recipe } from "./recipe";
+import { AMPLITUDE_MAX, type Recipe } from "./recipe";
 import { smoothNoise } from "./rng";
 import type { AccentKey } from "./accents";
 import { syncAt } from "./bone-sync";
@@ -153,8 +153,13 @@ export function loopLayersAt(recipe: Recipe, plan: ClipPlan, seconds: number): C
   return layers;
 }
 
-/** Amplitude at a time: the step lane (eased into each step) or the energy curve. */
+/** Amplitude at a time: the lane amplitude times the move's own amplitude and the recipe energy, 0–3. */
 export function amplitudeAt(recipe: Recipe, plan: ClipPlan, seconds: number): number {
+  return Math.min(AMPLITUDE_MAX, laneAmplitudeAt(recipe, plan, seconds) * moveAmplitudeAt(recipe, beatAtSeconds(recipe.beatGrid, seconds)) * recipe.energy);
+}
+
+/** The lane amplitude at a time: the step lane (eased into each step) or the energy curve, 0–1.5. */
+export function laneAmplitudeAt(recipe: Recipe, plan: ClipPlan, seconds: number): number {
   const cfg = recipe.reactive;
   const beat = beatAtSeconds(recipe.beatGrid, seconds);
   let a: number;
@@ -166,6 +171,18 @@ export function amplitudeAt(recipe: Recipe, plan: ClipPlan, seconds: number): nu
   } else a = cfg ? 1 + 1.3 * amplitudeAmount(cfg) * (energyAtSeconds(plan.drive, seconds) - 0.5) : 1;
   if (cfg && cfg.humanise > 0) a *= 1 + 0.08 * cfg.humanise * smoothNoise(cfg.seed, 1, beat / 2);
   return Math.max(0, Math.min(STEP_AMPLITUDE_MAX, a));
+}
+
+/**
+ * The selected move's own amplitude (its "volume", 0–3) at a beat, crossfaded over the blend
+ * into it. Before this was multiplied in, the rigged mannequin ignored the move amplitude.
+ */
+export function moveAmplitudeAt(recipe: Recipe, beat: number): number {
+  if (!recipe.moves.length) return 1;
+  const k = activeMoveIndex(recipe, beat), m = recipe.moves[k], own = m.phases[0]?.amplitude ?? 1;
+  if (k === 0) return own;
+  const w = ease((beat - m.atBeat) / blendBeatsOf(m, recipe));
+  return (recipe.moves[k - 1].phases[0]?.amplitude ?? 1) * (1 - w) + own * w;
 }
 
 export type AccentEval = { layers: ClipLayer[]; weight: number; lift: number; spin: number; phase: { name: string; kind: PhaseKind }; hit: ScheduledHit };

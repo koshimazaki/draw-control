@@ -24,6 +24,8 @@ export function drumWav(bpm = DRUM_BPM, bars = 8, rate = 44100) {
 }
 
 export const probe = page => page.evaluate(() => window.__msProbe());
+/** Bring the timeline canvas to the top of the window so every lane is under the pointer. */
+export const showTimeline = page => page.evaluate(() => document.querySelector("#strip").scrollIntoView({ block: "start" }));
 
 /** Count pixels of a colour (within a tolerance) in a canvas rectangle, in CSS pixels. */
 export async function countColour(page, rect, rgb, tol = 40) {
@@ -62,6 +64,7 @@ export async function smokeBands(page, { fail, OUT }) {
 
 /** Drag on the timeline canvas with real pointer events, from one beat to another, on a lane row (CSS px from the canvas top). */
 export async function dragBeats(page, fromBeat, toBeat, rowY, opts = {}) {
+  await showTimeline(page);
   const box = await page.locator("#strip").boundingBox(), p = await probe(page), total = p.recipe.durationBeats;
   const x = b => box.x + b / total * box.width;
   await page.mouse.move(x(fromBeat) + (opts.nudge ?? 0), box.y + rowY);
@@ -104,4 +107,34 @@ export async function smokeBlocks(page, { fail }) {
   const log = JSON.parse(await page.inputValue("#commandLog"));
   console.log(`command log: ${log.map(c => c.type).join(", ")}`);
   if (!log.some(c => c.type === "snapMoveTo") || !log.some(c => c.type === "resizeMove")) fail("command log misses a drag or a panel command");
+}
+
+/** Feature 3: draw the envelope freehand with the pencil and check it scales the motion. */
+export async function smokeEnvelope(page, { fail, OUT }) {
+  let p = await probe(page);
+  const top = p.lanes.envelope, h = 130, pad = 4;
+  const yOf = v => top + h - pad - v / 3 * (h - 2 * pad);
+  const before = await page.evaluate(() => window.__msFrame(6 * 12 + 2));
+  await page.click("#envPencil");
+  await showTimeline(page);
+  const box = await page.locator("#strip").boundingBox(), total = p.recipe.durationBeats;
+  const x = b => box.x + b / total * box.width;
+  await page.mouse.move(x(2), box.y + yOf(1));
+  await page.mouse.down();
+  for (let b = 2; b <= 12; b += 0.5) await page.mouse.move(x(b), box.y + yOf(b < 4 ? 1 + (b - 2) * 0.75 : 2.5));
+  await page.mouse.up();
+  p = await probe(page);
+  const pts = p.recipe.envelope?.points ?? [];
+  const after = await page.evaluate(() => window.__msFrame(6 * 12 + 2));
+  console.log(`envelope: ${pts.length} points, at frame 74: ${after.envelope?.toFixed(2)}; rigged amplitude ${before.amplitude?.toFixed(3)} -> ${after.amplitude?.toFixed(3)}`);
+  if (!pts.length || !(after.envelope > 2.3 && after.envelope < 2.7)) fail("pencil stroke did not set the envelope to about 2.5");
+  if (!(after.amplitude > before.amplitude * 1.8)) fail("the envelope did not scale the motion");
+  // Points mode: Shift-click the first point away, then start from the kicks.
+  await page.click("#envPoints");
+  await page.selectOption("#envSource", "kick");
+  await page.click("#envInit");
+  p = await probe(page);
+  console.log(`envelope from kicks: ${p.recipe.envelope?.points.length} points`);
+  if (!(p.recipe.envelope?.points.length > 10)) fail("envelope from kicks is empty");
+  await page.locator("#strip").screenshot({ path: `${OUT}timeline-envelope.png` });
 }

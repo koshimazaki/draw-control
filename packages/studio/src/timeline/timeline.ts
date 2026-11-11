@@ -11,12 +11,13 @@ import {
   ACCENT_KEYS, LOOP_CLIPS, MOVE_KEYS, MOVE_LIBRARY, addMarker, beatAtSeconds, clearEnergyCurve, clearSteps, currentMarkers,
   currentSteps, effectiveDrive, insertMove, markerPhases, moveMarker, paintEnergy, removeMarker, removeMove, retimePhase,
   CLIP_ACCENTS, setAnticipation, beatsToFrames, blendBeatsOf, playedBoundaries, secondsAtBeat, setMarkerAccent, setMoveAtBeat, setMoveBlend, setStepAmplitude, snapSeconds,
-  type AccentKey, type AudioDrive, type CommandContext, type MoveKey, type Recipe, type SnapTarget, type StepDivision,
+  type AccentKey, type AudioDrive, type CommandContext, type MotionCommand, type MoveKey, type Recipe, type SnapTarget, type StepDivision,
 } from "@motion-studio/core";
 import { LANES, TIMELINE_HEIGHT, drawTimeline, laneTop, type TimelineModel } from "./draw";
 import { MARKER_LAYOUT, bindMarkerInspector } from "./marker-inspector";
 import { closeMenu, deleteFocus, menuFor, showMenu, targetAt, type Focus } from "./focus";
 import { blockAt, startBlockDrag, type BlockHit, type MoveLaneHost } from "./move-lane";
+import { ENVELOPE_TOOLS, EnvelopeEditor } from "./envelope-lane";
 
 export const TIMELINE_LAYOUT = `
     <div class="tl-tools">
@@ -34,6 +35,7 @@ export const TIMELINE_LAYOUT = `
       <button id="tlDeleteMarker" type="button">Delete marker</button>
       <span class="muted">Alt: no snapping</span>
     </div>
+    <div class="tl-tools">${ENVELOPE_TOOLS}</div>
 ${MARKER_LAYOUT}
     <canvas id="strip" class="strip timeline-canvas" style="height:${TIMELINE_HEIGHT}px"></canvas>`;
 
@@ -54,6 +56,8 @@ export type TimelineHost = {
   select(moveId: string): void;
   /** Add a finished gesture's command to the command log. */
   log?(command: { type: string } & Record<string, unknown>): void;
+  /** Run a core command (logged). */
+  command(c: MotionCommand): void;
   /** A move for an imported clip (Mixamo) at a beat, or null for library clips. */
   importedMove?(clip: string, atBeat: number, recipe: Recipe): Recipe["moves"][number] | null;
 };
@@ -68,19 +72,26 @@ export class Timeline {
   private drawing = false;
   private points = false;
   private hover: TimelineModel["hover"] = null;
-  private cache: { recipe: Recipe; drive?: AudioDrive; division: number; model: Omit<TimelineModel, "beat" | "selectedMarker" | "selectedBlend" | "focus" | "poseSpeed" | "handles" | "hover"> } | null = null;
+  private cache: { recipe: Recipe; drive?: AudioDrive; division: number; model: Omit<TimelineModel, "beat" | "selectedMarker" | "selectedBlend" | "focus" | "poseSpeed" | "handles" | "hover" | "envelopePoints" | "envelopeHover"> } | null = null;
+
+  private envelope: EnvelopeEditor;
 
   constructor(private host: TimelineHost) {
+    this.envelope = new EnvelopeEditor({
+      recipe: () => host.recipe(), ctx: () => host.ctx(), edit: fn => host.edit(fn), log: c => host.log?.(c), command: c => host.command(c), redraw: () => this.draw(),
+    }, () => laneTop.envelope, LANES.envelope);
     $("tlDrawEnergy").onclick = () => { this.drawing = !this.drawing; if (this.drawing) this.points = false; this.syncModes(); };
     $("tlPoints").onclick = () => { this.points = !this.points; if (this.points) this.drawing = false; this.syncModes(); this.draw(); };
     this.canvas.addEventListener("pointermove", e => {
       if (e.buttons) return;
       const rect = this.canvas.getBoundingClientRect(), y = e.clientY - rect.top;
       const h = y >= laneTop.move && y < laneTop.move + LANES.move && !this.paintMode() ? blockAt(this.host.recipe(), e.clientX - rect.left, rect.width) : null;
-      this.canvas.style.cursor = h ? (h.kind === "body" ? "grab" : "ew-resize") : "";
+      this.canvas.style.cursor = h ? (h.kind === "body" ? "grab" : "ew-resize") : y >= laneTop.envelope && y < laneTop.steps ? "crosshair" : "";
+      const inEnv = y >= laneTop.envelope && y < laneTop.steps;
+      if (inEnv || this.envelope.hover) { this.envelope.hoverAt(rect, inEnv ? e : null); this.draw(); }
       this.hoverAt(e);
     });
-    this.canvas.addEventListener("pointerleave", () => { this.hover = null; this.draw(); });
+    this.canvas.addEventListener("pointerleave", () => { this.hover = null; this.envelope.hoverAt(this.canvas.getBoundingClientRect(), null); this.draw(); });
     $("tlResetEnergy").onclick = () => host.edit(clearEnergyCurve);
     $("tlResetSteps").onclick = () => host.edit(clearSteps);
     $("tlDeleteMarker").onclick = () => this.deleteSelected();
@@ -162,7 +173,8 @@ export class Timeline {
       const f = this.focus;
       if (f && (((f.kind === "marker" || f.kind === "phase") && f.marker >= markers.length) || (f.kind === "move" && !recipe.moves.some(mv => mv.id === f.id)))) this.focus = null;
     }
-    return { ...this.cache.model, beat: this.host.beat(), selectedMarker: this.selected, selectedBlend: this.blendDrag, focus: this.focus, poseSpeed: this.host.poseSpeed(), handles: this.points, hover: this.hover };
+    return { ...this.cache.model, beat: this.host.beat(), selectedMarker: this.selected, selectedBlend: this.blendDrag, focus: this.focus, poseSpeed: this.host.poseSpeed(), handles: this.points, hover: this.hover,
+      envelopePoints: this.envelope?.mode === "points", envelopeHover: this.envelope?.hover ?? null };
   }
 
   draw() { drawTimeline(this.canvas, this.model()); this.syncInspector(); }
@@ -228,11 +240,11 @@ export class Timeline {
         this.focus = f;
         this.syncAccent();
       }
-    } else if (y < laneTop.steps && !this.paintMode() && (hit = blockAt(recipe, x, rect.width)) && hit.kind !== "body") {
+    } else if (y < laneTop.envelope && !this.paintMode() && (hit = blockAt(recipe, x, rect.width)) && hit.kind !== "body") {
       // Move lane: drag a block's edge (longer plays slower, shorter faster).
       this.focus = { kind: "move", id: hit.id };
       move = startBlockDrag(this.blockHost(), hit, beatAtX(e.clientX), beatAtX);
-    } else if (y < laneTop.steps && this.blendHandleAt(recipe, x, xOfBeat) > 0) {
+    } else if (y < laneTop.envelope && this.blendHandleAt(recipe, x, xOfBeat) > 0) {
       // Move lane: drag a blend handle (the crossfade into a move), in whole frames.
       const i = this.blendHandleAt(recipe, x, xOfBeat), id = recipe.moves[i].id, at = recipe.moves[i].atBeat;
       this.blendDrag = i;
@@ -240,11 +252,11 @@ export class Timeline {
         const frames = beatsToFrames(beatAtX(ev.clientX) - at, this.host.recipe().beatGrid.bpm);
         this.host.edit(r => setMoveBlend(r, { moveId: id, frames }));
       };
-    } else if (y < laneTop.steps && !this.paintMode() && hit?.kind === "body") {
+    } else if (y < laneTop.envelope && !this.paintMode() && hit?.kind === "body") {
       // Move lane: drag a block to move it.
       this.focus = { kind: "move", id: hit.id };
       move = startBlockDrag(this.blockHost(), hit, beatAtX(e.clientX), beatAtX);
-    } else if (y < laneTop.steps) {
+    } else if (y < laneTop.envelope) {
       // Move lane: paint the brush on the beat (in a gap, or anywhere in paint mode).
       const beat = Math.floor(beatAtX(e.clientX)), v = $<HTMLSelectElement>("tlBrush").value;
       this.host.edit(r => {
@@ -255,6 +267,10 @@ export class Timeline {
         if (!v) return at ? removeMove(r, { moveId: at.id }) : r;
         return insertMove(at ? removeMove(r, { moveId: at.id }) : r, { move: v as MoveKey, atBeat: beat });
       });
+    } else if (y < laneTop.steps) {
+      // Envelope lane: pencil (freehand) or points.
+      this.focus = null;
+      move = this.envelope.down(e, rect);
     } else if (y < laneTop.graph) {
       // Amplitude lane: drag the bars.
       const division = this.division();

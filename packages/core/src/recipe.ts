@@ -9,6 +9,7 @@ import { validateCamera, type CameraConfig } from "./camera";
 import { validateReactive, type ReactiveConfig } from "./reactive-config";
 import { validateEnergyCurve, validateSteps, type EnergyCurve, type StepLane } from "./performance-config";
 import { RecipeError, fail, finite, isObject, only, text } from "./validate";
+import { validateEnvelope, type Envelope } from "./envelope";
 
 export const RECIPE_VERSION = 2;
 /** Upper bound of a phase amplitude and of the amplitude envelope. */
@@ -82,6 +83,8 @@ export type Recipe = {
   steps?: StepLane;
   /** Hand-edited energy curve; replaces the analysed one. */
   energyCurve?: EnergyCurve;
+  /** Amplitude envelope: one value per frame (0–3) scaling every move, as [frame, value] breakpoints. */
+  envelope?: Envelope;
 };
 
 export { RecipeError };
@@ -152,7 +155,7 @@ function validateMove(input: unknown, where: string, durationBeats: number): Mov
 /** Strict validation for agent-supplied JSON and imported recipes. Returns a fresh copy. */
 export function validateRecipe(input: unknown): Recipe {
   if (!isObject(input)) return fail("expected an object");
-  only(input, ["version", "fps", "durationBeats", "beatGrid", "character", "energy", "moves", "rootPath", "jumps", "audio", "camera", "reactive", "steps", "energyCurve"], "recipe");
+  only(input, ["version", "fps", "durationBeats", "beatGrid", "character", "energy", "moves", "rootPath", "jumps", "audio", "camera", "reactive", "steps", "energyCurve", "envelope"], "recipe");
   if (input.version !== RECIPE_VERSION) fail(`expected version ${RECIPE_VERSION}`);
   if (input.fps !== 24) fail("fps must be 24");
   if (!Number.isInteger(input.durationBeats) || !finite(input.durationBeats, 1, 512)) fail("durationBeats must be a whole number 1–512");
@@ -214,6 +217,7 @@ export function validateRecipe(input: unknown): Recipe {
   }
   if (input.steps !== undefined) recipe.steps = validateSteps(input.steps, durationBeats);
   if (input.energyCurve !== undefined) recipe.energyCurve = validateEnergyCurve(input.energyCurve);
+  if (input.envelope !== undefined) recipe.envelope = validateEnvelope(input.envelope);
   if (input.reactive !== undefined) recipe.reactive = validateReactive(input.reactive);
   if (input.camera !== undefined) recipe.camera = validateCamera(input.camera, durationBeats);
   return recipe;

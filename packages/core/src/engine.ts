@@ -33,7 +33,7 @@ export type FrameState = {
   accent?: { key: string; hitSeconds: number; weight: number };
   /** Reactive layer only: the smoothed audio energy at this frame. */
   energy?: number;
-  /** Rigged mannequin: amplitude of the loops relative to idle (0–1.5). */
+  /** Rigged mannequin: amplitude of the loops relative to idle (0–3: the step lane or energy, times the move's amplitude, the recipe energy and the envelope). */
   amplitude?: number;
   /** Rigged mannequin: loop layers sampled late for each bone group (overlapping action). */
   lagged?: { group: string; layers: ClipLayer[] }[];
@@ -41,6 +41,8 @@ export type FrameState = {
   accentWeight?: number;
   /** Rigged mannequin: per-bone sync signals added on top of the clips (reactive.sync). */
   sync?: { head: number; shoulders: number; arms: number; hips: number; sway: number };
+  /** The amplitude envelope's value on this frame, when the recipe has one. */
+  envelope?: number;
   /** Rigged mannequin: the accent phase playing, for the caption and the phase lane. */
   phase?: { name: string; kind: string; accent: string };
 };
