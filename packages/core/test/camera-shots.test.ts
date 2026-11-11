@@ -28,8 +28,8 @@ describe("shots", () => {
     expect(eased.samples[at(12)].fov).toBeCloseTo(SHOT_PRESETS.close.fov, 6);
     let worst = 0;
     for (let n = at(7); n < at(10); n++) worst = Math.max(worst, Math.abs(dist(eased.samples[n + 1]) - dist(eased.samples[n])));
-    expect(worst).toBeLessThan(0.3);   // 2.2 m eased over one beat (12 frames)
-    expect(Math.abs(dist(cut.samples[at(8)]) - dist(cut.samples[at(8) - 1]))).toBeGreaterThan(2);
+    expect(worst).toBeLessThan(0.3);   // 1.8 m eased over one beat (12 frames)
+    expect(Math.abs(dist(cut.samples[at(8)]) - dist(cut.samples[at(8) - 1]))).toBeGreaterThan(1.5);
   });
   it("a recipe without shots or amounts plans exactly as before (rig numbers throughout)", () => {
     const r = rig([{ fromBeat: 0, toBeat: 16, modes: ["orbit"] }]);

@@ -23,7 +23,8 @@ npm run cli -- commands                   # or: node cli/bin/motion-studio.mjs c
 | `new [--character rigged\|mannequin\|block\|stick\|blob] [--analysis a.json] --out recipe.json` | A starting recipe (the rigged mannequin dancing), fitted to the track's tempo and length. |
 | `apply <recipe.json> <commands.json> [--analysis a.json] [--out next.json]` | Apply a list of commands in order. All or nothing: a refused command names its index and the reason. |
 | `set <recipe.json> <path> <value> [--out next.json]` | Set any recipe field by path: `beatGrid.bpm 98`, `moves#Dance_Loop-4.speed 2`, `moves[0].phases[0].amplitude 2.5`, `camera.distance 5`, `reactive.amplitude 1`. The value is JSON when it parses, text otherwise; `null` deletes the field. |
-| `describe <recipe.json> [--analysis a.json]` | The timeline as text: move blocks with start, end, speed and amplitude, rests, hit markers, the camera ranges and paths, the walk path, the envelope, and the kicks, snares and hats in beats. |
+| `describe <recipe.json> [--analysis a.json] [--script]` | The timeline as text: move blocks with start, end, speed, amplitude and lock, rests, hit markers, the camera ranges (with shots, amounts and locks), the camera lanes and paths, the walk path and its lock, the envelope, and the kicks, snares and hats in beats. With `--script` (put it last): the shot script instead. |
+| `script <recipe.json> <script.txt> [--analysis a.json] [--out next.json]` | Apply a shot script ([recipe.md](recipe.md#shot-script)): the Action and Camera tracks from its rows. `@kick N` and `@snare N` need `--analysis`. |
 | `render <recipe.json> [--audio track.wav] --out bundle/` | The guide bundle, rendered in headless Chrome through the studio (as `npm run smoke` does). Options: `--view rig\|front\|side\|top\|orbit\|iso` (default: `rig` when the recipe has a camera rig), `--size 1280x720`, `--start 8 --length 8 --unit beats\|seconds`, `--grid` (render the ground grid). Needs Google Chrome (or `CHROME_PATH`). |
 | `commands` | Every command type with its arguments. |
 
@@ -33,10 +34,11 @@ Without `--analysis`, commands that read the music (kicks, snares, the loudness)
 
 Run `npm run cli -- commands` for the full list with arguments. In short:
 
-- **Blocks on the move track:** `moveMoveTo`, `resizeMove` (an edge; a longer block plays slower), `setMoveFields` (start, length, speed, amplitude), `snapMoveTo` (nearest or Nth kick, snare or hat), `placeOnEvery` (a move or an accent on every Nth kick or snare), `insertMove`, `swapMove`, `removeMove`, `deleteMove`, `setMoveAtBeat`, `setMoveBlend`, `setAmplitude`, `extendPhase`.
-- **Amplitude envelope** (0–3 per frame, scaling every move): `paintEnvelope`, `drawEnvelope` (one value per frame), `setEnvelopePoints`, `setEnvelopePoint`, `removeEnvelopePoint`, `envelopeFromAudio` (loudness, kick, snare, hat or peaks), `clearEnvelope`.
-- **Camera:** `setCamera` (distance, height, fov, intensity, orbit speed), `setCameraModes` (static, orbit, pushIn, pullOut, rise, lead, threeQuarter, side, chase, top, fixed, path, on a beat range), `startCameraMove` (on the Nth kick or snare), `setCameraPath`, `clearCameraPath`.
-- **Walk path:** `setRootPath` (a drawn floor path over a beat range, smoothed, steady speed, facing along it; `gait` adds a walk or run block), `clearRootPath`.
+- **Shot script:** `applyScript` (`{ script }`, the same as `motion-studio script`).
+- **Blocks on the move track:** `moveMoveTo`, `resizeMove` (an edge; a longer block plays slower), `setMoveFields` (start, length, speed, amplitude, `lock` off/beat/kick/snare/hat, `strength`), `snapMoveTo` (nearest or Nth kick, snare or hat), `placeOnEvery` (a move or an accent on every Nth kick or snare), `insertMove`, `swapMove`, `removeMove`, `deleteMove`, `setMoveAtBeat`, `setMoveBlend`, `setAmplitude`, `extendPhase`.
+- **Automation lanes** (the amplitude envelope, 0–3 per frame scaling every move, and the camera lanes `distance`, `height`, `yaw`, `fov`): `paintEnvelope`, `drawEnvelope` (one value per frame), `setEnvelopePoints`, `setEnvelopePoint`, `removeEnvelopePoint`, `clearEnvelope`, each with `lane` (default `amplitude`); `envelopeFromAudio` (loudness, kick, snare, hat or peaks) for the amplitude envelope. A camera lane overrides its parameter where it has points (yaw adds an offset); see [recipe.md](recipe.md#camerasegments-shot-amount-lock) for which wins.
+- **Camera:** `setCamera` (distance, height, fov, intensity, orbit speed), `setCameraModes` (static, orbit, pushIn, pullOut, rise, truck, lead, threeQuarter, side, chase, top, fixed, path, on a beat range), `startCameraMove` (on the Nth kick or snare), `setCameraSegment` (a block's modes, `shot`, `cut`, `amount`, `from`, `to`, `lock`, `strength`, `onHit`, `punch`; `null` clears), `moveCameraSegment`, `resizeCameraSegment` (the timeline's drags), `setCameraPath`, `clearCameraPath`.
+- **Walk path:** `setRootPath` (a drawn floor path over a beat range, smoothed, steady speed; `gait` adds a walk or run block at the path's speed, `gait: "glide"` slides with no gait; points may carry a height `y`; `lock`, `strength`), `setTravelLock` (stations on each locked hit), `clearRootPath`.
 - **Music-driven layer:** `addMarker`, `removeMarker`, `moveMarker`, `setMarkerAccent`, `retimePhase`, `setImpact`, `setAnticipation`, `deletePhase`, `restorePhase`, `setStepAmplitude`, `clearSteps`, `deleteStep`, `paintEnergy`, `clearEnergyCurve`.
 - **Anything else:** `set` by path.
 
@@ -56,7 +58,8 @@ Register it with any MCP client as a stdio server with that command (absolute pa
 | `load_analysis` | `path` |
 | `new_recipe` | `character?` |
 | `load_recipe`, `save_recipe` | `path` |
-| `get_recipe`, `describe`, `list_commands`, `undo` | none |
+| `get_recipe`, `describe`, `get_script`, `list_commands`, `undo` | none |
+| `apply_script` | `script` (returns the script as it now reads) |
 | `apply` | `commands`: the same list as a commands.json |
 | `set` | `path`, `value` |
 | `render` | `out`, `audio?`, `view?`, `size?`, `start?`, `length?`, `unit?`, `grid?` |
@@ -92,3 +95,43 @@ M render recipe.next.json --audio drums.wav --out bundle --start 0 --length 8 --
 A jump is an accent, so `placeOnEvery` writes hit markers (the jump lands on each kick); a loop move such as `Dance_Loop` or `Walk_Loop` would become blocks starting on each kick instead. Over MCP the same three commands go to `apply` after `analyse_audio` and `new_recipe`.
 
 The same example runs as a test: `cli/test/cli.test.ts` and `mcp/test/mcp.test.ts`.
+
+## Worked example: directing a clip by speaking
+
+The owner says: *"Camera follows; the character jumps and the camera moves around it; it falls and the camera goes to the top; then it follows behind."* An agent writes that as a shot script, one row per block ([grammar](recipe.md#shot-script)). There is no fall move in the library, so the agent rests the figure under the overhead shot and says so. The script is committed as `examples/scripts/follow-jump-top.txt`:
+
+```
+beats 0-8   | action: run on path lock kick 0.5 | camera: chase     | shot: wide
+beats 8-10  | action: jump @snare 1            | camera: orbit 360 | shot: medium
+beats 10-12 | action: rest                     | camera: top       | shot: wide
+beats 12-16 | action: run                      | camera: chase     | shot: close
+```
+
+`on path` needs a walk path, so one is drawn first (by command here; in the studio, *Draw walk path*). By CLI:
+
+```bash
+cd out/demo                                              # after the example above: drums.wav, analysis.json, recipe.json
+M() { node ../../cli/bin/motion-studio.mjs "$@"; }
+cat > path.json <<'JSON'
+[{ "type": "setRootPath", "points": [{ "x": 0, "z": 0 }, { "x": 2, "z": -3 }, { "x": 5, "z": -5 }, { "x": 8, "z": -5 }], "fromBeat": 0, "toBeat": 8 }]
+JSON
+M apply recipe.json path.json --out recipe.path.json
+M script recipe.path.json ../../examples/scripts/follow-jump-top.txt --analysis analysis.json --out recipe.shot.json
+M describe recipe.shot.json --analysis analysis.json --script
+# beats 0-8   | action: run on path lock kick 0.5 | camera: chase     | shot: wide
+# beats 8-10  | action: jump @snare 1             | camera: orbit 360 | shot: medium
+# beats 10-12 | action: rest                      | camera: top       | shot: wide
+# beats 12-16 | action: run                       | camera: chase     | shot: close
+# beats 16-33 | action: rest                      | camera: static    | shot: -
+M render recipe.shot.json --audio drums.wav --out bundle-shot --start 0 --length 16 --unit beats
+```
+
+The run block plays at the speed that matches the path (×0.91 here), its travel arrives on each kick (half stepped, strength 0.5), the jump lands on the first snare of beats 8–10, and the orbit turns exactly 360° in two beats. A word the studio does not know fails with the list it does know:
+
+```bash
+printf 'beats 0-4 | action: fall\n' > fall.txt && M script recipe.path.json fall.txt
+# motion-studio script: Recipe: command 0 ("applyScript"): script line 1: unknown action "fall" for the rigged character: use one of walk, run, jog, …
+```
+
+Over MCP: `analyse_audio` (the track), `new_recipe`, `apply` with the `setRootPath` command above, then `apply_script` with the script's text; it returns the script as the recipe now reads, and `get_script` prints it again at any time. Then fine-tune by hand in the studio: load `recipe.shot.json` (*Upload*), drag the camera blocks on the Camera track, open the Distance lane and draw over the orbit, or arm a lane and record it while playing. Both routes run as tests (`cli/test/cli.test.ts`, `mcp/test/mcp.test.ts`).
+

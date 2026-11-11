@@ -27,6 +27,8 @@ import type { BeatGrid } from "./recipe";
 export type ProgrammedCamera = {
   /** Base distance, height (metres) and fov (degrees) before the energy-driven motion. */
   distance: Float64Array; height: Float64Array; fov: Float64Array;
+  /** Aim height, metres (1 without shots; a close shot aims at the chest). */
+  aim: Float64Array;
   /** Programmed orbit (radians) and truck (metres, + right) since frame 0. */
   orbit: Float64Array; truck: Float64Array;
   /** Punch-in on locked hits, metres closer. */
@@ -48,7 +50,7 @@ const isCrane = (s: CameraSegment) => s.modes.includes("rise") && (s.amount !== 
 const isOrbit = (s: CameraSegment) => s.modes.includes("orbit") && s.amount !== undefined;
 const isTruck = (s: CameraSegment) => s.modes.includes("truck") && s.amount !== undefined;
 
-type Values = { d: number; h: number; f: number; orbit: number; truck: number };
+type Values = { d: number; h: number; f: number; a: number; orbit: number; truck: number };
 
 /** The progress 0–1 of a programmed move through its range (eased, re-timed by a lock). */
 function progressOf(s: CameraSegment, hits: number[], beat: number): number {
@@ -67,6 +69,7 @@ function valuesIn(s: CameraSegment, v: Values, hits: number[], beat: number): Va
   let d = preset ? v.d + (preset.distance - v.d) * w : v.d;
   let h = preset ? v.h + (preset.height - v.h) * w : v.h;
   const f = preset ? v.f + (preset.fov - v.f) * w : v.f;
+  const a = preset ? v.a + (preset.aim - v.a) * w : v.a;
   if (isDolly(s)) {
     if (s.to !== undefined) d = v.d + (s.to - v.d) * p;
     else d += (s.modes.includes("pushIn") ? -1 : 1) * s.amount! * p;
@@ -79,7 +82,7 @@ function valuesIn(s: CameraSegment, v: Values, hits: number[], beat: number): Va
     else h += s.amount! * p;
   }
   return {
-    d: Math.max(0.3, d), h: Math.max(0.05, h), f,
+    d: Math.max(0.3, d), h: Math.max(0.05, h), f, a,
     orbit: v.orbit + (isOrbit(s) ? s.amount! * DEG * p : 0),
     truck: v.truck + (isTruck(s) ? s.amount! * p : 0),
   };
@@ -88,14 +91,14 @@ function valuesIn(s: CameraSegment, v: Values, hits: number[], beat: number): Va
 export function programCamera(config: CameraConfig, grid: BeatGrid, bands: BandAnalysis | undefined, total: number, fps: number): ProgrammedCamera {
   const arr = () => new Float64Array(total), bytes = () => new Uint8Array(total);
   const out: ProgrammedCamera = {
-    distance: arr(), height: arr(), fov: arr(), orbit: arr(), truck: arr(), punch: arr(), gate: arr(),
+    distance: arr(), height: arr(), fov: arr(), aim: arr(), orbit: arr(), truck: arr(), punch: arr(), gate: arr(),
     owns: { orbit: bytes(), dolly: bytes(), crane: bytes() }, hits: [],
   };
   const segs = config.segments;
   out.hits = segs.map(s => (s.lock ? lockHits(grid, bands, s.lock, s.fromBeat, s.toBeat) : []));
   // Values at the start of each range, carried from the end of the one before.
   const starts: Values[] = [];
-  let v: Values = { d: config.distance, h: config.height, f: config.fov, orbit: 0, truck: 0 };
+  let v: Values = { d: config.distance, h: config.height, f: config.fov, a: 1, orbit: 0, truck: 0 };
   segs.forEach((s, i) => { starts.push(v); v = valuesIn(s, v, out.hits[i], s.toBeat); });
   for (let n = 0; n < total; n++) {
     const beat = beatAtSeconds(grid, n / fps);
@@ -106,7 +109,7 @@ export function programCamera(config: CameraConfig, grid: BeatGrid, bands: BandA
     if (!s) val = starts[0] ?? v;
     else if (beat < s.toBeat) val = valuesIn(s, starts[i], out.hits[i], beat);
     else val = i + 1 < starts.length ? starts[i + 1] : v;
-    out.distance[n] = val.d; out.height[n] = val.h; out.fov[n] = val.f; out.orbit[n] = val.orbit; out.truck[n] = val.truck;
+    out.distance[n] = val.d; out.height[n] = val.h; out.fov[n] = val.f; out.aim[n] = val.a; out.orbit[n] = val.orbit; out.truck[n] = val.truck;
     // Ownership includes the range's end frame, so an accent on the last beat cannot nudge the end value.
     for (let k = 0; k < segs.length; k++) {
       const q = segs[k];

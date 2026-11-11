@@ -42,13 +42,13 @@ export const FOLLOW_ANGLES: Partial<Record<CameraMode, number>> = { lead: 0, thr
 export const FOLLOW_MODES = Object.keys(FOLLOW_ANGLES) as CameraMode[];
 export const SHOTS = ["wide", "medium", "close", "low", "top"] as const;
 export type Shot = (typeof SHOTS)[number];
-/** Framing presets: distance and height in metres, vertical fov in degrees at 16:9. */
-export const SHOT_PRESETS: Record<Shot, { distance: number; height: number; fov: number }> = {
-  wide: { distance: 7, height: 1.6, fov: 40 },
-  medium: { distance: 4.2, height: 1.35, fov: 35 },
-  close: { distance: 2.2, height: 1.45, fov: 28 },
-  low: { distance: 3.4, height: 0.35, fov: 42 },
-  top: { distance: 1.4, height: 6.5, fov: 45 },
+/** Framing presets: distance, height and aim height in metres, vertical fov in degrees at 16:9 (the rig aims at 1 m). */
+export const SHOT_PRESETS: Record<Shot, { distance: number; height: number; fov: number; aim: number }> = {
+  wide: { distance: 7, height: 1.6, fov: 40, aim: 1 },
+  medium: { distance: 4.2, height: 1.35, fov: 35, aim: 1.05 },
+  close: { distance: 2.6, height: 1.5, fov: 30, aim: 1.35 },
+  low: { distance: 3.4, height: 0.35, fov: 42, aim: 1.1 },
+  top: { distance: 1.4, height: 6.5, fov: 45, aim: 0.9 },
 };
 /** Modes that take an amount; a range with an amount holds at most one of them. */
 export const AMOUNT_MODES = ["orbit", "pushIn", "pullOut", "truck", "rise"] as const;

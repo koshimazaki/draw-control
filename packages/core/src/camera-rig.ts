@@ -144,7 +144,7 @@ export function planCamera(recipe: Recipe, drive?: AudioDrive, frames = 0): Came
     ch.yaw[n] = yaw0 + followYaw + orbit + prog.orbit[n];
     ch.distance[n] = prog.distance[n] + dolly - prog.punch[n];
     ch.height[n] = prog.height[n] + crane;
-    ch.aimY[n] = AIM_Y + aim;
+    ch.aimY[n] = prog.aim[n] + aim;
     ch.cx[n] = cx; ch.cz[n] = cz;
   }
 

@@ -64,6 +64,7 @@ Units: metres, seconds, musical beats. Frame rate is fixed at 24.
 | `phases` | 1–32 | The move's phases (below). Clip moves carry one phase, the clip's cycle. |
 | `clip` | optional, up to 120 characters | Clip name: a loop of the rigged mannequin (`Idle_Loop`, `Dance_Loop`, `Walk_Loop`, `Jog_Fwd_Loop`, `Sprint_Loop`, `Crouch_Idle_Loop`, `Crouch_Fwd_Loop`, `Sword_Idle`, `Spell_Simple_Idle_Loop`) or an embedded clip of a loaded file. |
 | `clipCycleBeats` | optional, 0.25–64 | Beats one pass of a file clip is stretched to. Loops of the rigged mannequin are time-warped so each step lands on a beat instead. |
+| `lock`, `strength` | optional: `beat`, `kick`, `snare` or `hat`; 0–1 (default 1) | Beat lock. Inside the block the phases or the clip speed up into each locked hit and slow after it (playback rate 1 + strength·cos 2πu between hits), so the move reads as moving to the music at its normal average speed; every hit and both edges keep their beat. Strength 0 is exactly the unlocked move. `kick`, `snare` and `hat` read the analysed onsets (no track: no hits, no change). |
 
 Transitions between rigged loops: a gait (walk, jog, sprint, crouch walk) that follows a gait starts on the foot the old one steps with next. See `packages/core/src/transitions.ts`.
 
@@ -83,14 +84,16 @@ Transitions between rigged loops: a gait (walk, jog, sprint, crouch walk) that f
 The walk path drawn in the top view (or `setRootPath`) is stored here: up to 48 points resampled evenly along a smoothed spline, so the speed along it is steady, each with a facing (`yaw`) along the path.
 
 
-- `rootPath[]`: `{ beat, x, z, yaw }`. Beats strictly increase, inside the recipe; `x` and `z` from -100 to 100 metres; `yaw` from -720 to 720 degrees. Linear between points, held after the last. The rigged mannequin's clips stay in place, so travel comes only from here.
+- `rootPath[]`: `{ beat, x, z, yaw, y? }`. Beats strictly increase, inside the recipe; `x` and `z` from -100 to 100 metres; `yaw` from -720 to 720 degrees; `y` (optional, 0–30 m) lifts the root, for a glide that rises. Linear between points, held after the last. The rigged mannequin's clips stay in place, so travel comes only from here.
+- `setRootPath` with a gait (`Walk_Loop`, `Jog_Fwd_Loop`, `Sprint_Loop`; `walk`, `run` on the procedural figures) adds a move block over the range, facing along the path. A rigged gait plays at the speed whose steps cover the path's speed (its authored travel speed, `travel` in `clip-library.ts`), so the feet slide less; the procedural gaits have no authored travel speed and keep theirs. There is no foot locking. `gait: "glide"` adds no block: the figure slides along the path (sideways, backwards, up where points carry `y`) holding its pose or whatever move is on the Action track, facing where it faced (`face: "path"` turns it along the path). It works on every figure.
+- `travelLock` (optional): `{ lock: beat|kick|snare|hat, strength?: 0–1 }`. The travel (from the path's first move to its last point) is re-timed so the figure arrives at evenly spaced stations on each locked hit: it eases into the hit, holds for up to a quarter beat, and goes again. Strength blends with the steady speed; the start, the end and the range stay as drawn. The stations are drawn as red posts on the walk path in the top and orbit views.
 - `jumps[]`: `{ atBeat, durationBeats 0.125–16, height 0–3 }`: a programmed lift of the root.
 
 ## `camera`
 
 | Field | Limits | Meaning |
 | --- | --- | --- |
-| `segments[]` | 1–32, in order, not overlapping | `{ fromBeat, toBeat, modes }`. Modes: `static`, `orbit`, `pushIn`, `pullOut`, `rise`, the follow rigs `lead` (front), `threeQuarter`, `side` and `chase` (behind), `top` (overhead), `fixed` (a tripod that pans) and `path`. Several may share a range, except: `static`, `fixed` and `path` stand alone, one follow rig at a time, `pushIn` excludes `pullOut`. Beats outside every range hold. |
+| `segments[]` | 1–32, in order, not overlapping | `{ fromBeat, toBeat, modes, ...optional fields below }`, the blocks of the Camera track. Modes: `static`, `orbit`, `pushIn`, `pullOut`, `rise`, `truck` (sideways), the follow rigs `lead` (front), `threeQuarter`, `side` and `chase` (behind), `top` (overhead), `fixed` (a tripod that pans) and `path`. Several may share a range, except: `static`, `fixed` and `path` stand alone, one follow rig at a time, `pushIn` excludes `pullOut`. Beats outside every range hold. |
 | `intensity` | 0–1 | How strongly the music drives speed and accents (0: a plain programmed move). |
 | `orbitDegreesPerBeat` | -45 to 45 | Orbit speed at mid energy; the sign is the direction. |
 | `distance` | 1.5–12 m | Starting distance from the subject. |
@@ -98,7 +101,39 @@ The walk path drawn in the top view (or `setRootPath`) is stored here: up to 48 
 | `fov` | 15–80 degrees | Vertical field of view at 16:9. |
 | `startYaw` | -360 to 360 degrees | Starting angle around the subject (0 = in front, on +Z). |
 | `path[]` | optional, 2–32 points | `{ x, y, z }` in metres (`y` 0.1–30, the camera height) for the `path` mode; required when a segment uses it. |
+| `lanes` | optional | Automation lanes `distance`, `height`, `yaw`, `fov`, each `{ points: [[frame, value], ...] }` like the envelope (below). |
 
+### `camera.segments[]`: shot, amount, lock
+
+| Field | Limits | Meaning |
+| --- | --- | --- |
+| `shot` | `wide`, `medium`, `close`, `low`, `top` | Framing preset for distance, height and fov (wide 7 m, 1.6 m, 40°; medium 4.2 m, 1.35 m, 35°; close 2.6 m, 1.5 m, 30°, aimed at the chest; low 3.4 m, 0.35 m, 42°; top 1.4 m, 6.5 m, 45°). Eased in over the block's first beat (half the block if shorter); a block without a shot keeps the values it started with, so nothing jumps. |
+| `cut` | true | Switch to the shot (and a rise's start height) on the block's first frame instead of easing. |
+| `amount` | orbit -1440 to 1440°; pushIn, pullOut 0–20 m; truck -20 to 20 m (+ right); rise -10 to 10 m (jib up or down) | A programmed move, eased in and out over the block, ignoring the energy: an orbit of 360 over 4 beats ends exactly 360° on. The block holds exactly one of orbit, pushIn, pullOut, truck, rise (a follow rig or top may share it). `truck` needs one. |
+| `from`, `to` | rise: heights 0.05–30 m; pushIn, pullOut: `to` an end distance 0.5–30 m | Instead of an amount: rise from one height to another, or push in or pull out to a distance. |
+| `lock`, `strength` | `beat`, `kick`, `snare`, `hat`; 0–1 (default 1) | Beat lock on the block. A programmed move arrives at evenly spaced stations on each locked hit and holds briefly, still ending on its exact amount; an energy-driven move stops for the hold instead. Strength 0 is exactly the unlocked block. |
+| `onHit`, `punch` | `hold` (default) or `punch`; 0–3 m (default 0.4) | With `punch` each locked hit pushes the camera in by `punch` metres and back, instead of holding. |
+
+Which wins, per parameter and frame: an automation lane where it has points, then a programmed amount or shot, then the energy drive and the beat accents. The yaw lane is an offset in degrees added to the angle around the subject (held at its first and last value outside its points); the distance, height and fov lanes replace the value from their first point to their last. A block's shot, amount and lock stay in the recipe; `camera.json` in a bundle carries the resulting camera per frame and each range's beats and modes only.
+
+## Shot script
+
+The Action and Camera tracks as plain text, one row per block, readable aloud. It is a view of the recipe, never stored: `motion-studio describe <recipe> --script` (MCP `get_script`, the studio's Shot script panel) prints it; `motion-studio script <recipe> <file>` (MCP `apply_script`, command `applyScript`, the panel's Apply) turns it back into the recipe through the same edit commands. Printing an applied script gives the same script back (tested).
+
+```
+beats 0-8   | action: run on path lock kick 0.5 | camera: chase     | shot: wide
+beats 8-10  | action: jump @snare 1            | camera: orbit 360 | shot: medium
+beats 10-12 | action: rest                     | camera: top       | shot: wide
+beats 12-16 | action: run                      | camera: chase lock snare punch 0.4m | shot: close
+```
+
+- A row is `beats A-B` and then `|`-separated columns `action:`, `camera:`, `shot:` in any order; `#` starts a comment. Rows are in order and do not overlap; beats past the last row rest and hold the camera. The script replaces the move blocks, the edited hit markers and the camera blocks; everything else (grid, character, rig numbers, lanes, envelope) stays.
+- A left-out column, or the word `continue`, runs the block from the row above on (one block over several rows). `rest` leaves the Action track empty there.
+- **action:** a move word, then optionally `on path` and `lock <beat|kick|snare|hat> [strength]`, then accents after commas. Move words: `walk`, `run`, `jog`, `sprint`, `idle`, `dance`, `crouch`, `sneak` on the rigged mannequin; `walk`, `run`, `jog`, `idle`, `dance`, `bounce`, `clap`, `punches`, `disco` on the procedural figures; any exact clip or library move name works too (`Walk_Loop`, `stepTouch`). `glide on path` slides along the walk path with no gait. `on path` re-times the drawn walk path onto the row's block (one block per script) and, with a lock, sets the travel lock too. An accent is `<accent> @<kick|snare|hat> N` (the Nth onset inside the row, counted from 1) or `@beat B`; accents are `hit`, `point`, `strike`, `kick`, `jump`, `spin`, `jab`, `cross`, `sword`, `roll`. A row of accents only rests under them; an accent word with no anchor lands in the middle of the row.
+- **camera:** moves joined by `+`, then optionally `lock <target> [strength] [hold | punch [Nm]]` and a start `@snare N` (the block starts on that onset, as `startCameraMove`). Moves: `static`, `fixed`, `path`, `orbit [degrees]`, `chase`/`follow behind`, `lead`/`follow front`, `side`/`follow side`, `three-quarter`, `top`, `dolly in Nm`, `push in [to Nm]`, `dolly out Nm`, `pull out [to Nm]`, `truck left|right Nm`, `rise [Am to] Bm`, `rise to Bm`, `jib up|down Nm`, `rise` (energy-driven).
+- **shot:** `wide`, `medium`, `close`, `low`, `top`, optionally followed by `cut`; `-` for none. It belongs to the row that starts the camera block.
+- Unknown words fail with the list of valid ones. There is no fall move in the library: a script that says `fall` is refused; use `rest` (or a crouch) and say so.
+- Printing names an accent by the first band it sits on (kick, then snare, then hat), so `@snare 1` on a beat that is also a kick reads back as `@kick N`; a rest that runs over several rows reads `rest` on each.
 ## `reactive`
 
 | Field | Limits | Meaning |
@@ -142,4 +177,6 @@ The wind-up ("anticipation") has no field of its own: it is the span from the ac
 
 ## `envelope`
 
-`{ points: [[frame, value], ...] }`: the amplitude envelope, 1–8192 breakpoints with straight lines between them, frames whole and increasing, values 0–3 (1 = as authored). Before the first point and after the last the value holds. It multiplies every move's size on that frame: the pose angles of the procedural figures, the clip amplitude of the rigged mannequin. A freehand stroke is stored as the fewest breakpoints within 0.01 of it. Missing: 1 on every frame.
+`{ points: [[frame, value], ...] }`: the amplitude envelope (the Action track's automation lane), 1–8192 breakpoints with straight lines between them, frames whole and increasing, values 0–3 (1 = as authored). Before the first point and after the last the value holds. It multiplies every move's size on that frame: the pose angles of the procedural figures, the clip amplitude of the rigged mannequin. A freehand stroke is stored as the fewest breakpoints within 0.01 of it. Missing: 1 on every frame.
+
+The camera lanes (`camera.lanes`) use the same shape and the same commands (`paintEnvelope`, `drawEnvelope`, `setEnvelopePoints`, `setEnvelopePoint`, `removeEnvelopePoint`, `clearEnvelope`, each with `lane`: `distance` 0.3–30 m, `height` 0.05–30 m, `yaw` -720 to 720°, `fov` 10–100°). An edit on a camera lane covers only the frames it touches, so a stroke never spreads an override over the whole clip.
