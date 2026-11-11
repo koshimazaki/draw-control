@@ -4,7 +4,7 @@
  * press: a drag of a marker, a phase edge, the energy pencil, a step bar, a blend handle
  * or the camera path, or a slider) records once, so it undoes in one step.
  */
-import type { Recipe } from "@motion-studio/core";
+import type { Recipe } from "@motion-studio/core/internal";
 
 export class History {
   private past: Recipe[] = [];

@@ -5,7 +5,7 @@
  * no visible joints). They let the owner test which abstraction a video model follows best.
  */
 import * as THREE from "three";
-import { JOINTS, type FrameState, type JointName } from "@motion-studio/core";
+import { JOINTS, type FrameState, type JointName } from "@motion-studio/core/internal";
 import type { Character } from "./types";
 import { DIMS } from "./dims";
 

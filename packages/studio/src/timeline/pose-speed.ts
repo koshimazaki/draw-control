@@ -5,7 +5,7 @@
  * the two curves moving together.
  */
 import * as THREE from "three";
-import { frameAt, type AudioDrive, type Recipe } from "@motion-studio/core";
+import { frameAt, type AudioDrive, type Recipe } from "@motion-studio/core/internal";
 import type { Character } from "../characters/types";
 
 export function computePoseSpeed(c: Character, recipe: Recipe, drive: AudioDrive | undefined, frames: number): Float32Array {

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   ACCENT_RELEASE_BEATS, ACCENT_RISE_BEATS, CAMERA_LIMITS, DEFAULT_RECIPE, cameraAtFrame, cameraTimeline, energyEnvelope, flatDrive,
   planCamera, secondsAtBeat, validateRecipe, type AudioDrive, type CameraConfig, type Recipe,
-} from "../src";
+} from "../src/internal";
 
 const FPS = 24, DT = 1 / FPS;
 const withCamera = (camera: Partial<CameraConfig>, over: Partial<Recipe> = {}): Recipe => validateRecipe({

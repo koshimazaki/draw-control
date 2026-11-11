@@ -5,7 +5,7 @@
  * command log). Only the frames that played while armed are written; the rest of the lane
  * keeps its points.
  */
-import { LANE_SPECS, type CameraPlan, type EnvelopeLane, type MotionCommand } from "@motion-studio/core";
+import { LANE_SPECS, type CameraPlan, type EnvelopeLane, type MotionCommand } from "@motion-studio/core/internal";
 import { LANE_VIEWS } from "./envelope-lane";
 
 export const RECORD_TOOLS = `

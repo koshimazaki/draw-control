@@ -5,7 +5,7 @@
  * against either background. Arms hang clear of the torso so the silhouette separates.
  */
 import * as THREE from "three";
-import { JOINTS, type FrameState, type JointName } from "@motion-studio/core";
+import { JOINTS, type FrameState, type JointName } from "@motion-studio/core/internal";
 import type { Character } from "./types";
 import { createAbstractFigure } from "./abstract";
 import { DIMS } from "./dims";

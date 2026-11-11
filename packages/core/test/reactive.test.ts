@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   ACCENT_MOVES, proceduralAccent, DEFAULT_REACTIVE, DEFAULT_RECIPE, POSES, detectOnsets, frameAt, makeMove, planReactive, poseDistance,
   validateRecipe, type AudioDrive, type ReactiveConfig, type Recipe,
-} from "../src";
+} from "../src/internal";
 
 const FPS = 24, DT = 1 / FPS, HOP = 1 / 86;
 /** RMS at 86 hops/s: quiet until 4 s, loud after, with sharp hits at the given times. */
@@ -98,7 +98,7 @@ describe("reactive animation layer", () => {
 
 describe("example recipes", () => {
   it("A, C and D validate as recipes; D carries the reactive layer and the rig", async () => {
-    const { exampleRecipes } = await import("../src");
+    const { exampleRecipes } = await import("../src/internal");
     const list = exampleRecipes();
     expect(list.map(e => e.id)).toEqual(["A", "C", "D", "D8"]);
     for (const e of list) expect(validateRecipe(JSON.parse(JSON.stringify(e.recipe)))).toEqual(e.recipe);
@@ -109,7 +109,7 @@ describe("example recipes", () => {
 
 describe("hit markers", () => {
   it("edited markers replace detection and still land within one frame", async () => {
-    const { detectedMarkers } = await import("../src");
+    const { detectedMarkers } = await import("../src/internal");
     const d = drive([5.13, 7.4]);
     const r = reactiveRecipe({ accents: ["hit", "jump"] });
     const auto = detectedMarkers(r, d);

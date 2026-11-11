@@ -1,5 +1,5 @@
 /** Local-only audio: decode the user's track, analyse it, and play it in sync with the preview. */
-import { analyseSamples, waveformMinMax, type AudioFeatures } from "@motion-studio/core";
+import { analyseSamples, waveformMinMax, type AudioFeatures } from "@motion-studio/core/internal";
 
 export type Track = { name: string; buffer: AudioBuffer; features: AudioFeatures; wave: ReturnType<typeof waveformMinMax> };
 

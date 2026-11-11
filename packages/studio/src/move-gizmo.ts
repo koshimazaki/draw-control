@@ -5,7 +5,7 @@
  */
 import {
   CLIP_ACCENTS, LOOP_CLIPS, defaultPhaseBoundaries, evaluateClipAccent, type AccentKey, type ClipLayer, type FrameState, type ScheduledHit,
-} from "@motion-studio/core";
+} from "@motion-studio/core/internal";
 
 export type GizmoItem = { kind: "loop"; clip: string } | { kind: "accent"; key: AccentKey };
 const label = (i: GizmoItem) => i.kind === "loop" ? i.clip.replace(/_Loop$/, "").replace(/_/g, " ") : CLIP_ACCENTS[i.key]!.name;

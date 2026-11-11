@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_RECIPE, POSES, classifySpeed, frameAt, makeClipMove, makeMove, poseDistance, poseSpeed, timeline, type Recipe,
-} from "../src";
+} from "../src/internal";
 
 const recipe = (moves: Recipe["moves"], over: Partial<Recipe> = {}): Recipe => ({ ...structuredClone(DEFAULT_RECIPE), moves, ...over });
 

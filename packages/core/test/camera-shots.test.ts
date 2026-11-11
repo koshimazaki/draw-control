@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   CAMERA_MODES, DEFAULT_RECIPE, SHOT_PRESETS, applyMotionCommand, flatDrive, planCamera, validateRecipe,
   type AudioDrive, type BandAnalysis, type CameraConfig, type CameraSegment, type Recipe,
-} from "../src";
+} from "../src/internal";
 
 // 120 BPM, first beat at 0: beat b is frame 12·b exactly.
 const at = (beat: number) => Math.round(beat * 12);
@@ -121,7 +121,7 @@ describe("schema mode list", () => {
 
 describe("camera height cap", () => {
   it("holds a top block with a wide shot, a high lane and a high rise at CAMERA_MAX_HEIGHT, and describe says so", async () => {
-    const { CAMERA_MAX_HEIGHT, describeRecipe } = await import("../src");
+    const { CAMERA_MAX_HEIGHT, describeRecipe } = await import("../src/internal");
     const top = rig([{ fromBeat: 0, toBeat: 16, modes: ["top"], shot: "wide" }]);
     const p = planCamera(top);
     expect(Math.max(...p.samples.map(s => s.position[1]))).toBeLessThanOrEqual(CAMERA_MAX_HEIGHT);

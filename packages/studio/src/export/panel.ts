@@ -3,7 +3,7 @@
  * inline warning when the result falls outside the target model's limits. The warning
  * never blocks the export.
  */
-import { constraintWarnings, resolveExportRange, type ExportRange, type RangeRequest, type RangeUnit, type Recipe } from "@motion-studio/core";
+import { constraintWarnings, resolveExportRange, type ExportRange, type RangeRequest, type RangeUnit, type Recipe } from "@motion-studio/core/internal";
 import { $ } from "../ui";
 
 const input = (id: string) => $<HTMLInputElement>(id);

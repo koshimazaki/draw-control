@@ -4,7 +4,7 @@ import { Ajv2020 } from "ajv/dist/2020.js";
 import {
   BUNDLE_SCHEMA_VERSION, DEFAULT_RECIPE, buildBeats, buildCameraTrack, buildManifest, buildMeta, encodeWav, exportFrameCount, planCamera,
   suggestLtxCameraMovement, validateRecipe, CAMERA_MODES, type CameraSegment,
-} from "../src";
+} from "../src/internal";
 
 const schema = JSON.parse(readFileSync(new URL("../../../schema/guide-bundle.schema.json", import.meta.url), "utf8"));
 const ajv = new Ajv2020({ strict: false });

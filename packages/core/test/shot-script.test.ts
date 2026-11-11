@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   DEFAULT_CAMERA, DEFAULT_RECIPE, RIGGED_CHARACTER, applyMotionCommand, applyScript, beatAtSeconds, printScript, validateRecipe,
   type BandAnalysis, type Recipe,
-} from "../src";
+} from "../src/internal";
 
 // 120 BPM from 0 s: kicks on every beat, snares on 1, 3, 5, … (beat b = b / 2 s).
 const beats = (list: number[]) => list.map(b => ({ seconds: b / 2, strength: 1 }));

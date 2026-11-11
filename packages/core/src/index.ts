@@ -1,41 +1,53 @@
-export * from "./poses";
-export * from "./recipe";
-export * from "./moves";
-export * from "./beats";
-export * from "./engine";
-export * from "./commands";
-export * from "./bundle";
-export * from "./export-target";
-export * from "./audio-drive";
-export * from "./audio-bands";
-export * from "./camera";
-export * from "./camera-rig";
-export * from "./subject";
-export * from "./rng";
-export * from "./accents";
-export * from "./reactive-config";
-export * from "./reactive";
-export * from "./perform";
-export * from "./camera-track";
-export * from "./examples";
-export * from "./clip-library";
-export * from "./clip-perform";
-export * from "./performance-config";
-export * from "./performance-edits";
-export * from "./transitions";
-export * from "./delete-edits";
-export * from "./sequences";
-export * from "./accent-feel";
-export * from "./bone-sync";
-export * from "./move-edits";
-export * from "./command-table";
-export * from "./envelope";
-export * from "./camera-edits";
-export * from "./describe";
-export * from "./lock";
+/**
+ * @motion-studio/core, the public entry: everything another app needs to read, edit and
+ * play a Motion Studio recipe without a browser. Pure TypeScript, no DOM, no Three.js, no
+ * dependencies; every frame is a pure function of (recipe, audio drive, frame).
+ *
+ *   import { validateRecipe, frameAt, applyScript, planCamera } from "@motion-studio/core";
+ *
+ * The studio uses `@motion-studio/core/internal` (every module); names only there may change.
+ */
+
+// Recipe: the format, its validator and starting points (docs/recipe.md).
+export {
+  RECIPE_VERSION, CHARACTER_KINDS, PROCEDURAL_KINDS, AMPLITUDE_MAX, SPEED_RANGE, RecipeError, validateRecipe, recipeSeconds, secondsPerBeat,
+  type Recipe, type Move, type Phase, type BeatGrid, type CharacterRef, type CharacterKind, type RootPoint, type Jump,
+} from "./recipe";
+export { DEFAULT_RECIPE, MOVE_KEYS, MOVE_LIBRARY, makeMove, type MoveKey } from "./moves";
+export { defaultRiggedRecipe } from "./examples";
+export { LOOP_CLIPS, RIGGED_CHARACTER } from "./clip-library";
+export { ACCENT_KEYS, isAccentKey, type AccentKey } from "./accents";
+
+// Frames: the figure's state on any frame (pose angles, clip layers, root, accents).
+export { frameAt, poseSpeed } from "./perform";
+export type { FrameState, ClipLayer, ActivePhase } from "./engine";
+export { POSES, JOINTS, mixPoses, scalePose, type Pose, type PoseName, type JointName, type Euler3 } from "./poses";
 export { rootAt, travelRange, travelStations } from "./root-travel";
-export * from "./camera-shots";
-export * from "./camera-block-edits";
-export * from "./shot-script";
+export { exportFrameCount } from "./bundle";
+
+// Beats, audio analysis and onsets (kicks, snares, hats, peaks).
+export { beatAtSeconds, secondsAtBeat, analyseSamples, type AudioFeatures } from "./beats";
+export { buildDrive, flatDrive, energyAtFrame, energyAtSeconds, type AudioDrive } from "./audio-drive";
+export { bandOnsets, type BandAnalysis, type BandOnset } from "./audio-bands";
+export { onsetBeats, snapBeat, type SnapTarget } from "./move-edits";
+
+// Edits: one command entry point shared with the studio, the CLI and the MCP server.
+export { applyMotionCommand, applyCommands, commandHelp, type MotionCommand, type CommandContext } from "./commands";
+
+// The shot script and the timeline as text.
+export { printScript, cameraWords } from "./shot-script";
 export { applyScript, parseRows } from "./script-apply";
-export { CAMERA_LANES, LANE_SPECS, inLane, isCameraLane, laneAt, type CameraLane, type LaneSpec } from "./automation";
+export { describeRecipe } from "./describe";
+
+// Camera rig: shots, programmed moves, beat locks, automation lanes, the per-frame plan.
+export {
+  CAMERA_MODES, CAMERA_MAX_HEIGHT, DEFAULT_CAMERA, SHOTS, SHOT_PRESETS,
+  type CameraConfig, type CameraSegment, type CameraMode, type Shot,
+} from "./camera";
+export { planCamera, cameraAtFrame, cameraAtSeconds, fovForAspect, type CameraPlan, type CameraSample, type Vec3 } from "./camera-rig";
+export { CAMERA_LANES, LANE_SPECS, laneAt, type CameraLane, type Envelope, type EnvelopePoint } from "./automation";
+export { LOCK_TARGETS, type LockTarget } from "./lock";
+
+// Guide bundle (the export model-arena reads; schema/guide-bundle.schema.json).
+export { BUNDLE_SCHEMA_VERSION, buildBeats, buildManifest, buildMeta, encodeWav } from "./bundle";
+export { buildCameraTrack, type CameraTrackJson } from "./camera-track";

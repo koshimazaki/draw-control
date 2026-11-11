@@ -1,5 +1,5 @@
 import type * as THREE from "three";
-import type { FrameState } from "@motion-studio/core";
+import type { FrameState } from "@motion-studio/core/internal";
 
 export type ClipInfo = { name: string; seconds: number };
 

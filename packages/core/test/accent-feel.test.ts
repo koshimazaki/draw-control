@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   CLIP_ACCENTS, IMPACT_HOLD_FRAMES, anticipationBeats, clipPlanFor, defaultRiggedRecipe, frameAt, riggedMove, setAnticipation, setImpact,
   validateRecipe, type Recipe,
-} from "../src";
+} from "../src/internal";
 
 const base = (): Recipe => {
   const r = defaultRiggedRecipe();

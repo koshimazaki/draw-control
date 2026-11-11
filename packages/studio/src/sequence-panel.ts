@@ -3,7 +3,7 @@
  * sequences in examples/recipes/, and download / upload of the recipe .json. Loading is
  * an ordinary edit, so it can be undone.
  */
-import type { Recipe } from "@motion-studio/core";
+import type { Recipe } from "@motion-studio/core/internal";
 import { download } from "./export/button";
 import { browserStore, cleanName, deleteSequence, fileNameFor, parseSequenceFile, readLibrary, saveSequence } from "./sequence-library";
 import { $ } from "./ui";

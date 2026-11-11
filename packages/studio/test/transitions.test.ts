@@ -15,7 +15,7 @@ import { describe, expect, it } from "vitest";
 import {
   MIN_BLEND_FRAMES, blendBeatsOf, namedSequences, defaultRiggedRecipe, exportFrameCount, frameAt, framesToBeats, riggedMove, validateRecipe,
   type HitMarker, type Recipe,
-} from "@motion-studio/core";
+} from "@motion-studio/core/internal";
 import { createRiggedCharacter, type RiggedCharacter } from "../src/characters/rigged-core";
 
 /** Largest allowed spike of a joint's step above both neighbours, degrees per frame. */

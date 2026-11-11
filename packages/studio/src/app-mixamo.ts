@@ -4,7 +4,7 @@
  * Each clip is retargeted onto the rigged mannequin and shows up in its palette and the
  * move lane brush as "mixamo/<name>", played at its natural speed.
  */
-import { makeClipMove, type Recipe } from "@motion-studio/core";
+import { makeClipMove, type Recipe } from "@motion-studio/core/internal";
 import { fetchLocalMixamo, importMixamo, importedClip, importedClips, localMixamoFiles, parseAnimation, MIXAMO_PREFIX } from "./characters/mixamo-import";
 import type { RiggedCharacter } from "./characters/rigged";
 import { $ } from "./ui";

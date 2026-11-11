@@ -1,5 +1,5 @@
 /** Static page layout. Behaviour lives in app.ts; elements are looked up by id. */
-import { DEFAULT_EXPORT_SIZE, EXPORT_SIZES, EXPRESSIONS, MOVE_KEYS, MOVE_LIBRARY, PREVIEW_FPS } from "@motion-studio/core";
+import { DEFAULT_EXPORT_SIZE, EXPORT_SIZES, EXPRESSIONS, MOVE_KEYS, MOVE_LIBRARY, PREVIEW_FPS } from "@motion-studio/core/internal";
 import { RIG_LAYOUT } from "./rig-panel";
 import { TIMELINE_LAYOUT } from "./timeline/timeline";
 import { GIZMO_LAYOUT } from "./move-gizmo";

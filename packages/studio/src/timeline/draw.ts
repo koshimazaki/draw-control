@@ -8,7 +8,7 @@ import type { Focus } from "./focus";
 import { drawAudioLane, type Wave } from "./audio-lane";
 import { drawEnvelopeLane, type LaneHover } from "./envelope-lane";
 import { drawCameraLane } from "./camera-lane";
-import { CLIP_ACCENTS, accentSpan, beatsToFrames, blendBeatsOf, moveEndBeat, proceduralAccent, type AudioDrive, type CameraPlan, type HitMarker, type Recipe } from "@motion-studio/core";
+import { CLIP_ACCENTS, accentSpan, beatsToFrames, blendBeatsOf, moveEndBeat, proceduralAccent, type AudioDrive, type CameraPlan, type HitMarker, type Recipe } from "@motion-studio/core/internal";
 
 export const LANES = {
   actionHead: 16, phase: 26, move: 34, envelope: 130, steps: 54, graph: 230,

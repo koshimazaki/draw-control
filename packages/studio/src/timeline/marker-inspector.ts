@@ -8,7 +8,7 @@
 import {
   CLIP_ACCENTS, anticipationBeats, beatsToFrames, currentMarkers, framesToBeats, setAnticipation, setImpact,
   type AudioDrive, type Recipe,
-} from "@motion-studio/core";
+} from "@motion-studio/core/internal";
 
 export const MARKER_LAYOUT = `
     <div class="tl-tools" id="markerInspector">

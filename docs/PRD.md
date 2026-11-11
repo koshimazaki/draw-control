@@ -33,7 +33,7 @@ Nobody offers a per-beat recipe that an agent edits move by move and renders as 
 
 - **Creative technologists** making music videos, dance pieces and user-generated content with video models.
 - **Game developers** prototyping character moves, using the isometric view and sprite frame rates.
-- **Agents** (Claude Code, Codex and others) driving it through the CLI or MCP.
+- **Agents** (an AI coding agent, or any script) driving it through the CLI or MCP.
 
 ## Principles
 

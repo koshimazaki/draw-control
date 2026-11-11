@@ -1,5 +1,5 @@
 /** The Export button: renders the bundle frame by frame and downloads the zip. Split from app.ts. */
-import type { AudioDrive, Recipe } from "@motion-studio/core";
+import type { AudioDrive, Recipe } from "@motion-studio/core/internal";
 import type { Track } from "../audio";
 import { $ } from "../ui";
 import type { Viewport } from "../viewport";

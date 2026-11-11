@@ -4,7 +4,7 @@
  */
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { cameraAtFrame, cameraAtSeconds, type AudioDrive, type CameraPlan, type FrameState, type Recipe } from "@motion-studio/core";
+import { cameraAtFrame, cameraAtSeconds, type AudioDrive, type CameraPlan, type FrameState, type Recipe } from "@motion-studio/core/internal";
 import type { Character } from "./characters/types";
 import { PathsOverlay } from "./paths-overlay";
 import { ViewingAids, type AidOptions } from "./viewing-aids";

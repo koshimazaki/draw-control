@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   CLIP_ACCENTS, LOOP_CLIPS, clipPlanFor, defaultPhaseBoundaries, defaultRiggedRecipe, frameAt, riggedMove, secondsAtBeat,
   stepCount, validateRecipe, type AudioDrive, type HitMarker, type Recipe,
-} from "../src";
+} from "../src/internal";
 
 const FPS = 24, DT = 1 / FPS;
 const flat = (energy = 0.6, frames = 800): AudioDrive => ({ fps: FPS, energy: new Float32Array(frames).fill(energy), onsets: [], source: "audio" });

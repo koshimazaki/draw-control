@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { analyseBands, applyCommands, applyMotionCommand, defaultRiggedRecipe, frameAt, planCamera, subjectAt, validateRecipe } from "../src";
+import { analyseBands, applyCommands, applyMotionCommand, defaultRiggedRecipe, frameAt, planCamera, subjectAt, validateRecipe } from "../src/internal";
 import { patternTimes, synthDrums } from "./drum-synth";
 
 const bands = analyseBands([synthDrums(patternTimes(120, 4, 0), 8.5)], 44100);

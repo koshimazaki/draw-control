@@ -3,7 +3,7 @@
  * size, the viewing aids and bone highlight, the move gizmo, the camera path drawer and
  * the rig panel. Split from app.ts; every recipe change still goes through `ctx.edit`.
  */
-import { addMarker, setMarkerAccent, setMoveAtBeat, type AudioDrive, type FrameState, type MotionCommand, type Recipe } from "@motion-studio/core";
+import { addMarker, setMarkerAccent, setMoveAtBeat, type AudioDrive, type FrameState, type MotionCommand, type Recipe } from "@motion-studio/core/internal";
 import { updateExportPanel, exportSize } from "./export/panel";
 import { MoveGizmo, previewState } from "./move-gizmo";
 import { PathDrawer } from "./path-draw";

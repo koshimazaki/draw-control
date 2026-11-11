@@ -1,100 +1,114 @@
 # Motion Studio
 
-A browser motion studio: a neutral mannequin dances to your track, an agent edits the moves phase by phase, and the result exports as a guide clip that video models can follow.
+A browser studio where a neutral figure moves to your music, beat by beat, under a camera that moves with it.
+You (or an agent, by command or by a plain-text shot script) edit the moves and the camera on a timeline.
+The result exports as a guide clip, with its beats and camera path, for video models to follow.
 
-Status: first working slice plus the timeline editor, the audio-reactive layer, the CLI and the MCP server (11 November 2026). See [what is built](#what-is-built) and [next](#next).
+Status: working studio, CLI and MCP server, 11 November 2026. What is not done is [at the end](#not-done). Detail: [PRD](docs/PRD.md) · [plan and current state](docs/plan.md) · [agents: CLI and MCP](docs/agents.md) · [recipe and shot script format](docs/recipe.md).
 
-- [Product requirements](docs/PRD.md)
-- [Implementation plan and current state](docs/plan.md)
-- [Agents: CLI and MCP, with a worked example](docs/agents.md)
-- [Recipe format](docs/recipe.md)
+## Five-minute quickstart
 
-Companion repo: **model-arena**, which plays a guide's results from several video models side by side. The two share files (the guide bundle), not code.
-
-## From a music file to a guide bundle in five minutes
-
-You need Node 24 and a current Chrome or Edge (the export uses WebCodecs). Nothing is uploaded: the track and any character stay in your browser.
+You need Node 24 (`.nvmrc`) and Google Chrome or Edge (the export uses WebCodecs). Everything runs locally; nothing is uploaded.
 
 ```bash
 git clone <this repo> motion-studio && cd motion-studio
-nvm use            # Node 24, from .nvmrc
-npm install
-npm run dev        # open http://127.0.0.1:5180
+nvm use && npm install
+npm run check          # typecheck, lint, unit tests (about 10 s)
+npm run drums          # optional: writes out/drums-120.wav, a generated drum track, if you have no music to hand
+npm run dev            # open http://127.0.0.1:5180
 ```
 
-1. **Track.** Drop your music file anywhere on the page (or *Load music*). The studio detects the BPM and the first beat; check by ear and correct the numbers if needed. Press *Fit to track* to make the recipe as long as the song.
-2. **Moves.** Type a beat in *Add at beat*, then click a move (Bounce, Clap, Kick, Walk…). The cursor jumps a bar on, so clicking four moves fills four bars. Click the strip under the viewport to seek and select a move; change its amplitude, blend or preview fps.
-3. **View.** Keep *Front* for most video models; Side, Top, Orbit and Isometric are there too. Press *Play* to watch it against the track.
-4. **Export.** Size is 1280×720 by default (1920×1080 and 720×1280 portrait are offered). To export only part of the song, set *Start* and *Length* in beats or seconds; leave them empty for the whole recipe. A yellow note appears if the size or the clip length is outside what the target video model accepts (700–4553 px per side, 3–30 s); it is a warning, and the export still runs.
-5. Press *Export bundle (.zip)*. You get `guide-bundle.zip`; unzip it and send `guide.mp4` (with `frame0.png` if your model takes a first frame) to the video model.
+1. **Track.** Drop a music file (WAV, MP3, M4A, OGG, FLAC) anywhere on the page. The studio finds the tempo, the first beat and the kicks, snares and hats. Press *Fit to track*.
+2. **Script.** Open *Shot script* in the side panel, paste [`examples/scripts/glide-path.txt`](examples/scripts/glide-path.txt) and press *Apply script*. The rows land on the timeline as the **Action** track (what the figure does) and the **Camera** track (how the camera moves).
+3. **Fine-tune.** Drag blocks and their edges on either track (they snap to beats, kicks or snares), pick a camera block to edit its shot, amount and beat lock, or open a camera lane (*Show: Distance, Height, Yaw, FOV*) and draw on it. Cmd/Ctrl-Z undoes.
+4. **Export.** Pick the *Camera rig* view, set a size (1280×720 by default) and optionally a range, and press *Export bundle (.zip)*: `guide.mp4`, `frame0.png`, `audio.wav`, `beats.json`, `camera.json`, `recipe.json`, `meta.json`.
 
-Own character: drop a skinned `.glb` or `.fbx` (Mixamo bone names recognised) and set its licence. It plays its own embedded clips, listed under *Moves*. Library moves do not drive a loaded rig yet, so the studio asks, inline, whether to clear them from the recipe.
+## CLI
 
-## The guide bundle
-
-| File | Content |
-| --- | --- |
-| `guide.mp4` | H.264, 24 fps, frame count 8k+1, rendered frame by frame; AAC audio muxed in when the browser can encode it |
-| `audio.wav` | the track, trimmed to the exported range |
-| `frame0.png` | frame 0 of the export |
-| `beats.json` | BPM, beat and downbeat times, and (0.3.0) kick, snare and hat onsets and amplitude peaks, re-based so 0 is the export's first frame |
-| `recipe.json` | the recipe that produced it |
-| `meta.json` | width, height, fps, frames, view, character, generator, licence per asset; a mid-track range is named in the video asset |
-| `bundle.json` | manifest pointing at the files above |
-
-The JSON Schema is in [`schema/guide-bundle.schema.json`](schema/guide-bundle.schema.json). It is a pinned local copy: `model-arena/packages/core` owns the schema, and this copy is to be re-synced with it whenever its version changes. The target model limits live in `packages/core/src/export-target.ts`, re-synced with the per-model spec database in `model-arena`.
-
-## Development
+`cli/`, run with `npm run cli -- <command>` or `node cli/bin/motion-studio.mjs <command>`. No build step.
 
 ```bash
-npm test           # vitest: recipe, engine, beat grid, commands, bundle schema, export range and limits
-npm run typecheck
-npm run lint
-npm run smoke      # real headless Chrome: synthetic click and drum tracks, a generated skinned character; band markers, block drags, the envelope pencil, a walk path, a camera move on a snare and three exports checked with ffprobe; output in out/smoke/
-npm run cli -- commands   # the motion-studio CLI (docs/agents.md); npm run mcp starts the MCP server
+M() { node cli/bin/motion-studio.mjs "$@"; }
+M analyse out/drums-120.wav --out out/analysis.json            # tempo, kicks, snares, hats, peaks
+M new --analysis out/analysis.json --out out/recipe.json        # rigged mannequin, fitted to the track
+M script out/recipe.json examples/scripts/glide-path.txt --analysis out/analysis.json --out out/shot.json
+M describe out/shot.json --analysis out/analysis.json --script  # the tracks as a shot script again
+M render out/shot.json --audio out/drums-120.wav --out out/bundle --start 0 --length 16 --unit beats
 ```
 
-`packages/core` is pure TypeScript (recipe, validator, `frameAt`, beat analysis, commands, bundle builders), no DOM or Three.js. `packages/studio` is the Vite + Three.js app (no React Three Fiber).
+Also `apply` (a list of JSON commands), `set` (any field by path) and `commands` (every command with its arguments). `render` drives the studio in headless Chrome.
 
-## Editing on the timeline
+## MCP server
 
-Under the viewport, top to bottom on one beat axis:
-- **phases** of the accents (wind-up, strike, recover) on the hit markers;
-- **moves** as blocks: drag to move, drag an edge to lengthen (plays slower) or shorten (faster); *Snap* picks beats, half beats, kicks, snares or hats (Alt: free); *Paint* paints the brush instead; the side panel edits start, length, speed and amplitude (0–3), starts the move on the nearest kick or snare, or places it on every Nth one;
-- the **amplitude envelope** (0–3 per frame): *Pencil* draws, *Points* drags breakpoints, *Start* fills it from the loudness or a band's onsets;
-- **amplitude per step**, the **energy** graph with the hit markers, and the **audio lane**: the waveform, beat and bar ticks, kicks (red), snares (yellow) and hats (cyan), peaks as dots.
+`mcp/`, an MCP server over stdio (official TypeScript SDK). Register it with any MCP client as:
 
-Camera rig panel: follow from the front, three-quarter, side or behind, top, fixed, orbit, push and rise; *Start [mode] on [snare] N*. Floor path: *Draw walk path* in the top view over a range of beats, with a walk or run block. *Floor grid* and *Grid in export* in the View panel. Characters: the rigged mannequin, and the procedural mannequin, block, stick and capsule figures. *Command log* lists each edit as a command to replay with the CLI or MCP.
+```json
+{ "mcpServers": { "motion-studio": { "command": "node", "args": ["/absolute/path/to/motion-studio/mcp/bin/motion-studio-mcp.mjs"] } } }
+```
 
-## What is built
+Tools: `analyse_audio`, `new_recipe`, `load_recipe`, `save_recipe`, `get_recipe`, `describe`, `get_script`, `apply_script`, `apply`, `set`, `undo`, `list_commands`, `render`. A session holds one recipe and one analysis. `npm run mcp-check` starts the server over stdio, applies `glide-path.txt` and renders a bundle to `out/mcp-check/`.
 
-- Recipe v2: moves made of phases (name, caption, pose, amplitude, length in beats or frames, preview fps, optional `expression`), root path, jumps, beat grid, character and audio references with licences; strict validator.
-- Deterministic `frameAt(recipe, n)`: no wall clock; phases land on the beat grid; cross-fades between moves; clip layers for loaded characters; pose speed typed hold, move or fast.
-- Beat grid from the track: RMS envelope, BPM and offset estimate, downbeats.
-- Characters: procedural jointed mannequin (light limbs, dark joints, framed to fit any aspect ratio), block figure, local GLB/FBX playing its own clips.
-- One command entry point for every edit (`applyMotionCommand`; `npm run cli -- commands` lists them), with the `motion-studio` CLI and an MCP server ([agents.md](docs/agents.md)).
-- Drum-band analysis: kick, snare and hat onsets with strengths, amplitude peaks; exported in `beats.json` (schema 0.3.0).
-- Export of the bundle via WebCodecs and `mp4-muxer` (MIT): preset or custom size, any section of the recipe, inline warnings against the target model's limits.
-- Inline confirm when a character switch leaves moves the new character cannot play.
+## Folders
 
-## Next
+```
+packages/core/     the engine: recipe format and validator, frameAt, beat and drum analysis, edit commands,
+                   shot script, describe, camera rig, bundle builders. Pure TypeScript, no DOM, no dependencies.
+packages/studio/   the Vite + Three.js app (timeline, viewport, characters, export). Not imported by anything else.
+cli/               the motion-studio CLI (imports the core's public entry; `render` serves the studio to headless Chrome)
+mcp/               the MCP server (the same commands; reuses the CLI's analysis and render)
+schema/            guide-bundle JSON Schema 0.4.0 (pinned copy; the owner is the model-arena repo)
+examples/          recipes/ (example sequences), scripts/ (shot scripts); bundles/ is generated, not committed
+scripts/           smoke (real headless Chrome), mcp-check, examples, peek (screenshots), drums, mixamo-check, analyse-clips
+docs/              PRD, plan, agents (CLI, MCP, worked examples), recipe format, costs, friction log
+assets/characters/ the bundled rigged mannequin (licences below)
+```
 
-Not built yet:
+| `npm run` | What it does |
+| --- | --- |
+| `dev`, `build` | the studio on http://127.0.0.1:5180, or a static build in `packages/studio/dist/` |
+| `check` | `typecheck` (core, studio, CLI, MCP) + `lint` + `test` (vitest) |
+| `smoke` | real headless Chrome through the studio: tracks, drags, lanes, a script, recording, four exports checked with ffprobe; `out/smoke/` |
+| `mcp-check` | the MCP server over stdio: `apply_script` and `render`; `out/mcp-check/` |
+| `drums` | a generated 120 BPM drum track, `out/drums-120.wav` |
+| `examples` | regenerate the example bundles in `examples/bundles/` |
+| `peek`, `mixamo-check` | screenshots of the views; a check of your own Mixamo clips in `assets-local/mixamo/` |
+| `cli`, `mcp` | the CLI, or the MCP server on stdio |
 
-- Previous/new comparison with accept or revert; a camera lane on the timeline (camera ranges are set from the panel or by command).
-- Drum-band detection checked on real music (it is tested on synthetic patterns only).
-- Foot locking on walk paths; an energy-driven walking speed.
-- Recipe poses driving a loaded Mixamo rig (needs rest-pose retargeting); IK and foot locking.
-- Facial expressions: the `expression` field is validated and exported, not yet rendered.
-- Pose and expression extracted from a video into a recipe; MotionBricks as a serverless generator; MS-6 providers.
+## Using `packages/core` from another app
 
-## Levels
+`@motion-studio/core` is TypeScript source with an `exports` map: `.` is the public entry ([`src/index.ts`](packages/core/src/index.ts), the recipe types and validator, `frameAt`, commands, the shot script, `describeRecipe`, beats and onsets, the camera rig, the bundle builders); `./internal` is every module, for the studio. It has no runtime dependencies and needs no Three.js. In a Vite or React Three Fiber app, link it and import it; Vite compiles the TypeScript:
 
-| Level | What you do | Needs |
-| --- | --- | --- |
-| L0 | Open the page, pick a move, play, export the guide | nothing |
-| L1 | Load your track for the beat grid, edit phases on the timeline, let an agent edit the recipe | an agent (CLI or MCP) |
-| L2 | Send the guide to video models | your own provider key |
-| L3 | Generate motion with MotionBricks on serverless GPUs; import a dancer from video | a serverless account |
+```bash
+npm install ../motion-studio/packages/core      # or "@motion-studio/core": "file:../motion-studio/packages/core"
+```
 
-Licence: MIT. No Mixamo files, motion datasets or body models ship in this repo; you load your own. Test fixtures are generated. The seed engine, validator and preview come from the Motion Studio MVP kit.
+```ts
+import { validateRecipe, frameAt, planCamera, cameraAtSeconds } from "@motion-studio/core";
+const recipe = validateRecipe(json), plan = planCamera(recipe);   // planCamera(recipe, drive) for the music-driven camera
+useFrame(({ clock, camera }) => {
+  const t = clock.elapsedTime, f = frameAt(recipe, Math.floor(t * recipe.fps));
+  figure.current.position.set(f.root.x, f.root.y, f.root.z); figure.current.rotation.y = f.root.yawRadians;
+  // f.pose: joint angles (procedural figures); f.layers: clip name, time and weight for an AnimationMixer (rigged mannequin)
+  const c = cameraAtSeconds(plan, t); camera.position.set(...c.position); camera.lookAt(...c.target);
+});
+```
+
+Every frame is a pure function of (recipe, audio drive, frame), so it can be seeked and rendered out of order. The figures themselves (the procedural mannequin and the rigged mannequin's clip mixer) are drawn by the studio in `packages/studio/src/characters/`; copy what you need. Plain Node needs a loader for the extensionless TypeScript imports (Node 24 strips types): see `cli/bin/motion-studio.mjs`. `packages/core/test/public-api.test.ts` imports only the public entry by package name and computes frames and a camera with no DOM.
+
+## Licences
+
+- Code: MIT ([LICENSE](LICENSE)).
+- `assets/characters/AnimationLibrary.glb`: from Ecctrl, MIT (copyright Erdong Chen, [ECCTRL-LICENSE.txt](assets/characters/ECCTRL-LICENSE.txt)); animations based on the Quaternius Universal Animation Library, CC0. See [NOTICE.md](assets/characters/NOTICE.md). Every export lists the character's licence in `meta.json`.
+- Libraries: Three.js (MIT), mp4-muxer (MIT), fflate (MIT), the MCP TypeScript SDK (MIT), zod (MIT); dev only: Vite, vitest, ESLint, TypeScript, Playwright core, ajv.
+- Test and demo tracks are generated (`packages/core/test/drum-synth.ts`). No Mixamo files, motion datasets or body models ship; your own Mixamo clips stay in `assets-local/` (git-ignored).
+
+## Not done
+
+- No foot locking or IK: feet can slide, most with the procedural walk and run (a rigged gait plays at the path's speed).
+- Recipe poses do not drive a loaded GLB/FBX rig (no rest-pose retargeting); a loaded character plays its own clips.
+- There is no fall move; facial expressions are stored, not rendered.
+- Drum detection is tested on synthetic patterns only, not on real mixes.
+- Recording a camera lane by dragging the camera in the viewport; driving the figure from the keyboard; voice input.
+- Previous/new comparison with accept or revert; range preview and looping in the player.
+- MotionBricks, pose input from video and the provider interface (see [plan](docs/plan.md)).
+- The bundle schema 0.4.0 still has to be taken into model-arena.

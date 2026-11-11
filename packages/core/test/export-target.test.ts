@@ -5,7 +5,7 @@ import {
   DEFAULT_EXPORT_SIZE, DEFAULT_RECIPE, EXPORT_SIZES, TARGET_MODEL_CONSTRAINTS, buildBeats, buildMeta,
   clearIncompatibleMoves, constraintWarnings, exportFrameCount, incompatibleMoves, makeClipMove, resolveExportRange,
   validateRecipe, type Recipe,
-} from "../src";
+} from "../src/internal";
 
 const schema = JSON.parse(readFileSync(new URL("../../../schema/guide-bundle.schema.json", import.meta.url), "utf8"));
 const ajv = new Ajv2020({ strict: false });

@@ -6,7 +6,7 @@
 import {
   CLIP_ACCENTS, beatAtSeconds, deleteMove, deletePhase, deleteStep, removeMarker, restorePhase,
   type AudioDrive, type GapMode, type HitMarker, type Recipe, type StepDivision,
-} from "@motion-studio/core";
+} from "@motion-studio/core/internal";
 import { LANES, laneTop } from "./draw";
 
 export type Focus =

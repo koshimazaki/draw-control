@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   DEFAULT_RECIPE, analyseBands, applyCommands, applyMotionCommand, blockSpan, commandHelp, defaultRiggedRecipe, frameAt, neutralPose, poseAtBeat,
   snapBeat, validateRecipe, type BandAnalysis,
-} from "../src";
+} from "../src/internal";
 import { patternTimes, synthDrums } from "./drum-synth";
 
 const base = () => structuredClone(DEFAULT_RECIPE);   // bounce 0, stepTouch 4, armsUp 8, kick 12, 16 beats, 120 BPM

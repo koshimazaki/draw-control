@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { defaultRiggedRecipe, frameAt, namedSequences } from "@motion-studio/core";
+import { defaultRiggedRecipe, frameAt, namedSequences } from "@motion-studio/core/internal";
 import { LIBRARY_KEY, cleanName, deleteSequence, fileNameFor, parseSequenceFile, readLibrary, saveSequence } from "../src/sequence-library";
 
 const memory = () => { const m = new Map<string, string>(); return { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => { m.set(k, v); }, m }; };

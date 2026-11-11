@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { analyseSamples, buildDrive, defaultRiggedRecipe, frameAt, syncAt, validateRecipe, type AudioDrive, type Recipe } from "../src";
+import { analyseSamples, buildDrive, defaultRiggedRecipe, frameAt, syncAt, validateRecipe, type AudioDrive, type Recipe } from "../src/internal";
 
 const withSync = (sync = { head: 1, shoulders: 1, arms: 1, hips: 1 }): Recipe =>
   validateRecipe({ ...defaultRiggedRecipe(), reactive: { ...defaultRiggedRecipe().reactive!, sync } });

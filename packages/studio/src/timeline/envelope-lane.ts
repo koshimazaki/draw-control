@@ -11,7 +11,7 @@
 import {
   LANE_SPECS, applyMotionCommand, laneAt, laneEnvelope, secondsAtBeat, snapBeat, beatAtSeconds,
   type CommandContext, type EnvelopeLane, type MotionCommand, type Recipe, type SnapTarget,
-} from "@motion-studio/core";
+} from "@motion-studio/core/internal";
 
 export const ENVELOPE_TOOLS = `
       <span class="muted">Lanes</span>

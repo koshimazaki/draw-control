@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { defaultRiggedRecipe, deleteMove, moveMarker, paintEnergy, validateRecipe, type Recipe } from "@motion-studio/core";
+import { defaultRiggedRecipe, deleteMove, moveMarker, paintEnergy, validateRecipe, type Recipe } from "@motion-studio/core/internal";
 import { History, sameRecipe } from "../src/history";
 
 /** The studio's edit path, without the page: record the recipe before each real change. */

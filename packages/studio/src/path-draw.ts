@@ -5,7 +5,7 @@
  * freehand stroke the core smooths and resamples over the chosen beats). Both go through
  * core commands (setCameraPath, setRootPath, clearCameraPath), the same an agent sends.
  */
-import type { MotionCommand, Recipe } from "@motion-studio/core";
+import type { MotionCommand, Recipe } from "@motion-studio/core/internal";
 import type { Viewport } from "./viewport";
 
 type Command = (c: MotionCommand) => void;

@@ -7,7 +7,7 @@
  * against the idle pose, then accent clips mixed over them by their weight.
  */
 import * as THREE from "three";
-import { LOOP_CLIPS, type FrameState } from "@motion-studio/core";
+import { LOOP_CLIPS, type FrameState } from "@motion-studio/core/internal";
 import { ClipSampler, type Layer } from "./clip-sampler";
 import type { Character } from "./types";
 

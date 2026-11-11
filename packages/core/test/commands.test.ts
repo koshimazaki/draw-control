@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_RECIPE, applyMotionCommand, extendPhase, frameAt, insertMove, setAmplitude, swapMove, type MotionCommand } from "../src";
+import { DEFAULT_RECIPE, applyMotionCommand, extendPhase, frameAt, insertMove, setAmplitude, swapMove, type MotionCommand } from "../src/internal";
 
 describe("commands", () => {
   it("insertMove adds a library move on a beat, in order, without mutating input", () => {

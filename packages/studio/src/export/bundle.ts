@@ -6,7 +6,7 @@
 import { strToU8, zipSync } from "fflate";
 import {
   BUNDLE_FILES, BUNDLE_SCHEMA_VERSION, buildBeats, buildCameraTrack, buildManifest, buildMeta, encodeWav, frameAt, resolveExportRange, type AudioDrive, type ExportRange, type Recipe,
-} from "@motion-studio/core";
+} from "@motion-studio/core/internal";
 import { makeRenderer, type Viewport } from "../viewport";
 import { createMp4Writer } from "./mp4";
 

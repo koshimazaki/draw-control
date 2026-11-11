@@ -4,7 +4,7 @@
  * recipe's audio-reactive camera, posed per frame from the core camera plan.
  */
 import * as THREE from "three";
-import { fovForAspect, type CameraSample } from "@motion-studio/core";
+import { fovForAspect, type CameraSample } from "@motion-studio/core/internal";
 
 export const VIEWS = ["front", "side", "top", "orbit", "iso", "rig"] as const;
 export type View = (typeof VIEWS)[number];

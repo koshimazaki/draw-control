@@ -4,7 +4,7 @@
  * coloured per band (kick red at the bottom, snare yellow in the middle, hat cyan at the
  * top), each as tall as its strength. Amplitude peaks are small white dots on the top edge.
  */
-import type { BandAnalysis, Recipe } from "@motion-studio/core";
+import type { BandAnalysis, Recipe } from "@motion-studio/core/internal";
 
 export const BAND_COLOURS = { low: "#ff5a5a", mid: "#ffd34d", high: "#4fd1e8" } as const;
 export const BAND_LABELS = { low: "kick", mid: "snare", high: "hat" } as const;

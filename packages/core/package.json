@@ -5,5 +5,17 @@
   "type": "module",
   "main": "src/index.ts",
   "types": "src/index.ts",
-  "exports": { ".": "./src/index.ts" }
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./internal": {
+      "types": "./src/internal.ts",
+      "default": "./src/internal.ts"
+    },
+    "./package.json": "./package.json"
+  },
+  "description": "Motion Studio core: the recipe format, the deterministic frame engine, beat and drum analysis, edit commands, the shot script and the audio-reactive camera rig. Pure TypeScript, no DOM, no dependencies.",
+  "sideEffects": false
 }

@@ -7,7 +7,7 @@ import { readFileSync } from "node:fs";
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { describe, expect, it } from "vitest";
-import { defaultRiggedRecipe, frameAt, riggedMove, validateRecipe, type AudioDrive } from "@motion-studio/core";
+import { defaultRiggedRecipe, frameAt, riggedMove, validateRecipe, type AudioDrive } from "@motion-studio/core/internal";
 import { createRiggedCharacter } from "../src/characters/rigged-core";
 
 async function mannequin() {

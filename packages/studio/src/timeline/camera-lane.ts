@@ -9,7 +9,7 @@
 import {
   CAMERA_MODE_LABELS, LOCK_TARGETS, SHOTS, cameraWords, lockHits,
   type CameraMode, type CameraSegment, type MotionCommand, type Recipe,
-} from "@motion-studio/core";
+} from "@motion-studio/core/internal";
 import { spanAt, startSpanDrag, type MoveLaneHost, type SpanHit } from "./move-lane";
 
 const MODES: CameraMode[] = ["static", "orbit", "pushIn", "pullOut", "truck", "rise", "lead", "threeQuarter", "side", "chase", "top", "fixed", "path"];

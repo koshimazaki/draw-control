@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   DEFAULT_RECIPE, analyseBands, applyMotionCommand, buildDrive, defaultRiggedRecipe, envelopeAt, envelopeValues, frameAt, poseDistance, simplifyEnvelope,
   validateRecipe, type Recipe,
-} from "../src";
+} from "../src/internal";
 import { patternTimes, synthDrums } from "./drum-synth";
 
 const dance = (r: Recipe) => r.moves.find(m => m.clip === "Dance_Loop")!.id;

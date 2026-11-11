@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   CLIP_ACCENTS, clipPlanFor, currentSteps, defaultRiggedRecipe, deleteMove, deletePhase, deleteStep, frameAt, restorePhase, riggedMove,
   validateRecipe, type HitMarker, type Recipe,
-} from "../src";
+} from "../src/internal";
 
 const markers: HitMarker[] = [{ seconds: 2, accent: "spin", source: "manual" }, { seconds: 4, accent: "jab", source: "manual" }];
 const base = (): Recipe => {

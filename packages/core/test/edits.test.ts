@@ -3,7 +3,7 @@ import {
   addMarker, clearSteps, clipPlanFor, currentMarkers, currentSteps, defaultRiggedRecipe, frameAt, markerPhases, moveMarker,
   paintEnergy, removeMarker, retimePhase, riggedMove, secondsAtBeat, setMarkerAccent, setMoveAtBeat, setMoveBlend, setStepAmplitude,
   snapSeconds, validateRecipe, type AudioDrive, type Recipe,
-} from "../src";
+} from "../src/internal";
 
 const FPS = 24;
 const drive: AudioDrive = { fps: FPS, energy: new Float32Array(800).fill(0.5), onsets: [{ seconds: 3.37, strength: 1 }], source: "audio" };

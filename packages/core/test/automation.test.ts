@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_RECIPE, applyMotionCommand, describeRecipe, planCamera, validateRecipe, type Recipe } from "../src";
+import { DEFAULT_RECIPE, applyMotionCommand, describeRecipe, planCamera, validateRecipe, type Recipe } from "../src/internal";
 
 const r0 = (): Recipe => validateRecipe({ ...structuredClone(DEFAULT_RECIPE), durationBeats: 16,
   camera: { segments: [{ fromBeat: 0, toBeat: 16, modes: ["orbit"], shot: "medium" }], intensity: 1, orbitDegreesPerBeat: 8, distance: 4.4, height: 1.15, fov: 38, startYaw: 0 } });

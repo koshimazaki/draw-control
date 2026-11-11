@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_RECIPE, makeClipMove, makeMove, validateRecipe, type Recipe } from "../src";
+import { DEFAULT_RECIPE, makeClipMove, makeMove, validateRecipe, type Recipe } from "../src/internal";
 
 const withMoves = (moves: Recipe["moves"]): Recipe => ({ ...structuredClone(DEFAULT_RECIPE), moves });
 
@@ -42,7 +42,7 @@ describe("recipe schema", () => {
 
 describe("abstract figures", () => {
   it("stick and capsule figures are procedural kinds that keep every library move", async () => {
-    const { incompatibleMoves, PROCEDURAL_KINDS } = await import("../src");
+    const { incompatibleMoves, PROCEDURAL_KINDS } = await import("../src/internal");
     for (const kind of PROCEDURAL_KINDS) {
       const r = validateRecipe({ ...structuredClone(DEFAULT_RECIPE), character: { kind, name: kind, licence: "MIT (motion-studio)" } });
       expect(incompatibleMoves(r, kind)).toEqual([]);

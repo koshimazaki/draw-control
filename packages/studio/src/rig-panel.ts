@@ -5,7 +5,7 @@
 import {
   CAMERA_MODE_LABELS, DEFAULT_CAMERA, DEFAULT_REACTIVE, cameraTimeline, validateRecipe,
   type AccentKey, type CameraMode, type Recipe,
-} from "@motion-studio/core";
+} from "@motion-studio/core/internal";
 
 const PICKABLE: CameraMode[] = ["orbit", "pushIn", "pullOut", "rise", "lead", "threeQuarter", "side", "chase", "top", "fixed", "path"];
 export const ACCENT_SETS: Record<string, { label: string; accents: AccentKey[] }> = {

@@ -5,7 +5,7 @@
  * half beats, kicks, snares or hats; Alt: free). Every edit is a core command
  * (moveMoveTo, resizeMove), the same one an agent sends.
  */
-import { applyMotionCommand, moveEndBeat, snapBeat, type CommandContext, type Recipe, type SnapTarget } from "@motion-studio/core";
+import { applyMotionCommand, moveEndBeat, snapBeat, type CommandContext, type Recipe, type SnapTarget } from "@motion-studio/core/internal";
 
 export type SpanHit = { kind: "start" | "end" | "body"; index: number };
 export type BlockHit = SpanHit & { id: string };

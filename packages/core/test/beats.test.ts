@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { analyseSamples, beatGridJson, snapFrames8k1 } from "../src";
+import { analyseSamples, beatGridJson, snapFrames8k1 } from "../src/internal";
 
 /** Synthetic click track: short decaying noise bursts on each beat. Deterministic. */
 function clickTrack(bpm: number, offset: number, seconds: number, sampleRate = 22050): Float32Array {

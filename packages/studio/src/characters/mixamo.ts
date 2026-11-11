@@ -4,7 +4,7 @@
  * rest-pose retargeting and is a documented next step.
  */
 import type * as THREE from "three";
-import type { JointName } from "@motion-studio/core";
+import type { JointName } from "@motion-studio/core/internal";
 
 export const MIXAMO_BONES: Record<JointName, string> = {
   pelvis: "Hips", spine: "Spine", head: "Head",

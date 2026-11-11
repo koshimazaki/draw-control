@@ -15,7 +15,7 @@ import { LineSegmentsGeometry } from "three/addons/lines/LineSegmentsGeometry.js
 import {
   activeMoveIndex, beatAtSeconds, cameraAtFrame, frameAt, moveEndBeat, secondsAtBeat, travelStations,
   type AudioDrive, type CameraPlan, type CameraSample, type Recipe,
-} from "@motion-studio/core";
+} from "@motion-studio/core/internal";
 
 const CAMERA_COLOUR = 0xffa040, FRUSTUM_COLOUR = 0xffd34d, LIVE_COLOUR = 0xffffff, FLOOR_COLOUR = 0x46c2ff, CURRENT_COLOUR = 0xffffff, STATION_COLOUR = 0xff4d6d;
 

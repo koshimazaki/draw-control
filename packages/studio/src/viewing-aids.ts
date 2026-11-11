@@ -7,7 +7,7 @@ import * as THREE from "three";
 import { Line2 } from "three/addons/lines/Line2.js";
 import { LineGeometry } from "three/addons/lines/LineGeometry.js";
 import { LineMaterial } from "three/addons/lines/LineMaterial.js";
-import type { FrameState } from "@motion-studio/core";
+import type { FrameState } from "@motion-studio/core/internal";
 import type { Character } from "./characters/types";
 
 export type AidOptions = { bones: boolean; xray: boolean; onion: boolean; arcs: boolean; bone: string | null };

@@ -12,7 +12,7 @@ import {
   currentSteps, effectiveDrive, insertMove, markerPhases, moveMarker, paintEnergy, removeMarker, removeMove, retimePhase,
   CLIP_ACCENTS, setAnticipation, beatsToFrames, blendBeatsOf, playedBoundaries, secondsAtBeat, setMarkerAccent, setMoveAtBeat, setMoveBlend, setStepAmplitude, snapSeconds,
   type AccentKey, type AudioDrive, type CameraPlan, type CommandContext, type MotionCommand, type MoveKey, type Recipe, type SnapTarget, type StepDivision,
-} from "@motion-studio/core";
+} from "@motion-studio/core/internal";
 import { CAMERA_LANE_OF, COLLAPSIBLE, LANES, TIMELINE_HEIGHT, drawTimeline, laneAtY, laneHeight, laneTop, layoutLanes, openLanes, type CollapsibleLane, type TimelineModel } from "./draw";
 import { CAMERA_INSPECTOR, bindCameraInspector, cameraBlockAt, startCameraDrag } from "./camera-lane";
 import { MARKER_LAYOUT, bindMarkerInspector } from "./marker-inspector";

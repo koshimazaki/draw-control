@@ -85,7 +85,7 @@ export async function syntheticCharacterGlb(): Promise<Uint8Array> {
 }
 
 /** Example recipes A, C, D for `scripts/examples.mjs`. */
-export { exampleRecipes } from "@motion-studio/core";
+export { exampleRecipes } from "@motion-studio/core/internal";
 
 /** Dev-only Mixamo check helpers for scripts/mixamo-check.mjs. */
 export async function mixamoCheck(name: string) {

@@ -7,7 +7,7 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { FBXLoader } from "three/addons/loaders/FBXLoader.js";
-import type { FrameState } from "@motion-studio/core";
+import type { FrameState } from "@motion-studio/core/internal";
 import { findMixamoBones, MIXAMO_BONES } from "./mixamo";
 import type { Character } from "./types";
 

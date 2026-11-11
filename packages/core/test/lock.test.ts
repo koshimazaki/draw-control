@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   DEFAULT_RECIPE, applyMotionCommand, flatDrive, frameAt, gaitSpeedFor, lockedMoveBeat, pulseBeat, stationProgress, travelStations, validateRecipe,
   type AudioDrive, type BandAnalysis, type Recipe,
-} from "../src";
+} from "../src/internal";
 
 // 120 BPM, first beat at 0: beat b is frame 12·b. Kicks at beats 5, 7.5 and 10.
 const bands: BandAnalysis = { hopSeconds: 0.01, low: [5, 7.5, 10].map(b => ({ seconds: b / 2, strength: 1 })), mid: [], high: [], peaks: [] };

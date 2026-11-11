@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { analyseBands, analyseSamples, bandOnsets, buildDrive, waveformMinMax } from "../src";
+import { analyseBands, analyseSamples, bandOnsets, buildDrive, waveformMinMax } from "../src/internal";
 import { patternTimes, score, synthDrums } from "./drum-synth";
 
 const BPM = 120, BARS = 8, SECONDS = 0.1 + BARS * 2 + 0.5;

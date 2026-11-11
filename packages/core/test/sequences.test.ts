@@ -5,7 +5,7 @@
  */
 import { readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { exportFrameCount, frameAt, namedSequences, validateRecipe } from "../src";
+import { exportFrameCount, frameAt, namedSequences, validateRecipe } from "../src/internal";
 
 const DIR = new URL("../../../examples/recipes/", import.meta.url);
 const json = (r: unknown) => JSON.stringify(r, null, 2) + "\n";

@@ -6,7 +6,7 @@ import {
   LOOP_CLIPS, RIGGED_CHARACTER, defaultRiggedRecipe, riggedMove, clearIncompatibleMoves, clipCycleBeatsFor, exportFrameCount, frameAt, incompatibleMoves, insertMove,
   makeClipMove, printScript, beatsToFrames, blendBeatsOf, removeMove, swapMove, setMoveBlend, validateRecipe, MOVE_KEYS, MOVE_LIBRARY, buildDrive, flatDrive, planCamera, applyMotionCommand, blockSpan,
   type AudioDrive, type CharacterKind, type CommandContext, type Expression, type MotionCommand, type MoveKey, type PreviewFps, type Recipe,
-} from "@motion-studio/core";
+} from "@motion-studio/core/internal";
 import { createProceduralCharacter } from "./characters/rig";
 import { loadRiggedCharacter, type RiggedCharacter } from "./characters/rigged";
 import { loadFileCharacter } from "./characters/file-character";

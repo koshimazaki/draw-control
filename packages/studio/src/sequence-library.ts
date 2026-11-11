@@ -4,7 +4,7 @@
  * downloaded file loads anywhere the recipe validator runs. Everything read back goes
  * through `validateRecipe`, so a stale or edited entry is refused instead of half-loaded.
  */
-import { validateRecipe, type Recipe } from "@motion-studio/core";
+import { validateRecipe, type Recipe } from "@motion-studio/core/internal";
 
 export const LIBRARY_KEY = "motion-studio.sequences.v1";
 export type StoreLike = Pick<Storage, "getItem" | "setItem">;

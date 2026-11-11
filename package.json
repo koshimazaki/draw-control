@@ -20,12 +20,13 @@
     "lint": "eslint .",
     "check": "npm run typecheck && npm run lint && npm test",
     "smoke": "node scripts/smoke.mjs",
+    "mcp-check": "node scripts/mcp-check.mjs",
     "examples": "node scripts/examples.mjs",
     "peek": "node scripts/peek.mjs",
     "mixamo-check": "node scripts/mixamo-check.mjs",
     "cli": "node cli/bin/motion-studio.mjs",
     "mcp": "node mcp/bin/motion-studio-mcp.mjs",
-    "mcp-check": "node scripts/mcp-check.mjs"
+    "drums": "node scripts/drum-fixture.mjs out/drums-120.wav 120 8"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -41,5 +42,6 @@
   },
   "bin": {
     "motion-studio": "cli/bin/motion-studio.mjs"
-  }
+  },
+  "description": "Motion Studio: a browser studio where a neutral figure moves to your track, an agent edits it by command or shot script, and the result exports as a guide clip for video models."
 }
