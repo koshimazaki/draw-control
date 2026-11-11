@@ -94,8 +94,8 @@
   },
   "reactive": {
     "seed": 7,
-    "speed": 0.5,
-    "amplitude": 0.7,
+    "speed": 0.7,
+    "amplitude": 0.8,
     "accents": [
       "jump",
       "spin",
@@ -105,7 +105,8 @@
     "accentGapBeats": 2,
     "onsetThreshold": 0.6,
     "idleBelow": 0.12,
-    "humanise": 0.8
+    "humanise": 0.8,
+    "drive": 1
   },
   "camera": {
     "segments": [
