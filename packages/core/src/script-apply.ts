@@ -12,7 +12,7 @@ import type { BandAnalysis } from "./audio-bands";
 import type { AudioDrive } from "./audio-drive";
 import { secondsAtBeat } from "./beats";
 import { DEFAULT_CAMERA, SHOTS, type CameraMode, type Shot } from "./camera";
-import { gaitSpeedFor, setCameraModes, startCameraMove } from "./camera-edits";
+import { gaitSpeedFor, setCameraModes, setCameraPath, setRootPath, startCameraMove } from "./camera-edits";
 import { insertMove } from "./commands";
 import { LOCK_TARGETS, type LockTarget } from "./lock";
 import { makeMoveFor, onsetBeats, setMoveFields } from "./move-edits";
@@ -25,7 +25,8 @@ import { ACTION_WORDS, CAMERA_WORDS, accentVocabulary, actionVocabulary, cameraV
 type Lock = { lock: LockTarget; strength?: number };
 type Hit = { accent: AccentKey; band: string; index: number };
 type Row = { from: number; to: number; line: number; action?: string; camera?: string; shot?: string };
-type Cam = { modes: CameraMode[]; amount?: number; from?: number; to?: number; lock?: LockTarget; strength?: number; onHit?: "hold" | "punch"; punch?: number; at?: { band: string; index: number } };
+type Point = { x: number; z: number; y?: number };
+type Cam = { path?: Point[]; modes: CameraMode[]; amount?: number; from?: number; to?: number; lock?: LockTarget; strength?: number; onHit?: "hold" | "punch"; punch?: number; at?: { band: string; index: number } };
 
 const bad = (row: Row, msg: string): never => { throw new RecipeError(`script line ${row.line}: ${msg}`); };
 const number = (row: Row, t: string, what: string) => {
@@ -57,6 +58,19 @@ export function parseRows(script: string): Row[] {
   return rows;
 }
 
+/** Points "(x,z)" or "(x,z,height)" in metres, taken out of a column's text. */
+function takePoints(row: Row, text: string): { text: string; points?: Point[] } {
+  const points: Point[] = [];
+  const rest = text.replace(/\(([^)]*)\)/g, (_, inner: string) => {
+    const v = inner.split(",").map(t => Number(t.trim()));
+    if ((v.length !== 2 && v.length !== 3) || v.some(x => !Number.isFinite(x))) bad(row, `a point reads (x,z) or (x,z,height) in metres (got (${inner}))`);
+    points.push(v.length === 3 ? { x: v[0], z: v[1], y: v[2] } : { x: v[0], z: v[1] });
+    return " ";
+  }).replace(/\s+/g, " ").trim();
+  if (/[()]/.test(rest)) bad(row, "unbalanced brackets in a point list");
+  return points.length ? { text: rest, points } : { text: rest };
+}
+
 /** "lock kick 0.8" at the end of a word list; returns the remaining words. */
 function takeLock(row: Row, words: string[]): { words: string[]; lock?: Lock; rest: string[] } {
   const k = words.indexOf("lock");
@@ -76,9 +90,17 @@ function parseHit(row: Row, item: string): Hit {
   return { accent: m![1] as AccentKey, band: m![2], index: Number(m![3]) };
 }
 
-type Action = { kind: "continue" | "rest" | "move" | "glide"; move?: string; onPath?: boolean; lock?: Lock; hits: Hit[] };
+type Action = { kind: "continue" | "rest" | "move" | "glide"; move?: string; onPath?: boolean; points?: Point[]; lock?: Lock; hits: Hit[] };
 function parseAction(r: Recipe, row: Row): Action {
-  const text = row.action ?? "continue";
+  const taken = takePoints(row, row.action ?? "continue"), a = parseActionWords(r, row, taken.text);
+  if (taken.points) {
+    if (!a.onPath) bad(row, "points belong after \"on path\": \"glide on path (0,0) (2,0) (2,3,1.5)\"");
+    if (taken.points.length < 2) bad(row, "a path needs at least two points");
+    a.points = taken.points;
+  }
+  return a;
+}
+function parseActionWords(r: Recipe, row: Row, text: string): Action {
   const items = text.split(",").map(s => s.trim()).filter(Boolean);
   const hits: Hit[] = [];
   while (items.length && items[items.length - 1].includes("@")) hits.unshift(parseHit(row, items.pop()!));
@@ -99,10 +121,14 @@ function parseAction(r: Recipe, row: Row): Action {
 }
 
 function parseCamera(row: Row): Cam | "continue" {
-  const text = row.camera ?? "continue";
+  const taken = takePoints(row, row.camera ?? "continue"), text = taken.text;
   if (text === "continue") return "continue";
   let words = text.split(/\s+/);
   const cam: Cam = { modes: [] };
+  if (taken.points) {
+    if (taken.points.length < 2) bad(row, "a camera path needs at least two points");
+    cam.path = taken.points;
+  }
   const at = words.findIndex(w => w.startsWith("@"));
   if (at >= 0) {
     const band = words[at].slice(1), index = Number(words[at + 1]);
@@ -133,6 +159,7 @@ function parseCamera(row: Row): Cam | "continue" {
       else { cam.from = number(row, args[0], "start height"); if (toAt === 1) cam.to = number(row, args[2], "end height"); }
     } else bad(row, `${key} takes no amount`);
   }
+  if (cam.path && !cam.modes.includes("path")) bad(row, "camera points belong after \"path\": \"camera: path (4,2,1.6) (0,2,1.6)\"");
   return cam;
 }
 
@@ -186,7 +213,9 @@ export function applyScript(recipe: Recipe, args: { script: string }, ctx: { ban
   }
   if (pathBlock) {
     const glide = pathBlock.action.kind === "glide";
-    r = validateRecipe({ ...r, rootPath: retimePath(recipe, pathBlock.from, pathBlock.to, glide) });
+    const pts = pathBlock.action.points;
+    r = pts ? setRootPath(r, { points: pts, fromBeat: pathBlock.from, toBeat: pathBlock.to, face: glide ? "hold" : "path", smooth: false })
+      : validateRecipe({ ...r, rootPath: retimePath(recipe, pathBlock.from, pathBlock.to, glide) });
     const lock = pathBlock.action.lock;
     if (lock) r = { ...r, travelLock: lock }; else delete r.travelLock;
   }
@@ -226,8 +255,14 @@ export function applyScript(recipe: Recipe, args: { script: string }, ctx: { ban
       cams.push({ from: row.from, to: row.to, cam: { modes: ["static"] }, shot: {}, row });
     } else cams.push({ from: row.from, to: row.to, cam: c, shot: parseShot(row), row });
   }
+  const given = cams.filter(b => b.cam.path);
+  if (given.some(b => JSON.stringify(b.cam.path) !== JSON.stringify(given[0].cam.path))) bad(given[1].row, "one camera path per script: give the points once (later path blocks reuse them)");
+  if (given.length && given[0].cam.path!.length > 12) bad(given[0].row, "a camera path in a script takes up to 12 points");
+  if (given.length) r = setCameraPath(r, { points: given[0].cam.path!, useMode: false });
+  else if (cams.some(b => b.cam.modes.includes("path")) && !r.camera?.path) bad(cams.find(b => b.cam.modes.includes("path"))!.row, "camera: path needs points: \"path (4,2,1.6) (0,2,1.6)\" (x, z, height in metres)");
   for (const b of cams) {
-    const { modes, at, ...fields } = b.cam;
+    const { modes, at, path: _path, ...fields } = b.cam;
+    void _path;
     let start = b.from;
     if (at) {
       start = resolveAnchor(r, bands, b.row, at.band, at.index);

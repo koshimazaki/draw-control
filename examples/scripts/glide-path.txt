@@ -1,0 +1,6 @@
+# A figure glides an L-shaped path, rising half a metre, stopping on each kick; the camera
+# follows, then flies its own path over the last bars. Points are (x, z) or (x, z, height)
+# in metres; no drawing needed.
+beats 0-4   | action: idle                                                    | camera: chase                     | shot: medium
+beats 4-12  | action: glide on path (0,0) (2,0) (2,3,0.5) lock kick 0.8       | camera: chase                     | shot: wide
+beats 12-16 | action: dance                                                   | camera: path (6,3,1.8) (2,8,2.2) (-3,4,1.8) | shot: -

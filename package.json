@@ -24,7 +24,8 @@
     "peek": "node scripts/peek.mjs",
     "mixamo-check": "node scripts/mixamo-check.mjs",
     "cli": "node cli/bin/motion-studio.mjs",
-    "mcp": "node mcp/bin/motion-studio-mcp.mjs"
+    "mcp": "node mcp/bin/motion-studio-mcp.mjs",
+    "mcp-check": "node scripts/mcp-check.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

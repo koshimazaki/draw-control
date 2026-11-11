@@ -70,6 +70,14 @@ describe("motion-studio CLI", () => {
     writeFileSync(join(dir, "fall.txt"), "beats 0-4 | action: fall\n");
     expect((await run("script", rp, join(dir, "fall.txt"))).err).toMatch(/unknown action "fall"/);
   });
+  it("shot script with path points: the walk path and the camera path in metres, read back", async () => {
+    const a = join(dir, "analysis.json"), r0 = join(dir, "recipe.json"), out = join(dir, "glide.json");
+    const script = new URL("../../examples/scripts/glide-path.txt", import.meta.url).pathname;
+    expect((await run("script", r0, script, "--analysis", a, "--out", out)).err).toBe("");
+    const d = await run("describe", out, "--analysis", a, "--script");
+    expect(d.out).toMatch(/action: glide on path \(0,0\) \(2,0\) \(2,3,0\.5\) lock kick 0\.8/);
+    expect(d.out).toMatch(/camera: path \(6,3,1\.8\) \(2,8,2\.2\) \(-3,4,1\.8\)/);
+  });
   it("set by path, with readable errors", async () => {
     const r0 = join(dir, "recipe.json");
     const s = await run("set", r0, "moves[1].speed", "2");

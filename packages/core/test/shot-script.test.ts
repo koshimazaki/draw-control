@@ -70,3 +70,35 @@ describe("shot script", () => {
     expect(() => applyScript(base(), { script: "beats 0-2 | action: jump @kick 1" })).toThrow(/analyse a track first/);
   });
 });
+
+describe("path points in the shot script", () => {
+  const script = [
+    "beats 0-4  | action: idle | camera: chase | shot: wide",
+    "beats 4-12 | action: glide on path (0,0) (2,0) (2,3,1.5) lock kick 0.8 | camera: path (4,2,1.6) (0,4,2) (-4,2,1.6) | shot: -",
+    "beats 12-16 | action: run on path (0,0) (0,-4) | camera: path",
+  ].join("\n");
+  it("gives the walk path and the camera path in metres, without drawing", () => {
+    expect(() => applyScript(base(), { script })).toThrow(/one walk path/);
+    const one = script.replace("run on path (0,0) (0,-4)", "run");
+    const r = applyScript(base(), { script: one }, { bands });
+    const moving = r.rootPath.filter(p => p.beat >= 4);
+    expect(moving.map(p => [p.x, p.z, p.y ?? 0])).toEqual([[0, 0, 0], [2, 0, 0], [2, 3, 1.5]]);
+    expect(moving.at(-1)!.beat).toBe(12);
+    expect(r.travelLock).toEqual({ lock: "kick", strength: 0.8 });
+    expect(r.camera!.path).toEqual([{ x: 4, y: 1.6, z: 2 }, { x: 0, y: 2, z: 4 }, { x: -4, y: 1.6, z: 2 }]);
+    expect(r.camera!.segments.map(s => s.modes[0])).toEqual(["chase", "path", "path"]);
+    const text = printScript(r, bands);
+    expect(text).toContain("action: glide on path (0,0) (2,0) (2,3,1.5) lock kick 0.8");
+    expect(text).toContain("camera: path (4,2,1.6) (0,4,2) (-4,2,1.6) | shot: -");
+    expect(text).toMatch(/^beats 12-16 +\| action: run +\| camera: path +\| shot: -$/m);   // later path blocks reuse the points
+    const again = applyScript(r, { script: text }, { bands });
+    expect(printScript(again, bands)).toBe(text);
+    expect(again).toEqual(r);
+  });
+  it("refuses points in the wrong place or of the wrong shape", () => {
+    expect(() => applyScript(base(), { script: "beats 0-4 | action: run (0,0) (1,1)" })).toThrow(/points belong after "on path"/);
+    expect(() => applyScript(base(), { script: "beats 0-4 | action: run | camera: orbit (0,0) (1,1)" })).toThrow(/camera points belong after "path"/);
+    expect(() => applyScript(base(), { script: "beats 0-4 | action: glide on path (0,0) (1,x)" })).toThrow(/a point reads \(x,z\)/);
+    expect(() => applyScript(base(), { script: "beats 0-4 | action: run | camera: path" })).toThrow(/camera: path needs points/);
+  });
+});

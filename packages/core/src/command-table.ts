@@ -80,9 +80,9 @@ export const COMMAND_TABLE: Record<string, TableCommand> = {
   setCameraPath: { help: "{ points: [{ x, z, y? }], useMode? } the camera path seen from the top (x, z metres; y height)", run: (r, a) => setCameraPath(r, { points: a.points as { x: number; z: number; y?: number }[], useMode: a.useMode !== false }) },
   clearCameraPath: { help: "{} remove the camera path", run: r => clearCameraPath(r) },
   setRootPath: {
-    help: "{ points: [{ x, z, y? }], fromBeat?, toBeat?, gait?, face?: path|hold, lock?, strength? } the floor path the character travels over a range (smoothed, steady speed); gait adds a walk or run block at the path's speed, gait glide slides the figure with no gait",
+    help: "{ points: [{ x, z, y? }], fromBeat?, toBeat?, gait?, face?: path|hold, lock?, strength?, smooth? } the floor path the character travels over a range (smoothed, steady speed); gait adds a walk or run block at the path's speed, gait glide slides the figure with no gait",
     run: (r, a) => setRootPath(r, { points: a.points as { x: number; z: number; y?: number }[], fromBeat: optNum(a, "fromBeat"), toBeat: optNum(a, "toBeat"), gait: a.gait === undefined ? undefined : str(a, "gait"),
-      face: a.face === undefined ? undefined : a.face === "hold" ? "hold" : a.face === "path" ? "path" : bad("face", "path or hold"), lock: a.lock === undefined ? undefined : str(a, "lock"), strength: optNum(a, "strength") }),
+      face: a.face === undefined ? undefined : a.face === "hold" ? "hold" : a.face === "path" ? "path" : bad("face", "path or hold"), lock: a.lock === undefined ? undefined : str(a, "lock"), strength: optNum(a, "strength"), smooth: a.smooth !== false }),
   },
   setTravelLock: { help: "{ lock: off|beat|kick|snare|hat, strength? } lock the travel along the walk path: stations on each locked hit", run: (r, a) => setTravelLock(r, { lock: str(a, "lock"), strength: optNum(a, "strength") }) },
   clearRootPath: { help: "{} the character stands at the origin", run: r => clearRootPath(r) },

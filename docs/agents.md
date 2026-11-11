@@ -135,3 +135,24 @@ printf 'beats 0-4 | action: fall\n' > fall.txt && M script recipe.path.json fall
 
 Over MCP: `analyse_audio` (the track), `new_recipe`, `apply` with the `setRootPath` command above, then `apply_script` with the script's text; it returns the script as the recipe now reads, and `get_script` prints it again at any time. Then fine-tune by hand in the studio: load `recipe.shot.json` (*Upload*), drag the camera blocks on the Camera track, open the Distance lane and draw over the orbit, or arm a lane and record it while playing. Both routes run as tests (`cli/test/cli.test.ts`, `mcp/test/mcp.test.ts`).
 
+## Worked example: paths without drawing
+
+A script can give the walk path and the camera path in metres, so an agent never has to draw. `examples/scripts/glide-path.txt`:
+
+```
+beats 0-4   | action: idle                                              | camera: chase                             | shot: medium
+beats 4-12  | action: glide on path (0,0) (2,0) (2,3,0.5) lock kick 0.8 | camera: chase                             | shot: wide
+beats 12-16 | action: dance                                             | camera: path (6,3,1.8) (2,8,2.2) (-3,4,1.8) | shot: -
+```
+
+Points are `(x,z)` or `(x,z,height)`: x to the right, z towards the front camera, height above the floor (the glide rises half a metre on its last leg; the camera path's heights are the camera's). By CLI, on a fresh recipe:
+
+```bash
+M new --analysis analysis.json --out fresh.json
+M script fresh.json ../../examples/scripts/glide-path.txt --analysis analysis.json --out glide.json
+M describe glide.json --analysis analysis.json --script    # prints the same rows, points included
+M render glide.json --audio drums.wav --out bundle-glide --start 0 --length 16 --unit beats
+```
+
+Over MCP the same text goes to `apply_script`, then `render`. `npm run mcp-check` does exactly that against the real server over stdio (`node mcp/bin/motion-studio-mcp.mjs`, as an MCP client starts it): `analyse_audio`, `new_recipe`, `apply_script` with this file, `render` to `out/mcp-check/bundle/` in headless Chrome (about 3–5 s for 193 frames on this machine), and checks the bundle's files.
+

@@ -136,24 +136,41 @@ export function gaitSpeedFor(name: string, metresPerSecond: number, bpm: number)
  *   where points carry a height `y`) holding its pose or whatever move is on the Action
  *   track, facing the way it faced at the start (`face: "path"` turns it along the path).
  * `lock` and `strength` set the travel lock (stations on each locked hit, root-travel.ts).
+ * `smooth: false` keeps the points as given (up to 63, straight between them, spaced in time
+ * by distance): the shot script's `on path (x,z) (x,z,y) …` uses it, so a script reads back
+ * with the same points.
  */
-export function setRootPath(recipe: Recipe, args: { points: { x: number; z: number; y?: number }[]; fromBeat?: number; toBeat?: number; gait?: string; face?: "path" | "hold"; lock?: string; strength?: number }): Recipe {
+export function setRootPath(recipe: Recipe, args: { points: { x: number; z: number; y?: number }[]; fromBeat?: number; toBeat?: number; gait?: string; face?: "path" | "hold"; lock?: string; strength?: number; smooth?: boolean }): Recipe {
   if (!Array.isArray(args.points) || args.points.length < 2 || args.points.length > 4096) throw new RecipeError("setRootPath: points needs 2–4096 { x, z, y? } points");
   for (const p of args.points) if (!Number.isFinite(p?.x) || !Number.isFinite(p?.z) || Math.abs(p.x) > 100 || Math.abs(p.z) > 100 || (p.y !== undefined && !(p.y >= 0 && p.y <= 30))) throw new RecipeError("setRootPath: each point needs x and z within ±100 m (and y, if given, 0–30 m)");
   const from = Math.max(0, args.fromBeat ?? 0), to = Math.min(recipe.durationBeats, args.toBeat ?? recipe.durationBeats);
   if (!(to > from)) throw new RecipeError("setRootPath: toBeat must be after fromBeat");
   const glide = args.gait === GLIDE;
   const face = args.face ?? (glide ? "hold" : "path");
-  const control = resample(args.points, Math.min(12, args.points.length));
+  const startYaw = sampleRootPath(recipe.rootPath, from).yaw;
+  const smooth = args.smooth !== false;
+  if (!smooth && args.points.length > (from > 0 ? 63 : 64)) throw new RecipeError("setRootPath: a path given point by point (smooth false) takes up to 63 points");
+  // Smooth: a spline through up to 12 control points, resampled evenly. Point by point: the points as given, straight between them.
+  const control = smooth ? resample(args.points, Math.min(12, args.points.length)) : args.points;
   const hasY = control.some(p => p.y);
   const spline = buildSpline(control.map(p => ({ x: p.x, y: p.y ?? 0, z: p.z })));
-  const n = Math.max(2, Math.min(from > 0 ? 47 : 48, Math.round(spline.length * 4) + 2));
-  const startYaw = sampleRootPath(recipe.rootPath, from).yaw;
+  const cum = [0];
+  for (let i = 1; i < control.length; i++) cum.push(cum[i - 1] + Math.hypot(control[i].x - control[i - 1].x, control[i].z - control[i - 1].z, (control[i].y ?? 0) - (control[i - 1].y ?? 0)));
+  const total = cum[cum.length - 1] || 1, length = smooth ? spline.length : total;
+  const n = smooth ? Math.max(2, Math.min(from > 0 ? 47 : 48, Math.round(spline.length * 4) + 2)) : control.length;
+  const sample = (k: number): { s: number; p: [number, number, number]; dir: [number, number] } => {
+    if (smooth) {
+      const s = k / (n - 1), [x2, , z2] = spline.at(Math.min(1, s + 0.01)), [x0, , z0] = spline.at(Math.max(0, s - 0.01));
+      return { s, p: spline.at(s), dir: [x2 - x0, z2 - z0] };
+    }
+    const a = control[Math.max(0, k - (k === n - 1 ? 1 : 0))], b = control[Math.min(n - 1, k + (k === n - 1 ? 0 : 1))];
+    return { s: cum[k] / total, p: [control[k].x, control[k].y ?? 0, control[k].z], dir: [b.x - a.x, b.z - a.z] };
+  };
   const pts: RootPoint[] = [];
   let lastYaw: number | null = null;
   for (let k = 0; k < n; k++) {
-    const s = k / (n - 1), [x, y, z] = spline.at(s), [x2, , z2] = spline.at(Math.min(1, s + 0.01)), [x0, , z0] = spline.at(Math.max(0, s - 0.01));
-    let heading = face === "hold" ? startYaw : Math.atan2(x2 - x0, z2 - z0) * 180 / Math.PI;
+    const { s, p: [x, y, z], dir } = sample(k);
+    let heading = face === "hold" || (dir[0] === 0 && dir[1] === 0) ? (lastYaw ?? startYaw) : Math.atan2(dir[0], dir[1]) * 180 / Math.PI;
     if (lastYaw !== null) heading += 360 * Math.round((lastYaw - heading) / 360);   // unwrap: no spin on a ±180° crossing
     const yaw = Math.max(-720, Math.min(720, heading));
     lastYaw = yaw;
@@ -167,7 +184,7 @@ export function setRootPath(recipe: Recipe, args: { points: { x: number; z: numb
     const m = makeMoveFor(next, args.gait, from);
     m.id = `${m.id}-path`;
     m.lengthBeats = r3(to - from);
-    const sp = gaitSpeedFor(args.gait, spline.length / ((to - from) * 60 / recipe.beatGrid.bpm), recipe.beatGrid.bpm);
+    const sp = gaitSpeedFor(args.gait, length / ((to - from) * 60 / recipe.beatGrid.bpm), recipe.beatGrid.bpm);
     if (sp !== undefined && sp !== 1) m.speed = sp;
     next.moves = [...next.moves.filter(x => x.atBeat < from - 1e-6 || x.atBeat >= to), m].sort((a, b) => a.atBeat - b.atBeat);
   }

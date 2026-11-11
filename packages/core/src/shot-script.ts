@@ -58,8 +58,13 @@ export function wordForMove(r: Recipe, name: string): string {
 export const fmt = (x: number) => String(Math.round(x * 1000) / 1000);
 const metres = (x: number) => `${fmt(x)}m`;
 
-/** One camera block as words. */
-export function cameraWords(s: CameraSegment): string {
+/** A point list "(x,z)" or "(x,z,height)", the script's way to give a path. */
+export const pointWords = (pts: readonly { x: number; z: number; y?: number }[]) => pts.map(p => `(${fmt(p.x)},${fmt(p.z)}${p.y !== undefined ? `,${fmt(p.y)}` : ""})`).join(" ");
+/** Drawn walk paths longer than this print as "on path" without points (they keep their shape when re-applied). */
+export const MAX_PRINTED_PATH_POINTS = 16;
+
+/** One camera block as words; `path` prints the camera path's points after the path mode. */
+export function cameraWords(s: CameraSegment, path?: readonly { x: number; y: number; z: number }[]): string {
   const part = (m: CameraMode): string => {
     switch (m) {
       case "orbit": return s.amount !== undefined ? `orbit ${fmt(s.amount)}` : "orbit";
@@ -72,6 +77,7 @@ export function cameraWords(s: CameraSegment): string {
         if (s.amount !== undefined) return `jib ${s.amount < 0 ? "down" : "up"} ${metres(Math.abs(s.amount))}`;
         return "rise";
       case "threeQuarter": return "three-quarter";
+      case "path": return path ? `path ${pointWords(path)}` : "path";
       default: return m;
     }
   };
@@ -101,14 +107,16 @@ function anchorFor(r: Recipe, bands: BandAnalysis | undefined, beat: number, row
 function actionBlocks(r: Recipe): ActionBlock[] {
   const travel = travelRange(r.rootPath), lockWords = (l?: { lock?: string; strength?: number }) => (l?.lock ? ` lock ${l.lock}${l.strength !== undefined ? ` ${fmt(l.strength)}` : ""}` : "");
   const onPath = (s: Span) => !!travel && Math.abs(travel.from - s.from) < 1e-3 && Math.abs(travel.to - s.to) < 1e-3;
+  const moving = travel ? r.rootPath.filter(p => p.beat >= travel.from - 1e-6) : [];
+  const pts = moving.length && moving.length <= MAX_PRINTED_PATH_POINTS ? ` ${pointWords(moving)}` : "";
   const out: ActionBlock[] = [];
   let cursor = 0;
-  const rest = (to: number) => { if (to > cursor + 1e-6) out.push({ from: cursor, to, words: onPath({ from: cursor, to }) ? `glide on path${lockWords(r.travelLock)}` : "rest" }); };
+  const rest = (to: number) => { if (to > cursor + 1e-6) out.push({ from: cursor, to, words: onPath({ from: cursor, to }) ? `glide on path${pts}${lockWords(r.travelLock)}` : "rest" }); };
   r.moves.forEach((m, i) => {
     rest(m.atBeat);
     const span = { from: m.atBeat, to: moveEndBeat(r, i) };
     const path = onPath(span);
-    out.push({ ...span, words: `${wordForMove(r, m.clip ?? nameOf(m))}${path ? " on path" : ""}${lockWords(path && r.travelLock ? r.travelLock : m)}` });
+    out.push({ ...span, words: `${wordForMove(r, m.clip ?? nameOf(m))}${path ? ` on path${pts}` : ""}${lockWords(path && r.travelLock ? r.travelLock : m)}` });
     cursor = span.to;
   });
   rest(r.durationBeats);
@@ -121,9 +129,12 @@ function cameraBlocks(r: Recipe): CameraBlock[] {
   const out: CameraBlock[] = [];
   let cursor = 0;
   const gap = (to: number) => { if (to > cursor + 1e-6) out.push({ from: cursor, to, words: "static", shot: "-" }); };
+  let pathPrinted = false;
   for (const s of r.camera?.segments ?? []) {
     gap(s.fromBeat);
-    out.push({ from: s.fromBeat, to: s.toBeat, words: cameraWords(s), shot: s.shot ? `${s.shot}${s.cut ? " cut" : ""}` : "-" });
+    const withPath = !pathPrinted && s.modes.includes("path") ? r.camera!.path : undefined;
+    if (withPath) pathPrinted = true;
+    out.push({ from: s.fromBeat, to: s.toBeat, words: cameraWords(s, withPath), shot: s.shot ? `${s.shot}${s.cut ? " cut" : ""}` : "-" });
     cursor = s.toBeat;
   }
   if (r.camera) gap(r.durationBeats);
