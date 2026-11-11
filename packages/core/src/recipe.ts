@@ -5,6 +5,8 @@
  * Grown from the seed kit's v1 `MotionSpec` validator.
  */
 import { isPoseName, type PoseName } from "./poses";
+import { validateCamera, type CameraConfig } from "./camera";
+import { RecipeError, fail, finite, isObject, only, text } from "./validate";
 
 export const RECIPE_VERSION = 2;
 export const PREVIEW_FPS = [12, 18, 24, 30, 60] as const;
@@ -59,25 +61,11 @@ export type Recipe = {
   rootPath: RootPoint[];
   jumps: Jump[];
   audio?: AudioRef;
+  /** Audio-reactive camera rig, used by the "rig" view. */
+  camera?: CameraConfig;
 };
 
-export class RecipeError extends Error {
-  constructor(message: string) { super(`Recipe: ${message}`); this.name = "RecipeError"; }
-}
-const fail = (message: string): never => { throw new RecipeError(message); };
-const isObject = (x: unknown): x is Record<string, unknown> => !!x && typeof x === "object" && !Array.isArray(x);
-const finite = (x: unknown, min: number, max: number): x is number =>
-  typeof x === "number" && Number.isFinite(x) && x >= min && x <= max;
-const only = (x: Record<string, unknown>, keys: readonly string[], where: string) => {
-  const extra = Object.keys(x).filter(k => !keys.includes(k));
-  if (extra.length) fail(`${where}: unknown field(s) ${extra.join(", ")}`);
-};
-const SAFE_TEXT = /^[^<>{}\\]*$/;
-const text = (x: unknown, max: number, where: string): string => {
-  if (typeof x !== "string" || x.length > max || !SAFE_TEXT.test(x)) fail(`${where} must be text up to ${max} characters`);
-  if (/https?:|data:|javascript:/i.test(x as string)) fail(`${where} must not contain a URL`);
-  return x as string;
-};
+export { RecipeError };
 
 function validatePhase(input: unknown, where: string): Phase {
   if (!isObject(input)) return fail(`${where} must be an object`);
@@ -137,7 +125,7 @@ function validateMove(input: unknown, where: string, durationBeats: number): Mov
 /** Strict validation for agent-supplied JSON and imported recipes. Returns a fresh copy. */
 export function validateRecipe(input: unknown): Recipe {
   if (!isObject(input)) return fail("expected an object");
-  only(input, ["version", "fps", "durationBeats", "beatGrid", "character", "energy", "moves", "rootPath", "jumps", "audio"], "recipe");
+  only(input, ["version", "fps", "durationBeats", "beatGrid", "character", "energy", "moves", "rootPath", "jumps", "audio", "camera"], "recipe");
   if (input.version !== RECIPE_VERSION) fail(`expected version ${RECIPE_VERSION}`);
   if (input.fps !== 24) fail("fps must be 24");
   if (!Number.isInteger(input.durationBeats) || !finite(input.durationBeats, 1, 512)) fail("durationBeats must be a whole number 1–512");
@@ -197,6 +185,7 @@ export function validateRecipe(input: unknown): Recipe {
     only(a, ["name", "licence"], "audio");
     recipe.audio = { name: text(a.name, 120, "audio.name"), licence: text(a.licence, 120, "audio.licence") };
   }
+  if (input.camera !== undefined) recipe.camera = validateCamera(input.camera, durationBeats);
   return recipe;
 }
 

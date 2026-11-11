@@ -6,3 +6,8 @@ export * from "./engine";
 export * from "./commands";
 export * from "./bundle";
 export * from "./export-target";
+export * from "./audio-drive";
+export * from "./camera";
+export * from "./camera-rig";
+export * from "./subject";
+export * from "./rng";
