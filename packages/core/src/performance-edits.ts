@@ -14,6 +14,7 @@ import { detectedMarkers } from "./reactive";
 import type { HitMarker } from "./reactive-config";
 import { validateRecipe, type Recipe } from "./recipe";
 import type { AccentKey } from "./accents";
+import { MAX_BLEND_FRAMES, MIN_BLEND_FRAMES, framesToBeats } from "./transitions";
 
 const r4 = (x: number) => Math.round(x * 10000) / 10000;
 const clone = (r: Recipe): Recipe => structuredClone(r);
@@ -47,6 +48,16 @@ export function setMoveAtBeat(recipe: Recipe, beat: number, clip: string | null)
   if (clip) moves.push(riggedMove(clip, at, recipe.beatGrid.bpm));
   moves.sort((a, b) => a.atBeat - b.atBeat);
   return validateRecipe({ ...clone(recipe), moves });
+}
+
+/** Blend into a move (the transition from the move before it), in frames: 6–24, kept as beats. */
+export function setMoveBlend(recipe: Recipe, args: { moveId: string; frames: number }): Recipe {
+  const next = clone(recipe);
+  const m = next.moves.find(x => x.id === args.moveId);
+  if (!m) return recipe;
+  const frames = Math.round(Math.max(MIN_BLEND_FRAMES, Math.min(MAX_BLEND_FRAMES, args.frames)));
+  m.blendBeats = Math.min(8, r4(framesToBeats(frames, recipe.beatGrid.bpm)));
+  return validateRecipe(next);
 }
 
 /** The markers the recipe plays: its own, or the detected hits made editable. */

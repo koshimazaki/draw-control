@@ -15,15 +15,19 @@ export const RIGGED_CHARACTER = {
   file: "AnimationLibrary.glb",
 } as const;
 
-export type LoopClip = { seconds: number; steps: number; firstStep: number; /** in-place travel speed it was authored for, m/s */ travel?: number };
+export type LoopClip = {
+  seconds: number; steps: number; firstStep: number; /** in-place travel speed it was authored for, m/s */ travel?: number;
+  /** A gait: steps alternate feet, step 0 plants the left foot forward (measured). Gaits are foot-matched on a transition. */
+  gait?: true;
+};
 export const LOOP_CLIPS: Record<string, LoopClip> = {
   Idle_Loop: { seconds: 2.5, steps: 4, firstStep: 0 },
   Dance_Loop: { seconds: 1, steps: 2, firstStep: 0.267 },
-  Walk_Loop: { seconds: 1.333, steps: 2, firstStep: 0.067, travel: 1.4 },
-  Jog_Fwd_Loop: { seconds: 0.933, steps: 2, firstStep: 0.1, travel: 3 },
-  Sprint_Loop: { seconds: 0.667, steps: 2, firstStep: 0.067, travel: 6 },
+  Walk_Loop: { seconds: 1.333, steps: 2, firstStep: 0.067, travel: 1.4, gait: true },
+  Jog_Fwd_Loop: { seconds: 0.933, steps: 2, firstStep: 0.1, travel: 3, gait: true },
+  Sprint_Loop: { seconds: 0.667, steps: 2, firstStep: 0.067, travel: 6, gait: true },
   Crouch_Idle_Loop: { seconds: 2.933, steps: 4, firstStep: 0 },
-  Crouch_Fwd_Loop: { seconds: 2, steps: 2, firstStep: 0, travel: 1 },
+  Crouch_Fwd_Loop: { seconds: 2, steps: 2, firstStep: 0, travel: 1, gait: true },
   Sword_Idle: { seconds: 1.667, steps: 2, firstStep: 0 },
   Spell_Simple_Idle_Loop: { seconds: 2.1, steps: 4, firstStep: 0 },
 };

@@ -4,7 +4,7 @@
  */
 import {
   LOOP_CLIPS, RIGGED_CHARACTER, defaultRiggedRecipe, riggedMove, clearIncompatibleMoves, clipCycleBeatsFor, exportFrameCount, frameAt, incompatibleMoves, insertMove,
-  makeClipMove, moveBeats, removeMove, setAmplitude, swapMove, validateRecipe, buildDrive, flatDrive, planCamera,
+  makeClipMove, moveBeats, beatsToFrames, blendBeatsOf, setMoveBlend, removeMove, setAmplitude, swapMove, validateRecipe, buildDrive, flatDrive, planCamera,
   type AudioDrive, type CharacterKind, type Expression, type MoveKey, type PreviewFps, type Recipe,
 } from "@motion-studio/core";
 import { createProceduralCharacter } from "./characters/rig";
@@ -94,7 +94,7 @@ export function startApp(root: HTMLElement) {
       say("selBeat", `beat ${move.atBeat} · ${moveBeats(move, recipe)} beats per pass`);
       input("selAmp").value = String(move.phases[0].amplitude);
       $<HTMLSelectElement>("selFps").value = String(move.phases[0].previewFps);
-      input("selBlend").value = String(move.blendBeats);
+      input("selBlend").value = String(Math.round(beatsToFrames(blendBeatsOf(move, recipe), recipe.beatGrid.bpm)));
       $<HTMLSelectElement>("selExpr").value = move.phases[0].expression ?? "";
     }
     const clipDriven = recipe.character.kind === "file" || recipe.character.kind === "rigged";
@@ -278,7 +278,7 @@ export function startApp(root: HTMLElement) {
   });
   input("selAmp").oninput = () => { if (selectedId) edit(r => setAmplitude(r, { moveId: selectedId!, value: Number(input("selAmp").value) })); };
   $<HTMLSelectElement>("selFps").onchange = () => editSelected(m => m.phases.forEach(p => { p.previewFps = Number($<HTMLSelectElement>("selFps").value) as PreviewFps; }));
-  input("selBlend").onchange = () => editSelected(m => { m.blendBeats = Number(input("selBlend").value); });
+  input("selBlend").onchange = () => { if (selectedId) edit(r => setMoveBlend(r, { moveId: selectedId!, frames: Number(input("selBlend").value) })); };
   $<HTMLSelectElement>("selExpr").onchange = () => editSelected(m => m.phases.forEach(p => {
     const v = $<HTMLSelectElement>("selExpr").value;
     if (v) p.expression = v as Expression; else delete p.expression;

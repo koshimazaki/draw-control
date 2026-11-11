@@ -4,7 +4,7 @@
  * and a graph with the waveform, the energy curve (dashed: the analysed original when it
  * was edited), pose speed, beat ticks and the hit markers.
  */
-import { CLIP_ACCENTS, accentSpan, proceduralAccent, type AudioDrive, type HitMarker, type Recipe } from "@motion-studio/core";
+import { CLIP_ACCENTS, accentSpan, beatsToFrames, blendBeatsOf, proceduralAccent, type AudioDrive, type HitMarker, type Recipe } from "@motion-studio/core";
 
 export const LANES = { phase: 26, move: 22, steps: 54, graph: 230, gap: 4, markerStrip: 16 } as const;
 export const laneTop = {
@@ -28,6 +28,8 @@ export type TimelineModel = {
   phases: (number[] | null)[];
   steps: number[]; division: number;
   selectedMarker: number;
+  /** Move index whose blend handle is being dragged (-1: none). */
+  selectedBlend: number;
   poseSpeed: Float32Array | null;
   energyEdited: boolean;
   /** Point handles on the energy curve (one per step) when editing points. */
@@ -98,6 +100,16 @@ export function drawTimeline(canvas: HTMLCanvasElement, m: TimelineModel) {
     g.fillRect(X(mv.atBeat), laneTop.move + 2, X(end) - X(mv.atBeat) - 1, LANES.move - 4);
     g.fillStyle = "#101114";
     g.fillText(name.replace(/_Loop$/, "").replace(/_/g, " "), X(mv.atBeat) + 3, laneTop.move + LANES.move / 2);
+  });
+  // Blend wedges: the crossfade into each move; drag the right edge to change its length.
+  r.moves.forEach((mv, i) => {
+    if (i === 0) return;
+    const bb = blendBeatsOf(mv, r), x0 = X(mv.atBeat), x1 = X(mv.atBeat + bb);
+    g.fillStyle = "rgba(255,255,255,0.28)";
+    g.beginPath(); g.moveTo(x0, laneTop.move + LANES.move - 2); g.lineTo(x1, laneTop.move + 2); g.lineTo(x0, laneTop.move + 2); g.closePath(); g.fill();
+    g.fillStyle = i === m.selectedBlend ? "#ffd34d" : "rgba(255,255,255,0.8)";
+    g.fillRect(Math.round(x1) - 1, laneTop.move + 1, 2, LANES.move - 2);
+    if (x1 - x0 > 18 || i === m.selectedBlend) { g.fillStyle = "#101114"; g.fillText(`${Math.round(beatsToFrames(bb, r.beatGrid.bpm))}f`, x1 + 3, laneTop.move + LANES.move - 6); }
   });
 
   // Amplitude-per-step lane: one bar per step.

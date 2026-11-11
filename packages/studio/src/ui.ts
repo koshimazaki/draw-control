@@ -62,7 +62,7 @@ export const LAYOUT = `
         <label>Amplitude <input id="selAmp" type="range" min="0" max="2" step="0.05" /></label>
         <div class="grid3">
           <label>Preview fps <select id="selFps">${options(PREVIEW_FPS)}</select></label>
-          <label>Blend beats <input id="selBlend" type="number" min="0" max="8" step="0.25" /></label>
+          <label title="Crossfade from the move before, in frames (6–24); drag the handle on the move lane too">Blend frames <input id="selBlend" type="number" min="6" max="24" step="1" /></label>
           <label>Expression <select id="selExpr"><option value="">none</option>${options(EXPRESSIONS)}</select></label>
         </div>
         <div class="row">

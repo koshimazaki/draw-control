@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   addMarker, clearSteps, clipPlanFor, currentMarkers, currentSteps, defaultRiggedRecipe, frameAt, markerPhases, moveMarker,
-  paintEnergy, removeMarker, retimePhase, riggedMove, secondsAtBeat, setMarkerAccent, setMoveAtBeat, setStepAmplitude,
+  paintEnergy, removeMarker, retimePhase, riggedMove, secondsAtBeat, setMarkerAccent, setMoveAtBeat, setMoveBlend, setStepAmplitude,
   snapSeconds, validateRecipe, type AudioDrive, type Recipe,
 } from "../src";
 
@@ -10,6 +10,13 @@ const drive: AudioDrive = { fps: FPS, energy: new Float32Array(800).fill(0.5), o
 const base = (): Recipe => validateRecipe({ ...defaultRiggedRecipe(), durationBeats: 24, moves: [riggedMove("Dance_Loop", 0)] });
 
 describe("performance edits", () => {
+  it("sets a transition's blend in frames, clamped to 6–24", () => {
+    const r = validateRecipe({ ...base(), moves: [riggedMove("Idle_Loop", 0), riggedMove("Dance_Loop", 4)] });
+    expect(setMoveBlend(r, { moveId: "Dance_Loop-4", frames: 9 }).moves[1].blendBeats).toBeCloseTo(9 / 24 * 2, 4);
+    expect(setMoveBlend(r, { moveId: "Dance_Loop-4", frames: 2 }).moves[1].blendBeats).toBeCloseTo(6 / 24 * 2, 4);
+    expect(setMoveBlend(r, { moveId: "Dance_Loop-4", frames: 99 }).moves[1].blendBeats).toBeCloseTo(24 / 24 * 2, 4);
+    expect(setMoveBlend(r, { moveId: "nope", frames: 9 })).toBe(r);
+  });
   it("dragging a step bar changes the amplitude on that step only", () => {
     const r = base();
     const before = currentSteps(r, drive, 8);

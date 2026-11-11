@@ -24,9 +24,9 @@ import { STEP_AMPLITUDE_MAX, type StepLane } from "./performance-config";
 import type { Recipe } from "./recipe";
 import { smoothNoise } from "./rng";
 import type { AccentKey } from "./accents";
+import { MIN_BLEND_FRAMES, SWITCH_FRAMES, blendBeatsOf, gaitOffsets, layeredWeights } from "./transitions";
 
 const TEMPO_FADE_BEATS = 0.5;
-const CLIP_SWITCH_FADE = 0.3;   // share of a phase that cross-fades into the next phase's clip
 /** Frames each bone group trails the hips at humanise 1 (the studio maps DEF bones to groups). */
 export const BONE_LAG_FRAMES = { spine: 1.5, shoulder: 2, head: 3, arm: 3.5 } as const;
 export type BoneGroup = keyof typeof BONE_LAG_FRAMES;
@@ -42,7 +42,7 @@ export const clipSpan = (beatSeconds: number): AccentSpanFn => (key: AccentKey) 
 };
 
 export type ScheduledHit = Hit & { accent: ClipAccent; boundaries: number[] };
-export type ClipPlan = { levels: number[]; hits: ScheduledHit[]; drive?: AudioDrive };
+export type ClipPlan = { levels: number[]; hits: ScheduledHit[]; drive?: AudioDrive; /** cycle offset per move (gait foot matching) */ offsets: number[] };
 
 /** The drive with the recipe's hand-edited energy curve, when it has one. */
 export function effectiveDrive(recipe: Recipe, drive?: AudioDrive): AudioDrive | undefined {
@@ -98,7 +98,10 @@ export function clipPlanFor(recipe: Recipe, drive?: AudioDrive): ClipPlan {
       hits.push({ ...h, accent, boundaries });
     }
   }
-  const plan = { levels: barLevels(recipe, eff), hits, drive: eff };
+  hits.sort((a, b) => a.seconds - b.seconds);
+  const levels = barLevels(recipe, eff);
+  const offsets = gaitOffsets(recipe, beat => levels[Math.max(0, Math.floor(beat / recipe.beatGrid.beatsPerBar))] ?? 1);
+  const plan = { levels, hits, drive: eff, offsets };
   memo = { recipe, drive, plan };
   return plan;
 }
@@ -113,15 +116,15 @@ export function loopLayersAt(recipe: Recipe, plan: ClipPlan, seconds: number): C
   const tempoW = bar > 0 && prevLevel !== undefined && prevLevel !== level && into < TEMPO_FADE_BEATS ? ease(into / TEMPO_FADE_BEATS) : 1;
   const k = activeMoveIndex(recipe, beat);
   const move = recipe.moves[k];
-  const blendW = k > 0 && move.blendBeats > 0 ? ease((beat - move.atBeat) / move.blendBeats) : 1;
+  const blendW = k > 0 ? ease((beat - move.atBeat) / blendBeatsOf(move, recipe)) : 1;
   const layers: ClipLayer[] = [];
   const snap = stepSnap(recipe.reactive, energyAtSeconds(plan.drive, seconds));
-  const push = (m: Recipe["moves"][number], lvl: number, weight: number) => {
+  const push = (m: Recipe["moves"][number], lvl: number, weight: number, index: number) => {
     if (!m.clip || weight <= 1e-6) return;
     const lib = LOOP_CLIPS[m.clip];
     if (lib) {
       const cycle = loopCycleBeats(lib, g.bpm, lvl);
-      let phase = mod((beat - m.atBeat) / cycle, 1);
+      let phase = mod((beat - m.atBeat) / cycle + (plan.offsets[index] ?? 0), 1);
       if (snap > 0) {
         const x = phase * lib.steps, step = Math.floor(x), f = x - step;
         phase = (step + f + snap * (1 - Math.pow(1 - f, 2.5) - f)) / lib.steps;
@@ -132,12 +135,13 @@ export function loopLayersAt(recipe: Recipe, plan: ClipPlan, seconds: number): C
       layers.push({ moveId: m.id, clip: m.clip, cyclePhase: mod((beat - m.atBeat) * lvl / cycle, 1), weight });
     }
   };
-  const both = (m: Recipe["moves"][number], weight: number) => {
-    push(m, level, weight * tempoW);
-    if (tempoW < 1) push(m, prevLevel!, weight * (1 - tempoW));
+  const both = (index: number, weight: number) => {
+    const m = recipe.moves[index];
+    push(m, level, weight * tempoW, index);
+    if (tempoW < 1) push(m, prevLevel!, weight * (1 - tempoW), index);
   };
-  both(move, blendW);
-  if (blendW < 1) both(recipe.moves[k - 1], 1 - blendW);
+  both(k, blendW);
+  if (blendW < 1) both(k - 1, 1 - blendW);
   return layers;
 }
 
@@ -158,22 +162,35 @@ export function amplitudeAt(recipe: Recipe, plan: ClipPlan, seconds: number): nu
 
 export type AccentEval = { layers: ClipLayer[]; weight: number; lift: number; spin: number; phase: { name: string; kind: PhaseKind }; hit: ScheduledHit };
 
-/** One accent at `u` beats from its hit, or null outside its phases. */
+/**
+ * One accent at `u` beats from its hit, or null outside it. It fades in over its first
+ * phase and out over its last, each at least MIN_BLEND_FRAMES (holding the first or last
+ * clip frame outside the authored phases); a clip switch between two phases crossfades
+ * over SWITCH_FRAMES centred on their boundary.
+ */
 export function evaluateClipAccent(hit: ScheduledHit, u: number, beatSeconds: number): AccentEval | null {
   const { accent, boundaries: b } = hit;
   const n = accent.phases.length;
-  if (u <= b[0] || u >= b[n]) return null;
+  const minFade = MIN_BLEND_FRAMES / 24 / beatSeconds, half = SWITCH_FRAMES / 48 / beatSeconds;
+  const start = Math.min(b[0], b[1] - minFade), end = Math.max(b[n], b[n - 1] + minFade);
+  if (u <= start || u >= end) return null;
+  const uc = Math.max(b[0], Math.min(b[n] - 1e-9, u));
   let i = 0;
-  while (i < n - 1 && u >= b[i + 1]) i++;
-  const p = accent.phases[i], t = (u - b[i]) / (b[i + 1] - b[i]);
-  const weight = i === 0 ? ease(t) : i === n - 1 ? 1 - ease(t) : 1;
+  while (i < n - 1 && uc >= b[i + 1]) i++;
+  const p = accent.phases[i], t = Math.max(0, Math.min(1, (uc - b[i]) / (b[i + 1] - b[i])));
+  const weight = Math.min(ease((u - start) / (b[1] - start)), 1 - ease((u - b[n - 1]) / (end - b[n - 1])));
   const layers: ClipLayer[] = [];
   const id = `accent-${hit.seconds}`;
   if (p.clip) {
-    const next = accent.phases[i + 1];
-    const sw = next && next.clip && next.clip !== p.clip && t > 1 - CLIP_SWITCH_FADE ? ease((t - (1 - CLIP_SWITCH_FADE)) / CLIP_SWITCH_FADE) : 0;
-    layers.push({ moveId: id, clip: p.clip, cyclePhase: 0, weight: 1 - sw, time: p.from + (p.to - p.from) * t, accent: true });
-    if (sw > 0) layers.push({ moveId: id, clip: next.clip!, cyclePhase: 0, weight: sw, time: next.from, accent: true });
+    const own: ClipLayer = { moveId: id, clip: p.clip, cyclePhase: 0, weight: 1, time: p.from + (p.to - p.from) * t, accent: true };
+    layers.push(own);
+    for (let k = 1; k < n; k++) {
+      const before = accent.phases[k - 1], after = accent.phases[k], d = u - b[k];
+      if (!before.clip || !after.clip || before.clip === after.clip || Math.abs(d) >= half) continue;
+      const w = ease((d + half) / (2 * half));
+      if (d < 0) { own.weight *= 1 - w; layers.push({ moveId: id, clip: after.clip, cyclePhase: 0, weight: w, time: after.from, accent: true }); }
+      else { own.weight *= w; layers.push({ moveId: id, clip: before.clip, cyclePhase: 0, weight: 1 - w, time: before.to, accent: true }); }
+    }
   }
   let lift = 0;
   if (accent.airborne) {
@@ -207,16 +224,22 @@ export function clipFrameAt(recipe: Recipe, frame: number, drive?: AudioDrive): 
   const state: FrameState = { frame, seconds, beat, root, pose: neutralPose(), layers, active: base.active, amplitude: amplitudeAt(recipe, plan, seconds), energy: energyAtSeconds(plan.drive, seconds) };
   if (lagged) state.lagged = lagged;
   let accentWeight = 0;
+  const playing: AccentEval[] = [];
   for (const hit of plan.hits) {
     const a = evaluateClipAccent(hit, beat - hit.beat, beatSeconds);
-    if (!a) continue;
-    for (const l of a.layers) layers.push({ ...l, weight: l.weight * a.weight });
+    if (a) playing.push(a);
+  }
+  // A later accent covers the earlier ones as it fades in (hits are in time order).
+  const cover = layeredWeights(playing.map(a => a.weight));
+  playing.forEach((a, j) => {
+    const hit = a.hit;
+    for (const l of a.layers) layers.push({ ...l, weight: l.weight * cover[j] });
     root.y += a.lift * (0.75 + 0.5 * (state.energy ?? 0.5));
     root.yawRadians += a.spin;
     accentWeight = Math.max(accentWeight, a.weight);
     state.accent = { key: hit.key, hitSeconds: hit.seconds, weight: a.weight };
     state.phase = { name: a.phase.name, kind: a.phase.kind, accent: a.hit.accent.name };
-  }
+  });
   state.accentWeight = accentWeight;
   return state;
 }

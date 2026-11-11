@@ -10,7 +10,7 @@
 import {
   ACCENT_KEYS, LOOP_CLIPS, MOVE_KEYS, MOVE_LIBRARY, addMarker, beatAtSeconds, clearEnergyCurve, clearSteps, currentMarkers,
   currentSteps, effectiveDrive, insertMove, markerPhases, moveMarker, paintEnergy, removeMarker, removeMove, retimePhase,
-  secondsAtBeat, setMarkerAccent, setMoveAtBeat, setStepAmplitude, snapSeconds,
+  beatsToFrames, blendBeatsOf, secondsAtBeat, setMarkerAccent, setMoveAtBeat, setMoveBlend, setStepAmplitude, snapSeconds,
   type AccentKey, type AudioDrive, type MoveKey, type Recipe, type StepDivision,
 } from "@motion-studio/core";
 import { LANES, TIMELINE_HEIGHT, drawTimeline, laneTop, type TimelineModel } from "./draw";
@@ -47,10 +47,11 @@ const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getEleme
 export class Timeline {
   private canvas = $<HTMLCanvasElement>("strip");
   private selected = -1;
+  private blendDrag = -1;
   private drawing = false;
   private points = false;
   private hover: TimelineModel["hover"] = null;
-  private cache: { recipe: Recipe; drive?: AudioDrive; division: number; model: Omit<TimelineModel, "beat" | "selectedMarker" | "poseSpeed" | "handles" | "hover"> } | null = null;
+  private cache: { recipe: Recipe; drive?: AudioDrive; division: number; model: Omit<TimelineModel, "beat" | "selectedMarker" | "selectedBlend" | "poseSpeed" | "handles" | "hover"> } | null = null;
 
   constructor(private host: TimelineHost) {
     $("tlDrawEnergy").onclick = () => { this.drawing = !this.drawing; if (this.drawing) this.points = false; this.syncModes(); };
@@ -108,7 +109,7 @@ export class Timeline {
       } };
       if (this.selected >= markers.length) this.selected = -1;
     }
-    return { ...this.cache.model, beat: this.host.beat(), selectedMarker: this.selected, poseSpeed: this.host.poseSpeed(), handles: this.points, hover: this.hover };
+    return { ...this.cache.model, beat: this.host.beat(), selectedMarker: this.selected, selectedBlend: this.blendDrag, poseSpeed: this.host.poseSpeed(), handles: this.points, hover: this.hover };
   }
 
   draw() { drawTimeline(this.canvas, this.model()); }
@@ -159,6 +160,14 @@ export class Timeline {
         this.selected = m.phases.findIndex((b, i) => !!b && beatAtX(e.clientX) >= markerBeat(i) + b[0] && beatAtX(e.clientX) <= markerBeat(i) + b[b.length - 1]);
         this.syncAccent();
       }
+    } else if (y < laneTop.steps && this.blendHandleAt(recipe, x, xOfBeat) > 0) {
+      // Move lane: drag a blend handle (the crossfade into a move), in whole frames.
+      const i = this.blendHandleAt(recipe, x, xOfBeat), id = recipe.moves[i].id, at = recipe.moves[i].atBeat;
+      this.blendDrag = i;
+      move = ev => {
+        const frames = beatsToFrames(beatAtX(ev.clientX) - at, this.host.recipe().beatGrid.bpm);
+        this.host.edit(r => setMoveBlend(r, { moveId: id, frames }));
+      };
     } else if (y < laneTop.steps) {
       // Move lane: paint the brush on the beat.
       const beat = Math.floor(beatAtX(e.clientX)), v = $<HTMLSelectElement>("tlBrush").value;
@@ -231,9 +240,20 @@ export class Timeline {
     move(e);
     this.canvas.setPointerCapture(e.pointerId);
     const onMove = (ev: PointerEvent) => { move!(ev); this.draw(); };
-    const onUp = () => { this.canvas.removeEventListener("pointermove", onMove); this.canvas.removeEventListener("pointerup", onUp); };
+    const onUp = () => { this.blendDrag = -1; this.draw(); this.canvas.removeEventListener("pointermove", onMove); this.canvas.removeEventListener("pointerup", onUp); };
     this.canvas.addEventListener("pointermove", onMove);
     this.canvas.addEventListener("pointerup", onUp);
+  }
+
+  /** Index of the move whose blend handle is under x (within 5 px), or -1. */
+  private blendHandleAt(recipe: Recipe, x: number, xOfBeat: (b: number) => number): number {
+    let best = -1, bd = 5;
+    recipe.moves.forEach((mv, i) => {
+      if (i === 0) return;
+      const d = Math.abs(xOfBeat(mv.atBeat + blendBeatsOf(mv, recipe)) - x);
+      if (d < bd) { bd = d; best = i; }
+    });
+    return best;
   }
 
   private syncAccent() {
