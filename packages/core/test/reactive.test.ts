@@ -95,3 +95,14 @@ describe("reactive animation layer", () => {
     expect(frameAt(plain, 50, d)).toEqual(frameAt(plain, 50));
   });
 });
+
+describe("example recipes", () => {
+  it("A, C and D validate as recipes; D carries the reactive layer and the rig", async () => {
+    const { exampleRecipes } = await import("../src");
+    const list = exampleRecipes();
+    expect(list.map(e => e.id)).toEqual(["A", "C", "D"]);
+    for (const e of list) expect(validateRecipe(JSON.parse(JSON.stringify(e.recipe)))).toEqual(e.recipe);
+    const d = list.find(e => e.id === "D")!.recipe;
+    expect(d.reactive && d.camera).toBeTruthy();
+  });
+});

@@ -17,3 +17,6 @@ coverage/
 .vite/
 .local/
 *.key
+
+# example exports (regenerate with npm run examples)
+examples/bundles/

@@ -1,0 +1,320 @@
+{
+  "version": 2,
+  "fps": 24,
+  "durationBeats": 48,
+  "beatGrid": {
+    "bpm": 120,
+    "offsetSeconds": 0.25,
+    "beatsPerBar": 4,
+    "source": "manual"
+  },
+  "character": {
+    "kind": "mannequin",
+    "name": "Procedural mannequin",
+    "licence": "MIT (motion-studio)"
+  },
+  "energy": 1,
+  "moves": [
+    {
+      "id": "stepTouch-0",
+      "name": "Step touch",
+      "atBeat": 0,
+      "blendBeats": 0.5,
+      "loop": true,
+      "phases": [
+        {
+          "name": "left",
+          "caption": "Step to the left",
+          "pose": "stepLeft",
+          "amplitude": 1,
+          "length": {
+            "beats": 1
+          },
+          "previewFps": 24
+        },
+        {
+          "name": "right",
+          "caption": "Step to the right",
+          "pose": "stepRight",
+          "amplitude": 1,
+          "length": {
+            "beats": 1
+          },
+          "previewFps": 24
+        }
+      ]
+    },
+    {
+      "id": "disco-8",
+      "name": "Disco point",
+      "atBeat": 8,
+      "blendBeats": 0.5,
+      "loop": true,
+      "phases": [
+        {
+          "name": "up",
+          "caption": "Point up to the right",
+          "pose": "pointUpRight",
+          "amplitude": 1,
+          "length": {
+            "beats": 1
+          },
+          "previewFps": 24
+        },
+        {
+          "name": "down",
+          "caption": "Point down to the left",
+          "pose": "pointDownLeft",
+          "amplitude": 1,
+          "length": {
+            "beats": 1
+          },
+          "previewFps": 24
+        }
+      ]
+    },
+    {
+      "id": "bounce-16",
+      "name": "Bounce",
+      "atBeat": 16,
+      "blendBeats": 0.5,
+      "loop": true,
+      "phases": [
+        {
+          "name": "down",
+          "caption": "Drop on the beat",
+          "pose": "bounceDown",
+          "amplitude": 1,
+          "length": {
+            "beats": 0.5
+          },
+          "previewFps": 24
+        },
+        {
+          "name": "up",
+          "caption": "Lift between beats",
+          "pose": "bounceUp",
+          "amplitude": 1,
+          "length": {
+            "beats": 0.5
+          },
+          "previewFps": 24
+        }
+      ]
+    },
+    {
+      "id": "armsUp-20",
+      "name": "Arms up",
+      "atBeat": 20,
+      "blendBeats": 1,
+      "loop": true,
+      "phases": [
+        {
+          "name": "out",
+          "caption": "Arms out to the sides",
+          "pose": "armsOut",
+          "amplitude": 1,
+          "length": {
+            "beats": 1
+          },
+          "previewFps": 24
+        },
+        {
+          "name": "up",
+          "caption": "Arms overhead",
+          "pose": "armsUp",
+          "amplitude": 1,
+          "length": {
+            "beats": 1
+          },
+          "previewFps": 24
+        }
+      ]
+    },
+    {
+      "id": "stepTouch-24",
+      "name": "Step touch",
+      "atBeat": 24,
+      "blendBeats": 0.5,
+      "loop": true,
+      "phases": [
+        {
+          "name": "left",
+          "caption": "Step to the left",
+          "pose": "stepLeft",
+          "amplitude": 1,
+          "length": {
+            "beats": 1
+          },
+          "previewFps": 24
+        },
+        {
+          "name": "right",
+          "caption": "Step to the right",
+          "pose": "stepRight",
+          "amplitude": 1,
+          "length": {
+            "beats": 1
+          },
+          "previewFps": 24
+        }
+      ]
+    },
+    {
+      "id": "punches-28",
+      "name": "Punches",
+      "atBeat": 28,
+      "blendBeats": 0.5,
+      "loop": true,
+      "phases": [
+        {
+          "name": "left",
+          "caption": "Punch left",
+          "pose": "punchLeft",
+          "amplitude": 1,
+          "length": {
+            "beats": 1
+          },
+          "previewFps": 24
+        },
+        {
+          "name": "right",
+          "caption": "Punch right",
+          "pose": "punchRight",
+          "amplitude": 1,
+          "length": {
+            "beats": 1
+          },
+          "previewFps": 24
+        }
+      ]
+    },
+    {
+      "id": "disco-32",
+      "name": "Disco point",
+      "atBeat": 32,
+      "blendBeats": 0.5,
+      "loop": true,
+      "phases": [
+        {
+          "name": "up",
+          "caption": "Point up to the right",
+          "pose": "pointUpRight",
+          "amplitude": 1,
+          "length": {
+            "beats": 1
+          },
+          "previewFps": 24
+        },
+        {
+          "name": "down",
+          "caption": "Point down to the left",
+          "pose": "pointDownLeft",
+          "amplitude": 1,
+          "length": {
+            "beats": 1
+          },
+          "previewFps": 24
+        }
+      ]
+    },
+    {
+      "id": "stepTouch-40",
+      "name": "Step touch",
+      "atBeat": 40,
+      "blendBeats": 0.5,
+      "loop": true,
+      "phases": [
+        {
+          "name": "left",
+          "caption": "Step to the left",
+          "pose": "stepLeft",
+          "amplitude": 1,
+          "length": {
+            "beats": 1
+          },
+          "previewFps": 24
+        },
+        {
+          "name": "right",
+          "caption": "Step to the right",
+          "pose": "stepRight",
+          "amplitude": 1,
+          "length": {
+            "beats": 1
+          },
+          "previewFps": 24
+        }
+      ]
+    }
+  ],
+  "rootPath": [
+    {
+      "beat": 0,
+      "x": 0,
+      "z": 0,
+      "yaw": 0
+    }
+  ],
+  "jumps": [],
+  "audio": {
+    "name": "example-track.wav",
+    "licence": "Generated test signal (MIT, motion-studio)"
+  },
+  "reactive": {
+    "seed": 7,
+    "speed": 0.6,
+    "amplitude": 0.7,
+    "accents": [
+      "hit",
+      "point",
+      "jump",
+      "spin"
+    ],
+    "accentOn": "both",
+    "accentGapBeats": 2,
+    "onsetThreshold": 0.6,
+    "idleBelow": 0.15,
+    "humanise": 0.8
+  },
+  "camera": {
+    "segments": [
+      {
+        "fromBeat": 0,
+        "toBeat": 14,
+        "modes": [
+          "orbit"
+        ]
+      },
+      {
+        "fromBeat": 14,
+        "toBeat": 18,
+        "modes": [
+          "orbit",
+          "pushIn"
+        ]
+      },
+      {
+        "fromBeat": 18,
+        "toBeat": 40,
+        "modes": [
+          "orbit"
+        ]
+      },
+      {
+        "fromBeat": 40,
+        "toBeat": 48,
+        "modes": [
+          "pullOut",
+          "rise"
+        ]
+      }
+    ],
+    "intensity": 0.85,
+    "orbitDegreesPerBeat": 7,
+    "distance": 4.4,
+    "height": 1.15,
+    "fov": 38,
+    "startYaw": -20
+  }
+}

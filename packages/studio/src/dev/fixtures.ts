@@ -83,3 +83,6 @@ export async function syntheticCharacterGlb(): Promise<Uint8Array> {
   const out = await new GLTFExporter().parseAsync(scene, { binary: true, animations: clips() });
   return new Uint8Array(out as ArrayBuffer);
 }
+
+/** Example recipes A, C, D for `scripts/examples.mjs`. */
+export { exampleRecipes } from "@motion-studio/core";
