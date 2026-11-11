@@ -21,7 +21,9 @@ export const TIMELINE_LAYOUT = `
       <label>Paint move <select id="tlBrush"></select></label>
       <label>Accent <select id="tlAccent">${ACCENT_KEYS.map(k => `<option value="${k}">${k}</option>`).join("")}</select></label>
       <label class="check"><input id="tlSnapHits" type="checkbox" /> Snap to hits</label>
-      <button id="tlDrawEnergy" type="button" title="Draw over the energy curve">Draw energy</button>
+      <button id="tlDrawEnergy" type="button" title="Pencil: draw over the energy curve">Pencil</button>
+      <button id="tlPoints" type="button" title="Drag one point per step on the energy curve">Points</button>
+      <label class="check"><input id="tlSnapSteps" type="checkbox" /> Snap energy to steps</label>
       <button id="tlResetEnergy" type="button">Reset energy</button>
       <button id="tlResetSteps" type="button">Reset steps</button>
       <button id="tlDeleteMarker" type="button">Delete marker</button>
@@ -46,10 +48,15 @@ export class Timeline {
   private canvas = $<HTMLCanvasElement>("strip");
   private selected = -1;
   private drawing = false;
-  private cache: { recipe: Recipe; drive?: AudioDrive; division: number; model: Omit<TimelineModel, "beat" | "selectedMarker" | "poseSpeed"> } | null = null;
+  private points = false;
+  private hover: TimelineModel["hover"] = null;
+  private cache: { recipe: Recipe; drive?: AudioDrive; division: number; model: Omit<TimelineModel, "beat" | "selectedMarker" | "poseSpeed" | "handles" | "hover"> } | null = null;
 
   constructor(private host: TimelineHost) {
-    $("tlDrawEnergy").onclick = () => { this.drawing = !this.drawing; $("tlDrawEnergy").classList.toggle("on", this.drawing); };
+    $("tlDrawEnergy").onclick = () => { this.drawing = !this.drawing; if (this.drawing) this.points = false; this.syncModes(); };
+    $("tlPoints").onclick = () => { this.points = !this.points; if (this.points) this.drawing = false; this.syncModes(); this.draw(); };
+    this.canvas.addEventListener("pointermove", e => { if (!e.buttons) this.hoverAt(e); });
+    this.canvas.addEventListener("pointerleave", () => { this.hover = null; this.draw(); });
     $("tlResetEnergy").onclick = () => host.edit(clearEnergyCurve);
     $("tlResetSteps").onclick = () => host.edit(clearSteps);
     $("tlDeleteMarker").onclick = () => this.deleteSelected();
@@ -62,6 +69,19 @@ export class Timeline {
       if ((e.key === "Delete" || e.key === "Backspace") && this.selected >= 0) { e.preventDefault(); this.deleteSelected(); }
     });
     this.canvas.addEventListener("pointerdown", e => this.down(e));
+  }
+
+  private syncModes() { $("tlDrawEnergy").classList.toggle("on", this.drawing); $("tlPoints").classList.toggle("on", this.points); }
+
+  /** The value readout under the pointer, in the graph. */
+  private hoverAt(e: PointerEvent) {
+    const rect = this.canvas.getBoundingClientRect(), y = e.clientY - rect.top;
+    if (y < laneTop.graph) { if (this.hover) { this.hover = null; this.draw(); } return; }
+    const r = this.host.recipe(), x = e.clientX - rect.left, beat = x / rect.width * r.durationBeats, seconds = secondsAtBeat(r.beatGrid, beat);
+    const d = this.model().drive;
+    const energy = d ? d.energy[Math.max(0, Math.min(d.energy.length - 1, Math.round(seconds * d.fps)))] : 0.5;
+    this.hover = { x, seconds, beat, energy };
+    this.draw();
   }
 
   private division = () => Number($<HTMLSelectElement>("tlDivision").value) as StepDivision;
@@ -88,7 +108,7 @@ export class Timeline {
       } };
       if (this.selected >= markers.length) this.selected = -1;
     }
-    return { ...this.cache.model, beat: this.host.beat(), selectedMarker: this.selected, poseSpeed: this.host.poseSpeed() };
+    return { ...this.cache.model, beat: this.host.beat(), selectedMarker: this.selected, poseSpeed: this.host.poseSpeed(), handles: this.points, hover: this.hover };
   }
 
   draw() { drawTimeline(this.canvas, this.model()); }
@@ -160,11 +180,25 @@ export class Timeline {
     } else {
       const inStrip = y < laneTop.graph + LANES.markerStrip;
       const near = m.markers.findIndex((_, i) => Math.abs(xOfBeat(markerBeat(i)) - x) < (inStrip ? 7 : 4));
-      if (this.drawing && !inStrip) {
-        const gh = LANES.graph - LANES.markerStrip - 2, top = laneTop.graph + LANES.markerStrip;
-        let last: { t: number; v: number } | null = null;
+      const gh = LANES.graph - LANES.markerStrip - 2, top = laneTop.graph + LANES.markerStrip;
+      const valueAt = (ev: PointerEvent) => Math.max(0, Math.min(1, 1 - (ev.clientY - rect.top - top) / gh));
+      const stepBeats = 4 / this.division();
+      if (this.points && !inStrip) {
+        // Point handles: drag the step's point; the curve runs straight to its neighbours.
+        const i = Math.round(beatAtX(e.clientX) / stepBeats);
+        const tAt = (k: number) => secondsAtBeat(g, Math.max(0, Math.min(total, k * stepBeats)));
+        const eff = () => this.model().drive;
+        const valAt = (k: number) => { const d = eff(); return d ? d.energy[Math.max(0, Math.min(d.energy.length - 1, Math.round(tAt(k) * d.fps)))] : 0.5; };
         move = ev => {
-          const t = secondsAtBeat(g, beatAtX(ev.clientX)), v = Math.max(0, Math.min(1, 1 - (ev.clientY - rect.top - top) / gh));
+          const v = valueAt(ev), prev = valAt(i - 1), next = valAt(i + 1);
+          this.host.edit(r => paintEnergy(paintEnergy(r, this.host.drive(), tAt(i - 1), tAt(i), prev, v), this.host.drive(), tAt(i), tAt(i + 1), v, next));
+          this.hoverAt(ev);
+        };
+      } else if (this.drawing && !inStrip) {
+        let last: { t: number; v: number } | null = null;
+        const snapSteps = $<HTMLInputElement>("tlSnapSteps").checked;
+        move = ev => {
+          const b = beatAtX(ev.clientX), t = secondsAtBeat(g, snapSteps ? Math.round(b / stepBeats) * stepBeats : b), v = valueAt(ev);
           const from = last ?? { t, v };
           this.host.edit(r => paintEnergy(r, this.host.drive(), from.t, t, from.v, v));
           last = { t, v };

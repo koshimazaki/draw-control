@@ -57,17 +57,27 @@ export function effectiveDrive(recipe: Recipe, drive?: AudioDrive): AudioDrive |
   return { fps, energy, onsets: drive?.onsets ?? [], source: drive?.source ?? "flat" };
 }
 
+/** How strongly energy drives tempo and amplitude (the config amounts times the master drive). */
+export const tempoAmount = (cfg: Recipe["reactive"]) => cfg ? Math.min(1.5, cfg.speed * (cfg.drive ?? 1)) : 0;
+export const amplitudeAmount = (cfg: Recipe["reactive"]) => cfg ? Math.min(1.5, cfg.amplitude * (cfg.drive ?? 1)) : 0;
+/**
+ * Snappier steps when loud: within each step the clip moves fast right after the beat and
+ * settles into the next one. 0 below energy 0.4, up to 0.85.
+ */
+export const stepSnap = (cfg: Recipe["reactive"], energy: number) => Math.max(0, Math.min(0.85, tempoAmount(cfg) * (energy - 0.4) * 1.6));
+
 function barLevels(recipe: Recipe, drive: AudioDrive | undefined): number[] {
   const cfg = recipe.reactive, g = recipe.beatGrid;
   const bars = Math.ceil(recipe.durationBeats / g.beatsPerBar) + 1;
   const levels: number[] = [];
   for (let b = 0; b < bars; b++) {
-    if (!cfg || cfg.speed <= 0) { levels.push(1); continue; }
+    const T = tempoAmount(cfg);
+    if (!cfg || T <= 0) { levels.push(1); continue; }
     const from = secondsAtBeat(g, b * g.beatsPerBar), to = secondsAtBeat(g, (b + 1) * g.beatsPerBar);
     let sum = 0, n = 0;
     for (let t = from; t < to; t += 1 / recipe.fps) { sum += energyAtSeconds(drive, t); n++; }
     const e = n ? sum / n : 0.5;
-    levels.push(e > 1 - 0.3 * cfg.speed ? 2 : e < cfg.idleBelow + 0.25 * cfg.speed ? 0.5 : 1);
+    levels.push(e > 0.8 - 0.3 * T ? 2 : e < 0.2 + 0.2 * T ? 0.5 : 1);
   }
   return levels;
 }
@@ -105,12 +115,17 @@ export function loopLayersAt(recipe: Recipe, plan: ClipPlan, seconds: number): C
   const move = recipe.moves[k];
   const blendW = k > 0 && move.blendBeats > 0 ? ease((beat - move.atBeat) / move.blendBeats) : 1;
   const layers: ClipLayer[] = [];
+  const snap = stepSnap(recipe.reactive, energyAtSeconds(plan.drive, seconds));
   const push = (m: Recipe["moves"][number], lvl: number, weight: number) => {
     if (!m.clip || weight <= 1e-6) return;
     const lib = LOOP_CLIPS[m.clip];
     if (lib) {
       const cycle = loopCycleBeats(lib, g.bpm, lvl);
-      const phase = mod((beat - m.atBeat) / cycle, 1);
+      let phase = mod((beat - m.atBeat) / cycle, 1);
+      if (snap > 0) {
+        const x = phase * lib.steps, step = Math.floor(x), f = x - step;
+        phase = (step + f + snap * (1 - Math.pow(1 - f, 2.5) - f)) / lib.steps;
+      }
       layers.push({ moveId: m.id, clip: m.clip, cyclePhase: phase, weight, time: mod(lib.firstStep + phase * lib.seconds, lib.seconds) });
     } else {
       const cycle = m.clipCycleBeats ?? 4;
@@ -136,7 +151,7 @@ export function amplitudeAt(recipe: Recipe, plan: ClipPlan, seconds: number): nu
     const x = Math.max(0, beat) * lane.division / 4, i = Math.min(lane.amplitude.length - 1, Math.floor(x));
     const prev = lane.amplitude[Math.max(0, i - 1)], cur = lane.amplitude[i];
     a = i === 0 ? cur : prev + (cur - prev) * ease((x - i) / 0.4);
-  } else a = cfg ? 1 + cfg.amplitude * (energyAtSeconds(plan.drive, seconds) - 0.5) : 1;
+  } else a = cfg ? 1 + 1.3 * amplitudeAmount(cfg) * (energyAtSeconds(plan.drive, seconds) - 0.5) : 1;
   if (cfg && cfg.humanise > 0) a *= 1 + 0.08 * cfg.humanise * smoothNoise(cfg.seed, 1, beat / 2);
   return Math.max(0, Math.min(STEP_AMPLITUDE_MAX, a));
 }
@@ -196,7 +211,7 @@ export function clipFrameAt(recipe: Recipe, frame: number, drive?: AudioDrive): 
     const a = evaluateClipAccent(hit, beat - hit.beat, beatSeconds);
     if (!a) continue;
     for (const l of a.layers) layers.push({ ...l, weight: l.weight * a.weight });
-    root.y += a.lift;
+    root.y += a.lift * (0.75 + 0.5 * (state.energy ?? 0.5));
     root.yawRadians += a.spin;
     accentWeight = Math.max(accentWeight, a.weight);
     state.accent = { key: hit.key, hitSeconds: hit.seconds, weight: a.weight };

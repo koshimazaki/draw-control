@@ -24,9 +24,21 @@ try {
     await page.waitForFunction(() => /detected|no clear tempo/.test(document.querySelector("#trackStatus").textContent));
     await page.fill("#lengthBeats", "32"); await page.dispatchEvent("#lengthBeats", "change");
   }
+  // Markers are draggable: drag the first marker one beat later in the marker strip.
+  await page.check("#reactOn");
+  const before = await page.evaluate(() => JSON.parse(document.querySelector("#recipeJson").value).reactive?.markers?.length ?? 0);
+  const sb = await page.locator("#strip").boundingBox();
+  const lanesTop = 26 + 22 + 54 + 12;
+  const rec = JSON.parse(await page.inputValue("#recipeJson"));
+  const bpm = rec.beatGrid.bpm, off = rec.beatGrid.offsetSeconds, total = rec.durationBeats;
+  await page.mouse.move(sb.x + sb.width * 16 / total, sb.y + lanesTop + 8);
+  await page.mouse.down();
+  await page.mouse.move(sb.x + sb.width * 17 / total, sb.y + lanesTop + 8, { steps: 6 });
+  await page.mouse.up();
+  const after = JSON.parse(await page.inputValue("#recipeJson")).reactive?.markers ?? [];
+  console.log("marker drag:", before, "stored markers before,", after.length, "after; one at", after.map(m => m.seconds).find(s => Math.abs((s - off) * bpm / 60 - 17) < 0.05) ?? "none", "s (beat 17)");
   await page.check("#rigOn");
   await page.check('#rigModes input[value="pushIn"]');
-  await page.check("#reactOn");
   for (const [v, x] of [["rig", 0.3], ["rig", 0.6], ["orbit", 0.5], ["top", 0.5]]) {
     await page.click(`[data-view="${v}"]`);
     const box = await page.locator("#strip").boundingBox();

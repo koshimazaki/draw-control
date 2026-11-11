@@ -50,7 +50,7 @@ const REACTIVE_CAMERA: CameraConfig = {
 
 const dancer = () => base({
   camera: REACTIVE_CAMERA,
-  reactive: { seed: 7, speed: 0.5, amplitude: 0.7, accents: ["jump", "spin", "cross"], accentOn: "both",
+  reactive: { seed: 7, speed: 0.7, amplitude: 0.8, drive: 1, accents: ["jump", "spin", "cross"], accentOn: "both",
     accentGapBeats: 2, onsetThreshold: 0.6, idleBelow: 0.12, humanise: 0.8 },
 });
 
@@ -79,7 +79,7 @@ export function defaultRiggedRecipe(): Recipe {
     character: { kind: "rigged", name: RIGGED_CHARACTER.name, licence: RIGGED_CHARACTER.licence },
     energy: 1, moves: [riggedMove("Idle_Loop", 0), riggedMove("Dance_Loop", 4)],
     rootPath: [{ beat: 0, x: 0, z: 0, yaw: 0 }], jumps: [],
-    reactive: { seed: 1, speed: 0.5, amplitude: 0.6, accents: ["jump", "spin", "cross"], accentOn: "both",
+    reactive: { seed: 1, speed: 0.7, amplitude: 0.8, drive: 1, accents: ["jump", "spin", "cross"], accentOn: "both",
       accentGapBeats: 2, onsetThreshold: 0.6, idleBelow: 0.1, humanise: 0.7 },
   });
 }

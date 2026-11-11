@@ -6,7 +6,7 @@
  */
 import { CLIP_ACCENTS, accentSpan, proceduralAccent, type AudioDrive, type HitMarker, type Recipe } from "@motion-studio/core";
 
-export const LANES = { phase: 26, move: 22, steps: 54, graph: 104, gap: 4, markerStrip: 14 } as const;
+export const LANES = { phase: 26, move: 22, steps: 54, graph: 230, gap: 4, markerStrip: 16 } as const;
 export const laneTop = {
   phase: 0,
   move: LANES.phase + LANES.gap,
@@ -30,6 +30,10 @@ export type TimelineModel = {
   selectedMarker: number;
   poseSpeed: Float32Array | null;
   energyEdited: boolean;
+  /** Point handles on the energy curve (one per step) when editing points. */
+  handles: boolean;
+  /** Value readout under the pointer. */
+  hover: { x: number; seconds: number; beat: number; energy: number } | null;
 };
 
 export function setupCanvas(canvas: HTMLCanvasElement) {
@@ -131,6 +135,30 @@ export function drawTimeline(canvas: HTMLCanvasElement, m: TimelineModel) {
   if (m.poseSpeed) curve(m.poseSpeed, r.fps / 2, "rgba(79,195,247,0.85)", [], 1.2);
   if (m.energyEdited && m.analysed) curve(m.analysed.energy, m.analysed.fps, "rgba(255,211,77,0.55)", [4, 3], 1);
   if (m.drive) curve(m.drive.energy, m.drive.fps, "#ffd34d", [], 2);
+
+  // Energy grid lines (0.25 steps) and point handles, one per step.
+  g.fillStyle = "rgba(255,255,255,0.05)";
+  for (const v of [0.25, 0.5, 0.75]) g.fillRect(0, top + gh - v * gh, w, 1);
+  if (m.handles && m.drive) {
+    const n = Math.round(total * m.division / 4);
+    for (let i = 0; i <= n; i++) {
+      const beat = i * 4 / m.division, s = gb.offsetSeconds + beat * 60 / gb.bpm;
+      const e = m.drive.energy[Math.min(m.drive.energy.length - 1, Math.round(s * m.drive.fps))];
+      g.fillStyle = "#ffd34d"; g.strokeStyle = "#141518";
+      g.beginPath(); g.arc(X(beat), top + gh - e * gh, 3.5, 0, Math.PI * 2); g.fill(); g.stroke();
+    }
+  }
+  if (m.hover) {
+    g.fillStyle = "rgba(255,255,255,0.35)";
+    g.fillRect(Math.round(m.hover.x), top, 1, gh);
+    const label = `${m.hover.seconds.toFixed(2)} s · beat ${m.hover.beat.toFixed(2)} · energy ${m.hover.energy.toFixed(2)}`;
+    g.font = "11px ui-monospace, Menlo, monospace";
+    const tw = g.measureText(label).width;
+    const lx = Math.min(w - tw - 8, Math.max(4, m.hover.x + 8));
+    g.fillStyle = "rgba(20,21,24,0.85)"; g.fillRect(lx - 4, top + 4, tw + 8, 16);
+    g.fillStyle = "#e7e8ea"; g.fillText(label, lx, top + 12);
+    g.font = "10px system-ui, sans-serif";
+  }
 
   // Hit markers.
   m.markers.forEach((mk, i) => {

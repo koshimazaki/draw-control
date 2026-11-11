@@ -107,6 +107,20 @@ As specified on 7 November, with these changes:
 - MS-2: the procedural mannequin is the default guide figure: light limbs, dark slate joints, a plié bounce that reads from the front, framing that fits any aspect ratio.
 - MS-5: sizes 1280×720 (default), 1920×1080, 720×1280 and custom; export range; inline target warnings.
 
+### MS-9c, rigged mannequin and the audio clock (11 November, in progress)
+
+Built (verified by `npm test` 86 tests, `npm run smoke`, `npm run examples`, `npm run peek` screenshots):
+- The bundled rigged mannequin (Ecctrl AnimationLibrary, MIT; animations CC0, see `assets/characters/NOTICE.md`) is the default character; the procedural mannequin is the fallback.
+- Clip performance (`clip-library.ts`, `clip-perform.ts`): loops time-warped so steps land on beats; accent clips as phases placed on the audio clock, the key frame (landing, impact) on the hit; amplitude per step or from energy; a hand-edited energy curve; retimed phases stored per marker.
+- Energy drive: `reactive.drive` (default 1) scales how strongly energy sets playback (tempo level per bar, snappier steps when loud) and amplitude (bigger, heavier when loud, softer towards idle when quiet). Tested on the real clips: Dance_Loop at energy 0.9 against 0.2 shows about 8 times the pose speed, 1.6 times the knee range and 2.4 times the arm range.
+- Timeline lanes (phases, moves, amplitude per step, a 230 px energy graph with pencil, point handles, snap to steps and a value readout; markers draggable), transport rate and preview fps, a drawn camera path, bones, x-ray, onion skin, arcs, the move gizmo, and a Mixamo-to-DEF retarget module (bone map and synthetic test).
+
+Next in this package, in order (Radek's feedback, 11 November):
+1. Smooth transitions between moves: eased or inertialised crossfades of 6–12 frames, pose-matched where possible; a per-transition blend length editable on the move lane.
+2. Delete for moves, phase blocks, markers and steps (Delete key and a context menu; neighbours close the gap or hold), with undo and redo (Cmd-Z) for every edit.
+3. Sequences: Save, Save as, Load, a small library (localStorage, download and upload of the recipe JSON, named recipes in `examples/recipes/`); a reload restores the same animation; the recipe fields documented.
+4. Mixamo import in the studio (assets-local/mixamo/ in dev, drag and drop) and a check sheet plus MP4 per local clip into `out/mixamo-check/`, with a verdict per clip in `docs/friction.md`.
+
 ### MS-9b, after D (next, in this order)
 
 1. **Floor paths and beat-timed jumps.** One character per clip travels an editable floor path (a few control points, a smooth spline); travel speed follows energy; accent moves on the hits along the way (a jump that takes off and lands on the beat, a strike, a spin). Accent sets stay data, so a ninja combo or skateboard tricks are new entries.

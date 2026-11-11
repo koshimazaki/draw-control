@@ -40,16 +40,22 @@ export type ReactiveConfig = {
   humanise: number;
   /** Edited hits; when present they replace onset and downbeat detection. */
   markers?: HitMarker[];
+  /**
+   * Master amount of how strongly energy drives the motion (0–1.5, default 1): playback
+   * rate (tempo level per bar, snappier steps when loud) and amplitude (bigger, heavier
+   * movement when loud, softer towards idle when quiet).
+   */
+  drive?: number;
 };
 
 export const DEFAULT_REACTIVE: ReactiveConfig = {
-  seed: 1, speed: 0.6, amplitude: 0.6, accents: ["hit", "point", "jump"], accentOn: "both",
+  seed: 1, speed: 0.7, amplitude: 0.8, drive: 1, accents: ["hit", "point", "jump"], accentOn: "both",
   accentGapBeats: 2, onsetThreshold: 0.5, idleBelow: 0.12, humanise: 0.7,
 };
 
 export function validateReactive(input: unknown): ReactiveConfig {
   if (!isObject(input)) return fail("reactive must be an object");
-  only(input, ["seed", "speed", "amplitude", "accents", "accentOn", "accentGapBeats", "onsetThreshold", "idleBelow", "humanise", "markers"], "reactive");
+  only(input, ["seed", "speed", "amplitude", "accents", "accentOn", "accentGapBeats", "onsetThreshold", "idleBelow", "humanise", "markers", "drive"], "reactive");
   if (!Number.isInteger(input.seed) || !num(input.seed, 0, 2147483647, "reactive.seed")) fail("reactive.seed must be a whole number 0–2147483647");
   if (!Array.isArray(input.accents) || input.accents.length > 8) fail("reactive.accents must be a list of up to 8 accent moves");
   for (const a of input.accents as unknown[]) if (!isAccentKey(a)) fail(`reactive.accents: ${String(a)} is not an accent move`);
@@ -65,6 +71,7 @@ export function validateReactive(input: unknown): ReactiveConfig {
     idleBelow: num(input.idleBelow, 0, 1, "reactive.idleBelow"),
     humanise: num(input.humanise, 0, 1, "reactive.humanise"),
   };
+  if (input.drive !== undefined) out.drive = num(input.drive, 0, 1.5, "reactive.drive");
   if (input.markers !== undefined) {
     if (!Array.isArray(input.markers) || input.markers.length > 512) fail("reactive.markers must be a list of up to 512 markers");
     let last = -Infinity;

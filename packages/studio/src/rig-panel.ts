@@ -9,8 +9,9 @@ import {
 
 const PICKABLE: CameraMode[] = ["orbit", "pushIn", "pullOut", "rise", "lead", "chase", "path"];
 export const ACCENT_SETS: Record<string, { label: string; accents: AccentKey[] }> = {
-  dance: { label: "Dance: hit, point, jump, spin", accents: ["hit", "point", "jump", "spin"] },
-  ninja: { label: "Ninja: strike, kick, jump", accents: ["strike", "kick", "jump"] },
+  dance: { label: "Dance: jump, spin, cross", accents: ["jump", "spin", "cross"] },
+  dancePose: { label: "Procedural dance: hit, point, jump, spin", accents: ["hit", "point", "jump", "spin"] },
+  ninja: { label: "Ninja: jab, cross, sword, roll, jump", accents: ["jab", "cross", "sword", "roll", "jump"] },
   none: { label: "No accents", accents: [] },
 };
 
@@ -36,6 +37,7 @@ export const RIG_LAYOUT = `
       <h2>Reactive moves</h2>
       <label class="check"><input id="reactOn" type="checkbox" /> Moves follow the music (energy, accents on hits)</label>
       <div id="reactControls" class="rig" hidden>
+        <label>Energy drive (how strongly loudness sets speed and size) <input id="reactDrive" type="range" min="0" max="1.5" step="0.05" /></label>
         <label>Accents <select id="reactSet">${Object.entries(ACCENT_SETS).map(([k, v]) => `<option value="${k}">${v.label}</option>`).join("")}</select></label>
         <div class="grid3">
           <label>Amplitude <input id="reactAmp" type="range" min="0" max="1" step="0.05" /></label>
@@ -89,13 +91,13 @@ export function bindRigPanel(edit: Edit, onRigToggle: (on: boolean) => void) {
     accents: ACCENT_SETS[$<HTMLSelectElement>("reactSet").value]?.accents ?? [],
     amplitude: Number(input("reactAmp").value), speed: Number(input("reactSpeed").value), humanise: Number(input("reactHuman").value),
     accentOn: $<HTMLSelectElement>("reactOnWhat").value, seed: Math.max(0, Math.round(Number(input("reactSeed").value) || 0)),
-    idleBelow: Number(input("reactIdle").value) } }));
+    idleBelow: Number(input("reactIdle").value), drive: Number(input("reactDrive").value) } }));
   input("reactOn").onchange = () => edit(r => {
     const next = structuredClone(r);
     if (input("reactOn").checked) next.reactive = { ...DEFAULT_REACTIVE }; else delete next.reactive;
     return validateRecipe(next);
   });
-  for (const id of ["reactSet", "reactAmp", "reactSpeed", "reactHuman", "reactOnWhat", "reactSeed", "reactIdle"]) $(id).onchange = writeReactive;
+  for (const id of ["reactDrive", "reactSet", "reactAmp", "reactSpeed", "reactHuman", "reactOnWhat", "reactSeed", "reactIdle"]) $(id).onchange = writeReactive;
 }
 
 /** Read the recipe's rig and reactive fields back into the controls. */
@@ -119,6 +121,7 @@ export function syncRigPanel(recipe: Recipe) {
     const set = Object.entries(ACCENT_SETS).find(([, v]) => v.accents.join() === r.accents.join());
     $<HTMLSelectElement>("reactSet").value = set?.[0] ?? "dance";
     input("reactAmp").value = String(r.amplitude);
+    input("reactDrive").value = String(r.drive ?? 1);
     input("reactSpeed").value = String(r.speed);
     input("reactHuman").value = String(r.humanise);
     $<HTMLSelectElement>("reactOnWhat").value = r.accentOn;

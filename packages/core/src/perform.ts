@@ -49,7 +49,7 @@ export function movePoseAt(recipe: Recipe, plan: ReactivePlan, seconds: number):
   if (bar > 0 && prev !== undefined && prev !== level && into < TEMPO_FADE_BEATS) pose = mixPoses(levelPose(recipe, plan, prev, beat), pose, ease(into / TEMPO_FADE_BEATS));
   const e = energyAtSeconds(plan.drive, seconds);
   const h = cfg.humanise;
-  const scale = Math.max(0.2, 1 + cfg.amplitude * (e - 0.5) + 0.08 * h * smoothNoise(cfg.seed, 1, beat / 2));
+  const scale = Math.max(0.2, 1 + 1.3 * cfg.amplitude * (cfg.drive ?? 1) * (e - 0.5) + 0.08 * h * smoothNoise(cfg.seed, 1, beat / 2));
   pose = scalePose(pose, scale);
   if (h > 0) {
     JOINTS.forEach((j, i) => {
