@@ -9,19 +9,22 @@
   },
   "workspaces": [
     "packages/core",
-    "packages/studio"
+    "packages/studio",
+    "mcp"
   ],
   "scripts": {
     "dev": "npm run dev -w @motion-studio/studio",
     "build": "npm run build -w @motion-studio/studio",
     "test": "vitest run",
-    "typecheck": "tsc -p packages/core && tsc -p packages/studio",
+    "typecheck": "tsc -p packages/core && tsc -p packages/studio && tsc -p cli && tsc -p mcp",
     "lint": "eslint .",
     "check": "npm run typecheck && npm run lint && npm test",
     "smoke": "node scripts/smoke.mjs",
     "examples": "node scripts/examples.mjs",
     "peek": "node scripts/peek.mjs",
-    "mixamo-check": "node scripts/mixamo-check.mjs"
+    "mixamo-check": "node scripts/mixamo-check.mjs",
+    "cli": "node cli/bin/motion-studio.mjs",
+    "mcp": "node mcp/bin/motion-studio-mcp.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -34,5 +37,8 @@
     "typescript-eslint": "^8.72.2",
     "vite": "^8.3.7",
     "vitest": "^5.1.0"
+  },
+  "bin": {
+    "motion-studio": "cli/bin/motion-studio.mjs"
   }
 }

@@ -11,7 +11,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ["scripts/**/*.mjs"],
+    files: ["scripts/**/*.mjs", "cli/bin/*.mjs", "mcp/bin/*.mjs"],
     languageOptions: { globals: { console: "readonly", process: "readonly", URL: "readonly", Buffer: "readonly", window: "readonly", document: "readonly" } },
   },
 );

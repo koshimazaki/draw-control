@@ -31,3 +31,4 @@ export * from "./move-edits";
 export * from "./command-table";
 export * from "./envelope";
 export * from "./camera-edits";
+export * from "./describe";

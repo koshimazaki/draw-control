@@ -1,0 +1,72 @@
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { describe, expect, it } from "vitest";
+import { encodeWav, frameAt, validateRecipe, type Recipe } from "../../packages/core/src/index.ts";
+import { patternTimes, synthDrums } from "../../packages/core/test/drum-synth.ts";
+import { main, parseArgs, parseValue } from "../src/main.ts";
+import { readWav } from "../src/audio-file.ts";
+
+const dir = mkdtempSync(join(tmpdir(), "ms-cli-"));
+const wav = join(dir, "drums.wav");
+writeFileSync(wav, encodeWav([synthDrums(patternTimes(120, 8, 0.1), 16.6)], 44100, 0, 16.6));
+const run = async (...argv: string[]) => {
+  const out: string[] = [], err: string[] = [];
+  const code = await main(argv, s => out.push(s), s => err.push(s));
+  return { code, out: out.join("\n"), err: err.join("\n") };
+};
+
+describe("motion-studio CLI", () => {
+  it("parses flags and values", () => {
+    expect(parseArgs(["apply", "r.json", "--out", "x.json", "--grid"])).toEqual({ pos: ["apply", "r.json"], flags: { out: "x.json", grid: true } });
+    expect(parseValue("2.5")).toBe(2.5);
+    expect(parseValue("[\"orbit\"]")).toEqual(["orbit"]);
+    expect(parseValue("Walk_Loop")).toBe("Walk_Loop");
+  });
+  it("reads 16-bit WAV", () => {
+    const d = readWav(new Uint8Array(readFileSync(wav)));
+    expect(d.sampleRate).toBe(44100);
+    expect(d.channels[0].length).toBe(Math.round(16.6 * 44100));
+  });
+  it("worked example: analyse, a jump on every second kick, a camera push on the first snare, describe", async () => {
+    const a = join(dir, "analysis.json"), r0 = join(dir, "recipe.json"), cmds = join(dir, "commands.json"), r1 = join(dir, "recipe.next.json");
+    const an = await run("analyse", wav, "--out", a);
+    expect(an.code).toBe(0);
+    expect(an.err).toMatch(/120 BPM.*20 kicks, 16 snares/);
+    expect((await run("new", "--analysis", a, "--out", r0)).code).toBe(0);
+    writeFileSync(cmds, JSON.stringify([
+      { type: "placeOnEvery", move: "jump", target: "kick", every: 2, replace: true },
+      { type: "setCamera", distance: 4.8, height: 1.3 },
+      { type: "setCameraModes", modes: ["orbit"] },
+      { type: "startCameraMove", modes: ["pushIn"], target: "snare", index: 0, lengthBeats: 4 },
+    ]));
+    const ap = await run("apply", r0, cmds, "--analysis", a, "--out", r1);
+    expect(ap.err).toBe("");
+    const recipe = validateRecipe(JSON.parse(readFileSync(r1, "utf8"))) as Recipe;
+    expect(recipe.reactive!.markers!.length).toBe(10);
+    expect(recipe.camera!.segments.map(s => s.modes[0])).toEqual(["orbit", "pushIn", "orbit"]);
+    const d = await run("describe", r1, "--analysis", a);
+    expect(d.out).toMatch(/Hit markers \(10, edited\): jump@/);
+    expect(d.out).toMatch(/pushIn 1\.\d+–5\.\d+/);
+    expect(d.out).toMatch(/kicks 20/);
+    // Same script, same frames.
+    const again = join(dir, "again.json");
+    await run("apply", r0, cmds, "--analysis", a, "--out", again);
+    const r2 = JSON.parse(readFileSync(again, "utf8")) as Recipe;
+    expect([0, 40, 97, 180].map(n => frameAt(r2, n))).toEqual([0, 40, 97, 180].map(n => frameAt(recipe, n)));
+  });
+  it("set by path, with readable errors", async () => {
+    const r0 = join(dir, "recipe.json");
+    const s = await run("set", r0, "moves[1].speed", "2");
+    expect(JSON.parse(s.out).moves[1].speed).toBe(2);
+    const bad = await run("set", r0, "beatGrid.bpm", "900");
+    expect(bad.code).toBe(1);
+    expect(bad.err).toMatch(/bpm must be 40–240/);
+    const unknown = await run("apply", r0, join(dir, "nope.json"));
+    expect(unknown.code).toBe(1);
+  });
+  it("lists the commands", async () => {
+    const c = await run("commands");
+    for (const k of ["placeOnEvery", "startCameraMove", "drawEnvelope", "setRootPath", "set"]) expect(c.out).toContain(k);
+  });
+});
