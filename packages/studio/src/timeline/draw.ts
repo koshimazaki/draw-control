@@ -6,9 +6,9 @@
  */
 import type { Focus } from "./focus";
 import { drawAudioLane, type Wave } from "./audio-lane";
-import { CLIP_ACCENTS, accentSpan, beatsToFrames, blendBeatsOf, proceduralAccent, type AudioDrive, type HitMarker, type Recipe } from "@motion-studio/core";
+import { CLIP_ACCENTS, accentSpan, beatsToFrames, blendBeatsOf, moveEndBeat, proceduralAccent, type AudioDrive, type HitMarker, type Recipe } from "@motion-studio/core";
 
-export const LANES = { phase: 26, move: 22, steps: 54, graph: 230, audio: 84, gap: 4, markerStrip: 16 } as const;
+export const LANES = { phase: 26, move: 34, steps: 54, graph: 230, audio: 84, gap: 4, markerStrip: 16 } as const;
 export const laneTop = {
   phase: 0,
   move: LANES.phase + LANES.gap,
@@ -109,20 +109,26 @@ export function drawTimeline(canvas: HTMLCanvasElement, m: TimelineModel) {
     }
   });
 
-  // Move lane: one block per move, named.
+  // Move lane: one block per move, from its start to its end (a gap rests), with edge grips and its speed.
   r.moves.forEach((mv, i) => {
-    const end = Math.min(r.moves[i + 1]?.atBeat ?? total, total);
+    const end = moveEndBeat(r, i), x0 = X(mv.atBeat), x1 = X(end);
     const name = mv.clip ?? mv.name;
     g.fillStyle = clipColour(name);
-    g.fillRect(X(mv.atBeat), laneTop.move + 2, X(end) - X(mv.atBeat) - 1, LANES.move - 4);
+    g.fillRect(x0, laneTop.move + 2, x1 - x0 - 1, LANES.move - 4);
+    g.fillStyle = "rgba(255,255,255,0.55)";
+    g.fillRect(x0, laneTop.move + 2, 2, LANES.move - 4);
+    g.fillRect(x1 - 3, laneTop.move + 2, 2, LANES.move - 4);
     g.fillStyle = "#101114";
-    g.fillText(name.replace(/_Loop$/, "").replace(/_/g, " "), X(mv.atBeat) + 3, laneTop.move + LANES.move / 2);
+    const sp = mv.speed && mv.speed !== 1 ? ` ×${mv.speed.toFixed(2).replace(/\.?0+$/, "")}` : "";
+    if (x1 - x0 > 24) g.fillText(name.replace(/_Loop$/, "").replace(/_/g, " ") + sp, x0 + 4, laneTop.move + LANES.move / 2 - 5);
+    const amp = mv.phases[0]?.amplitude ?? 1;
+    if (x1 - x0 > 40 && amp !== 1) g.fillText(`amp ${amp.toFixed(2)}`, x0 + 4, laneTop.move + LANES.move / 2 + 7);
   });
   const fm = m.focus;
   if (fm?.kind === "move") {
     const i = r.moves.findIndex(v => v.id === fm.id);
     if (i >= 0) {
-      const end = Math.min(r.moves[i + 1]?.atBeat ?? total, total);
+      const end = moveEndBeat(r, i);
       g.strokeStyle = "#ffffff"; g.lineWidth = 2; g.strokeRect(X(r.moves[i].atBeat) + 1, laneTop.move + 1, X(end) - X(r.moves[i].atBeat) - 3, LANES.move - 2); g.lineWidth = 1;
     }
   }

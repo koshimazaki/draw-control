@@ -17,7 +17,7 @@ import { beatAtSeconds, secondsAtBeat } from "./beats";
 import {
   CLIP_ACCENTS, LOOP_CLIPS, clipAccent, defaultPhaseBoundaries, loopCycleBeats, type ClipAccent, type PhaseKind,
 } from "./clip-library";
-import { activeMoveIndex, jumpHeight, poseAtBeat, sampleRootPath, type ClipLayer, type FrameState } from "./engine";
+import { activeMoveIndex, jumpHeight, poseAtBeat, restWeight, sampleRootPath, type ClipLayer, type FrameState } from "./engine";
 import { neutralPose } from "./poses";
 import { planReactive, type AccentSpanFn, type Hit } from "./reactive";
 import { STEP_AMPLITUDE_MAX, type StepLane } from "./performance-config";
@@ -126,12 +126,13 @@ export function loopLayersAt(recipe: Recipe, plan: ClipPlan, seconds: number): C
   const blendW = k > 0 ? ease((beat - move.atBeat) / blendBeatsOf(move, recipe)) : 1;
   const layers: ClipLayer[] = [];
   const snap = stepSnap(recipe.reactive, energyAtSeconds(plan.drive, seconds));
-  const push = (m: Recipe["moves"][number], lvl: number, weight: number, index: number) => {
+  const push = (m: Recipe["moves"][number], lvl: number, w: number, index: number) => {
+    const weight = w * (1 - restWeight(recipe, index, beat));
     if (!m.clip || weight <= 1e-6) return;
-    const lib = LOOP_CLIPS[m.clip];
+    const lib = LOOP_CLIPS[m.clip], sp = m.speed ?? 1;
     if (lib) {
       const cycle = loopCycleBeats(lib, g.bpm, lvl);
-      let phase = mod((beat - m.atBeat) / cycle + (plan.offsets[index] ?? 0), 1);
+      let phase = mod((beat - m.atBeat) * sp / cycle + (plan.offsets[index] ?? 0), 1);
       if (snap > 0) {
         const x = phase * lib.steps, step = Math.floor(x), f = x - step;
         phase = (step + f + snap * (1 - Math.pow(1 - f, 2.5) - f)) / lib.steps;
@@ -139,7 +140,7 @@ export function loopLayersAt(recipe: Recipe, plan: ClipPlan, seconds: number): C
       layers.push({ moveId: m.id, clip: m.clip, cyclePhase: phase, weight, time: mod(lib.firstStep + phase * lib.seconds, lib.seconds) });
     } else {
       const cycle = m.clipCycleBeats ?? 4;
-      layers.push({ moveId: m.id, clip: m.clip, cyclePhase: mod((beat - m.atBeat) * lvl / cycle, 1), weight });
+      layers.push({ moveId: m.id, clip: m.clip, cyclePhase: mod((beat - m.atBeat) * lvl * sp / cycle, 1), weight });
     }
   };
   const both = (index: number, weight: number) => {

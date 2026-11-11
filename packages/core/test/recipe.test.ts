@@ -24,14 +24,15 @@ describe("recipe schema", () => {
     (r.moves[0].phases[1] as { expression: string }).expression = "smirk";
     expect(() => validateRecipe(r)).toThrow(/expression/);
   });
-  it("refuses unknown keys, URLs, bad poses and unsnapped beats", () => {
+  it("refuses unknown keys, URLs, bad poses and beats outside the recipe; takes off-grid starts", () => {
     expect(() => validateRecipe({ ...DEFAULT_RECIPE, model: "x" })).toThrow(/unknown field/);
     const url = withMoves([{ ...makeMove("clap", 0), name: "https://example.com" }]);
     expect(() => validateRecipe(url)).toThrow(/URL/);
     const pose = withMoves([makeMove("clap", 0)]);
     (pose.moves[0].phases[0] as { pose: string }).pose = "backflip";
     expect(() => validateRecipe(pose)).toThrow(/pose/);
-    expect(() => validateRecipe(withMoves([makeMove("clap", 0.5)]))).toThrow(/whole beat/);
+    expect(() => validateRecipe(withMoves([makeMove("clap", -1)]))).toThrow(/inside the recipe/);
+    expect(validateRecipe(withMoves([makeMove("clap", 0.5)])).moves[0].atBeat).toBe(0.5);
   });
   it("requires moves in beat order with unique ids", () => {
     expect(() => validateRecipe(withMoves([makeMove("clap", 4), makeMove("bounce", 2)]))).toThrow(/after/);

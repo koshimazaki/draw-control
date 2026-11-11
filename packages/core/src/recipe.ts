@@ -11,6 +11,9 @@ import { validateEnergyCurve, validateSteps, type EnergyCurve, type StepLane } f
 import { RecipeError, fail, finite, isObject, only, text } from "./validate";
 
 export const RECIPE_VERSION = 2;
+/** Upper bound of a phase amplitude and of the amplitude envelope. */
+export const AMPLITUDE_MAX = 3;
+export const SPEED_RANGE = [0.25, 4] as const;
 export const PREVIEW_FPS = [12, 18, 24, 30, 60] as const;
 export type PreviewFps = (typeof PREVIEW_FPS)[number];
 /** Validated and exported, not yet rendered (reserved for facial expressions). */
@@ -26,7 +29,7 @@ export type Phase = {
   caption: string;
   /** Target pose reached at the end of the phase (procedural characters). */
   pose: PoseName;
-  /** "Volume" of the move: 0 = rest, 1 = as authored, up to 2. */
+  /** "Volume" of the move: 0 = rest, 1 = as authored, up to AMPLITUDE_MAX (3). */
   amplitude: number;
   length: PhaseLength;
   previewFps: PreviewFps;
@@ -35,8 +38,15 @@ export type Phase = {
 export type Move = {
   id: string;
   name: string;
-  /** Whole beat index on the beat grid where the move starts. */
+  /** Beat on the beat grid where the move starts (fractional allowed: a kick or snare off the grid). */
   atBeat: number;
+  /**
+   * Length of the block in beats. Absent: the move runs until the next one starts. Present:
+   * it ends there (the figure settles to rest in a gap) or where the next one starts, if earlier.
+   */
+  lengthBeats?: number;
+  /** Playback rate of the move's phases or clip (1 = as authored, 2 = twice as fast), 0.25–4. */
+  speed?: number;
   /** Beats over which the previous move cross-fades into this one. */
   blendBeats: number;
   /** Repeat the phases until the next move starts. */
@@ -58,7 +68,7 @@ export type Recipe = {
   durationBeats: number;
   beatGrid: BeatGrid;
   character: CharacterRef;
-  /** Global multiplier on every phase amplitude. */
+  /** Global multiplier on every phase amplitude (0–3). */
   energy: number;
   moves: Move[];
   rootPath: RootPoint[];
@@ -80,7 +90,7 @@ function validatePhase(input: unknown, where: string): Phase {
   if (!isObject(input)) return fail(`${where} must be an object`);
   only(input, ["name", "caption", "pose", "amplitude", "length", "previewFps", "expression"], where);
   if (!isPoseName(input.pose)) fail(`${where}.pose is not a known pose`);
-  if (!finite(input.amplitude, 0, 2)) fail(`${where}.amplitude must be 0–2`);
+  if (!finite(input.amplitude, 0, AMPLITUDE_MAX)) fail(`${where}.amplitude must be 0–${AMPLITUDE_MAX}`);
   const len = input.length;
   let length: PhaseLength;
   if (isObject(len) && "beats" in len) {
@@ -110,8 +120,8 @@ function validatePhase(input: unknown, where: string): Phase {
 
 function validateMove(input: unknown, where: string, durationBeats: number): Move {
   if (!isObject(input)) return fail(`${where} must be an object`);
-  only(input, ["id", "name", "atBeat", "blendBeats", "loop", "phases", "clip", "clipCycleBeats"], where);
-  if (!Number.isInteger(input.atBeat) || !finite(input.atBeat, 0, durationBeats - 1)) fail(`${where}.atBeat must be a whole beat inside the recipe`);
+  only(input, ["id", "name", "atBeat", "blendBeats", "loop", "phases", "clip", "clipCycleBeats", "lengthBeats", "speed"], where);
+  if (!finite(input.atBeat, 0, durationBeats - 0.125)) fail(`${where}.atBeat must be a beat inside the recipe`);
   if (!finite(input.blendBeats, 0, 8)) fail(`${where}.blendBeats must be 0–8`);
   if (typeof input.loop !== "boolean") fail(`${where}.loop must be true or false`);
   if (!Array.isArray(input.phases) || input.phases.length < 1 || input.phases.length > 32) fail(`${where}.phases needs 1–32 phases`);
@@ -124,6 +134,14 @@ function validateMove(input: unknown, where: string, durationBeats: number): Mov
     phases: (input.phases as unknown[]).map((p, i) => validatePhase(p, `${where}.phases[${i}]`)),
   };
   if (input.clip !== undefined) move.clip = text(input.clip, 120, `${where}.clip`);
+  if (input.lengthBeats !== undefined) {
+    if (!finite(input.lengthBeats, 0.125, 512)) fail(`${where}.lengthBeats must be 0.125–512`);
+    move.lengthBeats = input.lengthBeats as number;
+  }
+  if (input.speed !== undefined) {
+    if (!finite(input.speed, SPEED_RANGE[0], SPEED_RANGE[1])) fail(`${where}.speed must be ${SPEED_RANGE[0]}–${SPEED_RANGE[1]}`);
+    if (input.speed !== 1) move.speed = input.speed as number;
+  }
   if (input.clipCycleBeats !== undefined) {
     if (!finite(input.clipCycleBeats, 0.25, 64)) fail(`${where}.clipCycleBeats must be 0.25–64`);
     move.clipCycleBeats = input.clipCycleBeats as number;
@@ -150,7 +168,7 @@ export function validateRecipe(input: unknown): Recipe {
   if (!isObject(c)) return fail("character is required");
   only(c, ["kind", "name", "licence"], "character");
   if (!CHARACTER_KINDS.includes(c.kind as CharacterKind)) fail(`character.kind must be one of ${CHARACTER_KINDS.join(", ")}`);
-  if (!finite(input.energy, 0, 2)) fail("energy must be 0–2");
+  if (!finite(input.energy, 0, AMPLITUDE_MAX)) fail(`energy must be 0–${AMPLITUDE_MAX}`);
   if (!Array.isArray(input.moves) || input.moves.length > 128) fail("moves must be a list of up to 128 moves");
   const moves = (input.moves as unknown[]).map((m, i) => validateMove(m, `moves[${i}]`, durationBeats));
   for (let i = 1; i < moves.length; i++) {

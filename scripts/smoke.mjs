@@ -14,7 +14,7 @@ import { execFileSync } from "node:child_process";
 import { createServer } from "vite";
 import { chromium } from "playwright-core";
 import { unzipSync, strFromU8 } from "fflate";
-import { smokeBands } from "./smoke-features.mjs";
+import { smokeBands, smokeBlocks } from "./smoke-features.mjs";
 
 const OUT = new URL("../out/smoke/", import.meta.url).pathname;
 mkdirSync(OUT, { recursive: true });
@@ -200,6 +200,7 @@ try {
   await page.goto("http://127.0.0.1:5181/");
   await page.waitForFunction(() => document.querySelector("#clipPalette button"), null, { timeout: 30_000 });
   await smokeBands(page, { fail, OUT });
+  await smokeBlocks(page, { fail, OUT });
 
   if (errors.length) fail(`page errors: ${errors.join(" | ")}`);
 } finally {

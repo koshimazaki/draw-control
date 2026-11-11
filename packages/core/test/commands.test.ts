@@ -36,7 +36,7 @@ describe("commands", () => {
       { type: "extendPhase", moveId: "disco-2", phase: "up", by: 1 },
     ];
     const run = () => {
-      const r = script.reduce(applyMotionCommand, DEFAULT_RECIPE);
+      const r = script.reduce((rr, c) => applyMotionCommand(rr, c), DEFAULT_RECIPE);
       return Array.from({ length: 193 }, (_, n) => frameAt(r, n));
     };
     expect(run()).toEqual(run());

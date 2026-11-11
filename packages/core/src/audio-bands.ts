@@ -108,7 +108,7 @@ function spectral(samples: Float32Array, sampleRate: number): Spectral {
       let p = 0, fl = 0;
       for (let k = first; k < last; k++) {
         p += cur[k] * cur[k];
-        if (f > 0) fl += Math.max(0, Math.log1p(1000 * cur[k]) - Math.log1p(1000 * prev[k]));
+        fl += Math.max(0, Math.log1p(1000 * cur[k]) - Math.log1p(1000 * prev[k]));   // frame 0 rises from silence
       }
       power[b][f] = p;
       flux[b][f] = fl / (last - first);
@@ -139,7 +139,7 @@ function pickOnsets(flux: Float32Array, power: Float32Array, frameRate: number, 
   const around = Math.max(1, Math.round(frameRate * 0.035)), meanW = Math.max(1, Math.round(frameRate * 0.1)), wait = Math.max(1, Math.round(frameRate * 0.05));
   const out: BandOnset[] = [];
   let last = -Infinity;
-  for (let i = 1; i < flux.length - 1; i++) {
+  for (let i = 0; i < flux.length - 1; i++) {
     const v = flux[i] / top;
     if (v < minStrength || i - last < wait) continue;
     let peak = true;
@@ -149,7 +149,7 @@ function pickOnsets(flux: Float32Array, power: Float32Array, frameRate: number, 
     for (let j = Math.max(0, i - meanW); j <= Math.min(flux.length - 1, i + meanW); j++) { sum += flux[j] / top; n++; }
     if (v < sum / n + 0.07 || !isAttack(power, i, frameRate)) continue;
     // Parabolic vertex for a sub-hop time.
-    const a = flux[i - 1], b = flux[i], c = flux[i + 1], d = a - 2 * b + c;
+    const a = flux[i - 1] ?? 0, b = flux[i], c = flux[i + 1], d = a - 2 * b + c;
     const off = d < 0 ? Math.max(-0.5, Math.min(0.5, 0.5 * (a - c) / d)) : 0;
     out.push({ seconds: r4(Math.max(0, (i + off) / frameRate + ONSET_LAG)), strength: Math.round(v * 1000) / 1000 });
     last = i;

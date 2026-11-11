@@ -11,16 +11,19 @@ import {
   ACCENT_KEYS, LOOP_CLIPS, MOVE_KEYS, MOVE_LIBRARY, addMarker, beatAtSeconds, clearEnergyCurve, clearSteps, currentMarkers,
   currentSteps, effectiveDrive, insertMove, markerPhases, moveMarker, paintEnergy, removeMarker, removeMove, retimePhase,
   CLIP_ACCENTS, setAnticipation, beatsToFrames, blendBeatsOf, playedBoundaries, secondsAtBeat, setMarkerAccent, setMoveAtBeat, setMoveBlend, setStepAmplitude, snapSeconds,
-  type AccentKey, type AudioDrive, type MoveKey, type Recipe, type StepDivision,
+  type AccentKey, type AudioDrive, type CommandContext, type MoveKey, type Recipe, type SnapTarget, type StepDivision,
 } from "@motion-studio/core";
 import { LANES, TIMELINE_HEIGHT, drawTimeline, laneTop, type TimelineModel } from "./draw";
 import { MARKER_LAYOUT, bindMarkerInspector } from "./marker-inspector";
 import { closeMenu, deleteFocus, menuFor, showMenu, targetAt, type Focus } from "./focus";
+import { blockAt, startBlockDrag, type BlockHit, type MoveLaneHost } from "./move-lane";
 
 export const TIMELINE_LAYOUT = `
     <div class="tl-tools">
       <label>Steps <select id="tlDivision"><option value="4">1/4</option><option value="8" selected>1/8</option><option value="16">1/16</option></select></label>
+      <label title="Where dragged blocks and edges snap (Alt: free)">Snap <select id="tlSnapTarget"><option value="beat">beats</option><option value="halfBeat">half beats</option><option value="kick">kicks</option><option value="snare">snares</option><option value="hat">hats</option><option value="free">free</option></select></label>
       <label>Paint move <select id="tlBrush"></select></label>
+      <label class="check" title="Click the move lane to paint the brush over blocks instead of dragging them"><input id="tlPaint" type="checkbox" /> Paint</label>
       <label>Accent <select id="tlAccent">${ACCENT_KEYS.map(k => `<option value="${k}">${k}</option>`).join("")}</select></label>
       <label class="check"><input id="tlSnapHits" type="checkbox" /> Snap to hits</label>
       <button id="tlDrawEnergy" type="button" title="Pencil: draw over the energy curve">Pencil</button>
@@ -45,6 +48,12 @@ export type TimelineHost = {
   poseSpeed(): Float32Array | null;
   edit(fn: (r: Recipe) => Recipe): void;
   seek(beat: number): void;
+  /** Bands and drive for commands that read the music. */
+  ctx(): CommandContext;
+  /** Select a move (the side panel shows its fields). */
+  select(moveId: string): void;
+  /** Add a finished gesture's command to the command log. */
+  log?(command: { type: string } & Record<string, unknown>): void;
   /** A move for an imported clip (Mixamo) at a beat, or null for library clips. */
   importedMove?(clip: string, atBeat: number, recipe: Recipe): Recipe["moves"][number] | null;
 };
@@ -64,7 +73,13 @@ export class Timeline {
   constructor(private host: TimelineHost) {
     $("tlDrawEnergy").onclick = () => { this.drawing = !this.drawing; if (this.drawing) this.points = false; this.syncModes(); };
     $("tlPoints").onclick = () => { this.points = !this.points; if (this.points) this.drawing = false; this.syncModes(); this.draw(); };
-    this.canvas.addEventListener("pointermove", e => { if (!e.buttons) this.hoverAt(e); });
+    this.canvas.addEventListener("pointermove", e => {
+      if (e.buttons) return;
+      const rect = this.canvas.getBoundingClientRect(), y = e.clientY - rect.top;
+      const h = y >= laneTop.move && y < laneTop.move + LANES.move && !this.paintMode() ? blockAt(this.host.recipe(), e.clientX - rect.left, rect.width) : null;
+      this.canvas.style.cursor = h ? (h.kind === "body" ? "grab" : "ew-resize") : "";
+      this.hoverAt(e);
+    });
     this.canvas.addEventListener("pointerleave", () => { this.hover = null; this.draw(); });
     $("tlResetEnergy").onclick = () => host.edit(clearEnergyCurve);
     $("tlResetSteps").onclick = () => host.edit(clearSteps);
@@ -102,6 +117,12 @@ export class Timeline {
   }
 
   private division = () => Number($<HTMLSelectElement>("tlDivision").value) as StepDivision;
+  private paintMode = () => $<HTMLInputElement>("tlPaint").checked;
+  snapTarget = () => $<HTMLSelectElement>("tlSnapTarget").value as SnapTarget;
+  private blockHost = (): MoveLaneHost => ({
+    recipe: () => this.host.recipe(), ctx: () => this.host.ctx(), edit: fn => this.host.edit(fn),
+    snapTarget: this.snapTarget, select: id => this.host.select(id), log: c => this.host.log?.(c),
+  });
 
   /** Fill the move brush with what the character can play. */
   setBrush(kind: Recipe["character"]["kind"], fileClips: string[], importedClips: string[] = []) {
@@ -168,6 +189,7 @@ export class Timeline {
     const snap = (beat: number, ev: PointerEvent) => snapSeconds(this.host.recipe(), this.host.drive(), secondsAtBeat(g, beat),
       { division: this.division(), onsets: $<HTMLInputElement>("tlSnapHits").checked, free: ev.altKey });
     let move: ((ev: PointerEvent) => void) | null = null;
+    let hit: BlockHit | null = null;
 
     if (y >= laneTop.audio) {
       // Audio lane: seek (scrub while held).
@@ -206,6 +228,10 @@ export class Timeline {
         this.focus = f;
         this.syncAccent();
       }
+    } else if (y < laneTop.steps && !this.paintMode() && (hit = blockAt(recipe, x, rect.width)) && hit.kind !== "body") {
+      // Move lane: drag a block's edge (longer plays slower, shorter faster).
+      this.focus = { kind: "move", id: hit.id };
+      move = startBlockDrag(this.blockHost(), hit, beatAtX(e.clientX), beatAtX);
     } else if (y < laneTop.steps && this.blendHandleAt(recipe, x, xOfBeat) > 0) {
       // Move lane: drag a blend handle (the crossfade into a move), in whole frames.
       const i = this.blendHandleAt(recipe, x, xOfBeat), id = recipe.moves[i].id, at = recipe.moves[i].atBeat;
@@ -214,8 +240,12 @@ export class Timeline {
         const frames = beatsToFrames(beatAtX(ev.clientX) - at, this.host.recipe().beatGrid.bpm);
         this.host.edit(r => setMoveBlend(r, { moveId: id, frames }));
       };
+    } else if (y < laneTop.steps && !this.paintMode() && hit?.kind === "body") {
+      // Move lane: drag a block to move it.
+      this.focus = { kind: "move", id: hit.id };
+      move = startBlockDrag(this.blockHost(), hit, beatAtX(e.clientX), beatAtX);
     } else if (y < laneTop.steps) {
-      // Move lane: paint the brush on the beat.
+      // Move lane: paint the brush on the beat (in a gap, or anywhere in paint mode).
       const beat = Math.floor(beatAtX(e.clientX)), v = $<HTMLSelectElement>("tlBrush").value;
       this.host.edit(r => {
         const own = v ? this.host.importedMove?.(v, beat, r) : null;
@@ -291,7 +321,7 @@ export class Timeline {
     move(e);
     this.canvas.setPointerCapture(e.pointerId);
     const onMove = (ev: PointerEvent) => { move!(ev); this.draw(); };
-    const onUp = () => { this.blendDrag = -1; this.draw(); this.canvas.removeEventListener("pointermove", onMove); this.canvas.removeEventListener("pointerup", onUp); };
+    const onUp = () => { (move as { finish?: () => void }).finish?.(); this.blendDrag = -1; this.draw(); this.canvas.removeEventListener("pointermove", onMove); this.canvas.removeEventListener("pointerup", onUp); };
     this.canvas.addEventListener("pointermove", onMove);
     this.canvas.addEventListener("pointerup", onUp);
   }

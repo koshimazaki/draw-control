@@ -63,7 +63,22 @@ export const LAYOUT = `
       <div id="clipPalette" class="palette"></div>
       <div id="selected" class="selected" hidden>
         <div class="row"><strong id="selName"></strong><span id="selBeat" class="muted"></span></div>
-        <label>Amplitude <input id="selAmp" type="range" min="0" max="2" step="0.05" /></label>
+        <div class="grid2">
+          <label title="Start beat (fractional: on a kick or snare)">Start <input id="selStart" type="number" min="0" step="0.25" /></label>
+          <label title="Block length in beats; longer plays the move slower">Length <input id="selLength" type="number" min="0.25" step="0.25" /></label>
+          <label title="Playback rate, 0.25–4 (1 = as authored)">Speed <input id="selSpeed" type="number" min="0.25" max="4" step="0.05" /></label>
+          <label title="How big the move is: 0 rest, 1 as authored, up to 3">Amplitude <input id="selAmpNum" type="number" min="0" max="3" step="0.05" /></label>
+        </div>
+        <input id="selAmp" type="range" min="0" max="3" step="0.01" aria-label="Amplitude" />
+        <div class="row">
+          <button id="selOnKick" type="button" title="Start this move on the nearest kick">On nearest kick</button>
+          <button id="selOnSnare" type="button" title="Start this move on the nearest snare">On nearest snare</button>
+        </div>
+        <div class="row">
+          <span class="muted">Place on every</span><input id="selEvery" class="tiny" type="number" min="1" max="64" step="1" value="2" />
+          <select id="selEveryTarget"><option value="kick">kick</option><option value="snare">snare</option><option value="hat">hat</option></select>
+          <button id="selPlaceEvery" type="button" title="Copy this move onto every Nth kick or snare (a gap after each settles to rest when a length is set)">Place</button>
+        </div>
         <div class="grid3">
           <label>Preview fps <select id="selFps">${options(PREVIEW_FPS)}</select></label>
           <label title="Crossfade from the move before, in frames (6–24); drag the handle on the move lane too">Blend frames <input id="selBlend" type="number" min="6" max="24" step="1" /></label>
@@ -105,6 +120,11 @@ ${RIG_LAYOUT}
     </section>
 ${SEQUENCE_LAYOUT}
     <section>
+      <details>
+        <summary>Command log</summary>
+        <p class="muted">Every timeline and panel edit as a core command: paste into <code>motion-studio apply</code> or send over MCP to replay it.</p>
+        <textarea id="commandLog" spellcheck="false" rows="8" readonly></textarea>
+      </details>
       <details>
         <summary>Recipe JSON</summary>
         <textarea id="recipeJson" spellcheck="false" rows="14"></textarea>

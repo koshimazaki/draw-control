@@ -59,3 +59,49 @@ export async function smokeBands(page, { fail, OUT }) {
   await page.locator("#strip").screenshot({ path: `${OUT}timeline-bands.png` });
   return { truth, box };
 }
+
+/** Drag on the timeline canvas with real pointer events, from one beat to another, on a lane row (CSS px from the canvas top). */
+export async function dragBeats(page, fromBeat, toBeat, rowY, opts = {}) {
+  const box = await page.locator("#strip").boundingBox(), p = await probe(page), total = p.recipe.durationBeats;
+  const x = b => box.x + b / total * box.width;
+  await page.mouse.move(x(fromBeat) + (opts.nudge ?? 0), box.y + rowY);
+  await page.mouse.down();
+  for (let k = 1; k <= 8; k++) await page.mouse.move(x(fromBeat + (toBeat - fromBeat) * k / 8), box.y + rowY);
+  await page.mouse.up();
+}
+
+/** Feature 2: drag-extend a block, move one onto a snare, undo. */
+export async function smokeBlocks(page, { fail }) {
+  let p = await probe(page);
+  const row = p.lanes.move + 17;
+  const idle = () => p.recipe.moves.find(m => m.clip === "Idle_Loop");
+  if (!idle()) return fail("default recipe has no Idle_Loop block");
+  // Drag the cut between Idle (0–4) and Dance (4–) to beat 6: Idle is longer and slower, Dance starts at 6.
+  await dragBeats(page, 4, 6, row, { nudge: -2 });
+  p = await probe(page);
+  const dance = p.recipe.moves.find(m => m.clip === "Dance_Loop");
+  console.log(`after edge drag: Idle length ${idle()?.lengthBeats} speed ${idle()?.speed}, Dance at ${dance?.atBeat}`);
+  if (idle()?.lengthBeats !== 6 || Math.abs((idle()?.speed ?? 1) - 0.6667) > 1e-3 || dance?.atBeat !== 6) fail("edge drag did not lengthen and slow the block");
+  // Snap to snares: drag Dance's body towards beat 8.6; it lands on the snare at beat 9 (120 BPM, offset 0.1 s: snares on odd beats).
+  await page.selectOption("#tlSnapTarget", "snare");
+  await dragBeats(page, 10, 12.6, row);
+  p = await probe(page);
+  const moved = p.recipe.moves.find(m => m.clip === "Dance_Loop");
+  const beatOf = s => (s - p.recipe.beatGrid.offsetSeconds) * p.recipe.beatGrid.bpm / 60;
+  const nearestSnare = Math.min(...p.bands.mid.map(s => Math.abs(beatOf(s) - moved.atBeat)));
+  console.log(`after body drag with snare snap: Dance at beat ${moved.atBeat} (${nearestSnare.toFixed(3)} beats from a snare)`);
+  if (nearestSnare > 0.01) fail("block did not snap to a snare");
+  // The inspector shows the selected block; "On nearest kick" moves it onto a kick.
+  if (!(await page.isVisible("#selected"))) fail("no inspector for the selected block");
+  await page.click("#selOnKick");
+  p = await probe(page);
+  const onKick = p.recipe.moves.find(m => m.clip === "Dance_Loop");
+  if (Math.min(...p.bands.low.map(s => Math.abs(beatOf(s) - onKick.atBeat))) > 0.01) fail("On nearest kick did not land on a kick");
+  // Undo twice restores the snare position, then the first drag's result.
+  await page.click("#undo");
+  p = await probe(page);
+  if (p.recipe.moves.find(m => m.clip === "Dance_Loop").atBeat !== moved.atBeat) fail("undo did not restore the block");
+  const log = JSON.parse(await page.inputValue("#commandLog"));
+  console.log(`command log: ${log.map(c => c.type).join(", ")}`);
+  if (!log.some(c => c.type === "snapMoveTo") || !log.some(c => c.type === "resizeMove")) fail("command log misses a drag or a panel command");
+}

@@ -4,8 +4,8 @@
  */
 import {
   LOOP_CLIPS, RIGGED_CHARACTER, defaultRiggedRecipe, riggedMove, clearIncompatibleMoves, clipCycleBeatsFor, exportFrameCount, frameAt, incompatibleMoves, insertMove,
-  makeClipMove, moveBeats, beatsToFrames, blendBeatsOf, setMoveBlend, removeMove, setAmplitude, swapMove, validateRecipe, buildDrive, flatDrive, planCamera,
-  type AudioDrive, type CharacterKind, type Expression, type MoveKey, type PreviewFps, type Recipe,
+  makeClipMove, beatsToFrames, blendBeatsOf, removeMove, swapMove, setMoveBlend, validateRecipe, MOVE_KEYS, MOVE_LIBRARY, buildDrive, flatDrive, planCamera, applyMotionCommand, blockSpan,
+  type AudioDrive, type CharacterKind, type CommandContext, type Expression, type MotionCommand, type MoveKey, type PreviewFps, type Recipe,
 } from "@motion-studio/core";
 import { createProceduralCharacter } from "./characters/rig";
 import { loadRiggedCharacter, type RiggedCharacter } from "./characters/rigged";
@@ -89,6 +89,19 @@ export function startApp(root: HTMLElement) {
       say("jsonStatus", "");
     } catch (e) { say("jsonStatus", (e as Error).message); alertSoft((e as Error).message); }
   }
+  /** Bands and drive for commands that read the music. */
+  const ctx = (): CommandContext => ({ drive: drive === FLAT ? undefined : drive, bands: drive.bands });
+  const commandLog: MotionCommand[] = [];
+  /** Every panel edit goes through a core command, logged so it can be replayed by an agent. */
+  function command(c: MotionCommand) {
+    const before = recipe;
+    edit(r => applyMotionCommand(r, c, ctx()));
+    if (recipe !== before) logCommand(c);
+  }
+  function logCommand(c: MotionCommand) {
+    commandLog.push(c);
+    $<HTMLTextAreaElement>("commandLog").value = JSON.stringify(commandLog.slice(-200), null, 1);
+  }
   const mixamo = bindMixamo({ ensureRigged, changed: () => { renderClipPalette(); syncInputs(); render(); schedulePoseSpeed(); } });
   const history = new History();
   const syncUndo = bindUndo(history, { current: () => recipe, restore: r => setRecipe(r) });
@@ -104,9 +117,12 @@ export function startApp(root: HTMLElement) {
     const move = recipe.moves.find(m => m.id === selectedId);
     $("selected").hidden = !move;
     if (move) {
+      const span = blockSpan(recipe, move.id);
       say("selName", move.name);
-      say("selBeat", `beat ${move.atBeat} · ${moveBeats(move, recipe)} beats per pass`);
+      say("selBeat", `beats ${span.start}–${+span.end.toFixed(3)} · speed ×${span.speed}`);
       input("selAmp").value = String(move.phases[0].amplitude);
+      for (const [id, v] of [["selAmpNum", move.phases[0].amplitude], ["selStart", span.start], ["selLength", +span.length.toFixed(4)], ["selSpeed", span.speed]] as const)
+        if (document.activeElement !== input(id)) input(id).value = String(v);
       $<HTMLSelectElement>("selFps").value = String(move.phases[0].previewFps);
       input("selBlend").value = String(Math.round(beatsToFrames(blendBeatsOf(move, recipe), recipe.beatGrid.bpm)));
       $<HTMLSelectElement>("selExpr").value = move.phases[0].expression ?? "";
@@ -299,7 +315,21 @@ export function startApp(root: HTMLElement) {
     if (m) fn(m);
     return validateRecipe(next);
   });
-  input("selAmp").oninput = () => { if (selectedId) edit(r => setAmplitude(r, { moveId: selectedId!, value: Number(input("selAmp").value) })); };
+  const field = (id: string, key: "start" | "length" | "speed" | "amplitude") => {
+    input(id).onchange = () => { const v = Number(input(id).value); if (selectedId && Number.isFinite(v)) command({ type: "setMoveFields", moveId: selectedId, [key]: v }); };
+  };
+  field("selStart", "start"); field("selLength", "length"); field("selSpeed", "speed"); field("selAmpNum", "amplitude");
+  input("selAmp").oninput = () => { if (selectedId) command({ type: "setMoveFields", moveId: selectedId, amplitude: Number(input("selAmp").value) }); };
+  const onBand = (target: string) => () => { if (selectedId) command({ type: "snapMoveTo", moveId: selectedId, target }); };
+  $("selOnKick").onclick = onBand("kick");
+  $("selOnSnare").onclick = onBand("snare");
+  $("selPlaceEvery").onclick = () => {
+    const m = selectedMove();
+    if (!m) return;
+    const name = m.clip ?? MOVE_KEYS.find(k => MOVE_LIBRARY[k].name === m.name) ?? m.name;
+    command({ type: "placeOnEvery", move: name, target: $<HTMLSelectElement>("selEveryTarget").value, every: Math.max(1, Math.round(Number(input("selEvery").value) || 1)),
+      lengthBeats: blockSpan(recipe, m.id).length });
+  };
   $<HTMLSelectElement>("selFps").onchange = () => editSelected(m => m.phases.forEach(p => { p.previewFps = Number($<HTMLSelectElement>("selFps").value) as PreviewFps; }));
   input("selBlend").onchange = () => { if (selectedId) edit(r => setMoveBlend(r, { moveId: selectedId!, frames: Number(input("selBlend").value) })); };
   $<HTMLSelectElement>("selExpr").onchange = () => editSelected(m => m.phases.forEach(p => {
@@ -328,7 +358,8 @@ export function startApp(root: HTMLElement) {
     recipe: () => recipe, drive: () => (drive === FLAT ? undefined : drive),
     rms: () => (track ? { rms: track.features.rms, hop: track.features.hopSeconds } : null),
     wave: () => track?.wave ?? null,
-    beat: () => currentBeat, poseSpeed: () => poseSpeedCurve, edit, seek: seekBeat, importedMove,
+    beat: () => currentBeat, poseSpeed: () => poseSpeedCurve, edit, seek: seekBeat, importedMove, ctx,
+    select: id => { selectedId = id; syncInputs(); }, log: logCommand,
   });
   /** Pose speed for the graph, recomputed shortly after the recipe or drive changes. */
   let poseSpeedCurve: Float32Array | null = null;

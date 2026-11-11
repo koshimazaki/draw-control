@@ -78,7 +78,7 @@ export function jumpHeight(recipe: Recipe, beat: number): number {
 export function evaluateMove(recipe: Recipe, moveIndex: number, beat: number) {
   const move = recipe.moves[moveIndex];
   const total = moveBeats(move, recipe);
-  const raw = Math.max(0, beat - move.atBeat);
+  const raw = Math.max(0, beat - move.atBeat) * (move.speed ?? 1);
   const local = move.loop ? mod(raw, total) : Math.min(raw, total - EPS);
   let start = 0, index = 0;
   for (; index < move.phases.length - 1; index++) {
@@ -103,6 +103,20 @@ export function evaluateMove(recipe: Recipe, moveIndex: number, beat: number) {
   return { pose, phaseIndex: index, progress, cyclePhase: mod(raw, cycle) / cycle };
 }
 
+/** Beat where a move's block ends: its own length, the next move's start, or the recipe end, whichever is first. */
+export function moveEndBeat(recipe: Pick<Recipe, "moves" | "durationBeats">, index: number): number {
+  const m = recipe.moves[index], next = recipe.moves[index + 1]?.atBeat ?? recipe.durationBeats;
+  return Math.min(next, recipe.durationBeats, m.lengthBeats !== undefined ? m.atBeat + m.lengthBeats : Infinity);
+}
+
+/** How far a move has faded to rest after its block ended (0 inside the block, 1 at rest). */
+export function restWeight(recipe: Recipe, index: number, beat: number): number {
+  const m = recipe.moves[index];
+  if (m.lengthBeats === undefined) return 0;
+  const end = moveEndBeat(recipe, index), fade = Math.max(0.25, Math.min(1, m.blendBeats || 0.5));
+  return beat <= end ? 0 : easeInOut((beat - end) / fade);
+}
+
 /** Index of the move playing at a beat: the last one that has started (the first, before any). */
 export function activeMoveIndex(recipe: Recipe, beat: number): number {
   let k = 0;
@@ -121,6 +135,7 @@ export function poseAtBeat(recipe: Recipe, beat: number, rate = 1): { pose: Pose
   const move = recipe.moves[k];
   const local = (m: { atBeat: number }) => m.atBeat + (beat - m.atBeat) * rate;
   const cur = evaluateMove(recipe, k, local(move));
+  const rest = restWeight(recipe, k, beat);
   let weight = 1;
   if (k > 0 && move.blendBeats > 0) weight = easeInOut((beat - move.atBeat) / move.blendBeats);
   let pose = cur.pose;
@@ -131,7 +146,8 @@ export function poseAtBeat(recipe: Recipe, beat: number, rate = 1): { pose: Pose
     pose = mixPoses(prev.pose, cur.pose, weight);
     if (pm.clip) layers.push({ moveId: pm.id, clip: pm.clip, cyclePhase: prev.cyclePhase, weight: 1 - weight });
   }
-  if (move.clip) layers.push({ moveId: move.id, clip: move.clip, cyclePhase: cur.cyclePhase, weight });
+  if (rest > 0) pose = mixPoses(pose, neutralPose(), rest);
+  if (move.clip) layers.push({ moveId: move.id, clip: move.clip, cyclePhase: cur.cyclePhase, weight: weight * (1 - rest) });
   const phase = move.phases[cur.phaseIndex];
   const active: ActivePhase = {
     moveIndex: k, moveId: move.id, moveName: move.name,
@@ -162,13 +178,13 @@ export type TimelineBlock = { moveIndex: number; moveId: string; name: string; s
 /** Which move and phase sits on which beats, for the beat strip and for tests. */
 export function timeline(recipe: Recipe): TimelineBlock[] {
   return recipe.moves.map((move, i) => {
-    const endBeat = Math.min(recipe.moves[i + 1]?.atBeat ?? recipe.durationBeats, recipe.durationBeats);
+    const endBeat = moveEndBeat(recipe, i);
     const phases: TimelineBlock["phases"] = [];
     let t = move.atBeat;
-    const total = moveBeats(move, recipe);
+    const total = moveBeats(move, recipe) / (move.speed ?? 1);
     do {
       for (const p of move.phases) {
-        const len = phaseBeats(p, recipe);
+        const len = phaseBeats(p, recipe) / (move.speed ?? 1);
         if (t >= endBeat - EPS) break;
         phases.push({ name: p.name, startBeat: t, endBeat: Math.min(t + len, endBeat) });
         t += len;
