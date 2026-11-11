@@ -83,7 +83,7 @@ describe("camera rig", () => {
     }
     // The push-in really moved in, and the rise really rose.
     const at = (beat: number) => Math.round(beat * 60 / 170 * FPS);
-    expect(plan.channels.distance[at(12)]).toBeLessThan(plan.channels.distance[at(6)] - 0.8);
+    expect(plan.channels.distance[at(12)]).toBeLessThan(plan.channels.distance[at(6)] - 0.6);
     expect(plan.channels.height[at(20)]).toBeGreaterThan(plan.channels.height[at(12)] + 0.8);
   });
   it("holds still in static with intensity 0", () => {

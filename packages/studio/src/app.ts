@@ -4,8 +4,8 @@
  */
 import {
   DEFAULT_RECIPE, clearIncompatibleMoves, clipCycleBeatsFor, exportFrameCount, frameAt, incompatibleMoves, insertMove,
-  makeClipMove, moveBeats, removeMove, setAmplitude, swapMove, validateRecipe,
-  type CharacterKind, type Expression, type MoveKey, type PreviewFps, type Recipe,
+  makeClipMove, moveBeats, removeMove, setAmplitude, swapMove, validateRecipe, buildDrive, flatDrive, planCamera,
+  type AudioDrive, type CharacterKind, type Expression, type MoveKey, type PreviewFps, type Recipe,
 } from "@motion-studio/core";
 import { createProceduralCharacter } from "./characters/rig";
 import { loadFileCharacter } from "./characters/file-character";
@@ -14,6 +14,7 @@ import { Player, loadTrack, type Track } from "./audio";
 import { beatFromStripX, drawBeatStrip } from "./beat-strip";
 import { exportBundle } from "./export/bundle";
 import { currentRange, exportSize, updateExportPanel } from "./export/panel";
+import { bindRigPanel, syncRigPanel } from "./rig-panel";
 import { $, LAYOUT } from "./ui";
 import { Viewport, type Background } from "./viewport";
 import type { View } from "./views";
@@ -25,6 +26,9 @@ export function startApp(root: HTMLElement) {
   const strip = $<HTMLCanvasElement>("strip");
   let recipe: Recipe = structuredClone(DEFAULT_RECIPE);
   let track: Track | null = null;
+  /** What the music hands to the rig and the reactive layer; flat (mid energy) without a track. */
+  const FLAT = flatDrive(24, 1);
+  let drive: AudioDrive = FLAT;
   let fileCharacter: Character | null = null;
   let frame = 0;
   let selectedId: string | null = null;
@@ -39,8 +43,24 @@ export function startApp(root: HTMLElement) {
   function setRecipe(next: Recipe) {
     recipe = next;
     if (selectedId && !recipe.moves.some(m => m.id === selectedId)) selectedId = null;
+    syncCharacter();
+    refreshRig();
     syncInputs();
     render();
+  }
+  /** Rebuild the camera plan and the path overlay from the recipe and the drive. */
+  function refreshRig() {
+    const plan = recipe.camera ? planCamera(recipe, drive, totalFrames()) : null;
+    viewport.setRig(plan, recipe, drive, totalFrames());
+    if (!plan && viewport.view === "rig") { viewport.setView("front"); markView("front"); }
+  }
+  /** A recipe applied as JSON may name another procedural character: show it. */
+  function syncCharacter() {
+    const kind = recipe.character.kind;
+    if (kind !== "file" && viewport.getCharacter()?.kind !== kind) {
+      viewport.setCharacter(createProceduralCharacter(kind), viewport.getCharacter() !== fileCharacter);
+      $<HTMLSelectElement>("character").value = kind;
+    }
   }
   function edit(fn: (r: Recipe) => Recipe) {
     try { setRecipe(fn(recipe)); say("jsonStatus", ""); }
@@ -68,11 +88,12 @@ export function startApp(root: HTMLElement) {
     const isFile = recipe.character.kind === "file";
     $("palette").hidden = isFile;
     $("clipPalette").hidden = !isFile;
+    syncRigPanel(recipe);
     updateExportPanel(recipe);
   }
 
   function render() {
-    const state = frameAt(recipe, frame);
+    const state = frameAt(recipe, frame, drive);
     viewport.show(state);
     const a = state.active;
     $("caption").textContent = a ? `${a.moveName} · ${a.phaseName}: ${a.caption}` : "";
@@ -169,6 +190,7 @@ export function startApp(root: HTMLElement) {
       setPlaying(false);
       track = await loadTrack(file);
       const f = track.features;
+      drive = buildDrive(f, recipe.fps, Math.ceil(f.lengthSeconds * recipe.fps) + 1);
       $<HTMLButtonElement>("useDetected").disabled = !f.estimatedBpm;
       $<HTMLButtonElement>("fitTrack").disabled = false;
       say("trackStatus", `${file.name} · ${f.lengthSeconds.toFixed(1)} s · ` +
@@ -247,7 +269,12 @@ export function startApp(root: HTMLElement) {
   };
 
   // View
-  $("views").onclick = e => { const v = (e.target as HTMLElement).dataset.view as View | undefined; if (v) { viewport.setView(v); markView(v); render(); } };
+  $("views").onclick = e => {
+    const v = (e.target as HTMLElement).dataset.view as View | undefined;
+    if (!v) return;
+    if (v === "rig" && !recipe.camera) { say("exportStatus", "Turn on the audio-reactive camera (Camera rig section) first."); return; }
+    viewport.setView(v); markView(v); render();
+  };
   const markView = (v: View) => $("views").querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.view === v));
   $<HTMLSelectElement>("background").onchange = () => viewport.setBackground($<HTMLSelectElement>("background").value as Background);
   input("grid").onchange = () => viewport.setGrid(input("grid").checked);
@@ -282,6 +309,10 @@ export function startApp(root: HTMLElement) {
     }
   });
 
+  // Camera rig and reactive moves
+  bindRigPanel(edit, on => { const v = on ? "rig" : "front"; viewport.setView(v); markView(v); render(); });
+  input("showPaths").onchange = () => { viewport.setShowPaths(input("showPaths").checked); render(); };
+
   // Recipe JSON
   $("applyJson").onclick = () => edit(() => validateRecipe(JSON.parse($<HTMLTextAreaElement>("recipeJson").value)));
 
@@ -297,7 +328,7 @@ export function startApp(root: HTMLElement) {
     bar.hidden = false;
     say("exportStatus", "Rendering frame by frame…");
     try {
-      const result = await exportBundle({ recipe, range, viewport, width, height, audio: track?.buffer ?? null,
+      const result = await exportBundle({ recipe, range, viewport, width, height, audio: track?.buffer ?? null, drive,
         onProgress: (d, t) => { bar.value = d / t; } });
       download(result.zip, "guide-bundle.zip");
       say("exportStatus", `Exported ${result.frames} frames from frame ${range.startFrame} (${(result.frames / recipe.fps).toFixed(2)} s, ${result.codec}), ` +
@@ -309,6 +340,7 @@ export function startApp(root: HTMLElement) {
   applyResolution();
   markView("front");
   viewport.setCharacter(createProceduralCharacter("mannequin"));
+  refreshRig();
   syncInputs();
   render();
   requestAnimationFrame(tick);

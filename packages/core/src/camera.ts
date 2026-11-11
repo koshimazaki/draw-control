@@ -37,7 +37,7 @@ export type CameraConfig = {
 
 export const DEFAULT_CAMERA: CameraConfig = {
   segments: [{ fromBeat: 0, toBeat: 16, modes: ["orbit"] }],
-  intensity: 0.6, orbitDegreesPerBeat: 6, distance: 4.4, height: 1.15, fov: 32, startYaw: 0,
+  intensity: 0.6, orbitDegreesPerBeat: 6, distance: 4.4, height: 1.15, fov: 38, startYaw: 0,
 };
 
 export function validateCamera(input: unknown, durationBeats: number): CameraConfig {

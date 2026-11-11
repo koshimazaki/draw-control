@@ -1,5 +1,6 @@
 /** Static page layout. Behaviour lives in app.ts; elements are looked up by id. */
 import { DEFAULT_EXPORT_SIZE, EXPORT_SIZES, EXPRESSIONS, MOVE_KEYS, MOVE_LIBRARY, PREVIEW_FPS } from "@motion-studio/core";
+import { RIG_LAYOUT } from "./rig-panel";
 import { VIEWS, VIEW_LABELS } from "./views";
 
 const sizeKey = (s: { width: number; height: number }) => `${s.width}x${s.height}`;
@@ -75,6 +76,7 @@ export const LAYOUT = `
         <label class="check"><input id="grid" type="checkbox" /> Floor grid</label>
       </div>
     </section>
+${RIG_LAYOUT}
     <section>
       <h2>Export guide</h2>
       <label>Size <select id="resolution">${SIZE_OPTIONS}</select></label>

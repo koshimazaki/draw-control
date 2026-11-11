@@ -4,7 +4,7 @@
  */
 import { strToU8, zipSync } from "fflate";
 import {
-  BUNDLE_FILES, buildBeats, buildManifest, buildMeta, encodeWav, frameAt, resolveExportRange, type ExportRange, type Recipe,
+  BUNDLE_FILES, buildBeats, buildManifest, buildMeta, encodeWav, frameAt, resolveExportRange, type AudioDrive, type ExportRange, type Recipe,
 } from "@motion-studio/core";
 import { makeRenderer, type Viewport } from "../viewport";
 import { createMp4Writer } from "./mp4";
@@ -14,7 +14,10 @@ export type ExportOptions = {
   /** Section of the recipe to export; the whole recipe when omitted. */
   range?: ExportRange;
   viewport: Viewport; width: number; height: number;
-  audio: AudioBuffer | null; onProgress?: (done: number, total: number) => void;
+  audio: AudioBuffer | null;
+  /** The audio drive for the reactive layer and the rig (same one the preview used). */
+  drive?: AudioDrive;
+  onProgress?: (done: number, total: number) => void;
 };
 export type ExportResult = { zip: Uint8Array; frames: number; mp4Bytes: number; audioInVideo: boolean; codec: string; files: string[] };
 
@@ -41,15 +44,17 @@ export async function exportBundle(o: ExportOptions): Promise<ExportResult> {
   });
 
   let firstFrame: Uint8Array | null = null;
+  viewport.setExporting(true);
   try {
     for (let n = 0; n < frames; n++) {
-      viewport.pose(frameAt(recipe, startFrame + n));
+      viewport.pose(frameAt(recipe, startFrame + n, o.drive));
+      viewport.poseExportCamera(camera, startFrame + n, width / height);
       renderer.render(viewport.scene, camera);
       if (n === 0) firstFrame = await pngBytes(canvas);
       await writer.addFrame(canvas, n);
       if (n % 8 === 0) o.onProgress?.(n, frames);
     }
-  } finally { renderer.dispose(); }
+  } finally { renderer.dispose(); viewport.setExporting(false); }
   const mp4 = await writer.finish();
   o.onProgress?.(frames, frames);
 

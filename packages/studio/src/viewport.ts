@@ -4,9 +4,10 @@
  */
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import type { FrameState } from "@motion-studio/core";
+import { cameraAtFrame, type AudioDrive, type CameraPlan, type FrameState, type Recipe } from "@motion-studio/core";
 import type { Character } from "./characters/types";
-import { TARGET, cameraFor, setAspect, type View } from "./views";
+import { PathsOverlay } from "./paths-overlay";
+import { TARGET, applyRigSample, cameraFor, setAspect, topCameraFitting, type View } from "./views";
 
 export const BACKGROUNDS = { grey: 0x77797c, dark: 0x1d1f22 } as const;
 export type Background = keyof typeof BACKGROUNDS;
@@ -22,6 +23,11 @@ export class Viewport {
   private character?: Character;
   private grid: THREE.GridHelper;
   private observer: ResizeObserver;
+  private rigCam = new THREE.PerspectiveCamera(32, 1, 0.1, 200);
+  private rigPlan: CameraPlan | null = null;
+  private overlay = new PathsOverlay();
+  private showPaths = true;
+  private lastFrame = 0;
   view: View = "front";
 
   constructor(container: HTMLElement) {
@@ -35,6 +41,8 @@ export class Viewport {
     this.controls.enableDamping = false;
     this.controls.update();
     this.camera = cameraFor("front", 1);
+    this.rigCam.position.set(0, 1.15, 4.4);
+    this.rigCam.lookAt(TARGET);
 
     // Soft fill, a high frontal key (its shadow falls short and behind the figure, so it
     // never reads as a second shape), and a back rim that separates the silhouette.
@@ -62,6 +70,7 @@ export class Viewport {
     this.grid.visible = false;
     this.scene.add(this.grid);
     this.scene.add(this.actor);
+    this.scene.add(this.overlay.group);
     this.setBackground("grey");
 
     this.controls.addEventListener("change", () => this.redraw());
@@ -80,8 +89,28 @@ export class Viewport {
   setView(view: View) {
     this.view = view;
     this.controls.enabled = view === "orbit";
-    this.camera = view === "orbit" ? this.orbitCam : cameraFor(view, this.aspect());
+    this.camera = view === "orbit" ? this.orbitCam : view === "rig" ? this.rigCam : this.fixedCamera(view, this.aspect());
+    this.syncOverlay();
     this.resize();
+  }
+  /** The rig's camera plan (null when the recipe has no rig), and the paths to draw. */
+  setRig(plan: CameraPlan | null, recipe: Recipe, drive: AudioDrive | undefined, frames: number) {
+    this.rigPlan = plan;
+    this.overlay.update(recipe, plan, drive, frames);
+    if (this.view === "top") this.camera = this.fixedCamera("top", this.aspect());
+    this.syncOverlay();
+    this.resize();
+  }
+  getRigPlan() { return this.rigPlan; }
+  setShowPaths(on: boolean) { this.showPaths = on; this.setView(this.view); }
+  /** Hide preview-only helpers (paths) while exporting. */
+  setExporting(on: boolean) { this.overlay.group.visible = !on && this.overlayWanted(); }
+  private overlayWanted() { return this.showPaths && (this.view === "top" || this.view === "orbit"); }
+  private syncOverlay() { this.overlay.group.visible = this.overlayWanted(); }
+  private fixedCamera(view: View, aspect: number): THREE.Camera {
+    // With paths shown, the top view widens to fit the camera path and the floor path.
+    if (view === "top" && this.showPaths && !this.overlay.bounds.isEmpty()) return topCameraFitting(this.overlay.bounds, aspect);
+    return cameraFor(view, aspect, this.orbitCam);
   }
   setBackground(bg: Background) { this.scene.background = new THREE.Color(BACKGROUNDS[bg]); this.redraw(); }
   setGrid(on: boolean) { this.grid.visible = on; this.redraw(); }
@@ -92,17 +121,31 @@ export class Viewport {
     this.actor.position.set(state.root.x, state.root.y, state.root.z);
     this.actor.rotation.set(0, state.root.yawRadians, 0);
   }
-  show(state: FrameState) { this.pose(state); this.redraw(); }
+  show(state: FrameState) {
+    this.pose(state);
+    this.lastFrame = state.frame;
+    if (this.view === "rig" && this.rigPlan) applyRigSample(this.rigCam, cameraAtFrame(this.rigPlan, state.frame), this.aspect());
+    this.overlay.showFrame(state.frame);
+    this.redraw();
+  }
+  /** Pose an export camera for a recipe frame (rig view only; other views are fixed). */
+  poseExportCamera(cam: THREE.Camera, frame: number, aspect: number) {
+    if (this.view === "rig" && this.rigPlan && cam instanceof THREE.PerspectiveCamera) applyRigSample(cam, cameraAtFrame(this.rigPlan, frame), aspect);
+  }
   redraw() { this.renderer.render(this.scene, this.camera); }
 
   /** Camera for the export at its own aspect ratio, matching the current view. */
-  exportCamera(aspect: number) { return cameraFor(this.view, aspect, this.orbitCam); }
+  exportCamera(aspect: number) { return this.view === "top" ? cameraFor("top", aspect) : cameraFor(this.view, aspect, this.orbitCam); }
 
   private aspect() { return Math.max(1, this.canvas.clientWidth) / Math.max(1, this.canvas.clientHeight); }
   private resize() {
     const w = Math.max(1, this.canvas.clientWidth), h = Math.max(1, this.canvas.clientHeight);
     this.renderer.setSize(w, h, false);
-    setAspect(this.camera, w / h);
+    this.overlay.setResolution(w, h);
+    if (this.camera === this.rigCam) {
+      if (this.rigPlan) applyRigSample(this.rigCam, cameraAtFrame(this.rigPlan, this.lastFrame), w / h);
+    } else if (this.view === "top") this.camera = this.fixedCamera("top", w / h);
+    else setAspect(this.camera, w / h);
     if (this.camera !== this.orbitCam) setAspect(this.orbitCam, w / h);
     this.redraw();
   }

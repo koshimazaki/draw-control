@@ -38,10 +38,10 @@ export const CAMERA_LIMITS = {
 /** Accent pulse shape, in beats: a rise into the beat, a release after it (sums to 1, so pulses never overlap). */
 export const ACCENT_RISE_BEATS = 0.45;
 export const ACCENT_RELEASE_BEATS = 0.55;
-const PUSH_FRACTION = 0.38;   // a push-in range covers this share of the start distance
+const PUSH_FRACTION = 0.3;    // a push-in range covers this share of the start distance
 const RISE_METRES = 1.6;
 const AIM_DROP = 0.35;
-const DOWNBEAT_PUSH = 0.32, BEAT_PUSH_SHARE = 0.35, DOWNBEAT_YAW = 3.2 * Math.PI / 180;
+const DOWNBEAT_PUSH = 0.32, BEAT_PUSH_SHARE = 0.25, DOWNBEAT_YAW = 3.2 * Math.PI / 180;
 const AIM_Y = 1.0;
 
 const clamp = (x: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, x));
@@ -76,7 +76,7 @@ export function planCamera(recipe: Recipe, drive?: AudioDrive, frames = 0): Came
     aimY: new Float64Array(total), cx: new Float64Array(total), cz: new Float64Array(total),
   };
   const subject = (n: number) => subjectAt(recipe, beatAtSeconds(g, n * dt));
-  const d0 = config.distance, dMin = d0 * 0.45, dMax = d0 * 1.7;
+  const d0 = config.distance, dMin = d0 * 0.55, dMax = d0 * 1.7;
   const hMin = 0.3, hMax = config.height + RISE_METRES + 1;
   // State: base yaw (follow), orbit yaw, dolly, crane, aim, centre.
   const s0 = subject(0);
