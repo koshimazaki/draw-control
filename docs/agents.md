@@ -118,15 +118,15 @@ JSON
 M apply recipe.json path.json --out recipe.path.json
 M script recipe.path.json ../../examples/scripts/follow-jump-top.txt --analysis analysis.json --out recipe.shot.json
 M describe recipe.shot.json --analysis analysis.json --script
-# beats 0-8   | action: run on path lock kick 0.5 | camera: chase     | shot: wide
-# beats 8-10  | action: jump @snare 1             | camera: orbit 360 | shot: medium
-# beats 10-12 | action: rest                      | camera: top       | shot: wide
-# beats 12-16 | action: run                       | camera: chase     | shot: close
-# beats 16-33 | action: rest                      | camera: static    | shot: -
+# beats 0-8   | action: run on path (0,0) (1.13,-1.86) (1.71,-2.64) … (6.06,-4.99) (8,-5) lock kick 0.5 | camera: chase | shot: wide
+# beats 8-10  | action: jump @snare 1                            | camera: orbit 360 | shot: medium
+# beats 10-12 | action: rest                                     | camera: top       | shot: wide
+# beats 12-16 | action: run                                      | camera: chase     | shot: close
+# beats 16-33 | action: rest                                     | camera: static    | shot: -
 M render recipe.shot.json --audio drums.wav --out bundle-shot --start 0 --length 16 --unit beats
 ```
 
-The run block plays at the speed that matches the path (×0.91 here), its travel arrives on each kick (half stepped, strength 0.5), the jump lands on the first snare of beats 8–10, and the orbit turns exactly 360° in two beats. A word the studio does not know fails with the list it does know:
+The printed script carries the walk path's points (the smoothed path, thinned to 12 points here), so it can be applied to any recipe, drawn path or not. The run block plays at the speed that matches the path (×0.91 here), its travel arrives on each kick (half stepped, strength 0.5), the jump lands on the first snare of beats 8–10, and the orbit turns exactly 360° in two beats. A word the studio does not know fails with the list it does know:
 
 ```bash
 printf 'beats 0-4 | action: fall\n' > fall.txt && M script recipe.path.json fall.txt

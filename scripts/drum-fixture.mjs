@@ -2,7 +2,7 @@
 /**
  * Write a synthetic kick/snare/hat track (WAV) for trying the CLI and the studio:
  *   node scripts/drum-fixture.mjs out/drums-120.wav [bpm] [bars]
- * Generated, licence-clean (packages/core/test/drum-synth.ts).
+ * Generated, licence-clean (packages/core/src/drum-synth.ts).
  */
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";

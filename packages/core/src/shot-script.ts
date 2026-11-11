@@ -55,13 +55,44 @@ export function wordForMove(r: Recipe, name: string): string {
   return hit ? hit[0] : name;
 }
 
+const COLUMN_MAX = 48;
 export const fmt = (x: number) => String(Math.round(x * 1000) / 1000);
 const metres = (x: number) => `${fmt(x)}m`;
 
 /** A point list "(x,z)" or "(x,z,height)", the script's way to give a path. */
 export const pointWords = (pts: readonly { x: number; z: number; y?: number }[]) => pts.map(p => `(${fmt(p.x)},${fmt(p.z)}${p.y !== undefined ? `,${fmt(p.y)}` : ""})`).join(" ");
-/** Drawn walk paths longer than this print as "on path" without points (they keep their shape when re-applied). */
-export const MAX_PRINTED_PATH_POINTS = 16;
+/** Most points a walk path prints with; a longer (drawn) path is thinned to fit. */
+export const MAX_PRINTED_PATH_POINTS = 24;
+/** The thinning starts here (metres off the drawn path) and doubles until the path fits. */
+export const PATH_PRINT_TOLERANCE = 0.02;
+
+type P3 = { x: number; z: number; y?: number };
+/**
+ * A path thinned for printing (Ramer–Douglas–Peucker in x, z and height): the first and last
+ * point stay, and the tolerance doubles from PATH_PRINT_TOLERANCE until at most `cap` points
+ * are left. A path that already fits prints as it is, so a printed script reads back the same.
+ */
+export function thinPath<T extends P3>(pts: readonly T[], cap = MAX_PRINTED_PATH_POINTS): T[] {
+  if (pts.length <= cap) return [...pts];
+  const off = (p: T, a: T, b: T) => {
+    const ab = [b.x - a.x, (b.y ?? 0) - (a.y ?? 0), b.z - a.z], ap = [p.x - a.x, (p.y ?? 0) - (a.y ?? 0), p.z - a.z];
+    const L = ab[0] ** 2 + ab[1] ** 2 + ab[2] ** 2, t = L ? Math.max(0, Math.min(1, (ap[0] * ab[0] + ap[1] * ab[1] + ap[2] * ab[2]) / L)) : 0;
+    return Math.hypot(ap[0] - t * ab[0], ap[1] - t * ab[1], ap[2] - t * ab[2]);
+  };
+  for (let tol = PATH_PRINT_TOLERANCE; ; tol *= 2) {
+    const keep = new Uint8Array(pts.length);
+    keep[0] = keep[pts.length - 1] = 1;
+    const stack: [number, number][] = [[0, pts.length - 1]];
+    while (stack.length) {
+      const [a, b] = stack.pop()!;
+      let worst = -1, wd = tol;
+      for (let i = a + 1; i < b; i++) { const d = off(pts[i], pts[a], pts[b]); if (d > wd) { wd = d; worst = i; } }
+      if (worst >= 0) { keep[worst] = 1; stack.push([a, worst], [worst, b]); }
+    }
+    const out = pts.filter((_, i) => keep[i]);
+    if (out.length <= cap) return out;
+  }
+}
 
 /** One camera block as words; `path` prints the camera path's points after the path mode. */
 export function cameraWords(s: CameraSegment, path?: readonly { x: number; y: number; z: number }[]): string {
@@ -108,7 +139,10 @@ function actionBlocks(r: Recipe): ActionBlock[] {
   const travel = travelRange(r.rootPath), lockWords = (l?: { lock?: string; strength?: number }) => (l?.lock ? ` lock ${l.lock}${l.strength !== undefined ? ` ${fmt(l.strength)}` : ""}` : "");
   const onPath = (s: Span) => !!travel && Math.abs(travel.from - s.from) < 1e-3 && Math.abs(travel.to - s.to) < 1e-3;
   const moving = travel ? r.rootPath.filter(p => p.beat >= travel.from - 1e-6) : [];
-  const pts = moving.length && moving.length <= MAX_PRINTED_PATH_POINTS ? ` ${pointWords(moving)}` : "";
+  // A thinned (drawn) path prints to the centimetre; once applied it fits and prints as stored.
+  const thin = thinPath(moving), r2 = (x: number) => Math.round(x * 100) / 100;
+  const shown = thin.length < moving.length ? thin.map(p => ({ x: r2(p.x), z: r2(p.z), ...(p.y !== undefined ? { y: r2(p.y) } : {}) })) : thin;
+  const pts = moving.length ? ` ${pointWords(shown)}` : "";
   const out: ActionBlock[] = [];
   let cursor = 0;
   const rest = (to: number) => { if (to > cursor + 1e-6) out.push({ from: cursor, to, words: onPath({ from: cursor, to }) ? `glide on path${pts}${lockWords(r.travelLock)}` : "rest" }); };
@@ -167,7 +201,8 @@ export function printScript(r: Recipe, bands?: BandAnalysis): string {
     }
     rows.push(cells);
   }
-  const widths = rows.reduce((w, cells) => cells.map((c, k) => Math.max(w[k] ?? 0, c.length)), [] as number[]);
+  // Columns line up, but a long cell (a path's points) does not pad every other row.
+  const widths = rows.reduce((w, cells) => cells.map((c, k) => Math.max(w[k] ?? 0, Math.min(COLUMN_MAX, c.length))), [] as number[]);
   return rows.map(cells => cells.map((c, k) => (k < cells.length - 1 ? c.padEnd(widths[k]) : c)).join(" | ")).join("\n") + "\n";
 }
 

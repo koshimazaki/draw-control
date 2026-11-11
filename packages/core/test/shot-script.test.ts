@@ -43,7 +43,8 @@ describe("shot script", () => {
     expect(once.split("\n")[1]).toMatch(/^beats 8-10 +\| action: jump @kick 2 +\| camera: orbit 360 +\| shot: medium$/);
     const again = applyScript(r, { script: once }, { bands });
     expect(printScript(again, bands)).toBe(once);
-    expect(again).toEqual(r);
+    // The first pass turns the drawn path into the printed points (spaced by distance); from then on the recipe is fixed too.
+    expect(applyScript(again, { script: once }, { bands })).toEqual(again);
   });
   it("continue rows keep one block over several rows; amounts, locks and anchors read back", () => {
     const s = applyScript(base(), { script: [
@@ -100,5 +101,33 @@ describe("path points in the shot script", () => {
     expect(() => applyScript(base(), { script: "beats 0-4 | action: run | camera: orbit (0,0) (1,1)" })).toThrow(/camera points belong after "path"/);
     expect(() => applyScript(base(), { script: "beats 0-4 | action: glide on path (0,0) (1,x)" })).toThrow(/a point reads \(x,z\)/);
     expect(() => applyScript(base(), { script: "beats 0-4 | action: run | camera: path" })).toThrow(/camera: path needs points/);
+  });
+});
+
+describe("a drawn walk path prints as thinned points", () => {
+  it("a 200-point stroke → script → fresh recipe: within 0.15 m at every beat; stable on the second pass", async () => {
+    const { rootAt, thinPath, MAX_PRINTED_PATH_POINTS } = await import("../src/internal");
+    const stroke = Array.from({ length: 200 }, (_, i) => { const t = i / 199; return { x: 6 * Math.sin(t * Math.PI * 1.5), z: -8 * t + Math.cos(t * 9) * 0.6 }; });
+    const drawn = applyMotionCommand(base(), { type: "setRootPath", points: stroke, fromBeat: 0, toBeat: 16, gait: "Walk_Loop" });
+    expect(drawn.rootPath.length).toBeGreaterThan(MAX_PRINTED_PATH_POINTS);
+    const text = printScript(drawn, bands);
+    const row = text.split("\n")[0];
+    const printed = row.match(/\([^)]*\)/g)!;
+    expect(printed.length).toBeLessThanOrEqual(MAX_PRINTED_PATH_POINTS);
+    const fresh = validateRecipe({ ...base(), rootPath: [{ beat: 0, x: 0, z: 0, yaw: 0 }] });
+    const again = applyScript(fresh, { script: text }, { bands });
+    let worst = 0;
+    for (let b = 0; b <= 16; b += 0.25) {
+      const p = rootAt(drawn, b), q = rootAt(again, b);
+      worst = Math.max(worst, Math.hypot(p.x - q.x, p.z - q.z));
+    }
+    expect(worst).toBeLessThan(0.15);
+    const second = printScript(again, bands);
+    expect(printScript(applyScript(again, { script: second }, { bands }), bands)).toBe(second);
+    expect(thinPath([{ x: 0, z: 0 }, { x: 1, z: 0 }])).toHaveLength(2);
+  });
+  it("plain \"on path\" still means the path already there", () => {
+    const r = applyScript(base(), { script: "beats 0-8 | action: walk on path" });
+    expect(r.rootPath.at(-1)).toMatchObject({ x: 6, z: -6, beat: 8 });
   });
 });

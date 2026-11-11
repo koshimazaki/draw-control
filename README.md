@@ -14,9 +14,12 @@ You need Node 24 (`.nvmrc`) and Google Chrome or Edge (the export uses WebCodecs
 git clone <this repo> motion-studio && cd motion-studio
 nvm use && npm install
 npm run check          # typecheck, lint, unit tests (about 10 s)
-npm run drums          # optional: writes out/drums-120.wav, a generated drum track, if you have no music to hand
 npm run dev            # open http://127.0.0.1:5180
 ```
+
+**Load demo** (top of the page) needs nothing else: it generates a drum track in the browser (8 bars at 120 BPM, the same synth as `npm run drums`), applies [`examples/scripts/glide-path.txt`](examples/scripts/glide-path.txt) (a figure glides an L-shaped path, stopping on each kick, while the camera follows and then flies its own path) and switches to the *Camera rig* view. Press *Play*. Everything the quickstart uses is in the repo or generated: the character (`assets/characters/`), the demo track, the example scripts. No download, no file from another project.
+
+With your own music (or `npm run drums`, which writes the same generated track to `out/drums-120.wav`):
 
 1. **Track.** Drop a music file (WAV, MP3, M4A, OGG, FLAC) anywhere on the page. The studio finds the tempo, the first beat and the kicks, snares and hats. Press *Fit to track*.
 2. **Script.** Open *Shot script* in the side panel, paste [`examples/scripts/glide-path.txt`](examples/scripts/glide-path.txt) and press *Apply script*. The rows land on the timeline as the **Action** track (what the figure does) and the **Camera** track (how the camera moves).
@@ -28,6 +31,7 @@ npm run dev            # open http://127.0.0.1:5180
 `cli/`, run with `npm run cli -- <command>` or `node cli/bin/motion-studio.mjs <command>`. No build step.
 
 ```bash
+npm run drums                                                   # out/drums-120.wav, a generated drum track
 M() { node cli/bin/motion-studio.mjs "$@"; }
 M analyse out/drums-120.wav --out out/analysis.json            # tempo, kicks, snares, hats, peaks
 M new --analysis out/analysis.json --out out/recipe.json        # rigged mannequin, fitted to the track

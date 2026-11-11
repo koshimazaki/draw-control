@@ -13,6 +13,7 @@ import { loadFileCharacter } from "./characters/file-character";
 import type { Character } from "./characters/types";
 import { Player, loadTrack, type Track } from "./audio";
 import { Timeline } from "./timeline/timeline";
+import { loadDemo } from "./demo";
 import { TIMELINE_HEIGHT, laneTop } from "./timeline/draw";
 import { computePoseSpeed } from "./timeline/pose-speed";
 import { bindExport } from "./export/button";
@@ -284,6 +285,10 @@ export function startApp(root: HTMLElement) {
       });
     } catch (e) { say("trackStatus", `Could not decode the track: ${(e as Error).message}`); }
   }
+  $("loadDemo").onclick = () => void loadDemo({
+    useTrack, fitToTrack: () => $("fitTrack").click(), applyScript: script => command({ type: "applyScript", script }),
+    showRig: () => { if (recipe.camera) { viewport.setView("rig"); markView("rig"); render(); } }, setLicence: t => { input("audioLicence").value = t; },
+  });
   $("useDetected").onclick = () => { const f = track?.features; if (f?.estimatedBpm) edit(r => validateRecipe({ ...r, beatGrid: { ...r.beatGrid, bpm: f.estimatedBpm!, offsetSeconds: f.estimatedOffsetSeconds, source: "analysis" } })); };
   $("fitTrack").onclick = () => { if (track) edit(r => validateRecipe({ ...r, durationBeats: Math.max(1, Math.min(512, Math.floor((track!.features.lengthSeconds - r.beatGrid.offsetSeconds) * r.beatGrid.bpm / 60))) })); };
   const gridField = (id: string, key: "bpm" | "offsetSeconds" | "beatsPerBar") => {

@@ -170,7 +170,9 @@ Follow-up, same day (`npm run check` 210 tests, `npm run smoke`, `npm run mcp-ch
 - **Paths in the script.** `on path (x,z) (x,z,height) …` and `camera: path (x,z,height) …` give the walk path and the camera path in metres, through `setRootPath` (`smooth: false`: the points as given) and `setCameraPath`; the script reads back with the points. CLI and MCP tested; `npm run mcp-check` runs the real MCP server over stdio through `apply_script` and `render` (headless Chrome, about 3–5 s for 193 frames), the first run of MCP `render`.
 - **Public core.** `packages/core/src/index.ts` is the public entry (exports map `.`); every module stays under `./internal` for the studio; the core typechecks without the DOM library; `public-api.test.ts` imports only `@motion-studio/core` and computes frames and a camera in Node. README rewritten for a newcomer.
 
-Known limits: one walk path and one camera path per script; a drawn walk path of more than 16 points prints as `on path` without its points; a script anchor names the first band an onset sits on (kick before snare).
+Then, for a self-contained demo repo: a script always prints the walk path's points (a drawn path is thinned to at most 24, within 15 cm at every beat when applied to an empty recipe; tested on a 200-point stroke), and **Load demo** generates the drum track in the browser and applies `examples/scripts/glide-path.txt` (smoke-tested). Nothing outside the repo is needed: the character is in `assets/characters/`, the track is generated, the scripts are in `examples/scripts/`; the only optional outside input is your own Mixamo clips in `assets-local/`.
+
+Known limits: one walk path and one camera path per script; a script anchor names the first band an onset sits on (kick before snare).
 
 ### MS-9b, after D (next, in this order)
 

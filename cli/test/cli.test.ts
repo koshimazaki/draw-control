@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { encodeWav, frameAt, validateRecipe, type Recipe } from "../../packages/core/src/index.ts";
-import { patternTimes, synthDrums } from "../../packages/core/test/drum-synth.ts";
+import { patternTimes, synthDrums } from "../../packages/core/src/drum-synth.ts";
 import { main, parseArgs, parseValue } from "../src/main.ts";
 import { readWav } from "../src/audio-file.ts";
 
@@ -63,7 +63,7 @@ describe("motion-studio CLI", () => {
     const s = await run("script", rp, script, "--analysis", a, "--out", rs);
     expect(s.err).toBe("");
     const d = await run("describe", rs, "--analysis", a, "--script");
-    expect(d.out.split("\n")[0]).toMatch(/^beats 0-8 +\| action: run on path lock kick 0\.5 \| camera: chase +\| shot: wide$/);
+    expect(d.out.split("\n")[0]).toMatch(/^beats 0-8 +\| action: run on path (\([-\d.,]+\) )+lock kick 0\.5 +\| camera: chase +\| shot: wide$/);
     expect(d.out).toMatch(/beats 8-10 +\| action: jump @snare 1 +\| camera: orbit 360 +\| shot: medium/);
     const bad = await run("script", rp, join(dir, "nope.txt"));
     expect(bad.code).toBe(1);

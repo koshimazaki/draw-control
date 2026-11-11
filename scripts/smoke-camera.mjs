@@ -83,3 +83,18 @@ export async function smokeCameraTrack(page, { fail, OUT }) {
   console.log(`recorded height lane: ${rec.length} points, frames ${rec[0]?.[0]}–${rec.at(-1)?.[0]}, values ${[...new Set(rec.map(q => q[1]))].join(", ")} (screenshots paths-top-playing.png, paths-orbit-playing.png)`);
   if (!rec.length || rec.some(q => q[1] !== 2.5)) fail("recording did not write the height lane at 2.5 m");
 }
+
+/** First run with nothing but the repo: Load demo generates the track and applies examples/scripts/glide-path.txt. */
+export async function smokeDemo(page, { fail, OUT }) {
+  await page.goto(page.url());
+  await page.waitForFunction(() => document.querySelector("#clipPalette button"), null, { timeout: 30_000 });
+  await page.click("#loadDemo");
+  await page.waitForFunction(() => window.__msProbe().recipe.travelLock, null, { timeout: 60_000 });
+  const p = await probe(page);
+  const script = await page.inputValue("#shotScript");
+  console.log(`demo: ${await page.textContent("#trackStatus")}\n${script.split("\n").slice(0, 3).join("\n")}`);
+  if (p.recipe.audio?.name !== "demo-drums-120.wav" || p.recipe.camera?.path?.length !== 3 || p.recipe.travelLock?.lock !== "kick") fail("Load demo did not load the track and the glide script");
+  if (!(await page.locator('[data-view="rig"]').evaluate(b => b.classList.contains("on")))) fail("Load demo did not switch to the camera rig view");
+  await page.fill("#cursorBeat", "8");
+  await page.locator("#viewport").screenshot({ path: `${OUT}demo-rig.png` });
+}

@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { encodeWav } from "../../packages/core/src/index.ts";
-import { patternTimes, synthDrums } from "../../packages/core/test/drum-synth.ts";
+import { patternTimes, synthDrums } from "../../packages/core/src/drum-synth.ts";
 import { Session, createServer } from "../src/server.ts";
 
 const dir = mkdtempSync(join(tmpdir(), "ms-mcp-"));

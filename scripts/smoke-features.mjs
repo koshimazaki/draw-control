@@ -3,9 +3,9 @@
  * 1. a synthetic kick/snare/hat track: band onsets analysed, markers drawn per band on
  *    the audio lane (checked by reading the canvas pixels);
  * later steps (added per feature) drive real pointer events on the timeline and export.
- * Fixtures are generated (packages/core/test/drum-synth.ts), licence-clean.
+ * Fixtures are generated (packages/core/src/drum-synth.ts), licence-clean.
  */
-import { patternTimes, synthDrums } from "../packages/core/test/drum-synth.ts";
+import { patternTimes, synthDrums } from "../packages/core/src/drum-synth.ts";
 
 export const DRUM_BPM = 120;
 

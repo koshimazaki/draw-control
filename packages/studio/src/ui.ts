@@ -16,7 +16,8 @@ const options = (values: readonly (string | number)[], selected?: string | numbe
 export const LAYOUT = `
 <header class="bar">
   <strong>Motion Studio</strong>
-  <span class="muted">Drop a track and a character anywhere. Everything stays in this browser.</span>
+  <button id="loadDemo" type="button" class="primary" title="A generated drum track and examples/scripts/glide-path.txt: a beat-locked glide with the camera following, then flying its own path">Load demo</button>
+  <span class="muted">Drop a track and a character anywhere, or press <em>Load demo</em>. Everything stays in this browser.</span>
 </header>
 <main class="shell">
   <aside class="side">
