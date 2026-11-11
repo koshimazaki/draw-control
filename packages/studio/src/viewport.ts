@@ -4,7 +4,7 @@
  */
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { cameraAtFrame, type AudioDrive, type CameraPlan, type FrameState, type Recipe } from "@motion-studio/core";
+import { cameraAtFrame, cameraAtSeconds, type AudioDrive, type CameraPlan, type FrameState, type Recipe } from "@motion-studio/core";
 import type { Character } from "./characters/types";
 import { PathsOverlay } from "./paths-overlay";
 import { TARGET, applyRigSample, cameraFor, setAspect, topCameraFitting, type View } from "./views";
@@ -124,7 +124,7 @@ export class Viewport {
   show(state: FrameState) {
     this.pose(state);
     this.lastFrame = state.frame;
-    if (this.view === "rig" && this.rigPlan) applyRigSample(this.rigCam, cameraAtFrame(this.rigPlan, state.frame), this.aspect());
+    if (this.view === "rig" && this.rigPlan) applyRigSample(this.rigCam, cameraAtSeconds(this.rigPlan, state.seconds), this.aspect());
     this.overlay.showFrame(state.frame);
     this.redraw();
   }

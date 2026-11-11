@@ -160,7 +160,7 @@ try {
   // Portrait framing: the arms-out kick (beat 13.5) has to fit inside 720×1280 (checked by eye in portrait-kick.png).
   await page.selectOption("#resolution", "720x1280");
   const stripBox = await page.locator("#strip").boundingBox();
-  await page.click("#strip", { position: { x: stripBox.width * 13.5 / 20, y: stripBox.height / 2 } });
+  await page.click("#strip", { position: { x: stripBox.width * 13.5 / 20, y: stripBox.height - 12 } });
   await page.locator("#viewport").screenshot({ path: `${OUT}portrait-kick.png` });
   await page.selectOption("#resolution", "1280x720");
 

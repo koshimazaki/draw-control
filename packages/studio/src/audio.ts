@@ -20,13 +20,16 @@ export class Player {
   private startedAt = 0;
   private from = 0;
   private wallStart = 0;
+  private rate = 1;
   playing = false;
 
-  play(track: Track | null, fromSeconds: number) {
+  /** Play from a time. Below 1× the preview runs silent on the wall clock (slow motion). */
+  play(track: Track | null, fromSeconds: number, rate = 1) {
     this.stop();
     this.from = fromSeconds;
+    this.rate = rate;
     this.playing = true;
-    if (!track) { this.wallStart = performance.now(); return; }
+    if (!track || rate !== 1) { this.wallStart = performance.now(); return; }
     this.ctx ??= new AudioContext();
     this.source = this.ctx.createBufferSource();
     this.source.buffer = track.buffer;
@@ -44,6 +47,6 @@ export class Player {
   position(): number {
     if (!this.playing) return this.from;
     if (this.source && this.ctx) return this.from + this.ctx.currentTime - this.startedAt;
-    return this.from + (performance.now() - this.wallStart) / 1000;
+    return this.from + (performance.now() - this.wallStart) / 1000 * this.rate;
   }
 }

@@ -12,7 +12,8 @@ import { loadRiggedCharacter, type RiggedCharacter } from "./characters/rigged";
 import { loadFileCharacter } from "./characters/file-character";
 import type { Character } from "./characters/types";
 import { Player, loadTrack, type Track } from "./audio";
-import { beatFromStripX, drawBeatStrip } from "./beat-strip";
+import { Timeline } from "./timeline/timeline";
+import { computePoseSpeed } from "./timeline/pose-speed";
 import { exportBundle } from "./export/bundle";
 import { currentRange, exportSize, updateExportPanel } from "./export/panel";
 import { bindRigPanel, syncRigPanel } from "./rig-panel";
@@ -24,7 +25,6 @@ export function startApp(root: HTMLElement) {
   root.innerHTML = LAYOUT;
   const viewport = new Viewport($("viewport"));
   const player = new Player();
-  const strip = $<HTMLCanvasElement>("strip");
   let recipe: Recipe = defaultRiggedRecipe();
   let track: Track | null = null;
   /** What the music hands to the rig and the reactive layer; flat (mid energy) without a track. */
@@ -53,6 +53,7 @@ export function startApp(root: HTMLElement) {
     refreshRig();
     syncInputs();
     render();
+    schedulePoseSpeed();
   }
   /** Rebuild the camera plan and the path overlay from the recipe and the drive. */
   function refreshRig() {
@@ -99,33 +100,37 @@ export function startApp(root: HTMLElement) {
     $("palette").hidden = clipDriven;
     $("clipPalette").hidden = !clipDriven;
     syncRigPanel(recipe);
+    timeline.setBrush(recipe.character.kind, fileCharacter?.clips.map(c => c.name) ?? []);
     updateExportPanel(recipe);
   }
 
-  function render() {
-    const state = frameAt(recipe, frame, drive);
+  /** Render the recipe at a frame (fractional while previewing above 24 fps). */
+  function render(shown: number = frame) {
+    const state = frameAt(recipe, shown, drive);
     viewport.show(state);
     const a = state.active;
-    $("caption").textContent = a ? `${a.moveName} · ${a.phaseName}: ${a.caption}` : "";
-    say("readout", `frame ${frame} / ${totalFrames()} · ${state.seconds.toFixed(2)} s · beat ${Math.max(0, state.beat).toFixed(2)}`);
-    drawBeatStrip(strip, {
-      recipe, beat: Math.max(0, state.beat), cursorBeat: Number(input("cursorBeat").value) || 0, selectedId,
-      waveform: track?.features.waveform ?? null,
-      trackBeats: track ? (track.features.lengthSeconds - recipe.beatGrid.offsetSeconds) * recipe.beatGrid.bpm / 60 : null,
-    });
+    $("caption").textContent = state.phase ? `${state.phase.accent.toUpperCase()} · ${state.phase.name}` : a ? `${a.moveName} · ${a.phaseName}: ${a.caption}` : "";
+    say("readout", `F ${String(frame).padStart(3, "0")} / ${totalFrames()} · ${state.seconds.toFixed(2)} s · beat ${Math.max(0, state.beat).toFixed(2)}`);
+    currentBeat = Math.max(0, state.beat);
+    timeline.draw();
   }
+  let currentBeat = 0;
+  const rate = () => Number($<HTMLSelectElement>("rate").value) || 1;
+  const previewFps = () => Number($<HTMLSelectElement>("previewFps").value) || 24;
 
   function tick() {
     if (player.playing && !exporting) {
-      frame = Math.floor(player.position() * recipe.fps);
-      if (frame >= totalFrames()) { frame = 0; player.play(track, 0); }
-      render();
+      const t = player.position();
+      frame = Math.floor(t * recipe.fps);
+      if (frame >= totalFrames()) { frame = 0; player.play(track, 0, rate()); }
+      // Preview fps: hold frames below 24, interpolate between them above.
+      render(Math.floor(t * previewFps()) / previewFps() * recipe.fps);
     }
     requestAnimationFrame(tick);
   }
 
   function setPlaying(on: boolean) {
-    if (on) player.play(track, frame / recipe.fps); else player.stop();
+    if (on) player.play(track, frame / recipe.fps, rate()); else player.stop();
     say("play", on ? "Pause" : "Play");
   }
 
@@ -283,17 +288,36 @@ export function startApp(root: HTMLElement) {
   };
   $("selRemove").onclick = () => { if (selectedId) edit(r => removeMove(r, { moveId: selectedId! })); };
 
-  // Beat strip: click to seek and place the cursor; clicking a move selects it.
-  strip.onclick = e => {
-    const beat = beatFromStripX(strip, e.clientX, recipe.durationBeats);
+  // Timeline: seeking places the cursor and selects the move under it.
+  function seekBeat(beat: number) {
     input("cursorBeat").value = String(Math.min(recipe.durationBeats - 1, Math.floor(beat)));
     const hit = [...recipe.moves].reverse().find(m => m.atBeat <= beat);
     selectedId = hit?.id ?? null;
     frame = Math.max(0, Math.round((recipe.beatGrid.offsetSeconds + beat * 60 / recipe.beatGrid.bpm) * recipe.fps));
-    if (player.playing) player.play(track, frame / recipe.fps);
+    if (player.playing) player.play(track, frame / recipe.fps, rate());
     syncInputs();
     render();
-  };
+  }
+  const timeline = new Timeline({
+    recipe: () => recipe, drive: () => (drive === FLAT ? undefined : drive),
+    rms: () => (track ? { rms: track.features.rms, hop: track.features.hopSeconds } : null),
+    beat: () => currentBeat, poseSpeed: () => poseSpeedCurve, edit, seek: seekBeat,
+  });
+  /** Pose speed for the graph, recomputed shortly after the recipe or drive changes. */
+  let poseSpeedCurve: Float32Array | null = null;
+  let poseTimer = 0;
+  function schedulePoseSpeed() {
+    clearTimeout(poseTimer);
+    poseTimer = window.setTimeout(() => {
+      const c = viewport.getCharacter();
+      if (!c) return;
+      poseSpeedCurve = computePoseSpeed(c, recipe, drive, totalFrames());
+      render();
+    }, 400);
+  }
+  $("rate").onchange = () => { if (player.playing) player.play(track, frame / recipe.fps, rate()); };
+  $("tStart").onclick = () => { setPlaying(false); frame = 0; render(); };
+  $("tEnd").onclick = () => { setPlaying(false); frame = totalFrames() - 1; render(); };
 
   // View
   $("views").onclick = e => {
