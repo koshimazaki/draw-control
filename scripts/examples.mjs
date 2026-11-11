@@ -8,7 +8,7 @@
  * the unzipped bundle, a contact sheet, and for D the top and orbit path views.
  *   npm run examples            (all)       npm run examples -- D   (one)
  */
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { createServer } from "vite";
 import { chromium } from "playwright-core";
@@ -72,9 +72,12 @@ try {
   console.log("track:", await page.textContent("#trackStatus"));
   const examples = await page.evaluate(async () => (await window.__msDev()).exampleRecipes());
   mkdirSync(`${ROOT}recipes`, { recursive: true });
+  const written = [];
   for (const ex of examples) {
     if (only.length && !only.includes(ex.id)) continue;
-    writeFileSync(`${ROOT}recipes/${ex.id}.json`, JSON.stringify(ex.recipe, null, 2) + "\n");
+    // Recipes are written after every export: the studio bundles examples/recipes/ (sequence
+    // library), so writing one mid-run would make the dev server reload the page.
+    written.push(ex);
     await page.click('[data-view="front"]');
     // The JSON panel sits in a closed <details>: set it and press Apply through the DOM.
     await page.evaluate(json => { document.querySelector("#recipeJson").value = json; document.querySelector("#applyJson").click(); }, JSON.stringify(ex.recipe));
@@ -117,6 +120,10 @@ try {
     } catch (e) { console.warn(`ffprobe/ffmpeg unavailable or failed: ${e.message}`); }
   }
   if (errors.length) fail(`page errors: ${errors.join(" | ")}`);
+  for (const ex of written) {
+    const file = `${ROOT}recipes/${ex.id}.json`, text = JSON.stringify(ex.recipe, null, 2) + "\n";
+    if (!existsSync(file) || readFileSync(file, "utf8") !== text) writeFileSync(file, text);
+  }
 } finally {
   await browser.close();
   await server.close();

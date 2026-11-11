@@ -13,7 +13,7 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { describe, expect, it } from "vitest";
 import {
-  MIN_BLEND_FRAMES, blendBeatsOf, defaultRiggedRecipe, exportFrameCount, frameAt, framesToBeats, riggedMove, validateRecipe,
+  MIN_BLEND_FRAMES, blendBeatsOf, namedSequences, defaultRiggedRecipe, exportFrameCount, frameAt, framesToBeats, riggedMove, validateRecipe,
   type HitMarker, type Recipe,
 } from "@motion-studio/core";
 import { createRiggedCharacter, type RiggedCharacter } from "../src/characters/rigged-core";
@@ -83,5 +83,16 @@ describe("smooth transitions (rigged mannequin)", () => {
     ];
     const worst = worstPop(c, fight(moves, markers));
     expect(worst.deg, `${worst.bone} at frame ${worst.frame}`).toBeLessThan(POP_DEGREES);
+  }, 60_000);
+
+  it("has no joint pop in the committed named sequences", async () => {
+    const c = await mannequin();
+    for (const seq of namedSequences()) {
+      // A fast loop has kinks of its own (Sprint_Loop at 120 BPM plays 1.33 times its speed and
+      // spikes 58 degrees alone): the transitions must add nothing above the loops played alone.
+      const alone = Math.max(...seq.recipe.moves.map(mv => worstPop(c, validateRecipe({ ...seq.recipe, moves: [{ ...mv, atBeat: 0 }], reactive: { ...seq.recipe.reactive!, markers: [] } })).deg));
+      const worst = worstPop(c, seq.recipe);
+      expect(worst.deg, `${seq.id}: ${worst.bone} at frame ${worst.frame} (loops alone ${alone.toFixed(1)})`).toBeLessThan(Math.max(POP_DEGREES, alone + 3));
+    }
   }, 60_000);
 });

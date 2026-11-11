@@ -23,3 +23,4 @@ export * from "./performance-config";
 export * from "./performance-edits";
 export * from "./transitions";
 export * from "./delete-edits";
+export * from "./sequences";

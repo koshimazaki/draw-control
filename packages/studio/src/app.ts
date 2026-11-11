@@ -21,6 +21,8 @@ import { bindViewControls } from "./app-view";
 import { $, LAYOUT } from "./ui";
 import { Viewport } from "./viewport";
 import { History, bindUndo, sameRecipe } from "./history";
+import { bindSequencePanel } from "./sequence-panel";
+import { parseSequenceFile } from "./sequence-library";
 
 export function startApp(root: HTMLElement) {
   root.innerHTML = LAYOUT;
@@ -348,6 +350,7 @@ export function startApp(root: HTMLElement) {
     e.preventDefault();
     for (const f of e.dataTransfer?.files ?? []) {
       if (/\.(glb|gltf|fbx)$/i.test(f.name)) void useCharacterFile(f);
+      else if (/\.json$/i.test(f.name)) void f.text().then(t => edit(() => parseSequenceFile(t)));
       else if (f.type.startsWith("audio/") || /\.(wav|mp3|m4a|ogg|flac|aac)$/i.test(f.name)) void useTrack(f);
     }
   });
@@ -358,6 +361,8 @@ export function startApp(root: HTMLElement) {
     drive: () => (drive === FLAT ? undefined : drive), frame: () => frame, cursor, selectedMarker: () => timeline.selectedMarker(),
   });
   const { markView, applyResolution } = view;
+
+  bindSequencePanel({ recipe: () => recipe, load: r => edit(() => r) });
 
   // Recipe JSON
   $("applyJson").onclick = () => edit(() => validateRecipe(JSON.parse($<HTMLTextAreaElement>("recipeJson").value)));

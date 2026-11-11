@@ -1,0 +1,173 @@
+{
+  "version": 2,
+  "fps": 24,
+  "durationBeats": 32,
+  "beatGrid": {
+    "bpm": 120,
+    "offsetSeconds": 0,
+    "beatsPerBar": 4,
+    "source": "manual"
+  },
+  "character": {
+    "kind": "rigged",
+    "name": "Rigged mannequin (Ecctrl AnimationLibrary)",
+    "licence": "MIT (c) 2023-2026 Erdong Chen (Ecctrl); animations based on Quaternius Universal Animation Library (CC0)"
+  },
+  "energy": 1,
+  "moves": [
+    {
+      "id": "Walk_Loop-0",
+      "name": "Walk_Loop",
+      "atBeat": 0,
+      "blendBeats": 0.6667,
+      "loop": true,
+      "phases": [
+        {
+          "name": "clip",
+          "caption": "Walk_Loop",
+          "pose": "neutral",
+          "amplitude": 1,
+          "length": {
+            "beats": 2
+          },
+          "previewFps": 24
+        }
+      ],
+      "clip": "Walk_Loop",
+      "clipCycleBeats": 2
+    },
+    {
+      "id": "Jog_Fwd_Loop-8",
+      "name": "Jog_Fwd_Loop",
+      "atBeat": 8,
+      "blendBeats": 0.6667,
+      "loop": true,
+      "phases": [
+        {
+          "name": "clip",
+          "caption": "Jog_Fwd_Loop",
+          "pose": "neutral",
+          "amplitude": 1,
+          "length": {
+            "beats": 2
+          },
+          "previewFps": 24
+        }
+      ],
+      "clip": "Jog_Fwd_Loop",
+      "clipCycleBeats": 2
+    },
+    {
+      "id": "Sprint_Loop-16",
+      "name": "Sprint_Loop",
+      "atBeat": 16,
+      "blendBeats": 0.5,
+      "loop": true,
+      "phases": [
+        {
+          "name": "clip",
+          "caption": "Sprint_Loop",
+          "pose": "neutral",
+          "amplitude": 1,
+          "length": {
+            "beats": 1
+          },
+          "previewFps": 24
+        }
+      ],
+      "clip": "Sprint_Loop",
+      "clipCycleBeats": 1
+    },
+    {
+      "id": "Jog_Fwd_Loop-22",
+      "name": "Jog_Fwd_Loop",
+      "atBeat": 22,
+      "blendBeats": 0.8333,
+      "loop": true,
+      "phases": [
+        {
+          "name": "clip",
+          "caption": "Jog_Fwd_Loop",
+          "pose": "neutral",
+          "amplitude": 1,
+          "length": {
+            "beats": 2
+          },
+          "previewFps": 24
+        }
+      ],
+      "clip": "Jog_Fwd_Loop",
+      "clipCycleBeats": 2
+    },
+    {
+      "id": "Walk_Loop-25",
+      "name": "Walk_Loop",
+      "atBeat": 25,
+      "blendBeats": 1,
+      "loop": true,
+      "phases": [
+        {
+          "name": "clip",
+          "caption": "Walk_Loop",
+          "pose": "neutral",
+          "amplitude": 1,
+          "length": {
+            "beats": 2
+          },
+          "previewFps": 24
+        }
+      ],
+      "clip": "Walk_Loop",
+      "clipCycleBeats": 2
+    },
+    {
+      "id": "Idle_Loop-29",
+      "name": "Idle_Loop",
+      "atBeat": 29,
+      "blendBeats": 1,
+      "loop": true,
+      "phases": [
+        {
+          "name": "clip",
+          "caption": "Idle_Loop",
+          "pose": "neutral",
+          "amplitude": 1,
+          "length": {
+            "beats": 4
+          },
+          "previewFps": 24
+        }
+      ],
+      "clip": "Idle_Loop",
+      "clipCycleBeats": 4
+    }
+  ],
+  "rootPath": [
+    {
+      "beat": 0,
+      "x": 0,
+      "z": 0,
+      "yaw": 0
+    }
+  ],
+  "jumps": [],
+  "reactive": {
+    "seed": 3,
+    "speed": 0.7,
+    "amplitude": 0.8,
+    "accents": [],
+    "accentOn": "both",
+    "accentGapBeats": 2,
+    "onsetThreshold": 0.6,
+    "idleBelow": 0,
+    "humanise": 0.6,
+    "drive": 1,
+    "markers": [
+      {
+        "seconds": 10,
+        "accent": "jump",
+        "source": "manual"
+      }
+    ]
+  }
+}

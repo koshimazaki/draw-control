@@ -4,6 +4,7 @@ import { RIG_LAYOUT } from "./rig-panel";
 import { TIMELINE_LAYOUT } from "./timeline/timeline";
 import { GIZMO_LAYOUT } from "./move-gizmo";
 import { VIEWS, VIEW_LABELS } from "./views";
+import { SEQUENCE_LAYOUT } from "./sequence-panel";
 
 const sizeKey = (s: { width: number; height: number }) => `${s.width}x${s.height}`;
 const SIZE_OPTIONS = EXPORT_SIZES.map(s => `<option value="${sizeKey(s)}"${s === DEFAULT_EXPORT_SIZE ? " selected" : ""}>${s.label}</option>`).join("")
@@ -99,6 +100,7 @@ ${RIG_LAYOUT}
       <progress id="exportProgress" max="1" value="0" hidden></progress>
       <p id="exportStatus" class="muted"></p>
     </section>
+${SEQUENCE_LAYOUT}
     <section>
       <details>
         <summary>Recipe JSON</summary>

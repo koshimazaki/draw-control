@@ -1,0 +1,166 @@
+{
+  "version": 2,
+  "fps": 24,
+  "durationBeats": 32,
+  "beatGrid": {
+    "bpm": 120,
+    "offsetSeconds": 0,
+    "beatsPerBar": 4,
+    "source": "manual"
+  },
+  "character": {
+    "kind": "rigged",
+    "name": "Rigged mannequin (Ecctrl AnimationLibrary)",
+    "licence": "MIT (c) 2023-2026 Erdong Chen (Ecctrl); animations based on Quaternius Universal Animation Library (CC0)"
+  },
+  "energy": 1,
+  "moves": [
+    {
+      "id": "Sword_Idle-0",
+      "name": "Sword_Idle",
+      "atBeat": 0,
+      "blendBeats": 0.6667,
+      "loop": true,
+      "phases": [
+        {
+          "name": "clip",
+          "caption": "Sword_Idle",
+          "pose": "neutral",
+          "amplitude": 1,
+          "length": {
+            "beats": 4
+          },
+          "previewFps": 24
+        }
+      ],
+      "clip": "Sword_Idle",
+      "clipCycleBeats": 4
+    },
+    {
+      "id": "Spell_Simple_Idle_Loop-8",
+      "name": "Spell_Simple_Idle_Loop",
+      "atBeat": 8,
+      "blendBeats": 0.8333,
+      "loop": true,
+      "phases": [
+        {
+          "name": "clip",
+          "caption": "Spell_Simple_Idle_Loop",
+          "pose": "neutral",
+          "amplitude": 1,
+          "length": {
+            "beats": 4
+          },
+          "previewFps": 24
+        }
+      ],
+      "clip": "Spell_Simple_Idle_Loop",
+      "clipCycleBeats": 4
+    },
+    {
+      "id": "Dance_Loop-16",
+      "name": "Dance_Loop",
+      "atBeat": 16,
+      "blendBeats": 1,
+      "loop": true,
+      "phases": [
+        {
+          "name": "clip",
+          "caption": "Dance_Loop",
+          "pose": "neutral",
+          "amplitude": 1,
+          "length": {
+            "beats": 2
+          },
+          "previewFps": 24
+        }
+      ],
+      "clip": "Dance_Loop",
+      "clipCycleBeats": 2
+    },
+    {
+      "id": "Sword_Idle-24",
+      "name": "Sword_Idle",
+      "atBeat": 24,
+      "blendBeats": 0.6667,
+      "loop": true,
+      "phases": [
+        {
+          "name": "clip",
+          "caption": "Sword_Idle",
+          "pose": "neutral",
+          "amplitude": 1,
+          "length": {
+            "beats": 4
+          },
+          "previewFps": 24
+        }
+      ],
+      "clip": "Sword_Idle",
+      "clipCycleBeats": 4
+    }
+  ],
+  "rootPath": [
+    {
+      "beat": 0,
+      "x": 0,
+      "z": 0,
+      "yaw": 0
+    }
+  ],
+  "jumps": [],
+  "reactive": {
+    "seed": 3,
+    "speed": 0.7,
+    "amplitude": 0.8,
+    "accents": [],
+    "accentOn": "both",
+    "accentGapBeats": 2,
+    "onsetThreshold": 0.6,
+    "idleBelow": 0,
+    "humanise": 0.6,
+    "drive": 1,
+    "markers": [
+      {
+        "seconds": 1,
+        "accent": "jab",
+        "source": "manual"
+      },
+      {
+        "seconds": 1.5,
+        "accent": "cross",
+        "source": "manual"
+      },
+      {
+        "seconds": 2.25,
+        "accent": "sword",
+        "source": "manual"
+      },
+      {
+        "seconds": 5,
+        "accent": "roll",
+        "source": "manual"
+      },
+      {
+        "seconds": 8.5,
+        "accent": "jump",
+        "source": "manual"
+      },
+      {
+        "seconds": 10,
+        "accent": "spin",
+        "source": "manual"
+      },
+      {
+        "seconds": 12.5,
+        "accent": "cross",
+        "source": "manual"
+      },
+      {
+        "seconds": 13,
+        "accent": "jab",
+        "source": "manual"
+      }
+    ]
+  }
+}
