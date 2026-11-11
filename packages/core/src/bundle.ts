@@ -6,14 +6,15 @@
 import { beatAtSeconds, beatGridJson, secondsAtBeat, snapFrames8k1, type BeatsJson } from "./beats";
 import { recipeSeconds, type Recipe } from "./recipe";
 
-export const BUNDLE_SCHEMA_VERSION = "0.1.0";
+/** 0.2.0 adds the optional camera track (manifest `camera`, asset role "camera"). */
+export const BUNDLE_SCHEMA_VERSION = "0.2.0";
 export const GENERATOR = { name: "motion-studio", version: "0.1.0", motion: "local-time-stretch" } as const;
 export const BUNDLE_FILES = {
   video: "guide.mp4", audio: "audio.wav", firstFrame: "frame0.png",
-  beats: "beats.json", recipe: "recipe.json", meta: "meta.json", manifest: "bundle.json",
+  beats: "beats.json", recipe: "recipe.json", meta: "meta.json", manifest: "bundle.json", camera: "camera.json",
 } as const;
 
-export type AssetRole = "video" | "audio" | "firstFrame" | "character" | "motion" | "recipe" | "beats";
+export type AssetRole = "video" | "audio" | "firstFrame" | "character" | "motion" | "recipe" | "beats" | "camera";
 export type AssetLicence = { role: AssetRole; name: string; licence: string; file?: string };
 export type BundleMeta = {
   schemaVersion: string;
@@ -29,6 +30,8 @@ export type BundleManifest = {
   schemaVersion: string;
   video: string; audio?: string; firstFrame: string; firstFrameStyled?: string;
   beats: string; recipe: string; meta: string;
+  /** Optional camera track (schema 0.2.0), written when the export used the camera rig. */
+  camera?: string;
 };
 
 /** Frame count for an export: the recipe length at 24 fps, rounded up to 8k+1. */
@@ -69,17 +72,18 @@ export function videoAssetName(recipe: Recipe, startFrame: number, frames: numbe
 }
 
 export function buildMeta(recipe: Recipe, opts: {
-  width: number; height: number; frames: number; view: string; audioInVideo: boolean; hasAudio: boolean; startFrame?: number;
+  width: number; height: number; frames: number; view: string; audioInVideo: boolean; hasAudio: boolean; startFrame?: number; hasCamera?: boolean;
 }): BundleMeta {
   const own = "MIT (motion-studio)";
   const assets: AssetLicence[] = [
     { role: "video", name: videoAssetName(recipe, opts.startFrame ?? 0, opts.frames), licence: own, file: BUNDLE_FILES.video },
     { role: "firstFrame", name: "Frame 0", licence: own, file: BUNDLE_FILES.firstFrame },
     { role: "character", name: recipe.character.name, licence: recipe.character.licence },
-    { role: "motion", name: "Move library and engine", licence: own },
+    { role: "motion", name: recipe.reactive ? "Move library, engine and audio-reactive layer" : "Move library and engine", licence: own },
     { role: "recipe", name: "Recipe", licence: own, file: BUNDLE_FILES.recipe },
     { role: "beats", name: "Beat grid", licence: own, file: BUNDLE_FILES.beats },
   ];
+  if (opts.hasCamera) assets.push({ role: "camera", name: "Audio-reactive camera track", licence: own, file: BUNDLE_FILES.camera });
   if (opts.hasAudio && recipe.audio) assets.splice(1, 0, { role: "audio", name: recipe.audio.name, licence: recipe.audio.licence, file: BUNDLE_FILES.audio });
   return {
     schemaVersion: BUNDLE_SCHEMA_VERSION,
@@ -87,19 +91,20 @@ export function buildMeta(recipe: Recipe, opts: {
     durationSeconds: Math.round(opts.frames / recipe.fps * 10000) / 10000,
     view: opts.view,
     character: { kind: recipe.character.kind, name: recipe.character.name },
-    generator: { ...GENERATOR },
+    generator: { ...GENERATOR, motion: recipe.reactive ? "local-time-stretch+audio-reactive" : GENERATOR.motion },
     audioInVideo: opts.audioInVideo,
     assets,
   };
 }
 
-export function buildManifest(hasAudio: boolean): BundleManifest {
+export function buildManifest(hasAudio: boolean, hasCamera = false): BundleManifest {
   const m: BundleManifest = {
     schemaVersion: BUNDLE_SCHEMA_VERSION,
     video: BUNDLE_FILES.video, firstFrame: BUNDLE_FILES.firstFrame,
     beats: BUNDLE_FILES.beats, recipe: BUNDLE_FILES.recipe, meta: BUNDLE_FILES.meta,
   };
   if (hasAudio) m.audio = BUNDLE_FILES.audio;
+  if (hasCamera) m.camera = BUNDLE_FILES.camera;
   return m;
 }
 

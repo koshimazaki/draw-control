@@ -1,7 +1,10 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { Ajv2020 } from "ajv/dist/2020.js";
-import { DEFAULT_RECIPE, buildBeats, buildManifest, buildMeta, encodeWav, exportFrameCount, validateRecipe } from "../src";
+import {
+  BUNDLE_SCHEMA_VERSION, DEFAULT_RECIPE, buildBeats, buildCameraTrack, buildManifest, buildMeta, encodeWav, exportFrameCount, planCamera,
+  suggestLtxCameraMovement, validateRecipe,
+} from "../src";
 
 const schema = JSON.parse(readFileSync(new URL("../../../schema/guide-bundle.schema.json", import.meta.url), "utf8"));
 const ajv = new Ajv2020({ strict: false });
@@ -43,5 +46,35 @@ describe("guide bundle", () => {
     expect(view.getUint16(22, true)).toBe(2);
     expect(view.getUint32(40, true)).toBe(48000 * 2 * 2);
     expect(view.getInt16(44, true)).toBe(Math.round(0.5 * 0x7fff - 0.5));
+  });
+});
+
+describe("camera track (schema 0.2.0)", () => {
+  const recipe = validateRecipe({ ...structuredClone(DEFAULT_RECIPE), camera: {
+    segments: [{ fromBeat: 0, toBeat: 8, modes: ["orbit"] }, { fromBeat: 8, toBeat: 16, modes: ["pushIn"] }],
+    intensity: 0.8, orbitDegreesPerBeat: 10, distance: 4.4, height: 1.15, fov: 38, startYaw: 0 } });
+  const plan = planCamera(recipe);
+  it("validates against the pinned schema, with the manifest and meta naming it", () => {
+    const track = buildCameraTrack(plan, recipe, 24, 97, 16 / 9, BUNDLE_SCHEMA_VERSION);
+    expect(track.track).toHaveLength(97);
+    expect(track.track[0].position).toEqual(plan.samples[24].position.map(x => Math.round(x * 10000) / 10000));
+    expect(check("guide-bundle.schema.json#/$defs/camera", JSON.parse(JSON.stringify(track)))).toBe(true);
+    expect(check("guide-bundle.schema.json", buildManifest(true, true))).toBe(true);
+    const meta = buildMeta(recipe, { width: 1280, height: 720, frames: 97, view: "rig", audioInVideo: true, hasAudio: false, hasCamera: true });
+    expect(check("guide-bundle.schema.json#/$defs/meta", meta)).toBe(true);
+    expect(meta.assets.some(a => a.role === "camera" && a.file === "camera.json")).toBe(true);
+  });
+  it("suggests the nearest LTX preset, marked approximate", () => {
+    expect(suggestLtxCameraMovement(plan, 0, 8 * 12).settings.cameraMovement).toBe("dolly_right");
+    expect(suggestLtxCameraMovement(plan, 8 * 12 + 6, 8 * 12).settings.cameraMovement).toBe("dolly_in");
+    const left = planCamera({ ...recipe, camera: { ...recipe.camera!, orbitDegreesPerBeat: -10 } });
+    expect(suggestLtxCameraMovement(left, 0, 96).settings.cameraMovement).toBe("dolly_left");
+    const still = planCamera({ ...recipe, camera: { ...recipe.camera!, intensity: 0, segments: [{ fromBeat: 0, toBeat: 16, modes: ["static"] }] } });
+    const s = suggestLtxCameraMovement(still, 0, 96);
+    expect(s.settings.cameraMovement).toBe("static");
+    expect(s.approximate).toBe(true);
+  });
+  it("a bundle without the rig has no camera entry (0.1.0 readers see the same files)", () => {
+    expect(buildManifest(true)).not.toHaveProperty("camera");
   });
 });

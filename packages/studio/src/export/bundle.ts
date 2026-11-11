@@ -1,10 +1,11 @@
 /**
  * Render the guide bundle frame by frame and zip it:
- * guide.mp4, frame0.png, audio.wav, beats.json, recipe.json, meta.json, bundle.json.
+ * guide.mp4, frame0.png, audio.wav, beats.json, recipe.json, meta.json, bundle.json, and
+ * camera.json when the Camera rig view is exported.
  */
 import { strToU8, zipSync } from "fflate";
 import {
-  BUNDLE_FILES, buildBeats, buildManifest, buildMeta, encodeWav, frameAt, resolveExportRange, type AudioDrive, type ExportRange, type Recipe,
+  BUNDLE_FILES, BUNDLE_SCHEMA_VERSION, buildBeats, buildCameraTrack, buildManifest, buildMeta, encodeWav, frameAt, resolveExportRange, type AudioDrive, type ExportRange, type Recipe,
 } from "@motion-studio/core";
 import { makeRenderer, type Viewport } from "../viewport";
 import { createMp4Writer } from "./mp4";
@@ -59,14 +60,16 @@ export async function exportBundle(o: ExportOptions): Promise<ExportResult> {
   o.onProgress?.(frames, frames);
 
   const hasAudio = !!channels;
+  const plan = viewport.view === "rig" ? viewport.getRigPlan() : null;
   const files: Record<string, Uint8Array> = {
     [BUNDLE_FILES.video]: mp4.bytes,
     [BUNDLE_FILES.firstFrame]: firstFrame!,
     [BUNDLE_FILES.beats]: json(buildBeats(recipe, frames, startFrame)),
     [BUNDLE_FILES.recipe]: json(recipe),
-    [BUNDLE_FILES.meta]: json(buildMeta(recipe, { width, height, frames, view: viewport.view, audioInVideo: mp4.audioInVideo, hasAudio, startFrame })),
-    [BUNDLE_FILES.manifest]: json(buildManifest(hasAudio)),
+    [BUNDLE_FILES.meta]: json(buildMeta(recipe, { width, height, frames, view: viewport.view, audioInVideo: mp4.audioInVideo, hasAudio, startFrame, hasCamera: !!plan })),
+    [BUNDLE_FILES.manifest]: json(buildManifest(hasAudio, !!plan)),
   };
+  if (plan) files[BUNDLE_FILES.camera] = json(buildCameraTrack(plan, recipe, startFrame, frames, width / height, BUNDLE_SCHEMA_VERSION));
   if (channels && o.audio) files[BUNDLE_FILES.audio] = encodeWav(channels, o.audio.sampleRate, startSeconds, seconds);
   // MP4, PNG and WAV gain little from deflate; store them.
   const zip = zipSync(Object.fromEntries(Object.entries(files).map(([k, v]) => [k, [v, { level: k.endsWith(".json") ? 6 : 0 }]])));
