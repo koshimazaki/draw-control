@@ -106,3 +106,23 @@ describe("example recipes", () => {
     expect(d.reactive && d.camera).toBeTruthy();
   });
 });
+
+describe("hit markers", () => {
+  it("edited markers replace detection and still land within one frame", async () => {
+    const { detectedMarkers } = await import("../src");
+    const d = drive([5.13, 7.4]);
+    const r = reactiveRecipe({ accents: ["hit", "jump"] });
+    const auto = detectedMarkers(r, d);
+    expect(auto.length).toBeGreaterThan(2);
+    const edited = reactiveRecipe({ accents: ["hit", "jump"], markers: [{ seconds: 6.03, accent: "strike", source: "manual" }] });
+    const plan = planReactive(edited, d);
+    expect(plan.hits.map(h => [h.seconds, h.key])).toEqual([[6.03, "strike"]]);
+    let landed = -1;
+    for (let n = 130; n < 160 && landed < 0; n++) {
+      const f = frameAt(edited, n, d);
+      if (f.accent?.weight === 1 && poseDistance(f.pose, POSES.strikeHit) < 1e-6) landed = n;
+    }
+    expect(Math.abs(landed * DT - 6.03)).toBeLessThanOrEqual(DT);
+    expect(() => reactiveRecipe({ markers: [{ seconds: 2, accent: "nope" as never, source: "manual" }] })).toThrow(/accent/);
+  });
+});

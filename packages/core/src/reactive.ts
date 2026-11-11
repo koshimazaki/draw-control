@@ -16,7 +16,7 @@ import { activeMoveIndex } from "./engine";
 import { makeMove } from "./moves";
 import { hash32 } from "./rng";
 import { moveBeats, type Recipe } from "./recipe";
-import type { ReactiveConfig } from "./reactive-config";
+import type { HitMarker, ReactiveConfig } from "./reactive-config";
 
 /** Tempo level of a bar: 0 = idle, otherwise a rate on the move's phases. */
 export type BarLevel = 0 | 0.5 | 1 | 2;
@@ -69,7 +69,14 @@ export function planReactive(recipe: Recipe, drive?: AudioDrive): ReactivePlan {
   }
   candidates.sort((a, b) => a.seconds - b.seconds);
   const hits: Hit[] = [];
-  if (cfg.accents.length) {
+  if (cfg.markers) {
+    // Edited markers are taken as they are (only the recipe bounds still apply).
+    for (const m of cfg.markers) {
+      const beat = beatAtSeconds(g, m.seconds);
+      const [lo, hi] = accentSpan(ACCENT_MOVES[m.accent]);
+      if (beat + lo >= 0 && beat + hi <= recipe.durationBeats) hits.push({ seconds: m.seconds, beat, key: m.accent, source: m.source === "downbeat" ? "downbeat" : "onset" });
+    }
+  } else if (cfg.accents.length) {
     let last = -Infinity, lastKey: AccentKey | null = null;
     for (const c of candidates) {
       if (c.beat - last < cfg.accentGapBeats) continue;
@@ -86,4 +93,10 @@ export function planReactive(recipe: Recipe, drive?: AudioDrive): ReactivePlan {
   }
   const idle: Recipe = { ...recipe, moves: [makeMove("idle", 0, { id: "reactive-idle" })] };
   return { config: cfg, barEnergy, levels, hits, idle, drive };
+}
+
+/** The detected hits as editable markers: the starting point for hand edits. */
+export function detectedMarkers(recipe: Recipe, drive?: AudioDrive): HitMarker[] {
+  const r = recipe.reactive ? { ...recipe, reactive: { ...recipe.reactive, markers: undefined } } : recipe;
+  return planReactive(r, drive).hits.map(h => ({ seconds: Math.round(h.seconds * 10000) / 10000, accent: h.key, source: h.source }));
 }

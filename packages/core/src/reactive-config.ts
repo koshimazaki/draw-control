@@ -7,6 +7,15 @@ import { fail, isObject, num, only } from "./validate";
 
 export const ACCENT_TRIGGERS = ["downbeats", "onsets", "both"] as const;
 export type AccentTrigger = (typeof ACCENT_TRIGGERS)[number];
+export const MARKER_SOURCES = ["onset", "downbeat", "manual"] as const;
+/**
+ * A hit marker: a time where the character does something (an accent move, or a change
+ * the generator should land). Markers are the editable form of the detected hits: when a
+ * recipe carries them they replace detection, so a person or an agent can move, add or
+ * delete hits and pick each accent. They are also the keyframe list a future in-between
+ * generator (MotionBricks) fills motion between.
+ */
+export type HitMarker = { seconds: number; accent: AccentKey; source: (typeof MARKER_SOURCES)[number] };
 export type ReactiveConfig = {
   /** Whole number; the same seed gives the same performance. */
   seed: number;
@@ -25,6 +34,8 @@ export type ReactiveConfig = {
   idleBelow: number;
   /** 0–1: overlapping action, follow-through and variation. */
   humanise: number;
+  /** Edited hits; when present they replace onset and downbeat detection. */
+  markers?: HitMarker[];
 };
 
 export const DEFAULT_REACTIVE: ReactiveConfig = {
@@ -34,12 +45,12 @@ export const DEFAULT_REACTIVE: ReactiveConfig = {
 
 export function validateReactive(input: unknown): ReactiveConfig {
   if (!isObject(input)) return fail("reactive must be an object");
-  only(input, ["seed", "speed", "amplitude", "accents", "accentOn", "accentGapBeats", "onsetThreshold", "idleBelow", "humanise"], "reactive");
+  only(input, ["seed", "speed", "amplitude", "accents", "accentOn", "accentGapBeats", "onsetThreshold", "idleBelow", "humanise", "markers"], "reactive");
   if (!Number.isInteger(input.seed) || !num(input.seed, 0, 2147483647, "reactive.seed")) fail("reactive.seed must be a whole number 0–2147483647");
   if (!Array.isArray(input.accents) || input.accents.length > 8) fail("reactive.accents must be a list of up to 8 accent moves");
   for (const a of input.accents as unknown[]) if (!isAccentKey(a)) fail(`reactive.accents: ${String(a)} is not an accent move`);
   if (!ACCENT_TRIGGERS.includes(input.accentOn as AccentTrigger)) fail(`reactive.accentOn must be one of ${ACCENT_TRIGGERS.join(", ")}`);
-  return {
+  const out: ReactiveConfig = {
     seed: input.seed as number,
     speed: num(input.speed, 0, 1, "reactive.speed"),
     amplitude: num(input.amplitude, 0, 1, "reactive.amplitude"),
@@ -50,5 +61,21 @@ export function validateReactive(input: unknown): ReactiveConfig {
     idleBelow: num(input.idleBelow, 0, 1, "reactive.idleBelow"),
     humanise: num(input.humanise, 0, 1, "reactive.humanise"),
   };
+  if (input.markers !== undefined) {
+    if (!Array.isArray(input.markers) || input.markers.length > 512) fail("reactive.markers must be a list of up to 512 markers");
+    let last = -Infinity;
+    out.markers = (input.markers as unknown[]).map((m, i) => {
+      const where = `reactive.markers[${i}]`;
+      if (!isObject(m)) return fail(`${where} must be an object`);
+      only(m, ["seconds", "accent", "source"], where);
+      const seconds = num(m.seconds, 0, 3600, `${where}.seconds`);
+      if (seconds < last) fail(`${where}.seconds must not be before the marker before it`);
+      last = seconds;
+      if (!isAccentKey(m.accent)) fail(`${where}.accent is not an accent move`);
+      if (!MARKER_SOURCES.includes(m.source as HitMarker["source"])) fail(`${where}.source must be one of ${MARKER_SOURCES.join(", ")}`);
+      return { seconds, accent: m.accent as AccentKey, source: m.source as HitMarker["source"] };
+    });
+  }
+  return out;
 }
 
