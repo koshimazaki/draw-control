@@ -47,7 +47,8 @@ export function createRiggedCharacter(model: THREE.Object3D, clips: THREE.Animat
   const sampler = new ClipSampler(model, clips);
   const groups = new Map<THREE.Object3D, string | null>(sampler.bones.map(b => [b, boneGroup(b.name)]));
   const hips = sampler.bones.find(b => b.name === "DEF-hips");
-  const tmpQ = new THREE.Quaternion();
+  const tmpQ = new THREE.Quaternion(), tmpV = new THREE.Vector3();
+  const feet = sampler.bones.filter(b => b.name === "DEF-footL" || b.name === "DEF-footR");
 
   function poseSkeleton(state: FrameState) {
     const amp = state.amplitude ?? 1;
@@ -66,17 +67,47 @@ export function createRiggedCharacter(model: THREE.Object3D, clips: THREE.Animat
     for (const l of accentLayers) accentTotal += l.weight;
     if (accentTotal > 0) sampler.blend(accentLayers.map(l => ({ ...l, weight: l.weight / accentTotal })), accents);
     const aw = Math.min(1, accentTotal);
-    for (const bone of sampler.bones) {
-      const ref = idle.get(bone) ?? sampler.restOf(bone);
-      const loop = loops.get(bone) ?? ref;
-      // Amplitude: 0 = idle, 1 = the clip as authored, above 1 exaggerates.
-      bone.quaternion.copy(ref.q).slerp(loop.q, amp);
-      bone.position.copy(ref.p).lerp(loop.p, amp);
-      const acc = accents.get(bone);
-      if (acc && aw > 0) { tmpQ.copy(acc.q); bone.quaternion.slerp(tmpQ, aw); bone.position.lerp(acc.p, aw); }
+    const applyBones = (acct: Map<THREE.Object3D, { q: THREE.Quaternion; p: THREE.Vector3 }>) => {
+      for (const bone of sampler.bones) {
+        const ref = idle.get(bone) ?? sampler.restOf(bone);
+        const loop = loops.get(bone) ?? ref;
+        // Amplitude: 0 = idle, 1 = the clip as authored, above 1 exaggerates.
+        bone.quaternion.copy(ref.q).slerp(loop.q, amp);
+        bone.position.copy(ref.p).lerp(loop.p, amp);
+        const acc = acct.get(bone);
+        if (acc && aw > 0) { tmpQ.copy(acc.q); bone.quaternion.slerp(tmpQ, aw); bone.position.lerp(acc.p, aw); }
+      }
+      if (hips) { const r = sampler.restOf(hips).p; hips.position.x = r.x; hips.position.z = r.z; }
+    };
+    // Hit harder: push the accent pose past the clip, away from the strike's starting pose,
+    // then lower the hips so the planted foot stays where the plain strike puts it (a deeper squash).
+    const pushed = state.layers.filter(l => l.accent && l.overshoot && l.overshoot.gain > 0);
+    if (accentTotal > 0 && pushed.length && hips) {
+      applyBones(accents);
+      const before = lowestFoot();
+      const gain = Math.max(...pushed.map(l => l.overshoot!.gain));
+      const refs = new Map<THREE.Object3D, { q: THREE.Quaternion; p: THREE.Vector3 }>();
+      sampler.blend(state.layers.filter(l => l.accent).map(l => ({ clip: l.clip, weight: l.weight / accentTotal, time: l.overshoot?.refTime ?? l.time ?? 0 })), refs);
+      const pushedPose = new Map<THREE.Object3D, { q: THREE.Quaternion; p: THREE.Vector3 }>();
+      for (const [bone, acc] of accents) {
+        const ref = refs.get(bone);
+        pushedPose.set(bone, ref ? { q: ref.q.clone().slerp(acc.q, 1 + gain), p: ref.p.clone().lerp(acc.p, 1 + gain) } : acc);
+      }
+      applyBones(pushedPose);
+      const after = lowestFoot();
+      if (before && after && hips.parent) {
+        const a = hips.parent.worldToLocal(new THREE.Vector3(0, after, 0)), b = hips.parent.worldToLocal(new THREE.Vector3(0, before, 0));
+        hips.position.sub(a.sub(b));   // the parent may be rotated (Z-up armature): move along world up
+      }
+      return;
     }
-    // In place: the recipe root path owns travel; the clip keeps its hip height.
-    if (hips) { const r = sampler.restOf(hips).p; hips.position.x = r.x; hips.position.z = r.z; }
+    applyBones(accents);
+  }
+  /** World height of the lower foot, after updating the skeleton's matrices. */
+  function lowestFoot(): number | null {
+    if (!feet.length) return null;
+    model.updateMatrixWorld(true);
+    return Math.min(...feet.map(f => f.getWorldPosition(tmpV).y));
   }
 
   return {

@@ -24,3 +24,4 @@ export * from "./performance-edits";
 export * from "./transitions";
 export * from "./delete-edits";
 export * from "./sequences";
+export * from "./accent-feel";

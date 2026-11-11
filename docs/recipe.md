@@ -120,8 +120,11 @@ Transitions between rigged loops: a gait (walk, jog, sprint, crouch walk) that f
 | `phases` | optional, 2–16 values, strictly increasing, -16 to 16, must contain 0 | Retimed phase boundaries in beats from the hit, one more than the accent has phases; 0 is the key frame. Missing: the accent's defaults at this tempo. |
 | `skip` | optional, distinct phase indices 0–15 | Phases deleted with their neighbours closing the gap: a phase before the key frame pulls the earlier phases later, one after it pulls the later ones earlier, so the key frame stays on the hit (Delete in the timeline). Skipping every phase deletes the marker instead. |
 | `hold` | optional, distinct phase indices 0–15 | Phases held: the phase keeps its time, the clip freezes on the phase's first frame, and a spin does not turn (Shift-Delete in the timeline). |
+| `impact` | optional, 0–1 | "Hit harder": the strike goes past its key pose (overshoot towards the pose it was heading for, a deeper squash on a landing with the planted foot kept where it was) and the impact frame holds for up to 3 frames before the follow-through. Set in the marker inspector; drawn as a red wedge on the key frame. |
 
-`skip` and `hold` were added on 11 November 2026. They are optional, so recipes without them are unchanged, but a reader built before that date refuses a recipe that has them.
+The wind-up ("anticipation") has no field of its own: it is the span from the accent's first boundary to the start of its strike (contact phase) in `phases`. The marker inspector sets it in beats (snapped to the step division) or frames, and Shift-dragging the accent's start edge in the phase lane scales it; the strike and the key frame stay on the hit.
+
+`skip`, `hold` and `impact` were added on 11 November 2026. They are optional, so recipes without them are unchanged, but a reader built before that date refuses a recipe that has them.
 
 ## `steps`
 

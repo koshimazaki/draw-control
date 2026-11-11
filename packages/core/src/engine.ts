@@ -14,6 +14,8 @@ export type ClipLayer = {
   time?: number;
   /** An accent clip (never lagged, mixed over the loops by its weight). */
   accent?: boolean;
+  /** "Hit harder": push the pose past the clip by `gain`, away from the clip pose at `refTime` (the strike's start). */
+  overshoot?: { gain: number; refTime: number };
 };
 export type ActivePhase = {
   moveIndex: number; moveId: string; moveName: string;

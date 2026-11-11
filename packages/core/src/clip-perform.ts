@@ -41,7 +41,7 @@ export const clipSpan = (beatSeconds: number): AccentSpanFn => (key: AccentKey) 
   return [b[0], b[b.length - 1]];
 };
 
-export type ScheduledHit = Hit & { accent: ClipAccent; boundaries: number[]; /** held phase indices */ holds?: number[] };
+export type ScheduledHit = Hit & { accent: ClipAccent; boundaries: number[]; /** held phase indices */ holds?: number[]; /** hit harder, 0–1 */ impact?: number };
 export type ClipPlan = { levels: number[]; hits: ScheduledHit[]; drive?: AudioDrive; /** cycle offset per move (gait foot matching) */ offsets: number[] };
 
 /** The drive with the recipe's hand-edited energy curve, when it has one. */
@@ -98,6 +98,7 @@ export function clipPlanFor(recipe: Recipe, drive?: AudioDrive): ClipPlan {
       const authored = own && own.length === accent.phases.length + 1 ? own : defaultPhaseBoundaries(accent, beatSeconds);
       const hit: ScheduledHit = { ...h, accent, boundaries: playedBoundaries(authored, marker?.skip) };
       if (marker?.hold) hit.holds = marker.hold;
+      if (marker?.impact) hit.impact = marker.impact;
       hits.push(hit);
     }
   }
@@ -171,8 +172,11 @@ export type AccentEval = { layers: ClipLayer[]; weight: number; lift: number; sp
  * clip frame outside the authored phases); a clip switch between two phases crossfades
  * over SWITCH_FRAMES centred on their boundary.
  */
-export function evaluateClipAccent(hit: ScheduledHit, u: number, beatSeconds: number): AccentEval | null {
+export function evaluateClipAccent(hit: ScheduledHit, raw: number, beatSeconds: number): AccentEval | null {
   const { accent, boundaries: b } = hit;
+  // Hit harder: hold the impact frame (up to 3 frames), the follow-through starts later.
+  const holdBeats = (hit.impact ?? 0) * IMPACT_HOLD_FRAMES / 24 / beatSeconds;
+  const u = raw <= 0 ? raw : raw < holdBeats ? 0 : raw - holdBeats;
   const n = accent.phases.length;
   const minFade = MIN_BLEND_FRAMES / 24 / beatSeconds, half = SWITCH_FRAMES / 48 / beatSeconds;
   const start = Math.min(b[0], b[1] - minFade), end = Math.max(b[n], b[n - 1] + minFade);
@@ -195,6 +199,11 @@ export function evaluateClipAccent(hit: ScheduledHit, u: number, beatSeconds: nu
       if (d < 0) { own.weight *= 1 - w; layers.push({ moveId: id, clip: after.clip, cyclePhase: 0, weight: w, time: after.from, accent: true }); }
       else { own.weight *= w; layers.push({ moveId: id, clip: before.clip, cyclePhase: 0, weight: 1 - w, time: before.to, accent: true }); }
     }
+    const gain = overshootGain(hit, raw, holdBeats, beatSeconds);
+    if (gain > 0) {
+      const strike = accent.phases[accent.contact];
+      if (strike.clip) for (const l of layers) l.overshoot = { gain, refTime: l.clip === strike.clip ? strike.from : l.time ?? 0 };
+    }
   }
   let lift = 0;
   if (accent.airborne) {
@@ -210,6 +219,20 @@ export function evaluateClipAccent(hit: ScheduledHit, u: number, beatSeconds: nu
     if (u > from) spin = 2 * Math.PI * accent.spin.turns * (u >= 0 ? 1 : ease((u - from) / -from));
   }
   return { layers, weight, lift, spin, phase: { name: p.name, kind: p.kind }, hit };
+}
+
+export const IMPACT_HOLD_FRAMES = 3;
+export const IMPACT_OVERSHOOT = 0.45;
+/**
+ * Overshoot of a hit-harder accent at `raw` beats from its hit: rises through the strike
+ * (the contact phase), peaks on the key frame and its hold, and settles over half a beat.
+ */
+export function overshootGain(hit: ScheduledHit, raw: number, holdBeats: number, beatSeconds: number): number {
+  const k = hit.impact ?? 0;
+  if (k <= 0) return 0;
+  const from = hit.boundaries[hit.accent.contact], settle = Math.max(0.25, 0.3 / beatSeconds);
+  const env = raw < 0 ? ease((raw - from) / Math.max(1e-6, -from)) : raw <= holdBeats ? 1 : 1 - ease((raw - holdBeats) / settle);
+  return k * IMPACT_OVERSHOOT * env;
 }
 
 /** Frame state of the rigged mannequin. */

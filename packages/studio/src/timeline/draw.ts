@@ -86,9 +86,14 @@ export function drawTimeline(canvas: HTMLCanvasElement, m: TimelineModel) {
           g.strokeStyle = "#ffffff"; g.lineWidth = 2; g.strokeRect(x0 + 1, laneTop.phase + 2, Math.max(2, x1 - x0 - 3), LANES.phase - 4); g.lineWidth = 1;
         }
       });
-      // The key frame edge.
+      // The key frame edge, and a red wedge above it for "hit harder".
       g.fillStyle = "#ffffff";
       g.fillRect(X(hb) - 1, laneTop.phase, 2, LANES.phase);
+      if (mk.impact) {
+        const h = 3 + mk.impact * (LANES.phase - 6);
+        g.fillStyle = "#ff4d4d";
+        g.beginPath(); g.moveTo(X(hb) - 5, laneTop.phase); g.lineTo(X(hb) + 5, laneTop.phase); g.lineTo(X(hb), laneTop.phase + h); g.closePath(); g.fill();
+      }
     } else {
       const pa = proceduralAccent(mk.accent);
       if (!pa) return;

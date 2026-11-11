@@ -10,10 +10,11 @@
 import {
   ACCENT_KEYS, LOOP_CLIPS, MOVE_KEYS, MOVE_LIBRARY, addMarker, beatAtSeconds, clearEnergyCurve, clearSteps, currentMarkers,
   currentSteps, effectiveDrive, insertMove, markerPhases, moveMarker, paintEnergy, removeMarker, removeMove, retimePhase,
-  beatsToFrames, blendBeatsOf, playedBoundaries, secondsAtBeat, setMarkerAccent, setMoveAtBeat, setMoveBlend, setStepAmplitude, snapSeconds,
+  CLIP_ACCENTS, setAnticipation, beatsToFrames, blendBeatsOf, playedBoundaries, secondsAtBeat, setMarkerAccent, setMoveAtBeat, setMoveBlend, setStepAmplitude, snapSeconds,
   type AccentKey, type AudioDrive, type MoveKey, type Recipe, type StepDivision,
 } from "@motion-studio/core";
 import { LANES, TIMELINE_HEIGHT, drawTimeline, laneTop, type TimelineModel } from "./draw";
+import { MARKER_LAYOUT, bindMarkerInspector } from "./marker-inspector";
 import { closeMenu, deleteFocus, menuFor, showMenu, targetAt, type Focus } from "./focus";
 
 export const TIMELINE_LAYOUT = `
@@ -30,6 +31,7 @@ export const TIMELINE_LAYOUT = `
       <button id="tlDeleteMarker" type="button">Delete marker</button>
       <span class="muted">Alt: no snapping</span>
     </div>
+${MARKER_LAYOUT}
     <canvas id="strip" class="strip timeline-canvas" style="height:${TIMELINE_HEIGHT}px"></canvas>`;
 
 export type TimelineHost = {
@@ -140,7 +142,11 @@ export class Timeline {
     return { ...this.cache.model, beat: this.host.beat(), selectedMarker: this.selected, selectedBlend: this.blendDrag, focus: this.focus, poseSpeed: this.host.poseSpeed(), handles: this.points, hover: this.hover };
   }
 
-  draw() { drawTimeline(this.canvas, this.model()); }
+  draw() { drawTimeline(this.canvas, this.model()); this.syncInspector(); }
+  private syncInspector = bindMarkerInspector({
+    recipe: () => this.host.recipe(), drive: () => this.host.drive(), edit: fn => this.host.edit(fn),
+    selected: () => this.selected, division: () => this.division(),
+  });
 
   private deleteSelected() {
     if (this.selected < 0) return;
@@ -180,7 +186,10 @@ export class Timeline {
           const rel = beatAtSeconds(r.beatGrid, t) - beatAtSeconds(r.beatGrid, seconds);
           const b = markerPhases(r, currentMarkers(r, this.host.drive())[idx]);
           const isKey = b ? b[k] === 0 : true;
-          this.host.edit(rr => retimePhase(rr, this.host.drive(), idx, k, rel));
+          const strike = CLIP_ACCENTS[currentMarkers(r, this.host.drive())[idx].accent]?.contact ?? 0;
+          // Shift on the start edge: scale the whole wind-up instead of moving one boundary.
+          if (ev.shiftKey && k === 0 && b && strike > 0) this.host.edit(rr => setAnticipation(rr, this.host.drive(), idx, b[strike] - rel));
+          else this.host.edit(rr => retimePhase(rr, this.host.drive(), idx, k, rel));
           if (isKey) seconds = t;
           this.selected = currentMarkers(this.host.recipe(), this.host.drive()).findIndex(mk => Math.abs(mk.seconds - seconds) < 1e-6);
         };

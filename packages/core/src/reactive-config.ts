@@ -23,6 +23,11 @@ export type HitMarker = {
   skip?: number[];
   /** Phases held: the clip freezes on the phase's first frame and the root does not turn. */
   hold?: number[];
+  /**
+   * "Hit harder", 0–1: the strike goes past its key pose (overshoot, a deeper squash on a
+   * landing) and holds the impact frame up to 3 frames before following through.
+   */
+  impact?: number;
 };
 export type ReactiveConfig = {
   /** Whole number; the same seed gives the same performance. */
@@ -82,7 +87,7 @@ export function validateReactive(input: unknown): ReactiveConfig {
     out.markers = (input.markers as unknown[]).map((m, i) => {
       const where = `reactive.markers[${i}]`;
       if (!isObject(m)) return fail(`${where} must be an object`);
-      only(m, ["seconds", "accent", "source", "phases", "skip", "hold"], where);
+      only(m, ["seconds", "accent", "source", "phases", "skip", "hold", "impact"], where);
       const seconds = num(m.seconds, 0, 3600, `${where}.seconds`);
       if (seconds < last) fail(`${where}.seconds must not be before the marker before it`);
       last = seconds;
@@ -100,6 +105,7 @@ export function validateReactive(input: unknown): ReactiveConfig {
         });
         if (!marker.phases.includes(0)) fail(`${where}.phases must keep the key frame at 0`);
       }
+      if (m.impact !== undefined) { const v = num(m.impact, 0, 1, `${where}.impact`); if (v > 0) marker.impact = v; }
       for (const key of ["skip", "hold"] as const) {
         const v = m[key];
         if (v === undefined) continue;
