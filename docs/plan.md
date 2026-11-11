@@ -165,7 +165,12 @@ Direct a clip by speaking: an agent writes the direction as a shot script, the s
 9. **Paths on the scene.** The walk path and the camera path were already drawn in the top and orbit views; now the parts belonging to the current camera block and action block are drawn brighter during playback, with the lock stations. Checked by eye in the smoke screenshots `paths-top-playing.png` and `paths-orbit-playing.png`.
 10. **Schema 0.4.0.** The pinned schema's camera mode list (`$defs/camera` → `properties.modes.items.properties.modes.items.enum`) now matches `CAMERA_MODES`: adds `side`, `threeQuarter`, `top`, `fixed` (0.3.0 exports already wrote them and failed the repo's own schema) and `truck`; `BUNDLE_SCHEMA_VERSION` is 0.4.0. Nothing else changed: shots, amounts, locks and lanes stay out of `camera.json`, which already carries the camera per frame. A test validates every mode, and the smoke run validates the exported `camera.json`. **`model-arena` must take the same enum change.**
 
-Known limits: a `top` block with a `wide` shot lifts the camera to about 11 m (the top mode's lift scales with the distance), which frames the figure very small; the script's `on path` re-times the drawn walk path and does not draw one; one path per script; a script anchor names the first band an onset sits on (kick before snare).
+Follow-up, same day (`npm run check` 210 tests, `npm run smoke`, `npm run mcp-check`, and the README followed from a fresh clone):
+- **Height cap.** The camera is held at 8 m (`CAMERA_MAX_HEIGHT`) whatever asks for more (a top block with a wide shot asked for about 11 m; a rise, a camera path or a height lane); `describe` names what asked. Unit-tested.
+- **Paths in the script.** `on path (x,z) (x,z,height) …` and `camera: path (x,z,height) …` give the walk path and the camera path in metres, through `setRootPath` (`smooth: false`: the points as given) and `setCameraPath`; the script reads back with the points. CLI and MCP tested; `npm run mcp-check` runs the real MCP server over stdio through `apply_script` and `render` (headless Chrome, about 3–5 s for 193 frames), the first run of MCP `render`.
+- **Public core.** `packages/core/src/index.ts` is the public entry (exports map `.`); every module stays under `./internal` for the studio; the core typechecks without the DOM library; `public-api.test.ts` imports only `@motion-studio/core` and computes frames and a camera in Node. README rewritten for a newcomer.
+
+Known limits: the script's `on path` re-times the drawn walk path and does not draw one; one path per script; a script anchor names the first band an onset sits on (kick before snare).
 
 ### MS-9b, after D (next, in this order)
 
