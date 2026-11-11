@@ -16,7 +16,8 @@ import { Timeline } from "./timeline/timeline";
 import { computePoseSpeed } from "./timeline/pose-speed";
 import { exportBundle } from "./export/bundle";
 import { currentRange, exportSize, updateExportPanel } from "./export/panel";
-import { bindRigPanel, syncRigPanel } from "./rig-panel";
+import { bindRigPanel, setRecipeSource, syncRigPanel } from "./rig-panel";
+import { PathDrawer } from "./path-draw";
 import { $, LAYOUT } from "./ui";
 import { Viewport, type Background } from "./viewport";
 import type { View } from "./views";
@@ -361,6 +362,21 @@ export function startApp(root: HTMLElement) {
   });
 
   // Camera rig and reactive moves
+  setRecipeSource(() => recipe);
+  const pathDrawer = new PathDrawer(viewport, () => recipe, edit, () => {
+    $("drawPath").classList.toggle("on", pathDrawer.drawing);
+    viewport.setSelectedPathPoint(pathDrawer.selected);
+    const p = recipe.camera?.path?.[pathDrawer.selected];
+    $("pointHeightRow").hidden = !p;
+    if (p) input("pointHeight").value = String(p.y);
+  });
+  $("drawPath").onclick = () => {
+    pathDrawer.drawing = !pathDrawer.drawing;
+    $("drawPath").classList.toggle("on", pathDrawer.drawing);
+    if (pathDrawer.drawing) { viewport.setView("top"); markView("top"); render(); say("exportStatus", "Click-drag in the top view to draw the camera path."); }
+  };
+  $("clearPath").onclick = () => { pathDrawer.clear(); $("pointHeightRow").hidden = true; };
+  input("pointHeight").onchange = () => pathDrawer.setHeight(Number(input("pointHeight").value));
   bindRigPanel(edit, on => { const v = on ? "rig" : "front"; viewport.setView(v); markView(v); render(); });
   input("showPaths").onchange = () => { viewport.setShowPaths(input("showPaths").checked); render(); };
 

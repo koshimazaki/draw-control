@@ -17,6 +17,7 @@ import { energyAtFrame, type AudioDrive } from "./audio-drive";
 import { beatAtSeconds, secondsAtBeat } from "./beats";
 import { modesAt, type CameraConfig } from "./camera";
 import type { Recipe } from "./recipe";
+import { buildSpline } from "./spline";
 import { subjectAt } from "./subject";
 
 export type Vec3 = [number, number, number];
@@ -143,6 +144,7 @@ export function planCamera(recipe: Recipe, drive?: AudioDrive, frames = 0): Came
 
   // Beat accents: a push and a yaw nudge on every beat, larger on downbeats, scaled by energy.
   const accents: CameraAccent[] = [];
+  const push = new Float64Array(total);
   const rise = ACCENT_RISE_BEATS * beatSeconds, release = ACCENT_RELEASE_BEATS * beatSeconds;
   const pushMax = Math.min(clampPulseAmplitude(DOWNBEAT_PUSH, rise, CAMERA_LIMITS.accentPushAccel), clampPulseAmplitude(DOWNBEAT_PUSH, release, CAMERA_LIMITS.accentPushAccel));
   const yawMax = Math.min(clampPulseAmplitude(DOWNBEAT_YAW, rise, CAMERA_LIMITS.accentYawAccel), clampPulseAmplitude(DOWNBEAT_YAW, release, CAMERA_LIMITS.accentYawAccel));
@@ -158,20 +160,55 @@ export function planCamera(recipe: Recipe, drive?: AudioDrive, frames = 0): Came
       for (let n = from; n <= to; n++) {
         const p = accentPulse(n * dt - seconds, rise, release) * amount;
         ch.distance[n] -= pushMax * p;
+        push[n] += pushMax * p;
         if (downbeat) ch.yaw[n] += yawMax * p * nudgeSign;   // yaw nudges on downbeats only: a calmer path
       }
     }
   }
 
+  // Drawn path: the camera travels the spline over the path ranges, faster when loud,
+  // cross-fading from and to the other modes; accents push along the view.
+  const usesPath = !!config.path && config.segments.some(s => s.modes.includes("path"));
+  const pathS = new Float64Array(total), pathW = new Float64Array(total);
+  if (usesPath) {
+    let cum = 0, rate = 0, w = modesAt(config, beatAtSeconds(g, 0)).includes("path") ? 1 : 0;
+    const cums = new Float64Array(total);
+    for (let n = 0; n < total; n++) {
+      const on = modesAt(config, beatAtSeconds(g, n * dt)).includes("path");
+      rate = slew(rate, on ? speedFactor(config.intensity, energyAtFrame(drive, n)) : 0, 2 * dt);
+      cum += rate * dt;
+      cums[n] = cum;
+      w = slew(w, on ? 1 : 0, 1.2 * dt);
+      pathW[n] = w;
+    }
+    // The path is covered by the end of the last path range.
+    const lastBeat = Math.max(...config.segments.filter(s => s.modes.includes("path")).map(s => s.toBeat));
+    const end = cums[Math.min(total - 1, Math.round(secondsAtBeat(g, lastBeat) * fps))] || cum;
+    for (let n = 0; n < total; n++) pathS[n] = end > 0 ? Math.min(1, cums[n] / end) : 0;
+  }
+  const spline = usesPath ? buildSpline(config.path!) : null;
   const samples: CameraSample[] = new Array(total);
   for (let n = 0; n < total; n++) {
     const yaw = ch.yaw[n], d = ch.distance[n];
-    samples[n] = {
-      position: [ch.cx[n] + Math.sin(yaw) * d, ch.height[n], ch.cz[n] + Math.cos(yaw) * d],
-      target: [ch.cx[n], ch.aimY[n], ch.cz[n]],
-      fov: config.fov,
-      energy: energyAtFrame(drive, n),
-    };
+    const target: Vec3 = [ch.cx[n], ch.aimY[n], ch.cz[n]];
+    let position: Vec3 = [ch.cx[n] + Math.sin(yaw) * d, ch.height[n], ch.cz[n] + Math.cos(yaw) * d];
+    if (spline && pathW[n] > 0) {
+      const p = spline.at(pathS[n]);
+      const dir = [target[0] - p[0], target[1] - p[1], target[2] - p[2]], len = Math.hypot(dir[0], dir[1], dir[2]) || 1;
+      const q: Vec3 = [p[0] + dir[0] / len * push[n], p[1] + dir[1] / len * push[n], p[2] + dir[2] / len * push[n]];
+      const w = 0.5 - 0.5 * Math.cos(Math.PI * pathW[n]);
+      position = [position[0] + (q[0] - position[0]) * w, position[1] + (q[1] - position[1]) * w, position[2] + (q[2] - position[2]) * w];
+      // Keep the channels describing the camera actually used (LTX suggestion, tests).
+      ch.yaw[n] = Math.atan2(position[0] - target[0], position[2] - target[2]);
+      ch.distance[n] = Math.hypot(position[0] - target[0], position[2] - target[2]);
+      ch.height[n] = position[1];
+    }
+    samples[n] = { position, target, fov: config.fov, energy: energyAtFrame(drive, n) };
+  }
+  if (usesPath) for (let n = 1; n < total; n++) {
+    // Unwrap yaw recomputed by atan2 so it stays continuous.
+    while (ch.yaw[n] - ch.yaw[n - 1] > Math.PI) ch.yaw[n] -= 2 * Math.PI;
+    while (ch.yaw[n] - ch.yaw[n - 1] < -Math.PI) ch.yaw[n] += 2 * Math.PI;
   }
   return { fps, frames: total, config, samples, accents, channels: ch };
 }

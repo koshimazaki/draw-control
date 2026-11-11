@@ -33,6 +33,20 @@ try {
     await page.click("#strip", { position: { x: box.width * x, y: box.height - 12 } });
     await page.locator("#viewport").screenshot({ path: `${OUT}${v}-${x}.png` });
   }
+  // Draw a camera path in the top view: an arc in front of the character.
+  await page.click("#drawPath");
+  const vb = await page.locator("#viewport canvas").boundingBox();
+  await page.mouse.move(vb.x + vb.width * 0.25, vb.y + vb.height * 0.75);
+  await page.mouse.down();
+  for (let k = 0; k <= 30; k++) {
+    const a = Math.PI * (0.8 + 1.4 * k / 30);
+    await page.mouse.move(vb.x + vb.width * (0.5 + 0.25 * Math.cos(a) * vb.height / vb.width * 1.6), vb.y + vb.height * (0.5 - 0.35 * Math.sin(a)));
+  }
+  await page.mouse.up();
+  await page.locator("#viewport").screenshot({ path: `${OUT}path-top.png` });
+  await page.click('[data-view="rig"]');
+  await page.locator("#viewport").screenshot({ path: `${OUT}path-rig.png` });
+  console.log("drawn path points:", JSON.parse(await page.inputValue("#recipeJson")).camera?.path?.length);
   await page.waitForTimeout(800);
   await page.screenshot({ path: `${OUT}page.png`, fullPage: true });
   await page.locator(".stage").screenshot({ path: `${OUT}stage.png` });

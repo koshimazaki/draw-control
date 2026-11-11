@@ -7,7 +7,7 @@ import {
   type AccentKey, type CameraMode, type Recipe,
 } from "@motion-studio/core";
 
-const PICKABLE: CameraMode[] = ["orbit", "pushIn", "pullOut", "rise", "lead", "chase"];
+const PICKABLE: CameraMode[] = ["orbit", "pushIn", "pullOut", "rise", "lead", "chase", "path"];
 export const ACCENT_SETS: Record<string, { label: string; accents: AccentKey[] }> = {
   dance: { label: "Dance: hit, point, jump, spin", accents: ["hit", "point", "jump", "spin"] },
   ninja: { label: "Ninja: strike, kick, jump", accents: ["strike", "kick", "jump"] },
@@ -28,6 +28,8 @@ export const RIG_LAYOUT = `
           <label>Height m <input id="rigHeight" type="number" min="0.2" max="6" step="0.05" /></label>
         </div>
       </div>
+      <div class="row"><button id="drawPath" type="button" title="Switches to the top view; click-drag a path around the character">Draw camera path</button><button id="clearPath" type="button">Clear path</button></div>
+      <label id="pointHeightRow" hidden>Selected point height m <input id="pointHeight" type="number" min="0.1" max="30" step="0.05" /></label>
       <label class="check"><input id="showPaths" type="checkbox" checked /> Draw camera and floor paths (top and orbit views)</label>
     </section>
     <section>
@@ -49,6 +51,9 @@ export const RIG_LAYOUT = `
     </section>`;
 
 type Edit = (fn: (r: Recipe) => Recipe) => void;
+let getRecipeForPath: (() => Recipe) | null = null;
+/** The panel needs the recipe to know whether a drawn path exists (the path mode needs one). */
+export const setRecipeSource = (fn: () => Recipe) => { getRecipeForPath = fn; };
 /** Local lookup (ui.ts imports this file for its layout, so this file does not import ui.ts). */
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const input = (id: string) => $<HTMLInputElement>(id);
@@ -56,9 +61,13 @@ const modeBoxes = () => [...$("rigModes").querySelectorAll<HTMLInputElement>("in
 
 export function bindRigPanel(edit: Edit, onRigToggle: (on: boolean) => void) {
   const writeCamera = () => edit(r => {
-    const modes = modeBoxes().filter(b => b.checked).map(b => b.value as CameraMode);
+    const r0 = getRecipeForPath?.();
+    const modes = modeBoxes().filter(b => b.checked).map(b => b.value as CameraMode).filter(m => m !== "path" || !!r0?.camera?.path);
     const base = r.camera ?? DEFAULT_CAMERA;
     const segments = cameraTimeline(modes, r.durationBeats, { sequence: input("rigSequence").checked, beatsEach: Number(input("rigBeatsEach").value) || 8 });
+    if (segments.some(sg => sg.modes.includes("path")) && segments.some(sg => sg.modes.length > 1)) {
+      for (const sg of segments) if (sg.modes.includes("path")) sg.modes = ["path"];
+    }
     return validateRecipe({ ...r, camera: { ...base, segments,
       intensity: Number(input("rigIntensity").value), orbitDegreesPerBeat: Number(input("rigOrbit").value),
       distance: Number(input("rigDistance").value), height: Number(input("rigHeight").value) } });

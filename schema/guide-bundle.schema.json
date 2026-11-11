@@ -305,7 +305,8 @@
                     "pullOut",
                     "rise",
                     "lead",
-                    "chase"
+                    "chase",
+                    "path"
                   ]
                 }
               }

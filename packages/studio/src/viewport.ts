@@ -102,6 +102,18 @@ export class Viewport {
     this.resize();
   }
   getRigPlan() { return this.rigPlan; }
+  /** The floor point (y = 0) under a screen position, in the current view. */
+  floorPoint(clientX: number, clientY: number): { x: number; z: number } | null {
+    const r = this.canvas.getBoundingClientRect();
+    const ndc = new THREE.Vector2((clientX - r.left) / r.width * 2 - 1, -((clientY - r.top) / r.height) * 2 + 1);
+    const ray = new THREE.Raycaster();
+    ray.setFromCamera(ndc, this.camera);
+    const hit = ray.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), new THREE.Vector3());
+    return hit ? { x: hit.x, z: hit.z } : null;
+  }
+  /** Show a stroke being drawn (null clears it). */
+  previewStroke(points: { x: number; z: number }[] | null) { this.overlay.setStroke(points); this.redraw(); }
+  setSelectedPathPoint(i: number) { this.overlay.setSelectedPoint(i); this.redraw(); }
   setShowPaths(on: boolean) { this.showPaths = on; this.setView(this.view); }
   /** Hide preview-only helpers (paths) while exporting. */
   setExporting(on: boolean) { this.overlay.group.visible = !on && this.overlayWanted(); }

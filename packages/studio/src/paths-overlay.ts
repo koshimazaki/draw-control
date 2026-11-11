@@ -34,6 +34,10 @@ export class PathsOverlay {
   readonly group = new THREE.Group();
   private materials: LineMaterial[] = [];
   private live?: LineSegments2;
+  private stroke?: Line2;
+  private handles?: LineSegments2;
+  private points: { x: number; y: number; z: number }[] = [];
+  private selectedPoint = -1;
   private plan: CameraPlan | null = null;
   private resolution = new THREE.Vector2(1, 1);
   bounds = new THREE.Box3();
@@ -71,6 +75,8 @@ export class PathsOverlay {
       line.computeLineDistances();
       this.group.add(line);
     }
+    this.points = recipe.camera?.path ?? [];
+    this.drawHandles();
     if (!plan) return;
     const path: number[] = [];
     for (let n = 0; n < Math.min(frames, plan.frames); n++) {
@@ -84,6 +90,30 @@ export class PathsOverlay {
     if (edges.length) this.group.add(new LineSegments2(new LineSegmentsGeometry().setPositions(edges), this.material(FRUSTUM_COLOUR, 1.8)));
     this.live = new LineSegments2(new LineSegmentsGeometry().setPositions(frustumEdges(plan.samples[0], 0.5)), this.material(LIVE_COLOUR, 2.5));
     this.group.add(this.live);
+  }
+
+  /** Square handles at the drawn path's points (the selected one larger). */
+  private drawHandles() {
+    if (this.handles) { this.group.remove(this.handles); this.handles.geometry.dispose(); this.handles = undefined; }
+    if (!this.points.length) return;
+    const seg: number[] = [];
+    this.points.forEach((p, i) => {
+      const s = i === this.selectedPoint ? 0.2 : 0.12;
+      const c = [[-s, -s], [s, -s], [s, s], [-s, s]];
+      for (let k = 0; k < 4; k++) { const a = c[k], b = c[(k + 1) % 4]; seg.push(p.x + a[0], p.y, p.z + a[1], p.x + b[0], p.y, p.z + b[1]); }
+      seg.push(p.x, 0.02, p.z, p.x, p.y, p.z);   // a stem down to the floor shows the height
+    });
+    this.handles = new LineSegments2(new LineSegmentsGeometry().setPositions(seg), this.material(0xffffff, 2));
+    this.group.add(this.handles);
+  }
+  setSelectedPoint(i: number) { this.selectedPoint = i; this.drawHandles(); }
+  /** The stroke being drawn, on the floor (null clears it). */
+  setStroke(points: { x: number; z: number }[] | null) {
+    if (this.stroke) { this.group.remove(this.stroke); this.stroke.geometry.dispose(); this.stroke = undefined; }
+    if (!points || points.length < 2) return;
+    this.stroke = new Line2(new LineGeometry().setPositions(points.flatMap(p => [p.x, 0.03, p.z])), this.material(CAMERA_COLOUR, 2, true));
+    this.stroke.computeLineDistances();
+    this.group.add(this.stroke);
   }
 
   /** Move the live frustum to the camera at a frame. */
@@ -101,5 +131,7 @@ export class PathsOverlay {
     for (const m of this.materials) m.dispose();
     this.materials = [];
     this.live = undefined;
+    this.stroke = undefined;
+    this.handles = undefined;
   }
 }

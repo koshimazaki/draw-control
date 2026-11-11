@@ -81,7 +81,7 @@ export function applyRigSample(cam: THREE.PerspectiveCamera, s: CameraSample, as
 export function topCameraFitting(box: THREE.Box3, aspect: number): THREE.PerspectiveCamera {
   const cam = new THREE.PerspectiveCamera(fitFov(aspect), aspect, 0.1, 200);
   const c = box.getCenter(new THREE.Vector3()), size = box.getSize(new THREE.Vector3());
-  const half = Math.max(size.z / 2 + 0.8, (size.x / 2 + 0.8) / aspect, FRAME_HALF_HEIGHT);
+  const half = Math.max(size.z / 2 + 0.8, (size.x / 2 + 0.8) / aspect, 4.5);
   const h = half / Math.tan(cam.fov * Math.PI / 360);
   cam.position.set(c.x, h, c.z + 0.001);
   cam.lookAt(c.x, 0, c.z);

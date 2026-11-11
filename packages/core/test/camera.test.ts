@@ -103,3 +103,24 @@ describe("camera rig", () => {
     expect(() => withCamera({ segments: [{ fromBeat: 0, toBeat: 8, modes: ["lead", "chase"] }] })).toThrow(/exclude/);
   });
 });
+
+describe("drawn camera path", () => {
+  const path = [{ x: -3, y: 1.2, z: 4 }, { x: 0, y: 1.8, z: 5 }, { x: 3, y: 1.4, z: 3.5 }, { x: 4, y: 1.1, z: 0 }];
+  const r = withCamera({ segments: [{ fromBeat: 0, toBeat: 32, modes: ["path"] }], path, intensity: 0.8 });
+  it("starts on the first point, ends on the last, and looks at the subject", () => {
+    const plan = planCamera(r, stepDrive());
+    const first = plan.samples[0].position, end = plan.samples[Math.round(16.0 * FPS)].position;
+    expect(Math.hypot(first[0] + 3, first[2] - 4)).toBeLessThan(0.1);
+    expect(Math.hypot(end[0] - 4, end[2] - 0)).toBeLessThan(0.15);
+    expect(plan.samples[100].target[0]).toBe(0);
+  });
+  it("moves faster along the path when the music is loud, and smoothly", () => {
+    const plan = planCamera(r, stepDrive());
+    const step = (n: number) => Math.hypot(...plan.samples[n + 1].position.map((v, k) => v - plan.samples[n].position[k]) as [number, number, number]);
+    expect(step(8 * FPS)).toBeGreaterThan(step(2 * FPS) * 1.8);
+    for (let n = 1; n < 16 * FPS - 2; n++) expect(Math.abs(step(n) - step(n - 1))).toBeLessThan(0.02);
+  });
+  it("refuses the path mode without a path", () => {
+    expect(() => withCamera({ segments: [{ fromBeat: 0, toBeat: 8, modes: ["path"] }] })).toThrow(/needs camera.path/);
+  });
+});
