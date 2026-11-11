@@ -7,6 +7,7 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { cameraAtFrame, cameraAtSeconds, type AudioDrive, type CameraPlan, type FrameState, type Recipe } from "@motion-studio/core";
 import type { Character } from "./characters/types";
 import { PathsOverlay } from "./paths-overlay";
+import { ViewingAids, type AidOptions } from "./viewing-aids";
 import { TARGET, applyRigSample, cameraFor, setAspect, topCameraFitting, type View } from "./views";
 
 export const BACKGROUNDS = { grey: 0x77797c, dark: 0x1d1f22 } as const;
@@ -28,6 +29,9 @@ export class Viewport {
   private overlay = new PathsOverlay();
   private showPaths = true;
   private lastFrame = 0;
+  private lastState?: FrameState;
+  private stateAt: ((frame: number) => FrameState) | null = null;
+  readonly aids = new ViewingAids();
   view: View = "front";
 
   constructor(container: HTMLElement) {
@@ -71,6 +75,7 @@ export class Viewport {
     this.scene.add(this.grid);
     this.scene.add(this.actor);
     this.scene.add(this.overlay.group);
+    this.scene.add(this.aids.group);
     this.setBackground("grey");
 
     this.controls.addEventListener("change", () => this.redraw());
@@ -83,7 +88,11 @@ export class Viewport {
     if (this.character) { this.actor.remove(this.character.object); if (disposeOld) this.character.dispose(); }
     this.character = c;
     this.actor.add(c.object);
+    this.aids.setCharacter(c);
   }
+  /** Where the aids (onion skin, arcs) read nearby frames from. */
+  setFrameSource(fn: (frame: number) => FrameState) { this.stateAt = fn; }
+  setAids(options: Partial<AidOptions>) { this.aids.set(options); if (this.lastState) this.show(this.lastState); }
   getCharacter() { return this.character; }
 
   setView(view: View) {
@@ -116,7 +125,12 @@ export class Viewport {
   setSelectedPathPoint(i: number) { this.overlay.setSelectedPoint(i); this.redraw(); }
   setShowPaths(on: boolean) { this.showPaths = on; this.setView(this.view); }
   /** Hide preview-only helpers (paths) while exporting. */
-  setExporting(on: boolean) { this.overlay.group.visible = !on && this.overlayWanted(); }
+  setExporting(on: boolean) {
+    this.exporting = on;
+    this.overlay.group.visible = !on && this.overlayWanted();
+    this.aids.group.visible = !on;
+  }
+  private exporting = false;
   private overlayWanted() { return this.showPaths && (this.view === "top" || this.view === "orbit"); }
   private syncOverlay() { this.overlay.group.visible = this.overlayWanted(); }
   private fixedCamera(view: View, aspect: number): THREE.Camera {
@@ -136,6 +150,8 @@ export class Viewport {
   show(state: FrameState) {
     this.pose(state);
     this.lastFrame = state.frame;
+    this.lastState = state;
+    this.aids.update(state, this.stateAt, this.actor);
     if (this.view === "rig" && this.rigPlan) applyRigSample(this.rigCam, cameraAtSeconds(this.rigPlan, state.seconds), this.aspect());
     this.overlay.showFrame(state.frame);
     this.redraw();
@@ -144,7 +160,30 @@ export class Viewport {
   poseExportCamera(cam: THREE.Camera, frame: number, aspect: number) {
     if (this.view === "rig" && this.rigPlan && cam instanceof THREE.PerspectiveCamera) applyRigSample(cam, cameraAtFrame(this.rigPlan, frame), aspect);
   }
-  redraw() { this.renderer.render(this.scene, this.camera); }
+  redraw() {
+    const ghosts = !this.exporting && this.lastState && this.stateAt;
+    if (ghosts) {
+      this.renderer.autoClear = false;
+      if (this.scene.background instanceof THREE.Color) this.renderer.setClearColor(this.scene.background);
+      this.renderer.clear();
+      // Ghosts first (on a cleared frame, under the background), then the scene on top.
+      const bg = this.scene.background;
+      this.scene.background = null;
+      const drew = this.aids.renderGhosts(this.renderer, this.camera, this.actor, this.lastState!, this.stateAt!);
+      this.scene.background = bg;
+      if (drew) {
+        this.renderer.clearDepth();
+        const prev = this.scene.background;
+        this.scene.background = null;
+        this.renderer.render(this.scene, this.camera);
+        this.scene.background = prev;
+        this.renderer.autoClear = true;
+        return;
+      }
+      this.renderer.autoClear = true;
+    }
+    this.renderer.render(this.scene, this.camera);
+  }
 
   /** Camera for the export at its own aspect ratio, matching the current view. */
   exportCamera(aspect: number) { return this.view === "top" ? cameraFor("top", aspect) : cameraFor(this.view, aspect, this.orbitCam); }
@@ -154,6 +193,7 @@ export class Viewport {
     const w = Math.max(1, this.canvas.clientWidth), h = Math.max(1, this.canvas.clientHeight);
     this.renderer.setSize(w, h, false);
     this.overlay.setResolution(w, h);
+    this.aids.setResolution(w, h);
     if (this.camera === this.rigCam) {
       if (this.rigPlan) applyRigSample(this.rigCam, cameraAtFrame(this.rigPlan, this.lastFrame), w / h);
     } else if (this.view === "top") this.camera = this.fixedCamera("top", w / h);

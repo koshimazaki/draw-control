@@ -47,6 +47,17 @@ try {
   await page.click('[data-view="rig"]');
   await page.locator("#viewport").screenshot({ path: `${OUT}path-rig.png` });
   console.log("drawn path points:", JSON.parse(await page.inputValue("#recipeJson")).camera?.path?.length);
+  // Viewing aids: skeleton, x-ray, onion skin, arcs; the move gizmo previewing a jump.
+  await page.click('[data-view="front"]');
+  for (const aid of ["bones", "xray", "onion", "arcs"]) await page.click(`[data-aid="${aid}"]`);
+  await page.selectOption("#boneSelect", { index: 10 });
+  await page.locator("#viewport").screenshot({ path: `${OUT}aids-front.png` });
+  for (const aid of ["bones", "xray", "onion", "arcs"]) await page.click(`[data-aid="${aid}"]`);
+  await page.click("#gizmoToggle");
+  await page.hover('#gizmoList button:has-text("Sword")');
+  await page.waitForTimeout(500);
+  await page.locator("#viewport").screenshot({ path: `${OUT}gizmo.png` });
+  await page.click("#gizmoToggle");
   await page.waitForTimeout(800);
   await page.screenshot({ path: `${OUT}page.png`, fullPage: true });
   await page.locator(".stage").screenshot({ path: `${OUT}stage.png` });

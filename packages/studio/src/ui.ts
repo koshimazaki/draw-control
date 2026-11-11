@@ -2,6 +2,7 @@
 import { DEFAULT_EXPORT_SIZE, EXPORT_SIZES, EXPRESSIONS, MOVE_KEYS, MOVE_LIBRARY, PREVIEW_FPS } from "@motion-studio/core";
 import { RIG_LAYOUT } from "./rig-panel";
 import { TIMELINE_LAYOUT } from "./timeline/timeline";
+import { GIZMO_LAYOUT } from "./move-gizmo";
 import { VIEWS, VIEW_LABELS } from "./views";
 
 const sizeKey = (s: { width: number; height: number }) => `${s.width}x${s.height}`;
@@ -76,6 +77,7 @@ export const LAYOUT = `
       <div class="grid3">
         <label>Background <select id="background"><option value="grey">Mid grey</option><option value="dark">Dark</option></select></label>
         <label class="check"><input id="grid" type="checkbox" /> Floor grid</label>
+        <label>Highlight bone <select id="boneSelect"><option value="">none</option></select></label>
       </div>
     </section>
 ${RIG_LAYOUT}
@@ -106,7 +108,16 @@ ${RIG_LAYOUT}
     </section>
   </aside>
   <section class="stage">
-    <div id="viewport" class="viewport"><div id="caption" class="caption"></div></div>
+    <div id="viewport" class="viewport"><div id="caption" class="caption"></div>
+      <div class="aids" id="aids">
+        <button type="button" data-aid="bones" title="Show the skeleton">Bones</button>
+        <button type="button" data-aid="xray" title="Translucent mesh">X-ray</button>
+        <button type="button" data-aid="onion" title="Ghosts of nearby frames">Onion</button>
+        <button type="button" data-aid="arcs" title="Motion trails of hands, feet and head">Arcs</button>
+        <button type="button" id="gizmoToggle" title="Preview and swap moves">Moves</button>
+      </div>
+      ${GIZMO_LAYOUT}
+    </div>
     <div class="transport">
       <button id="tStart" type="button" title="Start">⏮</button>
       <button id="prev" type="button" title="Previous frame">◀</button>

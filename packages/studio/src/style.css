@@ -53,3 +53,9 @@ progress { width: 100%; }
 .tl-tools label { display: flex; gap: 4px; align-items: center; }
 .timeline-canvas { cursor: default; }
 .transport select { padding: 3px 5px; }
+.aids { position: absolute; top: 8px; right: 8px; display: flex; gap: 4px; }
+.aids button, .gizmo button { padding: 3px 7px; font-size: 11px; background: rgba(20,21,24,0.72); }
+.gizmo { position: absolute; right: 8px; bottom: 8px; width: 230px; display: grid; gap: 6px; padding: 8px; border-radius: 6px; background: rgba(20,21,24,0.8); }
+.gizmo[hidden] { display: none; }
+.gizmo-list { display: flex; flex-wrap: wrap; gap: 4px; max-height: 150px; overflow-y: auto; }
+.gizmo-list button.accent { border-color: #7a4040; }

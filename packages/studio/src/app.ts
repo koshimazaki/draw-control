@@ -3,7 +3,7 @@
  * (or the validator), and keeps the preview, beat strip and JSON panel in sync.
  */
 import {
-  LOOP_CLIPS, RIGGED_CHARACTER, defaultRiggedRecipe, riggedMove, clearIncompatibleMoves, clipCycleBeatsFor, exportFrameCount, frameAt, incompatibleMoves, insertMove,
+  LOOP_CLIPS, RIGGED_CHARACTER, defaultRiggedRecipe, riggedMove, clearIncompatibleMoves, setMoveAtBeat, setMarkerAccent, addMarker, clipCycleBeatsFor, exportFrameCount, frameAt, incompatibleMoves, insertMove,
   makeClipMove, moveBeats, removeMove, setAmplitude, swapMove, validateRecipe, buildDrive, flatDrive, planCamera,
   type AudioDrive, type CharacterKind, type Expression, type MoveKey, type PreviewFps, type Recipe,
 } from "@motion-studio/core";
@@ -18,6 +18,8 @@ import { exportBundle } from "./export/bundle";
 import { currentRange, exportSize, updateExportPanel } from "./export/panel";
 import { bindRigPanel, setRecipeSource, syncRigPanel } from "./rig-panel";
 import { PathDrawer } from "./path-draw";
+import { MoveGizmo, previewState } from "./move-gizmo";
+import { boneList } from "./viewing-aids";
 import { $, LAYOUT } from "./ui";
 import { Viewport, type Background } from "./viewport";
 import type { View } from "./views";
@@ -34,6 +36,9 @@ export function startApp(root: HTMLElement) {
   let fileCharacter: Character | null = null;
   /** The bundled rigged mannequin, loaded once and kept (it is the default character). */
   let rigged: RiggedCharacter | null = null;
+  let gizmo: MoveGizmo | null = null;
+  let previewStart = performance.now();
+  let bonesFor: Character | undefined;
   let riggedLoading: Promise<RiggedCharacter> | null = null;
   const ensureRigged = () => (riggedLoading ??= loadRiggedCharacter().then(c => { rigged = c; return c; }));
   const keep = (c: Character | undefined) => c === fileCharacter || c === rigged;
@@ -107,7 +112,9 @@ export function startApp(root: HTMLElement) {
 
   /** Render the recipe at a frame (fractional while previewing above 24 fps). */
   function render(shown: number = frame) {
-    const state = frameAt(recipe, shown, drive);
+    let state = frameAt(recipe, shown, drive);
+    if (gizmo?.preview) state = previewState(gizmo.preview, (performance.now() - previewStart) / 1000, state);
+    if (viewport.getCharacter() !== bonesFor) { bonesFor = viewport.getCharacter(); fillBones(); }
     viewport.show(state);
     const a = state.active;
     $("caption").textContent = state.phase ? `${state.phase.accent.toUpperCase()} · ${state.phase.name}` : a ? `${a.moveName} · ${a.phaseName}: ${a.caption}` : "";
@@ -360,6 +367,37 @@ export function startApp(root: HTMLElement) {
       else if (f.type.startsWith("audio/") || /\.(wav|mp3|m4a|ogg|flac|aac)$/i.test(f.name)) void useTrack(f);
     }
   });
+
+  // Viewing aids and the move gizmo
+  viewport.setFrameSource(f => frameAt(recipe, Math.max(0, f), drive));
+  $("aids").onclick = e => {
+    const b = (e.target as HTMLElement).closest("button") as HTMLButtonElement | null;
+    const aid = b?.dataset.aid as "bones" | "xray" | "onion" | "arcs" | undefined;
+    if (!b || !aid) return;
+    b.classList.toggle("on");
+    viewport.setAids({ [aid]: b.classList.contains("on") });
+    render();
+  };
+  $<HTMLSelectElement>("boneSelect").onchange = () => { viewport.setAids({ bone: $<HTMLSelectElement>("boneSelect").value || null }); render(); };
+  function fillBones() {
+    const names = boneList(viewport.getCharacter()).map(b => b.name);
+    $("boneSelect").innerHTML = `<option value="">none</option>` + names.map(n => `<option value="${n}">${n}</option>`).join("");
+  }
+  let previewing = false;
+  gizmo = new MoveGizmo(() => {
+    previewStart = performance.now();
+    if (gizmo?.preview && !previewing) { previewing = true; const loop = () => { if (!gizmo?.preview) { previewing = false; render(); return; } render(); requestAnimationFrame(loop); }; requestAnimationFrame(loop); }
+  }, item => {
+    if (item.kind === "loop") edit(r => setMoveAtBeat(r, cursor(), item.clip));
+    else if (timeline.selectedMarker() >= 0) edit(r => setMarkerAccent(r, drive === FLAT ? undefined : drive, timeline.selectedMarker(), item.key));
+    else edit(r => addMarker(r, drive === FLAT ? undefined : drive, frame / r.fps, item.key));
+  });
+  $("gizmoToggle").onclick = () => {
+    const on = !$("gizmoToggle").classList.contains("on");
+    $("gizmoToggle").classList.toggle("on", on);
+    gizmo?.setVisible(on && recipe.character.kind === "rigged");
+    render();
+  };
 
   // Camera rig and reactive moves
   setRecipeSource(() => recipe);
