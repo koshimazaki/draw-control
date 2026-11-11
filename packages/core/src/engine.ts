@@ -1,10 +1,11 @@
 /**
- * Deterministic engine: `frameAt(recipe, n)` returns the full state of frame n.
+ * Deterministic engine: `baseFrameAt(recipe, n)` returns the full state of frame n on the
+ * time-stretch path; `frameAt` (perform.ts) adds the audio-reactive layer when the recipe has one.
  * No wall clock, no randomness, no mutable state, so preview, export and an agent
  * replaying a recipe all see identical frames.
  */
 import { beatAtSeconds } from "./beats";
-import { POSES, mixPoses, neutralPose, poseDistance, scalePose, type Pose } from "./poses";
+import { POSES, mixPoses, neutralPose, scalePose, type Pose } from "./poses";
 import { moveBeats, phaseBeats, type Expression, type Recipe, type RootPoint } from "./recipe";
 
 export type ClipLayer = { moveId: string; clip: string; /** 0–1 through one clip cycle */ cyclePhase: number; weight: number };
@@ -20,6 +21,10 @@ export type FrameState = {
   pose: Pose;
   layers: ClipLayer[];
   active: ActivePhase | null;
+  /** Reactive layer only: the accent move playing, and its blend weight. */
+  accent?: { key: string; hitSeconds: number; weight: number };
+  /** Reactive layer only: the smoothed audio energy at this frame. */
+  energy?: number;
 };
 
 const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
@@ -87,24 +92,25 @@ export function activeMoveIndex(recipe: Recipe, beat: number): number {
   return k;
 }
 
-export function frameAt(recipe: Recipe, frame: number): FrameState {
-  const seconds = frame / recipe.fps;
-  const beat = beatAtSeconds(recipe.beatGrid, seconds);
-  const path = sampleRootPath(recipe.rootPath, beat);
-  const root = { x: path.x, y: jumpHeight(recipe, beat), z: path.z, yawRadians: path.yaw * Math.PI / 180 };
-  if (recipe.moves.length === 0) return { frame, seconds, beat, root, pose: neutralPose(), layers: [], active: null };
-
+/**
+ * The move layer at a beat: the active move, cross-faded from the previous one over its
+ * blend beats. `rate` plays the moves' phases faster or slower (2 = double time) while the
+ * scheduling (which move is active, the blends) stays on the real beat.
+ */
+export function poseAtBeat(recipe: Recipe, beat: number, rate = 1): { pose: Pose; layers: ClipLayer[]; active: ActivePhase | null } {
+  if (recipe.moves.length === 0) return { pose: neutralPose(), layers: [], active: null };
   const k = activeMoveIndex(recipe, beat);
   const move = recipe.moves[k];
-  const cur = evaluateMove(recipe, k, beat);
+  const local = (m: { atBeat: number }) => m.atBeat + (beat - m.atBeat) * rate;
+  const cur = evaluateMove(recipe, k, local(move));
   let weight = 1;
   if (k > 0 && move.blendBeats > 0) weight = easeInOut((beat - move.atBeat) / move.blendBeats);
   let pose = cur.pose;
   const layers: ClipLayer[] = [];
   if (weight < 1) {
-    const prev = evaluateMove(recipe, k - 1, beat);
-    pose = mixPoses(prev.pose, cur.pose, weight);
     const pm = recipe.moves[k - 1];
+    const prev = evaluateMove(recipe, k - 1, local(pm));
+    pose = mixPoses(prev.pose, cur.pose, weight);
     if (pm.clip) layers.push({ moveId: pm.id, clip: pm.clip, cyclePhase: prev.cyclePhase, weight: 1 - weight });
   }
   if (move.clip) layers.push({ moveId: move.id, clip: move.clip, cyclePhase: cur.cyclePhase, weight });
@@ -114,13 +120,16 @@ export function frameAt(recipe: Recipe, frame: number): FrameState {
     phaseIndex: cur.phaseIndex, phaseName: phase.name, caption: phase.caption, progress: cur.progress,
   };
   if (phase.expression) active.expression = phase.expression;
-  return { frame, seconds, beat, root, pose, layers, active };
+  return { pose, layers, active };
 }
 
-/** Pose speed in radians per second between frame n-1 and n (0 at frame 0). */
-export function poseSpeed(recipe: Recipe, frame: number): number {
-  if (frame <= 0) return 0;
-  return poseDistance(frameAt(recipe, frame - 1).pose, frameAt(recipe, frame).pose) * recipe.fps;
+/** The time-stretch path: moves on the beat grid, root path and jumps, no audio input. */
+export function baseFrameAt(recipe: Recipe, frame: number): FrameState {
+  const seconds = frame / recipe.fps;
+  const beat = beatAtSeconds(recipe.beatGrid, seconds);
+  const path = sampleRootPath(recipe.rootPath, beat);
+  const root = { x: path.x, y: jumpHeight(recipe, beat), z: path.z, yawRadians: path.yaw * Math.PI / 180 };
+  return { frame, seconds, beat, root, ...poseAtBeat(recipe, beat) };
 }
 
 export type SpeedClass = "hold" | "move" | "fast";

@@ -6,6 +6,7 @@
  */
 import { isPoseName, type PoseName } from "./poses";
 import { validateCamera, type CameraConfig } from "./camera";
+import { validateReactive, type ReactiveConfig } from "./reactive-config";
 import { RecipeError, fail, finite, isObject, only, text } from "./validate";
 
 export const RECIPE_VERSION = 2;
@@ -63,6 +64,8 @@ export type Recipe = {
   audio?: AudioRef;
   /** Audio-reactive camera rig, used by the "rig" view. */
   camera?: CameraConfig;
+  /** Audio-reactive animation layer on top of the moves. */
+  reactive?: ReactiveConfig;
 };
 
 export { RecipeError };
@@ -125,7 +128,7 @@ function validateMove(input: unknown, where: string, durationBeats: number): Mov
 /** Strict validation for agent-supplied JSON and imported recipes. Returns a fresh copy. */
 export function validateRecipe(input: unknown): Recipe {
   if (!isObject(input)) return fail("expected an object");
-  only(input, ["version", "fps", "durationBeats", "beatGrid", "character", "energy", "moves", "rootPath", "jumps", "audio", "camera"], "recipe");
+  only(input, ["version", "fps", "durationBeats", "beatGrid", "character", "energy", "moves", "rootPath", "jumps", "audio", "camera", "reactive"], "recipe");
   if (input.version !== RECIPE_VERSION) fail(`expected version ${RECIPE_VERSION}`);
   if (input.fps !== 24) fail("fps must be 24");
   if (!Number.isInteger(input.durationBeats) || !finite(input.durationBeats, 1, 512)) fail("durationBeats must be a whole number 1–512");
@@ -185,6 +188,7 @@ export function validateRecipe(input: unknown): Recipe {
     only(a, ["name", "licence"], "audio");
     recipe.audio = { name: text(a.name, 120, "audio.name"), licence: text(a.licence, 120, "audio.licence") };
   }
+  if (input.reactive !== undefined) recipe.reactive = validateReactive(input.reactive);
   if (input.camera !== undefined) recipe.camera = validateCamera(input.camera, durationBeats);
   return recipe;
 }

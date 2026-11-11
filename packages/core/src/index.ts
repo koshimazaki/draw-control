@@ -11,3 +11,7 @@ export * from "./camera";
 export * from "./camera-rig";
 export * from "./subject";
 export * from "./rng";
+export * from "./accents";
+export * from "./reactive-config";
+export * from "./reactive";
+export * from "./perform";

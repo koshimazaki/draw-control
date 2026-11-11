@@ -60,6 +60,13 @@ export const POSES = {
   kickRight: pose(0, { spine: [-0.15, 0, 0], rightHip: [-1.35, 0, 0], rightKnee: [0.1, 0, 0], leftKnee: [0.12, 0, 0], leftShoulder: [0, 0, 1.2], rightShoulder: [0, 0, -1.2], leftElbow: [-0.3, 0, 0], rightElbow: [-0.3, 0, 0] }),
   punchLeft: pose(-0.04, { pelvis: [0, -0.35, 0], leftShoulder: [-1.5, 0, -0.1], leftElbow: [0, 0, 0], rightShoulder: [-0.4, 0, 0.1], rightElbow: [-1.9, 0, 0], leftKnee: [0.25, 0, 0], rightKnee: [0.25, 0, 0] }),
   punchRight: pose(-0.04, { pelvis: [0, 0.35, 0], rightShoulder: [-1.5, 0, 0.1], rightElbow: [0, 0, 0], leftShoulder: [-0.4, 0, -0.1], leftElbow: [-1.9, 0, 0], leftKnee: [0.25, 0, 0], rightKnee: [0.25, 0, 0] }),
+  // Accent poses (reactive layer). Each is reached exactly on a hit.
+  hitPose: pose(-0.02, { spine: [-0.12, 0, 0], head: [-0.15, 0, 0], leftShoulder: [0, 0, 2.3], rightShoulder: [0, 0, -2.3], leftHip: [0, 0, 0.18], rightHip: [0, 0, -0.18], leftKnee: [0.12, 0, 0], rightKnee: [0.12, 0, 0] }),
+  strikeChamber: pose(-0.12, { pelvis: [0, 0.45, 0], spine: [0.1, 0.2, 0], rightShoulder: [0.5, 0, -0.3], rightElbow: [-2.0, 0, 0], leftShoulder: [-1.2, 0, -0.2], leftElbow: [-1.0, 0, 0], leftHip: [-0.3, 0, 0], rightHip: [-0.3, 0, 0], leftKnee: [0.5, 0, 0], rightKnee: [0.5, 0, 0] }),
+  strikeHit: pose(-0.18, { pelvis: [0, -0.5, 0], spine: [0.15, -0.2, 0], rightShoulder: [-1.55, 0, 0.15], rightElbow: [0, 0, 0], leftShoulder: [0.4, 0, 0.3], leftElbow: [-1.8, 0, 0], leftHip: [-0.9, 0, 0], leftKnee: [1.0, 0, 0], rightHip: [0.45, 0, 0], rightKnee: [0.3, 0, 0] }),
+  jumpTuck: pose(0.05, { spine: [0.2, 0, 0], leftHip: [-1.2, 0, 0], rightHip: [-1.2, 0, 0], leftKnee: [1.8, 0, 0], rightKnee: [1.8, 0, 0], leftShoulder: [-0.9, 0, 0.4], rightShoulder: [-0.9, 0, -0.4], leftElbow: [-1.2, 0, 0], rightElbow: [-1.2, 0, 0] }),
+  jumpLand: pose(-0.2, { spine: [0.3, 0, 0], head: [-0.1, 0, 0], leftHip: [-0.75, 0, 0], rightHip: [-0.75, 0, 0], leftKnee: [1.25, 0, 0], rightKnee: [1.25, 0, 0], leftShoulder: [0, 0, 1.3], rightShoulder: [0, 0, -1.3], leftElbow: [-0.2, 0, 0], rightElbow: [-0.2, 0, 0] }),
+  spinTuck: pose(0.02, { leftShoulder: [-0.7, 0, -0.4], rightShoulder: [-0.7, 0, 0.4], leftElbow: [-1.9, 0, 0], rightElbow: [-1.9, 0, 0], leftKnee: [0.1, 0, 0], rightKnee: [0.1, 0, 0] }),
 } satisfies Record<string, Pose>;
 
 export type PoseName = keyof typeof POSES;
