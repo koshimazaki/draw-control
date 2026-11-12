@@ -33,6 +33,7 @@ export function bindActions(p: Page) {
     input("strength").closest(".slider")!.classList.toggle("off", !locked);
     document.querySelector('[data-control="hit"]')!.classList.toggle("off", !locked);
     input("strength").value = String(s.strength);
+    input("landmarksExport").checked = s.landmarks.on;
     $("strengthOut").textContent = s.strength.toFixed(2);
     const corners = p.tool === "subject" ? s.subjectCorners : s.cameraCorners;
     input("corners").value = String(corners);
@@ -64,6 +65,7 @@ export function bindActions(p: Page) {
   const corners = (final: boolean) => { const c = Number(input("corners").value); p.update({ ...p.state, ...(p.tool === "subject" ? { subjectCorners: c } : { cameraCorners: c }) }, final); };
   input("corners").oninput = () => corners(false);
   input("corners").onchange = () => corners(true);
+  input("landmarksExport").onchange = () => p.update({ ...p.state, landmarks: { ...p.state.landmarks, on: input("landmarksExport").checked } });
   input("gridExport").onchange = () => { p.viewport.setExportGrid(input("gridExport").checked); p.viewport.setGrid(input("gridExport").checked); p.rebuild(); };
   $("clearPath").onclick = () => {
     const s = p.state;

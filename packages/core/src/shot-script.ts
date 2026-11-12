@@ -204,7 +204,9 @@ export function printScript(r: Recipe, bands?: BandAnalysis): string {
   }
   // Columns line up, but a long cell (a path's points) does not pad every other row.
   const widths = rows.reduce((w, cells) => cells.map((c, k) => Math.max(w[k] ?? 0, Math.min(COLUMN_MAX, c.length))), [] as number[]);
-  return rows.map(cells => cells.map((c, k) => (k < cells.length - 1 ? c.padEnd(widths[k]) : c)).join(" | ")).join("\n") + "\n";
+  // Settings lines first: whether the landmark blocks are on (and their seed).
+  const settings = r.landmarks ? `landmarks: ${r.landmarks.on ? `on seed ${r.landmarks.seed}` : "off"}\n` : "";
+  return settings + rows.map(cells => cells.map((c, k) => (k < cells.length - 1 ? c.padEnd(widths[k]) : c)).join(" | ")).join("\n") + "\n";
 }
 
 export const SCRIPT_HELP = {

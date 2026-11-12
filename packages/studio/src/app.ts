@@ -5,7 +5,7 @@
 import {
   LOOP_CLIPS, RIGGED_CHARACTER, defaultRiggedRecipe, riggedMove, clearIncompatibleMoves, clipCycleBeatsFor, exportFrameCount, frameAt, incompatibleMoves, insertMove,
   makeClipMove, printScript, beatsToFrames, blendBeatsOf, removeMove, swapMove, setMoveBlend, validateRecipe, MOVE_KEYS, MOVE_LIBRARY, buildDrive, flatDrive, planCamera, applyMotionCommand, blockSpan,
-  encodeWav, type AudioDrive, type CharacterKind, type CommandContext, type Expression, type MotionCommand, type MoveKey, type PreviewFps, type Recipe,
+  encodeWav, placeLandmarks, type AudioDrive, type CharacterKind, type CommandContext, type Expression, type MotionCommand, type MoveKey, type PreviewFps, type Recipe,
 } from "@motion-studio/core/internal";
 import { createProceduralCharacter } from "./characters/rig";
 import { loadRiggedCharacter, type RiggedCharacter } from "./characters/rigged";
@@ -69,6 +69,7 @@ export function startApp(root: HTMLElement) {
     const plan = recipe.camera ? planCamera(recipe, drive, totalFrames()) : null;
     cameraPlan = plan;
     viewport.setRig(plan, recipe, drive, totalFrames());
+    viewport.setLandmarks(placeLandmarks(recipe, plan, drive === FLAT ? undefined : drive));
     if (!plan && viewport.view === "rig") { viewport.setView("front"); markView("front"); }
   }
   /** A recipe applied as JSON may name another procedural character: show it. */

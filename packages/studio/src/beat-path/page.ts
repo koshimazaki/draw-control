@@ -6,13 +6,14 @@
  * strip and lanes redraw. page-actions.ts binds the buttons, the menus and the keyboard.
  */
 import {
-  beatAtSeconds, buildDrive, cameraAtSeconds, clipBeats, flatDrive, frameAt, planCamera, secondsAtBeat, snapBeat, travelStations,
+  beatAtSeconds, buildDrive, placeLandmarks, cameraAtSeconds, clipBeats, flatDrive, frameAt, planCamera, secondsAtBeat, snapBeat, travelStations,
   type AudioDrive, type CameraPlan, type Recipe,
 } from "@motion-studio/core";
 import { Player, loadTrack, trackFromSamples, type Track } from "../audio";
 import { createGlider } from "../characters/glider";
 import { DEMO_LICENCE, DEMO_TRACK_NAME, demoDrums } from "../demo";
 import { Viewport } from "../viewport";
+import { GRID_LOOKS } from "../ground-grid";
 import { exampleState } from "./examples";
 import { LaneView, Menu } from "./lanes";
 import { LAYOUT } from "./layout";
@@ -47,8 +48,10 @@ export function startBeatPath(root: HTMLElement) {
   viewport.setCharacter(createGlider());
   viewport.setShowPaths(false);
   viewport.setGrid(true);
-  // The guide's colour coding: a neutral grey ground grid, clear on the grey background.
-  viewport.styleGrid(0x9a9ca0, 0x5a5d62);
+  // The guide's colour coding: a dark ground with lighter 1 m and 4 m lines, fading to a dark horizon.
+  const look = GRID_LOOKS[new URLSearchParams(location.search).get("ground") === "light" ? "light" : "dark"];
+  viewport.setGridLook(look);
+  viewport.setBackgroundColour(look.horizon);
   viewport.setExportGrid(true);
   viewport.setView("rig");
 
@@ -113,7 +116,9 @@ export function startBeatPath(root: HTMLElement) {
       const n = Math.round(secondsAtBeat(recipe.beatGrid, b) * recipe.fps), p = at(n), a = at(n - 6), c = at(n + 6);
       return { x: p.x, z: p.z, dx: c.x - a.x, dz: c.z - a.z };
     });
-    map.setScene({ floor, stations, trail });
+    const landmarks = placeLandmarks(recipe, plan, live());
+    viewport.setLandmarks(landmarks);
+    map.setScene({ floor, stations, trail, landmarks });
     hits = [...stationBeats, ...plan.programmed.hits.flat()].map(b => secondsAtBeat(recipe.beatGrid, b)).sort((a, b) => a - b);
     const bands = live()?.bands, t0 = window0(), t1 = window1(), inClip = (t: number) => t >= t0 && t <= t1;
     const beats: number[] = [];

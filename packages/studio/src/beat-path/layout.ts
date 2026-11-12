@@ -10,6 +10,8 @@ export const LAYOUT = `
   <p class="tag muted">Draw a path, add music: the movement and the camera lock to the beat.</p>
   <div class="top-right">
     <button type="button" id="examples" class="btn ghost" aria-haspopup="menu">Examples</button>
+    <button type="button" id="pasteScript" class="btn ghost tip-below" data-tip="The page state is a shot script: paste one (or drop a .txt)">Paste script</button>
+    <button type="button" id="copyScript" class="btn ghost tip-below" data-tip="Copy the shot script an agent, the CLI or the MCP server can replay">Copy script</button>
     <a id="openStudio" class="btn ghost tip-below" href="./" data-tip="Saves this as the sequence “Beat Path” and opens the full studio">Full studio ↗</a>
     <span class="credit muted" id="credit"></span>
   </div>
@@ -44,10 +46,9 @@ export const LAYOUT = `
       </div>
       <span class="lab">Guide</span>
       <div class="row">
-        <label class="toggle" data-tip="Draw the ground grid in the exported clip"><input id="gridExport" type="checkbox" checked /><span class="knob"></span>Grid in export</label>
+        <label class="toggle" data-tip="Draw the ground grid in the exported clip"><input id="gridExport" type="checkbox" checked /><span class="knob"></span>Grid</label>
+        <label class="toggle" data-tip="Grey blocks around the scene, clear of both paths: travel and parallax read in every still"><input id="landmarksExport" type="checkbox" checked /><span class="knob"></span>Landmarks in export</label>
         <span class="push-right"></span>
-        <button type="button" id="pasteScript" class="btn outline">Paste script</button>
-        <button type="button" id="copyScript" class="btn outline">Copy script</button>
         <button type="button" id="exportGuide" class="btn primary">Export guide</button>
       </div>
       <span class="lab">Prompt</span>

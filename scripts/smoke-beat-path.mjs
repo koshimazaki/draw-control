@@ -76,6 +76,15 @@ export async function smokeBeatPath(browser, base, { fail, OUT, SHOTS }) {
   if (!back.includes("walk on path (-5,3) (0,-2) (5,2) corners 0.6 lock kick 1") || !back.includes("orbit 75")) fail(`the pasted script does not read back:\n${back}`);
   await page.screenshot({ path: `${SHOTS}beat-path-script.png` });
 
+  // Landmarks: on by default, the toggle turns them off in the recipe and the script, and back on.
+  const lm = async () => (await probe()).recipe.landmarks;
+  if (!(await lm())?.on) fail("landmarks are not on by default");
+  await page.click("label:has(#landmarksExport)");
+  const offScript = await page.evaluate(() => window.__beatPath.script());
+  if ((await lm())?.on !== false || !/^landmarks: off$/m.test(offScript)) fail("the landmarks toggle did not turn them off");
+  await page.click("label:has(#landmarksExport)");
+  console.log(`beat path: landmarks ${JSON.stringify(await lm())}, toggle off and on`);
+
   // Export the guide.
   const dl = page.waitForEvent("download", { timeout: 180_000 });
   await page.click("#exportGuide");
@@ -87,7 +96,8 @@ export async function smokeBeatPath(browser, base, { fail, OUT, SHOTS }) {
   const ok = ajv.validate("guide-bundle.schema.json", manifest) && ajv.validate("guide-bundle.schema.json#/$defs/meta", meta)
     && ajv.validate("guide-bundle.schema.json#/$defs/beats", JSON.parse(strFromU8(zip["beats.json"]))) && ajv.validate("guide-bundle.schema.json#/$defs/camera", JSON.parse(strFromU8(zip["camera.json"])));
   console.log(`beat path export: ${Object.keys(zip).sort().join(", ")}; ${meta.width}x${meta.height} ${meta.frames} frames, ${meta.character.kind}, schema ${meta.schemaVersion} ${ok ? "validates" : `does NOT validate: ${ajv.errorsText()}`}`);
-  if (!ok || meta.frames !== 193 || meta.width !== 1280 || meta.character.kind !== "glider" || meta.schemaVersion !== "0.5.0") fail("the Beat Path bundle is wrong");
+  const exported = JSON.parse(strFromU8(zip["recipe.json"]));
+  if (!ok || meta.frames !== 193 || meta.width !== 1280 || meta.character.kind !== "glider" || meta.schemaVersion !== "0.5.0" || !exported.landmarks?.on) fail("the Beat Path bundle is wrong");
   mkdirSync(`${OUT}beat-path/`, { recursive: true });
   for (const [k, v] of Object.entries(zip)) writeFileSync(`${OUT}beat-path/${k}`, v);
 

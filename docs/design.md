@@ -57,4 +57,12 @@ Contrast (WCAG ratio): text `#1c1c1c` on the green `#afff9f` 14.3, on `#90f77c` 
 
 ## The guide's colour coding (fixed, separate from the UI theme)
 
-The exported clip shows only: a mid-grey background, a neutral grey ground grid (1 m fine lines `#9a9ca0`, 4 m bold lines `#5a5d62`; "Grid in export" turns it off) with a soft contact shadow, and the subject. The subject is **one flat orange** (`#ff6a13`, pyramid and floating sphere) with a **white front marker** (the pyramid's front face and the sphere's nose). Nothing else is in frame: no paths, ticks or helpers. A prompt can say "the orange figure", "its white front", "the grey grid is the ground". (A second, smaller follower figure in another fixed colour was planned and is not built.)
+The exported clip shows only:
+- the **subject**: one flat orange (`#ff6a13`, pyramid and floating sphere) with a **white front marker** (the pyramid's front face and the sphere's nose);
+- the **ground**: a dark floor (`#23262b`) with lighter lines, 1 m cells (`#464b53`) and bolder 4 m sections (`#737882`), fading into a dark horizon (`#16181b`, also the background) about 34 m out; a shader grid (`ground-grid.ts`, adapted from drei's `Grid`, MIT) that follows the camera, so it never ends, and drops the 1 m cells where they would shimmer. "Grid" turns it off;
+- the **landmarks**: neutral grey blocks (boxes `#a7aaaf`, tall pillars `#c3c5c9`, low walls `#8f9297`) with a soft contact shade, about 14 of them, placed from the recipe's seed clear of the subject's travel, the camera's path and the line of sight between them (and the space just behind the figure); "Landmarks in export" turns them off;
+- a soft contact shadow under the figure.
+
+Nothing else: no paths, ticks or helpers. A prompt can say "the orange figure", "its white front", "the grey blocks", "the grid is the ground".
+
+Chosen by frame sheets of the four examples (`out/peek-lm/`): on the dark ground the orange figure and the grey blocks both separate clearly and the 4 m lines give a strong perspective cue; the light ground (`?ground=light` on the page) was flatter, with the blocks close to the floor's value. Without landmarks a follow camera kept the figure centred with only a faint grid sliding under it; with them every still shows where the figure is and how the camera moves. (A second, smaller follower figure in another fixed colour was planned and is not built.)

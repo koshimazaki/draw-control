@@ -22,7 +22,7 @@ It opens with a generated drum track, the "car on a road" example and lock on ki
 - **Export guide**: the guide bundle zip at 1280×720, 24 fps. **Copy script** / **Paste script** (or drop a `.txt`): the page state *is* a shot script, so an agent can write one and the CLI or MCP server renders the same thing without the page: `motion-studio new --character glider --clip 8 --analysis a.json --out base.json`, then `motion-studio script base.json examples/scripts/beat-path-road-bend.txt --analysis a.json`.
 - **Examples**: four scripts in `examples/scripts/beat-path-*.txt` (a car on a road with a bend, a runner leaping a gap, something flying, a dancer spinning while the camera circles), each with a suggested prompt.
 
-**Colours in the guide** (so a prompt can name them): the **orange figure** is the subject (a pyramid with a sphere floating above it); **white** marks its front (the front face and the sphere's nose); the **grey grid** is the ground (1 m lines, bolder every 4 m; *Grid in export* turns it off); the background is flat mid grey and nothing else is in frame. Design tokens, the two themes and the sources of the Runware values: [docs/design.md](docs/design.md).
+**Colours in the guide** (so a prompt can name them): the **orange figure** is the subject (a pyramid with a sphere floating above it); **white** marks its front (the front face and the sphere's nose); the **dark ground with lighter grid lines** is the floor (1 m cells, bolder every 4 m, fading into a dark horizon; *Grid* turns it off); the **grey blocks** (boxes, tall pillars, low walls) are landmarks placed clear of both paths so travel and parallax read in every still (*Landmarks in export* turns them off; `landmarks: off` in a script). Nothing else is in frame. Design tokens, the two themes and the sources of the Runware values: [docs/design.md](docs/design.md).
 
 ## Five-minute quickstart
 
@@ -121,6 +121,7 @@ Every frame is a pure function of (recipe, audio drive, frame), so it can be see
 
 - Code: MIT ([LICENSE](LICENSE)).
 - `assets/characters/AnimationLibrary.glb`: from Ecctrl, MIT (copyright Erdong Chen, [ECCTRL-LICENSE.txt](assets/characters/ECCTRL-LICENSE.txt)); animations based on the Quaternius Universal Animation Library, CC0. See [NOTICE.md](assets/characters/NOTICE.md). Every export lists the character's licence in `meta.json`.
+- The ground grid shader (`packages/studio/src/ground-grid.ts`) adapts the `Grid` shader of [@react-three/drei](https://github.com/pmndrs/drei) (MIT, copyright (c) 2020 react-spring); the licence text is in that file.
 - Libraries: Three.js (MIT), mp4-muxer (MIT), fflate (MIT), the MCP TypeScript SDK (MIT), zod (MIT); dev only: Vite, vitest, ESLint, TypeScript, Playwright core, ajv.
 - Test and demo tracks are generated (`packages/core/test/drum-synth.ts`). No Mixamo files, motion datasets or body models ship; your own Mixamo clips stay in `assets-local/` (git-ignored).
 

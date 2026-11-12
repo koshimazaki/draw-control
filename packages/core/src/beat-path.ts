@@ -6,6 +6,7 @@
  * and aims with the figure's height. No moves and no paths: the script brings those.
  */
 import { validateRecipe, type Recipe } from "./recipe";
+import { DEFAULT_LANDMARKS } from "./landmarks";
 
 export const BEAT_PATH_RIG = { distance: 7, height: 1.6, fov: 40, intensity: 0.25, orbitDegreesPerBeat: 0, startYaw: 0 } as const;
 export const GLIDER_CHARACTER = { kind: "glider", name: "Glider (pyramid and sphere)", licence: "MIT (motion-studio)" } as const;
@@ -24,5 +25,7 @@ export function beatPathBase(opts: { seconds: number; bpm?: number; offsetSecond
     rootPath: [{ beat: 0, x: 0, z: 0, yaw: 0 }],
     ...(opts.audio ? { audio: { name: opts.audio.name.slice(0, 120), licence: opts.audio.licence.slice(0, 120) } } : {}),
     camera: { segments: [{ fromBeat: 0, toBeat: beats, modes: ["chase"] }], ...BEAT_PATH_RIG, followHeight: true },
+    // Landmark blocks on: the stills then show travel and parallax (a script's "landmarks:" line turns them off).
+    landmarks: { ...DEFAULT_LANDMARKS },
   });
 }

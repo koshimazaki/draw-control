@@ -7,7 +7,7 @@
  * It shows the subject's travel and its lock stations, the camera's trail, both paths with
  * their corner rounding, and live markers for the subject (facing) and the camera (view cone).
  */
-import { cornerPath } from "@motion-studio/core";
+import { cornerPath, type Landmark } from "@motion-studio/core";
 import type { PathPt } from "./script";
 
 export type Tool = "subject" | "camera";
@@ -16,6 +16,7 @@ export type MapScene = {
   floor: { x: number; z: number }[];
   stations: { x: number; z: number; dx: number; dz: number }[];
   trail: { x: number; z: number }[] | null;
+  landmarks: Landmark[];
 };
 export type MapHost = {
   tool(): Tool;
@@ -58,7 +59,7 @@ const r2 = (x: number) => Math.round(x * 100) / 100;
 export class MapView {
   private ctx: CanvasRenderingContext2D;
   private base = document.createElement("canvas");
-  private scene: MapScene = { floor: [], stations: [], trail: null };
+  private scene: MapScene = { floor: [], stations: [], trail: null, landmarks: [] };
   private live: Live = {};
   private stroke: PathPt[] | null = null;
   private cancel: (() => void) | null = null;
@@ -233,6 +234,15 @@ export class MapView {
     g.fillStyle = C["map-text"]; g.font = "10px ui-monospace, Menlo, monospace";
     for (let m = -16; m <= 16; m += 4) if (m) { const [x, y] = this.top({ x: m, z: 0 }); g.fillText(`${m} m`, x + 3, y - 4); }
     const s = this.scene, tool = this.host.tool();
+    // Landmark blocks: plain outlines of their footprints.
+    g.strokeStyle = C["map-text"]; g.lineWidth = 1.2; g.setLineDash([]);
+    for (const b of s.landmarks) {
+      const c = Math.cos(b.yaw), sn = Math.sin(b.yaw);
+      const corner = (u: number, v: number) => this.top({ x: b.x + c * u - sn * v, z: b.z + sn * u + c * v });
+      const pts = [corner(-b.w / 2, -b.d / 2), corner(b.w / 2, -b.d / 2), corner(b.w / 2, b.d / 2), corner(-b.w / 2, b.d / 2)];
+      g.beginPath(); pts.forEach(([x, y], k) => (k ? g.lineTo(x, y) : g.moveTo(x, y))); g.closePath(); g.stroke();
+      if (b.kind === "pillar") { g.beginPath(); g.moveTo(pts[0][0], pts[0][1]); g.lineTo(pts[2][0], pts[2][1]); g.stroke(); }   // a tall block: crossed
+    }
     if (s.trail) this.line(g, s.trail.map(p => this.top(p)), C.camera, 1.6, 0.5);
     this.line(g, s.floor.map(p => this.top(p)), C.subject, 3.2);
     g.strokeStyle = C.station; g.lineWidth = 2.4; g.lineCap = "round";
@@ -261,6 +271,21 @@ export class MapView {
     for (let s = 0; s <= f.L; s++) { const [px] = f.at(s, 0); g.strokeStyle = C["map-minor"]; g.beginPath(); g.moveTo(Math.round(px) + 0.5, f.pad); g.lineTo(Math.round(px) + 0.5, this.h - f.pad); g.stroke(); }
     g.fillText(`along the ${tool} path · ${f.L.toFixed(1)} m`, f.pad, this.h - 16);
     if (f.pts.length < 2) return;
+    // Landmark blocks within 6 m of the path: outlines at the distance along it they sit beside.
+    g.strokeStyle = C["map-text"]; g.lineWidth = 1.2;
+    for (const b of this.scene.landmarks) {
+      let best = { d: Infinity, s: 0 };
+      for (let i = 1; i < f.pts.length; i++) {
+        const a = f.pts[i - 1], q = f.pts[i], dx = q.x - a.x, dz = q.z - a.z, L = dx * dx + dz * dz || 1;
+        const t = Math.max(0, Math.min(1, ((b.x - a.x) * dx + (b.z - a.z) * dz) / L)), d = Math.hypot(b.x - a.x - t * dx, b.z - a.z - t * dz);
+        if (d < best.d) best = { d, s: f.cum[i - 1] + t * Math.sqrt(L) };
+      }
+      if (best.d > 6) continue;
+      const half = Math.max(b.w, b.d) / 2, [x0, y0] = f.at(best.s - half, 0), [x1, y1] = f.at(best.s + half, Math.min(f.ymax + 0.4, b.h));
+      g.globalAlpha = Math.max(0.25, 1 - best.d / 6);
+      g.strokeRect(x0, y1, x1 - x0, y0 - y1);
+      g.globalAlpha = 1;
+    }
     // The rounded path's heights against its distance, scaled to the control polygon's length.
     const dense = cornerPath(f.pts, this.host.corners(tool)), dc = [0];
     for (let i = 1; i < dense.length; i++) dc.push(dc[i - 1] + Math.hypot(dense[i].x - dense[i - 1].x, dense[i].z - dense[i - 1].z));

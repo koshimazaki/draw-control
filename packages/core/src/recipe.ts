@@ -106,6 +106,8 @@ export type Recipe = {
    * setRootPath with `corners`; any other walk path edit removes it.
    */
   rootShape?: RootShape;
+  /** Landmark blocks around the scene (landmarks.ts), placed from `seed` clear of both paths. Absent: none. */
+  landmarks?: { seed: number; on: boolean };
 };
 export type RootShape = { corners: number; points: { x: number; z: number; y?: number }[] };
 
@@ -178,7 +180,7 @@ function validateMove(input: unknown, where: string, durationBeats: number): Mov
 /** Strict validation for agent-supplied JSON and imported recipes. Returns a fresh copy. */
 export function validateRecipe(input: unknown): Recipe {
   if (!isObject(input)) return fail("expected an object");
-  only(input, ["version", "fps", "durationBeats", "beatGrid", "character", "energy", "moves", "rootPath", "jumps", "audio", "camera", "reactive", "steps", "energyCurve", "envelope", "travelLock", "rootShape"], "recipe");
+  only(input, ["version", "fps", "durationBeats", "beatGrid", "character", "energy", "moves", "rootPath", "jumps", "audio", "camera", "reactive", "steps", "energyCurve", "envelope", "travelLock", "rootShape", "landmarks"], "recipe");
   if (input.version !== RECIPE_VERSION) fail(`expected version ${RECIPE_VERSION}`);
   if (input.fps !== 24) fail("fps must be 24");
   if (!Number.isInteger(input.durationBeats) || !finite(input.durationBeats, 1, 512)) fail("durationBeats must be a whole number 1–512");
@@ -253,6 +255,14 @@ export function validateRecipe(input: unknown): Recipe {
     if (lock.lock) recipe.travelLock = lock;
   }
   if (input.rootShape !== undefined) recipe.rootShape = validateRootShape(input.rootShape);
+  if (input.landmarks !== undefined) {
+    const l = input.landmarks;
+    if (!isObject(l)) return fail("landmarks must be an object");
+    only(l, ["seed", "on"], "landmarks");
+    if (!Number.isInteger(l.seed) || !finite(l.seed, 0, 2147483647)) fail("landmarks.seed must be a whole number 0–2147483647");
+    if (typeof l.on !== "boolean") fail("landmarks.on must be true or false");
+    recipe.landmarks = { seed: l.seed as number, on: l.on as boolean };
+  }
   if (input.camera !== undefined) recipe.camera = validateCamera(input.camera, durationBeats);
   return recipe;
 }

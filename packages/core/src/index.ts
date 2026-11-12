@@ -25,6 +25,7 @@ export type { FrameState, ClipLayer, ActivePhase } from "./engine";
 export { POSES, JOINTS, mixPoses, scalePose, type Pose, type PoseName, type JointName, type Euler3 } from "./poses";
 export { rootAt, travelRange, travelStations } from "./root-travel";
 export { cornerPath, polylineSpline } from "./corners";
+export { placeLandmarks, footprintDistance, scenePaths, LANDMARKS, DEFAULT_LANDMARKS, type Landmark, type LandmarkKind } from "./landmarks";
 export { exportFrameCount } from "./bundle";
 
 // Beats, audio analysis and onsets (kicks, snares, hats, peaks).
@@ -38,7 +39,7 @@ export { applyMotionCommand, applyCommands, commandHelp, type MotionCommand, typ
 
 // The shot script and the timeline as text.
 export { printScript, cameraWords } from "./shot-script";
-export { applyScript, parseRows } from "./script-apply";
+export { applyScript, parseRows, parseSettings } from "./script-apply";
 export { ACTION_WORDS, CAMERA_WORDS } from "./shot-script";
 export { describeRecipe } from "./describe";
 

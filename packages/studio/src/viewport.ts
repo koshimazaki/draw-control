@@ -9,6 +9,9 @@ import type { Character } from "./characters/types";
 import { PathsOverlay } from "./paths-overlay";
 import { ViewingAids, type AidOptions } from "./viewing-aids";
 import { TARGET, applyRigSample, cameraFor, setAspect, topCameraFitting, type View } from "./views";
+import { GroundGrid, type GridLook } from "./ground-grid";
+import { LandmarkLayer } from "./landmarks-3d";
+import type { Landmark } from "@motion-studio/core/internal";
 
 export const BACKGROUNDS = { grey: 0x77797c, dark: 0x1d1f22 } as const;
 export type Background = keyof typeof BACKGROUNDS;
@@ -22,7 +25,8 @@ export class Viewport {
   private camera: THREE.Camera;
   private actor = new THREE.Group();
   private character?: Character;
-  private grid: THREE.Group;
+  private ground = new GroundGrid();
+  private landmarks = new LandmarkLayer();
   private gridOn = false;
   private exportGrid = false;
   private observer: ResizeObserver;
@@ -71,13 +75,10 @@ export class Viewport {
     floor.rotation.x = -Math.PI / 2;
     floor.receiveShadow = true;
     this.scene.add(floor);
-    // Blocked-out ground grid: 1 m lines, bolder every 4 m, the two axes darker.
-    this.grid = new THREE.Group();
-    const fine = new THREE.GridHelper(40, 40, 0x8e9196, 0x8e9196), coarse = new THREE.GridHelper(40, 10, 0x55585e, 0x6a6d72);
-    fine.position.y = 0.002; coarse.position.y = 0.003;
-    this.grid.add(fine, coarse);
-    this.grid.visible = false;
-    this.scene.add(this.grid);
+    // Blocked-out ground grid (ground-grid.ts): 1 m cells, bolder every 4 m, endless under the camera.
+    this.ground.mesh.visible = false;
+    this.scene.add(this.ground.mesh);
+    this.scene.add(this.landmarks.group);
     this.scene.add(this.actor);
     this.scene.add(this.overlay.group);
     this.scene.add(this.aids.group);
@@ -132,7 +133,7 @@ export class Viewport {
   /** Hide preview-only helpers (paths) while exporting. */
   setExporting(on: boolean) {
     this.exporting = on;
-    this.grid.visible = on ? this.exportGrid : this.gridOn;
+    this.ground.mesh.visible = on ? this.exportGrid : this.gridOn;
     this.overlay.group.visible = !on && this.overlayWanted();
     this.aids.group.visible = !on;
   }
@@ -145,15 +146,13 @@ export class Viewport {
     return cameraFor(view, aspect, this.orbitCam);
   }
   setBackground(bg: Background) { this.scene.background = new THREE.Color(BACKGROUNDS[bg]); this.redraw(); }
-  /** Recolour the ground grid (fine 1 m lines, bold 4 m lines); the studio keeps its defaults. */
-  styleGrid(fine: number, coarse: number) {
-    const [a, b] = this.grid.children as THREE.GridHelper[];
-    (a.material as THREE.LineBasicMaterial).vertexColors = false; (a.material as THREE.LineBasicMaterial).color.setHex(fine);
-    (b.material as THREE.LineBasicMaterial).vertexColors = false; (b.material as THREE.LineBasicMaterial).color.setHex(coarse);
-    for (const g of [a, b]) (g.material as THREE.Material).needsUpdate = true;
-    this.redraw();
-  }
-  setGrid(on: boolean) { this.gridOn = on; this.grid.visible = on; this.redraw(); }
+  setGrid(on: boolean) { this.gridOn = on; this.ground.mesh.visible = on; this.redraw(); }
+  /** The grid's look (GRID_LOOKS: the studio's lines, a dark or a light ground). */
+  setGridLook(look: GridLook) { this.ground.setLook(look); this.redraw(); }
+  /** A background colour of its own (a ground look fades into it). */
+  setBackgroundColour(hex: number) { this.scene.background = new THREE.Color(hex); this.redraw(); }
+  /** The recipe's landmark blocks (core placeLandmarks); an empty list removes them. */
+  setLandmarks(list: Landmark[]) { this.landmarks.set(list); this.redraw(); }
   /** Whether the exported guide shows the grid (whatever the preview shows). */
   setExportGrid(on: boolean) { this.exportGrid = on; }
 

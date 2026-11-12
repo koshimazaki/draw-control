@@ -5,7 +5,7 @@
  * the global lock and "on each hit" are its `lock …` words. A script with words outside the
  * page's vocabulary is read to the nearest page word, and `notes` says what changed.
  */
-import { parseRows } from "@motion-studio/core";
+import { parseRows, parseSettings } from "@motion-studio/core";
 
 export type PathPt = { x: number; z: number; y?: number };
 export const CHARACTER_WORDS = ["glide", "hover", "spin", "jump"] as const;
@@ -33,6 +33,8 @@ export type BeatPathState = {
   lock: LockChoice;
   strength: number;
   onHit: HitChoice;
+  /** Landmark blocks around the scene (on by default; seed places them). */
+  landmarks: { on: boolean; seed: number };
   /** A suggested prompt line (examples carry one); printed as a comment. */
   prompt?: string;
 };
@@ -66,6 +68,7 @@ export function toScript(state: BeatPathState): string {
   const lines: string[] = [];
   if (state.prompt) lines.push(`# prompt: ${state.prompt}`);
   lines.push(`# clip: ${state.clip} s · figure: glider · Beat Path`);
+  lines.push(`landmarks: ${state.landmarks.on ? `on seed ${state.landmarks.seed}` : "off"}`);
   for (let i = 0; i < edges.length - 1; i++) {
     const from = edges[i], to = edges[i + 1];
     const c = state.character.find(b => b.from === from), k = state.cameraLane.find(b => b.from === from);
@@ -106,6 +109,8 @@ export function fromScript(text: string, base: BeatPathState): { state: BeatPath
   if (prompt) state.prompt = prompt[1].trim();
   const clip = /^#\s*clip:\s*(\d+)/im.exec(text);
   if (clip) state.clip = Number(clip[1]) <= 6 ? 5 : 8;
+  const settings = parseSettings(text).landmarks;
+  if (settings) state.landmarks = { on: settings.on, seed: settings.seed ?? state.landmarks.seed };
   let lockSeen = false, hitSeen = false;
   const orbits: { index: number; degrees: number; line: number }[] = [];
   const readLock = (cell: string) => {
@@ -194,7 +199,7 @@ export function setWord<W extends string>(lane: Block<W>[], index: number, word:
 export const BLANK_STATE: BeatPathState = {
   clip: 8, subject: [], subjectCorners: 0.5, camera: [], cameraCorners: 0.5,
   character: [{ from: 0, to: 17, word: "hover" }], cameraLane: [{ from: 0, to: 17, word: "behind" }],
-  lock: "kick", strength: 1, onHit: "hold",
+  lock: "kick", strength: 1, onHit: "hold", landmarks: { on: true, seed: 7 },
 };
 
 /** A camera path to start from when "My path" is picked with none drawn: a slow arc in front. */

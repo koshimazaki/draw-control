@@ -34,12 +34,27 @@ const number = (row: Row, t: string, what: string) => {
   return Number.isFinite(v) ? v : bad(row, `${what} must be a number (got ${JSON.stringify(t)})`);
 };
 
+/** A settings line: `landmarks: on seed 7` or `landmarks: off` (not a row). */
+const SETTING = /^landmarks\s*:/i;
+/** The script's settings lines; a script without one leaves the setting as it was. */
+export function parseSettings(script: string): { landmarks?: { on: boolean; seed?: number } } {
+  const out: { landmarks?: { on: boolean; seed?: number } } = {};
+  script.split(/\r?\n/).forEach((raw, i) => {
+    const text = raw.replace(/#.*$/, "").trim();
+    if (!SETTING.test(text)) return;
+    const m = /^landmarks\s*:\s*(on|off)(?:\s+seed\s+(\d+))?\s*$/i.exec(text);
+    if (!m) throw new RecipeError(`script line ${i + 1}: landmarks reads "landmarks: on seed 7" or "landmarks: off"`);
+    out.landmarks = { on: m[1].toLowerCase() === "on", ...(m[2] !== undefined ? { seed: Number(m[2]) } : {}) };
+  });
+  return out;
+}
+
 export function parseRows(script: string): Row[] {
   if (typeof script !== "string" || script.length > 100_000) throw new RecipeError("script must be text up to 100 000 characters");
   const rows: Row[] = [];
   script.split(/\r?\n/).forEach((raw, i) => {
     const text = raw.replace(/#.*$/, "").trim();
-    if (!text) return;
+    if (!text || SETTING.test(text)) return;
     const [head, ...cells] = text.split("|").map(c => c.trim());
     const m = /^beats\s+(\d+(?:\.\d+)?)\s*[-–]\s*(\d+(?:\.\d+)?)$/i.exec(head);
     const row: Row = { from: 0, to: 0, line: i + 1 };
@@ -215,6 +230,8 @@ export function applyScript(recipe: Recipe, args: { script: string }, ctx: { ban
   const rows = parseRows(args.script), bands = ctx.bands ?? ctx.drive?.bands;
   if (rows[rows.length - 1].to > recipe.durationBeats + 1e-6) throw new RecipeError(`script runs to beat ${rows[rows.length - 1].to}, past the recipe's ${recipe.durationBeats} beats`);
   let r: Recipe = validateRecipe({ ...structuredClone(recipe), moves: [] });
+  const settings = parseSettings(args.script);
+  if (settings.landmarks) r = validateRecipe({ ...r, landmarks: { seed: settings.landmarks.seed ?? recipe.landmarks?.seed ?? 7, on: settings.landmarks.on } });
   // Action track: blocks from rows, a block running on over `continue` rows.
   type Block = { from: number; to: number; action: Action };
   const blocks: Block[] = [], hits: { row: Row; hit: Hit }[] = [];

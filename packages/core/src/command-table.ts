@@ -84,6 +84,7 @@ export const COMMAND_TABLE: Record<string, TableCommand> = {
     run: (r, a) => setRootPath(r, { points: a.points as { x: number; z: number; y?: number }[], fromBeat: optNum(a, "fromBeat"), toBeat: optNum(a, "toBeat"), gait: a.gait === undefined ? undefined : str(a, "gait"),
       face: a.face === undefined ? undefined : a.face === "hold" ? "hold" : a.face === "path" ? "path" : bad("face", "path or hold"), lock: a.lock === undefined ? undefined : str(a, "lock"), strength: optNum(a, "strength"), smooth: a.smooth !== false, corners: optNum(a, "corners") }),
   },
+  setLandmarks: { help: "{ on?, seed? } landmark blocks around the scene (grey boxes, pillars, low walls), placed from the seed clear of both paths", run: (r, a) => validateRecipe({ ...r, landmarks: { seed: a.seed === undefined ? r.landmarks?.seed ?? 7 : num(a, "seed"), on: a.on === undefined ? true : a.on === true } }) },
   setTravelLock: { help: "{ lock: off|beat|kick|snare|hat, strength? } lock the travel along the walk path: stations on each locked hit", run: (r, a) => setTravelLock(r, { lock: str(a, "lock"), strength: optNum(a, "strength") }) },
   clearRootPath: { help: "{} the character stands at the origin", run: r => clearRootPath(r) },
   // The shot script (shot-script.ts): the Action and Camera tracks as text.
