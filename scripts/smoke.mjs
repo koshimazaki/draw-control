@@ -5,7 +5,7 @@
  * exports two guide bundles and checks their contents. Fixtures are synthetic.
  * Covers: the 1280×720 default and the inline size and length warnings; a mid-track
  * range export (trimmed audio, re-based beats.json, ffprobe); the inline confirm that
- * clears library moves when switching to a loaded character.
+ * clears library moves when switching to a loaded character; the Beat Path page (smoke-beat-path.mjs).
  * Output: out/smoke/ (gitignored). Needs Google Chrome installed (or CHROME_PATH).
  *   npm run smoke
  */
@@ -16,6 +16,7 @@ import { chromium } from "playwright-core";
 import { unzipSync, strFromU8 } from "fflate";
 import { smokeBands, smokeBlocks, smokeCameraPath, smokeEnvelope } from "./smoke-features.mjs";
 import { smokeCameraTrack, smokeDemo } from "./smoke-camera.mjs";
+import { smokeBeatPath } from "./smoke-beat-path.mjs";
 
 const OUT = new URL("../out/smoke/", import.meta.url).pathname;
 mkdirSync(OUT, { recursive: true });
@@ -218,6 +219,9 @@ try {
   await smokeDemo(page, { fail, OUT });
 
   if (errors.length) fail(`page errors: ${errors.join(" | ")}`);
+
+  // 6. The Beat Path page (path.html): first run, a drawn path, lock on kick, a lane menu, a pasted script, an export.
+  await smokeBeatPath(browser, "http://127.0.0.1:5181", { fail, OUT, SHOTS: new URL("../out/", import.meta.url).pathname });
 } finally {
   await browser.close();
   await server.close();

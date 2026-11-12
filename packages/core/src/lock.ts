@@ -39,9 +39,14 @@ export function validateLock(input: Record<string, unknown>, where: string, out:
   }
 }
 
-/** Beats of the locked hits strictly inside (from, to): whole beats, or the analysed onsets of a band. */
+/**
+ * Beats of the locked hits inside (from, to): whole beats, or the analysed onsets of a band.
+ * A hit within EDGE_BEATS of either edge is left out: a block that starts on a kick would
+ * otherwise have a first leg a few milliseconds long, and its move would jump.
+ */
+export const EDGE_BEATS = STATION_HOLD_BEATS;
 export function lockHits(grid: BeatGrid, bands: BandAnalysis | undefined, target: LockTarget, from: number, to: number): number[] {
-  const inside = (b: number) => b > from + 1e-6 && b < to - 1e-6;
+  const inside = (b: number) => b > from + EDGE_BEATS - 1e-6 && b < to - EDGE_BEATS + 1e-6;
   if (target === "beat") {
     const out: number[] = [];
     for (let b = Math.floor(from) + 1; b < to - 1e-6; b++) if (inside(b)) out.push(b);

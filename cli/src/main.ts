@@ -1,7 +1,7 @@
 /**
  * motion-studio: the studio's edit commands from a terminal or an agent.
  *   analyse <audio> --out analysis.json
- *   new [--character rigged|mannequin|block|stick|blob] [--analysis a.json] --out recipe.json
+ *   new [--character rigged|mannequin|block|stick|blob|glider] [--clip 5|8] [--analysis a.json] --out recipe.json
  *   apply <recipe.json> <commands.json> [--analysis a.json] [--out next.json]
  *   set <recipe.json> <path> <value> [--out next.json]
  *   describe <recipe.json> [--analysis a.json] [--script]
@@ -15,7 +15,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { basename } from "node:path";
 import {
-  DEFAULT_RECIPE, PROCEDURAL_KINDS, applyCommands, commandHelp, defaultRiggedRecipe, describeRecipe, printScript, validateRecipe, type CommandContext, type MotionCommand, type Recipe,
+  DEFAULT_RECIPE, PROCEDURAL_KINDS, beatPathBase, applyCommands, commandHelp, defaultRiggedRecipe, describeRecipe, printScript, validateRecipe, type CommandContext, type MotionCommand, type Recipe,
 } from "../../packages/core/src/index.ts";
 import { decodeAudioFile } from "./audio-file.ts";
 import { analyse, driveFrom, parseAnalysis, type AnalysisJson } from "./analysis.ts";
@@ -59,7 +59,10 @@ function output(recipe: Recipe, f: Flags, out: (s: string) => void) {
 const FIGURE_NAMES: Record<string, string> = { mannequin: "Procedural mannequin", block: "Block figure", stick: "Stick figure", blob: "Capsule figure" };
 
 /** Start a recipe: the rigged mannequin dancing (or a procedural figure), fitted to the analysed track. */
-export function newRecipe(character: string, analysis?: AnalysisJson): Recipe {
+export function newRecipe(character: string, analysis?: AnalysisJson, clip = 8): Recipe {
+  // The glider starts from the Beat Path base: a clip of `clip` seconds, the rig the page uses.
+  if (character === "glider") return beatPathBase({ seconds: clip, ...(analysis?.bpm ? { bpm: analysis.bpm, offsetSeconds: analysis.offsetSeconds } : {}),
+    ...(analysis ? { audio: { name: basename(analysis.source).replace(/[<>{}\\]/g, ""), licence: "unspecified" } } : {}) });
   let r: Recipe = character === "rigged" ? defaultRiggedRecipe() : { ...structuredClone(DEFAULT_RECIPE), character: { kind: character as Recipe["character"]["kind"], name: FIGURE_NAMES[character] ?? "Procedural mannequin", licence: "MIT (motion-studio)" } };
   if (analysis) {
     const bpm = analysis.bpm ?? r.beatGrid.bpm, offset = analysis.bpm ? analysis.offsetSeconds : 0;
@@ -86,8 +89,10 @@ export async function main(argv: string[], out: (s: string) => void = s => conso
       }
       case "new": {
         const character = flagStr(flags, "character") ?? "rigged";
-        if (!["rigged", ...PROCEDURAL_KINDS].includes(character)) throw new Error(`--character must be rigged, ${PROCEDURAL_KINDS.join(", ")}`);
-        output(newRecipe(character, contextFrom(flags).analysis), flags, out);
+        if (!["rigged", ...PROCEDURAL_KINDS, "glider"].includes(character)) throw new Error(`--character must be rigged, ${PROCEDURAL_KINDS.join(", ")} or glider`);
+        const clip = flagStr(flags, "clip") === undefined ? 8 : Number(flagStr(flags, "clip"));
+        if (!(clip > 0 && clip <= 60)) throw new Error("--clip takes seconds, 5 or 8 for Beat Path");
+        output(newRecipe(character, contextFrom(flags).analysis, clip), flags, out);
         return 0;
       }
       case "apply": {

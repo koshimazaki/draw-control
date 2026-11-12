@@ -5,6 +5,7 @@ import { $ } from "../ui";
 import type { Viewport } from "../viewport";
 import { exportBundle } from "./bundle";
 import { currentRange, exportSize } from "./panel";
+import { download } from "../shared/download";
 
 export type ExportHost = {
   recipe(): Recipe;
@@ -39,13 +40,4 @@ export function bindExport(host: ExportHost) {
     } catch (e) { host.say("exportStatus", `Export failed: ${(e as Error).message}`); }
     finally { done(); bar.hidden = true; host.render(); }
   };
-}
-
-export function download(bytes: Uint8Array | string, name: string, type: string) {
-  const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type }));
-  const a = Object.assign(document.createElement("a"), { href: url, download: name });
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }

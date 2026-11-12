@@ -86,6 +86,10 @@ export type CameraConfig = {
   path?: { x: number; y: number; z: number }[];
   /** Automation lanes (automation.ts): distance, height, fov override the rig where they have points; yaw adds an offset. */
   lanes?: Partial<Record<CameraLane, Envelope>>;
+  /** The camera rises and aims with the subject's height (the walk path's `y`), so a figure in flight stays framed. Absent: it does not. */
+  followHeight?: boolean;
+  /** Corner rounding of the drawn path, 0 (straight segments) to 1 (round), corners.ts. Absent: the smooth spline through the points. */
+  corners?: number;
 };
 
 export const DEFAULT_CAMERA: CameraConfig = {
@@ -95,7 +99,7 @@ export const DEFAULT_CAMERA: CameraConfig = {
 
 export function validateCamera(input: unknown, durationBeats: number): CameraConfig {
   if (!isObject(input)) return fail("camera must be an object");
-  only(input, ["segments", "intensity", "orbitDegreesPerBeat", "distance", "height", "fov", "startYaw", "path", "lanes"], "camera");
+  only(input, ["segments", "intensity", "orbitDegreesPerBeat", "distance", "height", "fov", "startYaw", "path", "lanes", "followHeight", "corners"], "camera");
   if (!Array.isArray(input.segments) || input.segments.length < 1 || input.segments.length > 32) fail("camera.segments needs 1–32 ranges");
   let last = -Infinity;
   const segments = (input.segments as unknown[]).map((s, i): CameraSegment => {
@@ -140,6 +144,11 @@ export function validateCamera(input: unknown, durationBeats: number): CameraCon
     startYaw: num(input.startYaw, -360, 360, "camera.startYaw"),
   };
   if (path) out.path = path;
+  if (input.corners !== undefined) out.corners = num(input.corners, 0, 1, "camera.corners");
+  if (input.followHeight !== undefined) {
+    if (typeof input.followHeight !== "boolean") fail("camera.followHeight must be true or false");
+    if (input.followHeight) out.followHeight = true;
+  }
   if (input.lanes !== undefined) { const lanes = validateCameraLanes(input.lanes); if (Object.keys(lanes).length) out.lanes = lanes; }
   return out;
 }

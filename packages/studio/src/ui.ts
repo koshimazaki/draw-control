@@ -45,6 +45,7 @@ export const LAYOUT = `
         <option value="block">Block figure</option>
         <option value="stick">Stick figure (lines and joint dots)</option>
         <option value="blob">Capsule figure (no visible joints)</option>
+        <option value="glider">Glider (pyramid and sphere, no limbs)</option>
         <option value="file">Loaded file (GLB / FBX)</option>
       </select>
       <label class="file">Load GLB / FBX <input id="characterFile" type="file" accept=".glb,.gltf,.fbx" /></label>

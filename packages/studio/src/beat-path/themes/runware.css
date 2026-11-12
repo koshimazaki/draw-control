@@ -1,0 +1,27 @@
+/*
+ * Runware theme (?theme=runware): values from runware.ai and docs.runware.ai CSS, read
+ * 12 November 2026; every value and its source is in docs/design.md. Light (the docs' light
+ * theme), the site's lime accent and its 7 px radius, pills for play. Figtree and JetBrains
+ * Mono are open (OFL) and load from Google Fonts; the site's heading face Coxx is not open,
+ * so headings use Figtree (the site's own fallback for it). Unofficial: no logo, no mark.
+ */
+:root[data-theme="runware"] {
+  color-scheme: light;
+  --font-sans: "Figtree", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --weight-regular: 400; --weight-medium: 500; --weight-semibold: 600;
+  --radius-sm: 4.2px; --radius-md: 5.6px; --radius-lg: 7px; --radius-pill: 999px;
+  --shadow-xs: 0 1px 1px rgba(27, 27, 27, .06); --shadow-sm: 0 1px 3px rgba(27, 27, 27, .08); --shadow-lg: 0 12px 32px rgba(27, 27, 27, .14);
+
+  --bg: #fbfbfb; --surface: #ffffff; --surface-2: #f2f2f2; --surface-sunk: oklch(96.48% 0 0); --surface-hover: oklch(91.8% 0 0); --seg-on: #ffffff; --popover: #ffffff;
+  --border: #e8e8e8; --border-strong: #c9c9c9; --text: #1b1b1b; --text-muted: oklch(52.34% 0 0);
+  --accent: #afff9f; --accent-hover: #90f77c; --accent-ink: #345c2d; --on-accent: #1c1c1c; --ring: #345c2d;
+  --track: #d9d9d9; --thumb: #ffffff;
+  --block-bg: #ffffff; --block-border: #e8e8e8; --block-hover: #f2f2f2;
+  --tooltip-bg: #1b1b1b; --tooltip-text: #fbfbfb; --scrim: rgba(27, 27, 27, .28); --danger: oklch(52% .12 20);
+
+  /* supporting colours, from the docs' palette (oklch 52% .12 hue) */
+  --subject: oklch(52% .12 40); --camera: oklch(52% .12 240); --kick: oklch(52% .12 20); --snare: oklch(52% .12 300); --station: oklch(52% .12 20);
+  --map-bg: #ffffff; --map-minor: #f2f2f2; --map-major: #e8e8e8; --map-axis: #c9c9c9; --map-text: #9a9a9a;
+  --wave: #c9c9c9; --wave-bg: #ffffff; --beat-line: #f2f2f2; --bar-line: #e8e8e8; --playhead: #345c2d; --played: rgba(175, 255, 159, .28);
+}

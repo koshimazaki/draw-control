@@ -16,6 +16,7 @@ import { buildSpline } from "./spline";
 import { LOOP_CLIPS, loopCycleBeats } from "./clip-library";
 import type { LockTarget } from "./lock";
 import { sampleRootPath } from "./root-travel";
+import { cornerPath } from "./corners";
 
 const r3 = (x: number) => Math.round(x * 1000) / 1000;
 const clone = (r: Recipe): Recipe => structuredClone(r);
@@ -71,7 +72,7 @@ export function startCameraMove(recipe: Recipe, args: { modes: CameraMode[] | Ca
 }
 
 /** The camera path (top view), 2–32 points; y is the camera height (default: the rig height). Uses the path mode over the whole recipe unless `useMode` is false. */
-export function setCameraPath(recipe: Recipe, args: { points: { x: number; z: number; y?: number }[]; useMode?: boolean }): Recipe {
+export function setCameraPath(recipe: Recipe, args: { points: { x: number; z: number; y?: number }[]; useMode?: boolean; corners?: number }): Recipe {
   const cam = cameraOf(recipe);
   if (!Array.isArray(args.points) || args.points.length < 2 || args.points.length > 4096) throw new RecipeError("setCameraPath: points needs 2–4096 { x, z, y? } points");
   // Up to 12 points are kept as given (with their heights); a longer stroke is thinned evenly at the rig height.
@@ -79,6 +80,8 @@ export function setCameraPath(recipe: Recipe, args: { points: { x: number; z: nu
     ? args.points.map(p => ({ x: r3(p.x), y: r3(p.y ?? cam.height), z: r3(p.z) }))
     : resample(args.points, 12).map(p => ({ x: r3(p.x), y: r3(cam.height), z: r3(p.z) }));
   if (args.useMode !== false) cam.segments = [{ fromBeat: 0, toBeat: recipe.durationBeats, modes: ["path"] }];
+  // Corner rounding (corners.ts): given, the camera follows the rounded polyline; absent, the smooth spline.
+  if (args.corners !== undefined) cam.corners = args.corners; else delete cam.corners;
   return validateRecipe({ ...clone(recipe), camera: cam });
 }
 
@@ -86,6 +89,7 @@ export function clearCameraPath(recipe: Recipe): Recipe {
   if (!recipe.camera?.path) return recipe;
   const cam = cameraOf(recipe);
   delete cam.path;
+  delete cam.corners;
   cam.segments = cam.segments.map(s => (s.modes.includes("path") ? { ...s, modes: ["orbit"] } : s));
   return validateRecipe({ ...clone(recipe), camera: cam });
 }
@@ -140,7 +144,7 @@ export function gaitSpeedFor(name: string, metresPerSecond: number, bpm: number)
  * by distance): the shot script's `on path (x,z) (x,z,y) …` uses it, so a script reads back
  * with the same points.
  */
-export function setRootPath(recipe: Recipe, args: { points: { x: number; z: number; y?: number }[]; fromBeat?: number; toBeat?: number; gait?: string; face?: "path" | "hold"; lock?: string; strength?: number; smooth?: boolean }): Recipe {
+export function setRootPath(recipe: Recipe, args: { points: { x: number; z: number; y?: number }[]; fromBeat?: number; toBeat?: number; gait?: string; face?: "path" | "hold"; lock?: string; strength?: number; smooth?: boolean; corners?: number }): Recipe {
   if (!Array.isArray(args.points) || args.points.length < 2 || args.points.length > 4096) throw new RecipeError("setRootPath: points needs 2–4096 { x, z, y? } points");
   for (const p of args.points) if (!Number.isFinite(p?.x) || !Number.isFinite(p?.z) || Math.abs(p.x) > 100 || Math.abs(p.z) > 100 || (p.y !== undefined && !(p.y >= 0 && p.y <= 30))) throw new RecipeError("setRootPath: each point needs x and z within ±100 m (and y, if given, 0–30 m)");
   const from = Math.max(0, args.fromBeat ?? 0), to = Math.min(recipe.durationBeats, args.toBeat ?? recipe.durationBeats);
@@ -148,10 +152,15 @@ export function setRootPath(recipe: Recipe, args: { points: { x: number; z: numb
   const glide = args.gait === GLIDE;
   const face = args.face ?? (glide ? "hold" : "path");
   const startYaw = sampleRootPath(recipe.rootPath, from).yaw;
-  const smooth = args.smooth !== false;
-  if (!smooth && args.points.length > (from > 0 ? 63 : 64)) throw new RecipeError("setRootPath: a path given point by point (smooth false) takes up to 63 points");
+  // Corner rounding (corners.ts): the points as given, their corners rounded, straight between the results.
+  const shaped = args.corners !== undefined;
+  if (shaped && !(args.corners! >= 0 && args.corners! <= 1)) throw new RecipeError("setRootPath: corners must be 0–1");
+  if (shaped && args.points.length > 63) throw new RecipeError("setRootPath: a path with corners takes up to 63 points");
+  const given = shaped ? hardTurns(cornerPath(args.points, args.corners!), from > 0 ? 63 : 64) : args.points;
+  const smooth = !shaped && args.smooth !== false;
+  if (!smooth && given.length > (from > 0 ? 63 : 64)) throw new RecipeError("setRootPath: a path given point by point (smooth false) takes up to 63 points");
   // Smooth: a spline through up to 12 control points, resampled evenly. Point by point: the points as given, straight between them.
-  const control = smooth ? resample(args.points, Math.min(12, args.points.length)) : args.points;
+  const control = smooth ? resample(args.points, Math.min(12, args.points.length)) : given;
   const hasY = control.some(p => p.y);
   const spline = buildSpline(control.map(p => ({ x: p.x, y: p.y ?? 0, z: p.z })));
   const cum = [0];
@@ -180,6 +189,8 @@ export function setRootPath(recipe: Recipe, args: { points: { x: number; z: numb
   }
   const rootPath = from > 0 ? [{ ...pts[0], beat: 0 }, ...pts] : pts;
   let next: Recipe = { ...clone(recipe), rootPath };
+  if (shaped) next.rootShape = { corners: args.corners!, points: args.points.map(p => ({ x: r3(p.x), z: r3(p.z), ...(p.y !== undefined ? { y: r3(p.y) } : {}) })) };
+  else delete next.rootShape;
   if (args.gait && !glide) {
     const m = makeMoveFor(next, args.gait, from);
     m.id = `${m.id}-path`;
@@ -196,6 +207,30 @@ export function setRootPath(recipe: Recipe, args: { points: { x: number; z: numb
   return next;
 }
 
+/**
+ * A sharp corner turns the facing at the corner, not across the segment before it: a point
+ * 3 cm before each corner that turns more than 20° carries the incoming heading (facing
+ * is linear between points). Skipped when the path would pass `max` points.
+ */
+function hardTurns<P extends { x: number; z: number; y?: number }>(pts: P[], max: number): P[] {
+  const out: P[] = [pts[0]];
+  let room = max - pts.length;
+  for (let i = 1; i < pts.length; i++) {
+    const a = pts[i - 1], b = pts[i], c = pts[i + 1], len = Math.hypot(b.x - a.x, b.z - a.z);
+    if (c && room > 0 && len > 0.09) {
+      const turn = Math.abs(Math.atan2((b.x - a.x) * (c.z - b.z) - (b.z - a.z) * (c.x - b.x), (b.x - a.x) * (c.x - b.x) + (b.z - a.z) * (c.z - b.z)));
+      if (turn > 20 * Math.PI / 180) {
+        const k = 1 - 0.03 / len;
+        const q = { ...b, x: a.x + (b.x - a.x) * k, z: a.z + (b.z - a.z) * k } as P;
+        if (b.y !== undefined || a.y !== undefined) q.y = (a.y ?? 0) + ((b.y ?? 0) - (a.y ?? 0)) * k;
+        out.push(q); room--;
+      }
+    }
+    out.push(b);
+  }
+  return out;
+}
+
 /** Lock the travel along the walk path to the beat, kicks, snares or hats (`off` clears it). */
 export function setTravelLock(recipe: Recipe, args: { lock: string; strength?: number }): Recipe {
   const next = clone(recipe);
@@ -206,5 +241,7 @@ export function setTravelLock(recipe: Recipe, args: { lock: string; strength?: n
 
 /** Back to standing at the origin, facing the front camera. */
 export function clearRootPath(recipe: Recipe): Recipe {
-  return validateRecipe({ ...clone(recipe), rootPath: [{ beat: 0, x: 0, z: 0, yaw: 0 }] });
+  const next = clone(recipe);
+  delete next.rootShape;
+  return validateRecipe({ ...next, rootPath: [{ beat: 0, x: 0, z: 0, yaw: 0 }] });
 }

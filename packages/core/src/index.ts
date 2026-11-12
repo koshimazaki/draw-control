@@ -11,10 +11,11 @@
 // Recipe: the format, its validator and starting points (docs/recipe.md).
 export {
   RECIPE_VERSION, CHARACTER_KINDS, PROCEDURAL_KINDS, AMPLITUDE_MAX, SPEED_RANGE, RecipeError, validateRecipe, recipeSeconds, secondsPerBeat,
-  type Recipe, type Move, type Phase, type BeatGrid, type CharacterRef, type CharacterKind, type RootPoint, type Jump,
+  type Recipe, type RootShape, type Move, type Phase, type BeatGrid, type CharacterRef, type CharacterKind, type RootPoint, type Jump,
 } from "./recipe";
 export { DEFAULT_RECIPE, MOVE_KEYS, MOVE_LIBRARY, makeMove, type MoveKey } from "./moves";
 export { defaultRiggedRecipe } from "./examples";
+export { beatPathBase, clipBeats, BEAT_PATH_RIG, GLIDER_CHARACTER } from "./beat-path";
 export { LOOP_CLIPS, RIGGED_CHARACTER } from "./clip-library";
 export { ACCENT_KEYS, isAccentKey, type AccentKey } from "./accents";
 
@@ -23,6 +24,7 @@ export { frameAt, poseSpeed } from "./perform";
 export type { FrameState, ClipLayer, ActivePhase } from "./engine";
 export { POSES, JOINTS, mixPoses, scalePose, type Pose, type PoseName, type JointName, type Euler3 } from "./poses";
 export { rootAt, travelRange, travelStations } from "./root-travel";
+export { cornerPath, polylineSpline } from "./corners";
 export { exportFrameCount } from "./bundle";
 
 // Beats, audio analysis and onsets (kicks, snares, hats, peaks).
@@ -37,6 +39,7 @@ export { applyMotionCommand, applyCommands, commandHelp, type MotionCommand, typ
 // The shot script and the timeline as text.
 export { printScript, cameraWords } from "./shot-script";
 export { applyScript, parseRows } from "./script-apply";
+export { ACTION_WORDS, CAMERA_WORDS } from "./shot-script";
 export { describeRecipe } from "./describe";
 
 // Camera rig: shots, programmed moves, beat locks, automation lanes, the per-frame plan.

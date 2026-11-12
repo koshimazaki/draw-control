@@ -7,10 +7,21 @@ export async function loadTrack(file: File): Promise<Track> {
   if (file.size > 150 * 1024 * 1024) throw new Error("Keep the track below 150 MB.");
   const ctx = new AudioContext();
   try {
-    const buffer = await ctx.decodeAudioData(await file.arrayBuffer());
-    const channels = Array.from({ length: buffer.numberOfChannels }, (_, i) => buffer.getChannelData(i));
-    return { name: file.name, buffer, features: analyseSamples(channels, buffer.sampleRate), wave: waveformMinMax(channels, buffer.sampleRate) };
+    return trackFromBuffer(file.name, await ctx.decodeAudioData(await file.arrayBuffer()));
   } finally { await ctx.close().catch(() => {}); }
+}
+
+/** Analyse a decoded buffer into a track. */
+export function trackFromBuffer(name: string, buffer: AudioBuffer): Track {
+  const channels = Array.from({ length: buffer.numberOfChannels }, (_, i) => buffer.getChannelData(i));
+  return { name, buffer, features: analyseSamples(channels, buffer.sampleRate), wave: waveformMinMax(channels, buffer.sampleRate) };
+}
+
+/** A track from raw samples (a generated one): no decoding, no audio context, no user gesture needed. */
+export function trackFromSamples(name: string, channels: Float32Array[], sampleRate: number): Track {
+  const buffer = new AudioBuffer({ length: channels[0].length, numberOfChannels: channels.length, sampleRate });
+  channels.forEach((c, i) => buffer.copyToChannel(c as Float32Array<ArrayBuffer>, i));
+  return trackFromBuffer(name, buffer);
 }
 
 /** Plays a track from a time; `position()` is the transport clock while playing. */

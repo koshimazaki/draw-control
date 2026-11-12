@@ -1,0 +1,6 @@
+# Beat Path example: a character running and leaping. The rise in the path's heights is the leap.
+# prompt: A parkour runner sprints along a rooftop and leaps across a gap, filmed from the side; the orange figure is the runner, white marks the way it faces, its rise is the leap.
+# clip: 8 s · figure: glider · Beat Path
+beats 0-1   | action: rest | camera: follow side lock kick 1 punch 0.9m | shot: wide
+beats 1-14  | action: walk on path (-7,0) (-3,0.3) (-0.8,0,1.2) (1.5,-0.2) (6,0) corners 1 lock kick 1 | camera: continue
+beats 14-17 | action: rest, jump @beat 15.5 | camera: push in to 2.6m lock kick 1 punch 0.9m | shot: wide

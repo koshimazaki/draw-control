@@ -5,7 +5,7 @@
 import {
   LOOP_CLIPS, RIGGED_CHARACTER, defaultRiggedRecipe, riggedMove, clearIncompatibleMoves, clipCycleBeatsFor, exportFrameCount, frameAt, incompatibleMoves, insertMove,
   makeClipMove, printScript, beatsToFrames, blendBeatsOf, removeMove, swapMove, setMoveBlend, validateRecipe, MOVE_KEYS, MOVE_LIBRARY, buildDrive, flatDrive, planCamera, applyMotionCommand, blockSpan,
-  type AudioDrive, type CharacterKind, type CommandContext, type Expression, type MotionCommand, type MoveKey, type PreviewFps, type Recipe,
+  encodeWav, type AudioDrive, type CharacterKind, type CommandContext, type Expression, type MotionCommand, type MoveKey, type PreviewFps, type Recipe,
 } from "@motion-studio/core/internal";
 import { createProceduralCharacter } from "./characters/rig";
 import { loadRiggedCharacter, type RiggedCharacter } from "./characters/rigged";
@@ -13,7 +13,7 @@ import { loadFileCharacter } from "./characters/file-character";
 import type { Character } from "./characters/types";
 import { Player, loadTrack, type Track } from "./audio";
 import { Timeline } from "./timeline/timeline";
-import { loadDemo } from "./demo";
+import { DEMO_LICENCE, DEMO_TRACK_NAME, demoDrums, loadDemo } from "./demo";
 import { TIMELINE_HEIGHT, laneTop } from "./timeline/draw";
 import { computePoseSpeed } from "./timeline/pose-speed";
 import { bindExport } from "./export/button";
@@ -25,9 +25,9 @@ import { Viewport } from "./viewport";
 import { History, bindUndo, sameRecipe } from "./history";
 import { bindSequencePanel } from "./sequence-panel";
 import { bindMixamo, importedMove } from "./app-mixamo";
-import { parseSequenceFile } from "./sequence-library";
+import { browserStore, parseSequenceFile, readLibrary } from "./sequence-library";
 
-const PROCEDURAL_NAMES: Partial<Record<CharacterKind, string>> = { mannequin: "Procedural mannequin", block: "Block figure", stick: "Stick figure", blob: "Capsule figure" };
+const PROCEDURAL_NAMES: Partial<Record<CharacterKind, string>> = { mannequin: "Procedural mannequin", block: "Block figure", stick: "Stick figure", blob: "Capsule figure", glider: "Glider (pyramid and sphere)" };
 
 export function startApp(root: HTMLElement) {
   root.innerHTML = LAYOUT;
@@ -447,6 +447,18 @@ export function startApp(root: HTMLElement) {
   render();
   requestAnimationFrame(tick);
   window.addEventListener("resize", () => render());
+  openSequenceFromUrl();
+  /** `?sequence=<name>` (the Beat Path page's "Full studio" link): load that saved sequence, with the demo track if it names it. */
+  function openSequenceFromUrl() {
+    const name = new URLSearchParams(location.search).get("sequence");
+    const entry = name ? readLibrary(browserStore()).find(e => e.name === name) : undefined;
+    if (!entry) return;
+    const load = () => { edit(() => entry.recipe); if (recipe.camera) { viewport.setView("rig"); markView("rig"); render(); } };
+    if (entry.recipe.audio?.name !== DEMO_TRACK_NAME) { load(); return; }
+    const d = demoDrums();
+    input("audioLicence").value = DEMO_LICENCE;
+    void useTrack(new File([encodeWav([d.samples], d.sampleRate, 0, d.seconds) as BlobPart], DEMO_TRACK_NAME, { type: "audio/wav" })).then(load);
+  }
   if (import.meta.env.DEV) {
     // Dev-only probe for the smoke script: the live recipe, the analysed bands and the lane geometry.
     (window as unknown as { __msFrame: unknown }).__msFrame = (n: number) => { const f = frameAt(recipe, n, drive); return { amplitude: f.amplitude, envelope: f.envelope, root: f.root }; };

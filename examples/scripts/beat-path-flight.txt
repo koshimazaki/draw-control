@@ -1,0 +1,4 @@
+# Beat Path example: something flying. The path climbs and dives; the camera flies its own arc.
+# prompt: A white seagull glides low over the sea, climbs and banks into a dive, the camera sweeping past; the orange figure is the bird, white marks its head.
+# clip: 8 s · figure: glider · Beat Path
+beats 0-17 | action: walk on path (-6,3,1.2) (-2,-1,2.6) (2,1.5,3) (6,-2,1.5) corners 1 lock beat 0.6 | camera: path (-7,7,2.4) (-1,9,3.6) (5,7.5,3.2) (8,2,2.4) corners 1 lock beat 0.6 hold | shot: -

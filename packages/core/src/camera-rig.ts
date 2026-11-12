@@ -19,6 +19,8 @@ import { CAMERA_MAX_HEIGHT, FOLLOW_ANGLES, modesAt, type CameraConfig, type Came
 import type { Recipe } from "./recipe";
 import { buildSpline } from "./spline";
 import { subjectAt } from "./subject";
+import { rootAt } from "./root-travel";
+import { cornerPath, polylineSpline } from "./corners";
 import { programCamera, type ProgrammedCamera } from "./camera-shots";
 import { inLane, laneAt } from "./automation";
 
@@ -150,6 +152,12 @@ export function planCamera(recipe: Recipe, drive?: AudioDrive, frames = 0): Came
     ch.cx[n] = cx; ch.cz[n] = cz;
   }
 
+  // Follow height: the camera rises and aims with the subject's height (a figure in flight stays framed).
+  if (config.followHeight) for (let n = 0; n < total; n++) {
+    const y = rootAt(recipe, beatAtSeconds(g, n * dt), drive).y;
+    ch.height[n] += y; ch.aimY[n] += y;
+  }
+
   // Beat accents: a push and a yaw nudge on every beat, larger on downbeats, scaled by energy.
   const accents: CameraAccent[] = [];
   const push = new Float64Array(total);
@@ -192,7 +200,7 @@ export function planCamera(recipe: Recipe, drive?: AudioDrive, frames = 0): Came
     for (let n = 0; n < total; n++) {
       const on = modesAt(config, beatAtSeconds(g, n * dt)).includes("path");
       rate = slew(rate, on ? speedFactor(config.intensity, energyAtFrame(drive, n)) : 0, 2 * dt);
-      cum += rate * dt;
+      cum += rate * (1 - prog.gate[n]) * dt;   // a locked hold on a path block stops it on each hit
       cums[n] = cum;
       w = slew(w, on ? 1 : 0, 1.2 * dt);
       pathW[n] = w;
@@ -202,7 +210,7 @@ export function planCamera(recipe: Recipe, drive?: AudioDrive, frames = 0): Came
     const end = cums[Math.min(total - 1, Math.round(secondsAtBeat(g, lastBeat) * fps))] || cum;
     for (let n = 0; n < total; n++) pathS[n] = end > 0 ? Math.min(1, cums[n] / end) : 0;
   }
-  const spline = usesPath ? buildSpline(config.path!) : null;
+  const spline = !usesPath ? null : config.corners !== undefined ? polylineSpline(cornerPath(config.path!, config.corners).map(p => ({ x: p.x, y: p.y ?? 0, z: p.z }))) : buildSpline(config.path!);
   const samples: CameraSample[] = new Array(total);
   // Top and fixed fade in and out over about half a second, so switching never cuts.
   let topW = 0, fixW = 0, anchor: Vec3 | null = null, heightClamped = 0;
@@ -235,7 +243,8 @@ export function planCamera(recipe: Recipe, drive?: AudioDrive, frames = 0): Came
     if (spline && pathW[n] > 0) {
       const p = spline.at(pathS[n]);
       const dir = [target[0] - p[0], target[1] - p[1], target[2] - p[2]], len = Math.hypot(dir[0], dir[1], dir[2]) || 1;
-      const q: Vec3 = [p[0] + dir[0] / len * push[n], p[1] + dir[1] / len * push[n], p[2] + dir[2] / len * push[n]];
+      const along = push[n] + prog.punch[n];   // accents, and a locked punch-in, push along the view
+      const q: Vec3 = [p[0] + dir[0] / len * along, p[1] + dir[1] / len * along, p[2] + dir[2] / len * along];
       const w = 0.5 - 0.5 * Math.cos(Math.PI * pathW[n]);
       position = [position[0] + (q[0] - position[0]) * w, position[1] + (q[1] - position[1]) * w, position[2] + (q[2] - position[2]) * w];
       // Keep the channels describing the camera actually used (LTX suggestion, tests).

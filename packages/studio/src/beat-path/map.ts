@@ -1,0 +1,292 @@
+/**
+ * The map, a canvas in two views of one path at a time:
+ * - top (x, z, the studio's top view: x right, z towards the viewer): a pen; drag to draw a
+ *   freehand stroke (simplified to a few points), click to place a point; drag a point to
+ *   move it, double-click a point to remove it, Escape cancels a stroke;
+ * - side (distance along the active path, height): drag a point up or down to shape height.
+ * It shows the subject's travel and its lock stations, the camera's trail, both paths with
+ * their corner rounding, and live markers for the subject (facing) and the camera (view cone).
+ */
+import { cornerPath } from "@motion-studio/core";
+import type { PathPt } from "./script";
+
+export type Tool = "subject" | "camera";
+export type View = "top" | "side";
+export type MapScene = {
+  floor: { x: number; z: number }[];
+  stations: { x: number; z: number; dx: number; dz: number }[];
+  trail: { x: number; z: number }[] | null;
+};
+export type MapHost = {
+  tool(): Tool;
+  view(): View;
+  points(tool: Tool): PathPt[];
+  corners(tool: Tool): number;
+  change(tool: Tool, points: PathPt[], final: boolean): void;
+};
+type Live = { subject?: { x: number; z: number; yaw: number }; camera?: { x: number; z: number; tx: number; tz: number; fov: number } };
+
+const HALF = 9, LIMIT = 14, MAX_POINTS = 8, HIT_PX = 12;
+const HEIGHT = { subject: [0, 3], camera: [0.2, 6] } as const;
+const DEFAULT_Y = { subject: 0, camera: 2 } as const;
+
+/** Ramer–Douglas–Peucker on the floor, the tolerance raised until at most `max` points are left. */
+export function simplifyPen(points: PathPt[], max = MAX_POINTS): PathPt[] {
+  if (points.length <= 2) return points;
+  const off = (p: PathPt, a: PathPt, b: PathPt) => {
+    const dx = b.x - a.x, dz = b.z - a.z, L = dx * dx + dz * dz, t = L ? Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.z - a.z) * dz) / L)) : 0;
+    return Math.hypot(p.x - a.x - t * dx, p.z - a.z - t * dz);
+  };
+  for (let tol = 0.15; ; tol *= 1.5) {
+    const keep = new Uint8Array(points.length);
+    keep[0] = keep[points.length - 1] = 1;
+    const stack: [number, number][] = [[0, points.length - 1]];
+    while (stack.length) {
+      const [a, b] = stack.pop()!;
+      let worst = -1, wd = tol;
+      for (let i = a + 1; i < b; i++) { const d = off(points[i], points[a], points[b]); if (d > wd) { wd = d; worst = i; } }
+      if (worst >= 0) { keep[worst] = 1; stack.push([a, worst], [worst, b]); }
+    }
+    const out = points.filter((_, i) => keep[i]);
+    if (out.length <= max) return out;
+  }
+}
+
+const token = (name: string) => getComputedStyle(document.documentElement).getPropertyValue(name).trim() || "#888";
+const r2 = (x: number) => Math.round(x * 100) / 100;
+
+export class MapView {
+  private ctx: CanvasRenderingContext2D;
+  private base = document.createElement("canvas");
+  private scene: MapScene = { floor: [], stations: [], trail: null };
+  private live: Live = {};
+  private stroke: PathPt[] | null = null;
+  private cancel: (() => void) | null = null;
+  private w = 1; private h = 1; private dpr = 1; private scale = 1;
+  private colours: Record<string, string> = {};
+
+  constructor(readonly canvas: HTMLCanvasElement, private host: MapHost) {
+    this.ctx = canvas.getContext("2d")!;
+    new ResizeObserver(() => this.resize()).observe(canvas);
+    canvas.addEventListener("pointerdown", e => this.down(e));
+    canvas.addEventListener("pointermove", e => { if (!e.buttons) canvas.classList.toggle("over-point", this.pick(e) >= 0); });
+    canvas.addEventListener("dblclick", e => this.remove(e));
+    canvas.addEventListener("contextmenu", e => e.preventDefault());
+    this.retheme();
+  }
+
+  /** Re-read the theme's colours. */
+  retheme() {
+    for (const k of ["map-bg", "map-minor", "map-major", "map-axis", "map-text", "subject", "camera", "station", "text", "bg"]) this.colours[k] = token(`--${k}`);
+    this.resize();
+  }
+  /** Escape: cancel the stroke or drag in progress. */
+  cancelStroke() { this.cancel?.(); }
+  get busy() { return !!this.cancel; }
+
+  // Top view: metres to pixels.
+  private top(p: { x: number; z: number }): [number, number] { return [this.w / 2 + p.x * this.scale, this.h / 2 + p.z * this.scale]; }
+  private fromTop(px: number, py: number): PathPt { return { x: (px - this.w / 2) / this.scale, z: (py - this.h / 2) / this.scale }; }
+  /** Side view: the active path's distance along it (s) and height to pixels. */
+  private sideFrame() {
+    const tool = this.host.tool(), pts = this.host.points(tool), cum = [0];
+    for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot(pts[i].x - pts[i - 1].x, pts[i].z - pts[i - 1].z));
+    const L = Math.max(1, cum[cum.length - 1]), [, ymax] = HEIGHT[tool], pad = 44;
+    const sx = (this.w - 2 * pad) / L, sy = (this.h - 2 * pad) / (ymax + 0.5);
+    return { pts, cum, L, pad, sx, sy, ymax, at: (s: number, y: number): [number, number] => [pad + s * sx, this.h - pad - y * sy], yAt: (py: number) => (this.h - pad - py) / sy };
+  }
+  /** Client coordinates of a point in the current view (for the smoke test). */
+  clientAt(p: PathPt): { x: number; y: number } { const r = this.canvas.getBoundingClientRect(), [x, y] = this.top(p); return { x: r.left + x, y: r.top + y }; }
+
+  setScene(scene: MapScene) { this.scene = scene; this.paintBase(); this.draw(); }
+  setLive(live: Live) { this.live = live; this.draw(); }
+  refresh() { this.paintBase(); this.draw(); }
+
+  private resize() {
+    const r = this.canvas.getBoundingClientRect();
+    this.dpr = Math.min(2, window.devicePixelRatio || 1);
+    this.w = Math.max(1, r.width); this.h = Math.max(1, r.height);
+    this.scale = Math.min(this.w, this.h) / (2 * HALF);
+    for (const c of [this.canvas, this.base]) { c.width = Math.round(this.w * this.dpr); c.height = Math.round(this.h * this.dpr); }
+    this.refresh();
+  }
+
+  private local(e: MouseEvent): [number, number] { const r = this.canvas.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
+  private screenOf(i: number): [number, number] {
+    const pts = this.host.points(this.host.tool());
+    if (this.host.view() === "top") return this.top(pts[i]);
+    const f = this.sideFrame();
+    return f.at(f.cum[i], pts[i].y ?? 0);
+  }
+  private pick(e: MouseEvent): number {
+    const [px, py] = this.local(e), n = this.host.points(this.host.tool()).length;
+    let best = -1, bestD = HIT_PX;
+    for (let i = 0; i < n; i++) { const [x, y] = this.screenOf(i), d = Math.hypot(x - px, y - py); if (d < bestD) { best = i; bestD = d; } }
+    return best;
+  }
+  private clamp(p: PathPt): PathPt { return { ...p, x: Math.max(-LIMIT, Math.min(LIMIT, p.x)), z: Math.max(-LIMIT, Math.min(LIMIT, p.z)) }; }
+
+  private remove(e: MouseEvent) {
+    const i = this.pick(e), tool = this.host.tool();
+    if (i < 0 || this.host.view() !== "top") return;
+    this.host.change(tool, this.host.points(tool).filter((_, k) => k !== i), true);
+  }
+
+  private down(e: PointerEvent) {
+    if (e.button !== 0 || e.detail > 1) return;
+    e.preventDefault();
+    const tool = this.host.tool(), view = this.host.view(), i = this.pick(e), c = this.canvas;
+    const start = this.local(e), original = this.host.points(tool).map(p => ({ ...p }));
+    let move: (ev: PointerEvent) => void, up: (ev: PointerEvent) => void, revert: () => void;
+    if (i >= 0) {
+      const pts = original.map(p => ({ ...p }));
+      c.classList.add("dragging");
+      move = ev => {
+        const [px, py] = this.local(ev);
+        if (view === "top") { const q = this.clamp(this.fromTop(px, py)); pts[i] = { ...pts[i], x: r2(q.x), z: r2(q.z) }; }
+        else { const [lo, hi] = HEIGHT[tool], y = r2(Math.max(lo, Math.min(hi, this.sideFrame().yAt(py)))); pts[i] = { ...pts[i], ...(y > 0 ? { y } : { y: undefined }) }; if (pts[i].y === undefined) delete pts[i].y; }
+        this.host.change(tool, pts.map(p => ({ ...p })), false);
+      };
+      up = () => this.host.change(tool, pts, true);
+      revert = () => this.host.change(tool, original, true);
+    } else {
+      if (view !== "top") return;
+      const y = original.at(-1)?.y ?? (DEFAULT_Y[tool] || undefined);
+      const first = this.clamp(this.fromTop(...start)), stroke = [first];
+      let drawing = false;
+      move = ev => {
+        const [px, py] = this.local(ev);
+        if (!drawing && Math.hypot(px - start[0], py - start[1]) < 5) return;
+        drawing = true;
+        const p = this.clamp(this.fromTop(px, py)), last = stroke[stroke.length - 1];
+        if (Math.hypot(p.x - last.x, p.z - last.z) > 0.08) { stroke.push(p); this.stroke = stroke; this.draw(); }
+      };
+      up = () => {
+        this.stroke = null;
+        const withY = (p: PathPt): PathPt => ({ x: r2(p.x), z: r2(p.z), ...(y ? { y } : {}) });
+        let length = 0;
+        for (let k = 1; k < stroke.length; k++) length += Math.hypot(stroke[k].x - stroke[k - 1].x, stroke[k].z - stroke[k - 1].z);
+        if (drawing && length > 0.6) this.host.change(tool, simplifyPen(stroke).map(withY), true);
+        else if (!drawing) this.host.change(tool, [...original, withY(first)].slice(-MAX_POINTS * 2), true);   // a click places a point
+        this.draw();
+      };
+      revert = () => { this.stroke = null; this.draw(); };
+    }
+    c.setPointerCapture(e.pointerId);
+    const onMove = (ev: PointerEvent) => move(ev);
+    const done = (ev: PointerEvent | null) => {
+      c.removeEventListener("pointermove", onMove); c.removeEventListener("pointerup", onUp); c.removeEventListener("pointercancel", onCancel);
+      c.classList.remove("dragging");
+      this.cancel = null;
+      if (ev) up(ev); else revert();
+    };
+    const onUp = (ev: PointerEvent) => done(ev), onCancel = () => done(null);
+    this.cancel = () => done(null);
+    c.addEventListener("pointermove", onMove);
+    c.addEventListener("pointerup", onUp);
+    c.addEventListener("pointercancel", onCancel);
+  }
+
+  private line(g: CanvasRenderingContext2D, pts: [number, number][], colour: string, width: number, alpha = 1, dash: number[] = []) {
+    if (pts.length < 2) return;
+    g.save();
+    g.globalAlpha = alpha; g.strokeStyle = colour; g.lineWidth = width; g.lineJoin = "round"; g.lineCap = "round"; g.setLineDash(dash);
+    g.beginPath();
+    pts.forEach(([x, y], k) => (k ? g.lineTo(x, y) : g.moveTo(x, y)));
+    g.stroke();
+    g.restore();
+  }
+  private handles(g: CanvasRenderingContext2D, pts: [number, number][], colour: string, active: boolean) {
+    for (const [x, y] of pts) {
+      g.beginPath(); g.arc(x, y, active ? 5.5 : 3, 0, Math.PI * 2);
+      g.fillStyle = active ? colour : this.colours["map-bg"]; g.fill();
+      g.lineWidth = active ? 2 : 1.4; g.strokeStyle = active ? this.colours["map-bg"] : colour; g.stroke();
+    }
+  }
+
+  private paintBase() {
+    const g = this.base.getContext("2d")!, C = this.colours;
+    g.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    g.fillStyle = C["map-bg"]; g.fillRect(0, 0, this.w, this.h);
+    if (this.host.view() === "side") { this.paintSide(g); return; }
+    const ext = Math.ceil(Math.max(this.w, this.h) / 2 / this.scale);
+    for (let m = -ext; m <= ext; m++) {
+      g.strokeStyle = m === 0 ? C["map-axis"] : m % 4 === 0 ? C["map-major"] : C["map-minor"];
+      g.lineWidth = 1;
+      const [x] = this.top({ x: m, z: 0 }), [, y] = this.top({ x: 0, z: m });
+      g.beginPath(); g.moveTo(Math.round(x) + 0.5, 0); g.lineTo(Math.round(x) + 0.5, this.h); g.stroke();
+      g.beginPath(); g.moveTo(0, Math.round(y) + 0.5); g.lineTo(this.w, Math.round(y) + 0.5); g.stroke();
+    }
+    g.fillStyle = C["map-text"]; g.font = "10px ui-monospace, Menlo, monospace";
+    for (let m = -8; m <= 8; m += 4) if (m) { const [x, y] = this.top({ x: m, z: 0 }); g.fillText(`${m} m`, x + 3, y - 4); }
+    const s = this.scene, tool = this.host.tool();
+    if (s.trail) this.line(g, s.trail.map(p => this.top(p)), C.camera, 1.6, 0.5);
+    this.line(g, s.floor.map(p => this.top(p)), C.subject, 3.2);
+    g.strokeStyle = C.station; g.lineWidth = 2.4; g.lineCap = "round";
+    for (const st of s.stations) {
+      const [x, y] = this.top(st), len = Math.hypot(st.dx, st.dz) || 1, nx = -st.dz / len * 7, ny = st.dx / len * 7;
+      g.beginPath(); g.moveTo(x - nx, y - ny); g.lineTo(x + nx, y + ny); g.stroke();
+    }
+    for (const t of ["camera", "subject"] as const) {
+      const pts = this.host.points(t), active = t === tool, colour = t === "camera" ? C.camera : C.subject;
+      if (t === "camera" && pts.length >= 2) this.line(g, cornerPath(pts, this.host.corners(t)).map(p => this.top(p)), colour, 2, active ? 0.9 : 0.45);
+      if (active && pts.length >= 2) this.line(g, pts.map(p => this.top(p)), colour, 1, 0.35, [3, 4]);
+      this.handles(g, pts.map(p => this.top(p)), colour, active);
+    }
+  }
+
+  /** Side view: the active path unrolled, its heights against distance along it. */
+  private paintSide(g: CanvasRenderingContext2D) {
+    const C = this.colours, tool = this.host.tool(), f = this.sideFrame(), colour = tool === "camera" ? C.camera : C.subject;
+    g.lineWidth = 1; g.font = "10px ui-monospace, Menlo, monospace"; g.fillStyle = C["map-text"];
+    for (let y = 0; y <= f.ymax; y++) {
+      const [, py] = f.at(0, y);
+      g.strokeStyle = y === 0 ? C["map-axis"] : C["map-minor"];
+      g.beginPath(); g.moveTo(f.pad - 8, Math.round(py) + 0.5); g.lineTo(this.w - f.pad + 8, Math.round(py) + 0.5); g.stroke();
+      g.fillText(`${y} m`, 8, py + 3);
+    }
+    for (let s = 0; s <= f.L; s++) { const [px] = f.at(s, 0); g.strokeStyle = C["map-minor"]; g.beginPath(); g.moveTo(Math.round(px) + 0.5, f.pad); g.lineTo(Math.round(px) + 0.5, this.h - f.pad); g.stroke(); }
+    g.fillText(`along the ${tool} path · ${f.L.toFixed(1)} m`, f.pad, this.h - 16);
+    if (f.pts.length < 2) return;
+    // The rounded path's heights against its distance, scaled to the control polygon's length.
+    const dense = cornerPath(f.pts, this.host.corners(tool)), dc = [0];
+    for (let i = 1; i < dense.length; i++) dc.push(dc[i - 1] + Math.hypot(dense[i].x - dense[i - 1].x, dense[i].z - dense[i - 1].z));
+    const k = f.L / Math.max(1e-6, dc[dc.length - 1]);
+    const curve = dense.map((p, i) => f.at(dc[i] * k, p.y ?? 0));
+    g.save(); g.globalAlpha = 0.12; g.fillStyle = colour; g.beginPath(); g.moveTo(curve[0][0], f.at(0, 0)[1]);
+    for (const [x, y] of curve) g.lineTo(x, y);
+    g.lineTo(curve[curve.length - 1][0], f.at(0, 0)[1]); g.closePath(); g.fill(); g.restore();
+    this.line(g, curve, colour, 3);
+    for (let i = 0; i < f.pts.length; i++) { const [x, y] = f.at(f.cum[i], f.pts[i].y ?? 0); this.line(g, [[x, f.at(0, 0)[1]], [x, y]], colour, 1, 0.35, [2, 3]); }
+    this.handles(g, f.pts.map((p, i) => f.at(f.cum[i], p.y ?? 0)), colour, true);
+  }
+
+  draw() {
+    const g = this.ctx, C = this.colours;
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.drawImage(this.base, 0, 0);
+    g.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    if (this.host.view() !== "top") return;
+    const cam = this.live.camera;
+    if (cam) {
+      const [x, y] = this.top(cam), a = Math.atan2(cam.tz - cam.z, cam.tx - cam.x), half = cam.fov * 16 / 9 * Math.PI / 360, r = 46;
+      g.save(); g.globalAlpha = 0.16; g.fillStyle = C.camera;
+      g.beginPath(); g.moveTo(x, y); g.arc(x, y, r, a - half, a + half); g.closePath(); g.fill();
+      g.globalAlpha = 0.8; g.strokeStyle = C.camera; g.lineWidth = 1.2; g.stroke(); g.restore();
+      g.fillStyle = C.camera; g.beginPath(); g.arc(x, y, 4.5, 0, Math.PI * 2); g.fill();
+    }
+    const sub = this.live.subject;
+    if (sub) {
+      const [x, y] = this.top(sub), fx = Math.sin(sub.yaw), fz = Math.cos(sub.yaw);
+      g.save(); g.globalAlpha = 0.2; g.fillStyle = C.subject; g.beginPath(); g.arc(x, y, 15, 0, Math.PI * 2); g.fill(); g.restore();
+      g.fillStyle = C.subject; g.strokeStyle = C["map-bg"]; g.lineWidth = 1.5;
+      g.beginPath();
+      g.moveTo(x + fx * 11, y + fz * 11);
+      g.lineTo(x - fx * 6 + fz * 7, y - fz * 6 - fx * 7);
+      g.lineTo(x - fx * 3, y - fz * 3);
+      g.lineTo(x - fx * 6 - fz * 7, y - fz * 6 + fx * 7);
+      g.closePath(); g.fill(); g.stroke();
+    }
+    if (this.stroke) this.line(g, this.stroke.map(p => this.top(p)), this.host.tool() === "camera" ? C.camera : C.subject, 2.5, 0.9, [6, 5]);
+  }
+}

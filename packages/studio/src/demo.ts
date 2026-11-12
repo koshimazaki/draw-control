@@ -18,9 +18,15 @@ export type DemoHost = {
   setLicence(text: string): void;
 };
 
-export async function loadDemo(host: DemoHost) {
+/** The demo drum track's samples: 8 bars at 120 BPM, first hit at 0.1 s, mono at 44.1 kHz. */
+export function demoDrums(): { samples: Float32Array; sampleRate: number; seconds: number } {
   const seconds = 0.1 + 8 * 4 * 60 / 120 + 0.5;
-  const wav = encodeWav([synthDrums(patternTimes(120, 8, 0.1), seconds)], 44100, 0, seconds);
+  return { samples: synthDrums(patternTimes(120, 8, 0.1), seconds), sampleRate: 44100, seconds };
+}
+
+export async function loadDemo(host: DemoHost) {
+  const { samples, sampleRate, seconds } = demoDrums();
+  const wav = encodeWav([samples], sampleRate, 0, seconds);
   host.setLicence(DEMO_LICENCE);
   await host.useTrack(new File([wav as BlobPart], DEMO_TRACK_NAME, { type: "audio/wav" }));
   host.fitToTrack();

@@ -1,0 +1,7 @@
+# Beat Path example: a car on a road with a bend. The glider is the car; the path is the road.
+# prompt: A red sports car drives a coastal road and takes the bend, filmed from behind and then alongside; the orange figure is the car, its white nose is the front, the grey grid is the road.
+# clip: 8 s · figure: glider · Beat Path
+beats 0-1   | action: rest | camera: follow behind lock kick 1 hold | shot: wide
+beats 1-9   | action: walk on path (-6,5) (-1.5,5) (2.5,2.5) (3.5,-2) (1,-6) corners 0.8 lock kick 1 | camera: continue
+beats 9-15  | action: continue | camera: follow side lock kick 1 hold | shot: wide
+beats 15-17 | action: rest | camera: continue

@@ -28,5 +28,9 @@ function localMixamo(): Plugin {
 export default defineConfig({
   plugins: [localMixamo()],
   server: { host: "127.0.0.1", port: 5180 },
-  build: { target: "es2022", chunkSizeWarningLimit: 1200 },
+  build: {
+    target: "es2022", chunkSizeWarningLimit: 1200,
+    // Two pages: the studio (index.html) and Beat Path (path.html).
+    rollupOptions: { input: { main: fileURLToPath(new URL("./index.html", import.meta.url)), path: fileURLToPath(new URL("./path.html", import.meta.url)) } },
+  },
 });

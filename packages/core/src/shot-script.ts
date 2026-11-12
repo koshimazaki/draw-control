@@ -95,7 +95,7 @@ export function thinPath<T extends P3>(pts: readonly T[], cap = MAX_PRINTED_PATH
 }
 
 /** One camera block as words; `path` prints the camera path's points after the path mode. */
-export function cameraWords(s: CameraSegment, path?: readonly { x: number; y: number; z: number }[]): string {
+export function cameraWords(s: CameraSegment, path?: readonly { x: number; y: number; z: number }[], corners?: number): string {
   const part = (m: CameraMode): string => {
     switch (m) {
       case "orbit": return s.amount !== undefined ? `orbit ${fmt(s.amount)}` : "orbit";
@@ -108,7 +108,7 @@ export function cameraWords(s: CameraSegment, path?: readonly { x: number; y: nu
         if (s.amount !== undefined) return `jib ${s.amount < 0 ? "down" : "up"} ${metres(Math.abs(s.amount))}`;
         return "rise";
       case "threeQuarter": return "three-quarter";
-      case "path": return path ? `path ${pointWords(path)}` : "path";
+      case "path": return path ? `path ${pointWords(path)}${corners !== undefined ? ` corners ${fmt(corners)}` : ""}` : "path";
       default: return m;
     }
   };
@@ -142,7 +142,8 @@ function actionBlocks(r: Recipe): ActionBlock[] {
   // A thinned (drawn) path prints to the centimetre; once applied it fits and prints as stored.
   const thin = thinPath(moving), r2 = (x: number) => Math.round(x * 100) / 100;
   const shown = thin.length < moving.length ? thin.map(p => ({ x: r2(p.x), z: r2(p.z), ...(p.y !== undefined ? { y: r2(p.y) } : {}) })) : thin;
-  const pts = moving.length ? ` ${pointWords(shown)}` : "";
+  // A path given with corner rounding prints as given, with its corners word.
+  const pts = r.rootShape && moving.length ? ` ${pointWords(r.rootShape.points)} corners ${fmt(r.rootShape.corners)}` : moving.length ? ` ${pointWords(shown)}` : "";
   const out: ActionBlock[] = [];
   let cursor = 0;
   const rest = (to: number) => { if (to > cursor + 1e-6) out.push({ from: cursor, to, words: onPath({ from: cursor, to }) ? `glide on path${pts}${lockWords(r.travelLock)}` : "rest" }); };
@@ -168,7 +169,7 @@ function cameraBlocks(r: Recipe): CameraBlock[] {
     gap(s.fromBeat);
     const withPath = !pathPrinted && s.modes.includes("path") ? r.camera!.path : undefined;
     if (withPath) pathPrinted = true;
-    out.push({ from: s.fromBeat, to: s.toBeat, words: cameraWords(s, withPath), shot: s.shot ? `${s.shot}${s.cut ? " cut" : ""}` : "-" });
+    out.push({ from: s.fromBeat, to: s.toBeat, words: cameraWords(s, withPath, withPath ? r.camera!.corners : undefined), shot: s.shot ? `${s.shot}${s.cut ? " cut" : ""}` : "-" });
     cursor = s.toBeat;
   }
   if (r.camera) gap(r.durationBeats);

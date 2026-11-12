@@ -42,6 +42,8 @@ export { rootAt, travelRange, travelStations } from "./root-travel";
 export * from "./camera-shots";
 export * from "./camera-block-edits";
 export * from "./shot-script";
+export * from "./corners";
+export * from "./beat-path";
 export { applyScript, parseRows } from "./script-apply";
 export { CAMERA_LANES, LANE_SPECS, inLane, isCameraLane, laneAt, type CameraLane, type LaneSpec } from "./automation";
 export * from "./drum-synth";

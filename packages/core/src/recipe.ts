@@ -25,8 +25,10 @@ export type Expression = (typeof EXPRESSIONS)[number];
  * "rigged" is the bundled rigged mannequin (clip-driven); "mannequin" the procedural fallback.
  * "block", "stick" (lines and joint dots) and "blob" (capsules, no visible joints) are more
  * abstract procedural figures on the same skeleton, for testing which a video model follows.
+ * "glider" is an abstract figure with no limbs (a pyramid with a sphere floating above it,
+ * the front face marked): it travels and faces along the walk path and ignores poses.
  */
-export const CHARACTER_KINDS = ["mannequin", "block", "stick", "blob", "file", "rigged"] as const;
+export const CHARACTER_KINDS = ["mannequin", "block", "stick", "blob", "file", "rigged", "glider"] as const;
 /** The procedural figures: they play the recipe's poses (library moves), not clips. */
 export const PROCEDURAL_KINDS = ["mannequin", "block", "stick", "blob"] as const;
 export type CharacterKind = (typeof CHARACTER_KINDS)[number];
@@ -98,7 +100,14 @@ export type Recipe = {
   envelope?: Envelope;
   /** Beat lock on the travel along the walk path (root-travel.ts): stations on each locked hit. */
   travelLock?: BeatLock;
+  /**
+   * The walk path as given point by point with its corner rounding (corners.ts): `rootPath`
+   * is built from it, and the shot script prints these points and `corners N`. Set by
+   * setRootPath with `corners`; any other walk path edit removes it.
+   */
+  rootShape?: RootShape;
 };
+export type RootShape = { corners: number; points: { x: number; z: number; y?: number }[] };
 
 export { RecipeError };
 
@@ -169,7 +178,7 @@ function validateMove(input: unknown, where: string, durationBeats: number): Mov
 /** Strict validation for agent-supplied JSON and imported recipes. Returns a fresh copy. */
 export function validateRecipe(input: unknown): Recipe {
   if (!isObject(input)) return fail("expected an object");
-  only(input, ["version", "fps", "durationBeats", "beatGrid", "character", "energy", "moves", "rootPath", "jumps", "audio", "camera", "reactive", "steps", "energyCurve", "envelope", "travelLock"], "recipe");
+  only(input, ["version", "fps", "durationBeats", "beatGrid", "character", "energy", "moves", "rootPath", "jumps", "audio", "camera", "reactive", "steps", "energyCurve", "envelope", "travelLock", "rootShape"], "recipe");
   if (input.version !== RECIPE_VERSION) fail(`expected version ${RECIPE_VERSION}`);
   if (input.fps !== 24) fail("fps must be 24");
   if (!Number.isInteger(input.durationBeats) || !finite(input.durationBeats, 1, 512)) fail("durationBeats must be a whole number 1–512");
@@ -243,8 +252,23 @@ export function validateRecipe(input: unknown): Recipe {
     validateLock(input.travelLock as Record<string, unknown>, "travelLock", lock);
     if (lock.lock) recipe.travelLock = lock;
   }
+  if (input.rootShape !== undefined) recipe.rootShape = validateRootShape(input.rootShape);
   if (input.camera !== undefined) recipe.camera = validateCamera(input.camera, durationBeats);
   return recipe;
+}
+
+function validateRootShape(input: unknown): RootShape {
+  if (!isObject(input)) return fail("rootShape must be an object");
+  only(input, ["corners", "points"], "rootShape");
+  if (!finite(input.corners, 0, 1)) fail("rootShape.corners must be 0–1");
+  if (!Array.isArray(input.points) || input.points.length < 2 || input.points.length > 63) fail("rootShape.points needs 2–63 points");
+  const points = (input.points as unknown[]).map((p, i) => {
+    if (!isObject(p)) return fail(`rootShape.points[${i}] must be an object`);
+    only(p, ["x", "z", "y"], `rootShape.points[${i}]`);
+    if (!finite(p.x, -100, 100) || !finite(p.z, -100, 100) || (p.y !== undefined && !finite(p.y, 0, 30))) fail(`rootShape.points[${i}] needs x, z within ±100 m (y 0–30 m)`);
+    return { x: p.x as number, z: p.z as number, ...(p.y !== undefined ? { y: p.y as number } : {}) };
+  });
+  return { corners: input.corners as number, points };
 }
 
 export const secondsPerBeat = (grid: BeatGrid) => 60 / grid.bpm;

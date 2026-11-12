@@ -52,9 +52,9 @@ export function createServer(session = new Session()): McpServer {
   server.registerTool("load_analysis", { description: "Load an analysis.json written by `motion-studio analyse`.", inputSchema: { path: z.string() } },
     guard(({ path }: { path: string }) => { session.analysis = parseAnalysis(readFileSync(path, "utf8")); return text(`Loaded ${path}: ${summary(session.analysis)}.`); }));
   server.registerTool("new_recipe", {
-    description: "Start a new working recipe (rigged mannequin by default), fitted to the analysed track's tempo and length when there is one.",
-    inputSchema: { character: z.enum(["rigged", "mannequin", "block", "stick", "blob"]).optional() },
-  }, guard(({ character }: { character?: string }) => { session.replace(newRecipe(character ?? "rigged", session.analysis)); return text(session.describe()); }));
+    description: "Start a new working recipe (rigged mannequin by default), fitted to the analysed track's tempo and length when there is one. character glider starts the Beat Path base: a clip of `clip` seconds (5 or 8) with the page's camera rig, for a Beat Path shot script.",
+    inputSchema: { character: z.enum(["rigged", "mannequin", "block", "stick", "blob", "glider"]).optional(), clip: z.number().min(1).max(60).optional() },
+  }, guard(({ character, clip }: { character?: string; clip?: number }) => { session.replace(newRecipe(character ?? "rigged", session.analysis, clip ?? 8)); return text(session.describe()); }));
   server.registerTool("load_recipe", { description: "Load a recipe JSON file as the working recipe.", inputSchema: { path: z.string() } },
     guard(({ path }: { path: string }) => { session.replace(JSON.parse(readFileSync(path, "utf8"))); return text(session.describe()); }));
   server.registerTool("save_recipe", { description: "Write the working recipe to a JSON file.", inputSchema: { path: z.string() } },

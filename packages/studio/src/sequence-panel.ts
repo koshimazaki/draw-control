@@ -4,7 +4,7 @@
  * an ordinary edit, so it can be undone.
  */
 import type { Recipe } from "@motion-studio/core/internal";
-import { download } from "./export/button";
+import { download } from "./shared/download";
 import { browserStore, cleanName, deleteSequence, fileNameFor, parseSequenceFile, readLibrary, saveSequence } from "./sequence-library";
 import { $ } from "./ui";
 

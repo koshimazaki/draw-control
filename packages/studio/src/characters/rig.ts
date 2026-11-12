@@ -8,6 +8,7 @@ import * as THREE from "three";
 import { JOINTS, type FrameState, type JointName } from "@motion-studio/core/internal";
 import type { Character } from "./types";
 import { createAbstractFigure } from "./abstract";
+import { createGlider } from "./glider";
 import { DIMS } from "./dims";
 
 type Style = "mannequin" | "block";
@@ -34,7 +35,8 @@ function jointBall(style: Style, radius: number, mat: THREE.Material): THREE.Obj
   return new THREE.Mesh(new THREE.SphereGeometry(radius, 16, 12), mat);
 }
 
-export function createProceduralCharacter(style: Style | "stick" | "blob"): Character {
+export function createProceduralCharacter(style: Style | "stick" | "blob" | "glider"): Character {
+  if (style === "glider") return createGlider();
   if (style === "stick" || style === "blob") return createAbstractFigure(style);
   const { body, joint } = materials(style);
   const root = new THREE.Group();
