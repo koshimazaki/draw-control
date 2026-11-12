@@ -145,6 +145,14 @@ export class Viewport {
     return cameraFor(view, aspect, this.orbitCam);
   }
   setBackground(bg: Background) { this.scene.background = new THREE.Color(BACKGROUNDS[bg]); this.redraw(); }
+  /** Recolour the ground grid (fine 1 m lines, bold 4 m lines); the studio keeps its defaults. */
+  styleGrid(fine: number, coarse: number) {
+    const [a, b] = this.grid.children as THREE.GridHelper[];
+    (a.material as THREE.LineBasicMaterial).vertexColors = false; (a.material as THREE.LineBasicMaterial).color.setHex(fine);
+    (b.material as THREE.LineBasicMaterial).vertexColors = false; (b.material as THREE.LineBasicMaterial).color.setHex(coarse);
+    for (const g of [a, b]) (g.material as THREE.Material).needsUpdate = true;
+    this.redraw();
+  }
   setGrid(on: boolean) { this.gridOn = on; this.grid.visible = on; this.redraw(); }
   /** Whether the exported guide shows the grid (whatever the preview shows). */
   setExportGrid(on: boolean) { this.exportGrid = on; }

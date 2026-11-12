@@ -20,7 +20,7 @@ npm run cli -- commands                   # or: node cli/bin/motion-studio.mjs c
 | Command | What it does |
 | --- | --- |
 | `analyse <audio> --out analysis.json` | Tempo, first beat, kick, snare and hat onsets with strengths, amplitude peaks, and the loudness envelopes. WAV is read directly; MP3, M4A, FLAC and OGG need ffmpeg. |
-| `new [--character rigged\|mannequin\|block\|stick\|blob] [--analysis a.json] --out recipe.json` | A starting recipe (the rigged mannequin dancing), fitted to the track's tempo and length. |
+| `new [--character rigged\|mannequin\|block\|stick\|blob\|glider] [--clip 5\|8] [--analysis a.json] --out recipe.json` | A starting recipe (the rigged mannequin dancing), fitted to the track's tempo and length. `glider` starts the Beat Path base instead: a clip of `--clip` seconds from beat 0 with the page's camera rig, ready for a Beat Path script (`examples/scripts/beat-path-*.txt`). |
 | `apply <recipe.json> <commands.json> [--analysis a.json] [--out next.json]` | Apply a list of commands in order. All or nothing: a refused command names its index and the reason. |
 | `set <recipe.json> <path> <value> [--out next.json]` | Set any recipe field by path: `beatGrid.bpm 98`, `moves#Dance_Loop-4.speed 2`, `moves[0].phases[0].amplitude 2.5`, `camera.distance 5`, `reactive.amplitude 1`. The value is JSON when it parses, text otherwise; `null` deletes the field. |
 | `describe <recipe.json> [--analysis a.json] [--script]` | The timeline as text: move blocks with start, end, speed, amplitude and lock, rests, hit markers, the camera ranges (with shots, amounts and locks), the camera lanes and paths, the walk path and its lock, the envelope, and the kicks, snares and hats in beats. With `--script` (put it last): the shot script instead. |
@@ -56,7 +56,7 @@ Register it with any MCP client as a stdio server with that command (absolute pa
 | --- | --- |
 | `analyse_audio` | `path`, `out?` (also writes analysis.json) |
 | `load_analysis` | `path` |
-| `new_recipe` | `character?` |
+| `new_recipe` | `character?` (`glider`: the Beat Path base), `clip?` (seconds, with `glider`) |
 | `load_recipe`, `save_recipe` | `path` |
 | `get_recipe`, `describe`, `get_script`, `list_commands`, `undo` | none |
 | `apply_script` | `script` (returns the script as it now reads) |

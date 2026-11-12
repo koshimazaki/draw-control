@@ -13,7 +13,7 @@ import { unzipSync, strFromU8 } from "fflate";
 
 const SCRIPT = `beats 0-2 | action: rest | camera: follow behind lock kick 1 hold | shot: medium
 beats 2-12 | action: walk on path (-5,3) (0,-2) (5,2) corners 0.6 lock kick 1 | camera: follow side lock kick 1 hold | shot: medium
-beats 12-17 | action: rest, spin @beat 14.5 | camera: orbit 150 lock kick 1 hold | shot: medium
+beats 12-17 | action: rest, spin @beat 14.5 | camera: orbit 75 lock kick 1 hold | shot: medium
 `;
 
 export async function smokeBeatPath(browser, base, { fail, OUT, SHOTS }) {
@@ -22,7 +22,11 @@ export async function smokeBeatPath(browser, base, { fail, OUT, SHOTS }) {
   page.on("pageerror", e => errors.push(e.message));
   page.on("console", m => { if (m.type() === "error") errors.push(m.text()); });
   await page.goto(`${base}/path.html`);
-  await page.waitForFunction(() => window.__beatPath?.recipe().audio?.name === "demo-drums-120.wav", null, { timeout: 30_000 });
+  await page.waitForFunction(() => window.__beatPath?.recipe().audio?.name === "demo-drums-120.wav", null, { timeout: 30_000 })
+    .catch(async e => {
+      const seen = await page.evaluate(() => ({ probe: !!window.__beatPath, audio: window.__beatPath?.recipe().audio ?? null, status: document.getElementById("status")?.textContent, url: window.location.href })).catch(x => x.message);
+      throw new Error(`Beat Path did not load the demo (${e.message}); page: ${JSON.stringify(seen)}; page errors: ${errors.join(" | ") || "none"}`);
+    });
   const probe = () => page.evaluate(() => ({ recipe: window.__beatPath.recipe(), state: window.__beatPath.state(), playing: window.__beatPath.playing(), head: window.__beatPath.head() }));
   let p = await probe();
   console.log(`beat path: first run ${p.recipe.character.kind}, ${p.recipe.durationBeats} beats, travel lock ${JSON.stringify(p.recipe.travelLock)}, camera ${p.recipe.camera.segments.map(s => s.modes.join("+")).join(" / ")}`);
@@ -69,7 +73,7 @@ export async function smokeBeatPath(browser, base, { fail, OUT, SHOTS }) {
   p = await probe();
   const back = await page.evaluate(() => window.__beatPath.script());
   console.log(`beat path: pasted script → ${p.state.character.map(b => b.word).join(", ")} | ${p.state.cameraLane.map(b => b.word).join(", ")}`);
-  if (!back.includes("walk on path (-5,3) (0,-2) (5,2) corners 0.6 lock kick 1") || !back.includes("orbit 150")) fail(`the pasted script does not read back:\n${back}`);
+  if (!back.includes("walk on path (-5,3) (0,-2) (5,2) corners 0.6 lock kick 1") || !back.includes("orbit 75")) fail(`the pasted script does not read back:\n${back}`);
   await page.screenshot({ path: `${SHOTS}beat-path-script.png` });
 
   // Export the guide.
@@ -110,7 +114,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const server = await createServer({ root: new URL("../packages/studio/", import.meta.url).pathname, server: { port: 5182, host: "127.0.0.1" }, logLevel: "warn" });
   await server.listen();
   const browser = await chromium.launch(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : { channel: "chrome", headless: true });
-  try { await smokeBeatPath(browser, "http://127.0.0.1:5182", { fail, OUT, SHOTS }); }
+  try { await smokeBeatPath(browser, server.resolvedUrls.local[0].replace(/\/$/, ""), { fail, OUT, SHOTS }); }
   finally { await browser.close(); await server.close(); }
   console.log(process.exitCode ? "BEAT PATH SMOKE: FAILED" : "BEAT PATH SMOKE: OK");
 }

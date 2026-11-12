@@ -6,6 +6,24 @@ The result exports as a guide clip, with its beats and camera path, for video mo
 
 Status: working studio, CLI and MCP server, 11 November 2026. What is not done is [at the end](#not-done). Detail: [PRD](docs/PRD.md) · [plan and current state](docs/plan.md) · [agents: CLI and MCP](docs/agents.md) · [recipe and shot script format](docs/recipe.md).
 
+## Beat Path (start here)
+
+The lean demo: **draw a path on a map, add music, and the movement and the camera lock to the beat; export a guide clip for video models.** One screen, an abstract figure, a handful of controls.
+
+```bash
+nvm use && npm install && npm run dev   # open http://127.0.0.1:5180/path.html  (Runware look: /path.html?theme=runware)
+```
+
+It opens with a generated drum track, the "car on a road" example and lock on kick: press **Play**.
+
+- **Map** (left): *Subject path* or *Camera path*; drag to draw, click to place points, drag a point to move it, double-click to remove it, Escape cancels. *Corners* goes from sharp (straight segments, hard turns) to round. *Side* shows the active path's heights: drag a point up to make the figure fly or leap.
+- **Lanes** (bottom, under the waveform): *Character* (glide, hover, spin, jump) and *Camera* (follow behind, follow side, orbit, top, my path, push in). Click a block to change its word, split it or remove it; drag the edge between two blocks (half-beat snap).
+- **Lock to** off / beat / kick / snare with a strength, and **on each hit** the camera keeps moving, holds or punches in: the only global controls. **Clip** 5 s or 8 s (121 or 193 frames).
+- **Export guide**: the guide bundle zip at 1280×720, 24 fps. **Copy script** / **Paste script** (or drop a `.txt`): the page state *is* a shot script, so an agent can write one and the CLI or MCP server renders the same thing without the page: `motion-studio new --character glider --clip 8 --analysis a.json --out base.json`, then `motion-studio script base.json examples/scripts/beat-path-road-bend.txt --analysis a.json`.
+- **Examples**: four scripts in `examples/scripts/beat-path-*.txt` (a car on a road with a bend, a runner leaping a gap, something flying, a dancer spinning while the camera circles), each with a suggested prompt.
+
+**Colours in the guide** (so a prompt can name them): the **orange figure** is the subject (a pyramid with a sphere floating above it); **white** marks its front (the front face and the sphere's nose); the **grey grid** is the ground (1 m lines, bolder every 4 m; *Grid in export* turns it off); the background is flat mid grey and nothing else is in frame. Design tokens, the two themes and the sources of the Runware values: [docs/design.md](docs/design.md).
+
 ## Five-minute quickstart
 
 You need Node 24 (`.nvmrc`) and Google Chrome or Edge (the export uses WebCodecs). Everything runs locally; nothing is uploaded.
@@ -60,7 +78,7 @@ packages/core/     the engine: recipe format and validator, frameAt, beat and dr
 packages/studio/   the Vite + Three.js app (timeline, viewport, characters, export). Not imported by anything else.
 cli/               the motion-studio CLI (imports the core's public entry; `render` serves the studio to headless Chrome)
 mcp/               the MCP server (the same commands; reuses the CLI's analysis and render)
-schema/            guide-bundle JSON Schema 0.4.0 (pinned copy; the owner is the model-arena repo)
+schema/            guide-bundle JSON Schema 0.5.0 (pinned copy; the owner is the model-arena repo)
 examples/          recipes/ (example sequences), scripts/ (shot scripts); bundles/ is generated, not committed
 scripts/           smoke (real headless Chrome), mcp-check, examples, peek (screenshots), drums, mixamo-check, analyse-clips
 docs/              PRD, plan, agents (CLI, MCP, worked examples), recipe format, costs, friction log
@@ -71,7 +89,7 @@ assets/characters/ the bundled rigged mannequin (licences below)
 | --- | --- |
 | `dev`, `build` | the studio on http://127.0.0.1:5180, or a static build in `packages/studio/dist/` |
 | `check` | `typecheck` (core, studio, CLI, MCP) + `lint` + `test` (vitest) |
-| `smoke` | real headless Chrome through the studio: tracks, drags, lanes, a script, recording, four exports checked with ffprobe; `out/smoke/` |
+| `smoke` | real headless Chrome through the studio: tracks, drags, lanes, a script, recording, four exports checked with ffprobe; then the Beat Path page (a drawn path, lock on kick, a lane menu, a pasted script, an export validated against the schema); `out/smoke/` |
 | `mcp-check` | the MCP server over stdio: `apply_script` and `render`; `out/mcp-check/` |
 | `drums` | a generated 120 BPM drum track, `out/drums-120.wav` |
 | `examples` | regenerate the example bundles in `examples/bundles/` |
@@ -115,4 +133,4 @@ Every frame is a pure function of (recipe, audio drive, frame), so it can be see
 - Recording a camera lane by dragging the camera in the viewport; driving the figure from the keyboard; voice input.
 - Previous/new comparison with accept or revert; range preview and looping in the player.
 - MotionBricks, pose input from video and the provider interface (see [plan](docs/plan.md)).
-- The bundle schema 0.4.0 still has to be taken into model-arena.
+- The bundle schema 0.5.0 (0.4.0's camera modes, 0.5.0's character kind `glider`) still has to be taken into model-arena.

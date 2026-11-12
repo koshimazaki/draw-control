@@ -63,6 +63,8 @@ export class MapView {
   private stroke: PathPt[] | null = null;
   private cancel: (() => void) | null = null;
   private w = 1; private h = 1; private dpr = 1; private scale = 1;
+  /** The top view's centre and half extent (metres): set by `fit`, steady while drawing. */
+  private cx = 0; private cz = 0; private half = HALF;
   private colours: Record<string, string> = {};
 
   constructor(readonly canvas: HTMLCanvasElement, private host: MapHost) {
@@ -85,8 +87,19 @@ export class MapView {
   get busy() { return !!this.cancel; }
 
   // Top view: metres to pixels.
-  private top(p: { x: number; z: number }): [number, number] { return [this.w / 2 + p.x * this.scale, this.h / 2 + p.z * this.scale]; }
-  private fromTop(px: number, py: number): PathPt { return { x: (px - this.w / 2) / this.scale, z: (py - this.h / 2) / this.scale }; }
+  private top(p: { x: number; z: number }): [number, number] { return [this.w / 2 + (p.x - this.cx) * this.scale, this.h / 2 + (p.z - this.cz) * this.scale]; }
+  private fromTop(px: number, py: number): PathPt { return { x: (px - this.w / 2) / this.scale + this.cx, z: (py - this.h / 2) / this.scale + this.cz }; }
+  /** Frame both paths and the camera's trail (on a new example or script, never while drawing). */
+  fit() {
+    const all = [...this.host.points("subject"), ...this.host.points("camera"), ...this.scene.floor, ...(this.scene.trail ?? [])];
+    if (!all.length) { this.cx = this.cz = 0; this.half = HALF; this.resize(); return; }
+    const xs = all.map(p => p.x), zs = all.map(p => p.z), aspect = this.w / this.h;
+    const x0 = Math.min(...xs), x1 = Math.max(...xs), z0 = Math.min(...zs), z1 = Math.max(...zs);
+    this.cx = Math.round((x0 + x1) / 2); this.cz = Math.round((z0 + z1) / 2);
+    const need = Math.max((x1 - x0) / 2 + 1.5, (z1 - z0) / 2 + 1.5) * Math.max(1, aspect < 1 ? 1 / aspect : 1);
+    this.half = Math.max(HALF, Math.min(LIMIT + 2, Math.ceil(need)));
+    this.resize();
+  }
   /** Side view: the active path's distance along it (s) and height to pixels. */
   private sideFrame() {
     const tool = this.host.tool(), pts = this.host.points(tool), cum = [0];
@@ -106,7 +119,7 @@ export class MapView {
     const r = this.canvas.getBoundingClientRect();
     this.dpr = Math.min(2, window.devicePixelRatio || 1);
     this.w = Math.max(1, r.width); this.h = Math.max(1, r.height);
-    this.scale = Math.min(this.w, this.h) / (2 * HALF);
+    this.scale = Math.min(this.w, this.h) / (2 * this.half);
     for (const c of [this.canvas, this.base]) { c.width = Math.round(this.w * this.dpr); c.height = Math.round(this.h * this.dpr); }
     this.refresh();
   }
@@ -209,7 +222,7 @@ export class MapView {
     g.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     g.fillStyle = C["map-bg"]; g.fillRect(0, 0, this.w, this.h);
     if (this.host.view() === "side") { this.paintSide(g); return; }
-    const ext = Math.ceil(Math.max(this.w, this.h) / 2 / this.scale);
+    const ext = Math.ceil(Math.max(this.w, this.h) / 2 / this.scale) + Math.ceil(Math.max(Math.abs(this.cx), Math.abs(this.cz)));
     for (let m = -ext; m <= ext; m++) {
       g.strokeStyle = m === 0 ? C["map-axis"] : m % 4 === 0 ? C["map-major"] : C["map-minor"];
       g.lineWidth = 1;
@@ -218,7 +231,7 @@ export class MapView {
       g.beginPath(); g.moveTo(0, Math.round(y) + 0.5); g.lineTo(this.w, Math.round(y) + 0.5); g.stroke();
     }
     g.fillStyle = C["map-text"]; g.font = "10px ui-monospace, Menlo, monospace";
-    for (let m = -8; m <= 8; m += 4) if (m) { const [x, y] = this.top({ x: m, z: 0 }); g.fillText(`${m} m`, x + 3, y - 4); }
+    for (let m = -16; m <= 16; m += 4) if (m) { const [x, y] = this.top({ x: m, z: 0 }); g.fillText(`${m} m`, x + 3, y - 4); }
     const s = this.scene, tool = this.host.tool();
     if (s.trail) this.line(g, s.trail.map(p => this.top(p)), C.camera, 1.6, 0.5);
     this.line(g, s.floor.map(p => this.top(p)), C.subject, 3.2);

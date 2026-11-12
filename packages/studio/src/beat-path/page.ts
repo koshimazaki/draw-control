@@ -47,6 +47,8 @@ export function startBeatPath(root: HTMLElement) {
   viewport.setCharacter(createGlider());
   viewport.setShowPaths(false);
   viewport.setGrid(true);
+  // The guide's colour coding: a neutral grey ground grid, clear on the grey background.
+  viewport.styleGrid(0x9a9ca0, 0x5a5d62);
   viewport.setExportGrid(true);
   viewport.setView("rig");
 
@@ -186,9 +188,12 @@ export function startBeatPath(root: HTMLElement) {
     setTool(t: Tool) { tool = t; map.refresh(); actions.sync(); },
     setView(v: View) { view = v; map.refresh(); actions.sync(); },
     retheme() { map.retheme(); strip.retheme(); },
+    /** A new example or script: rebuild and frame it on the map. */
+    load(next: BeatPathState) { update(next); map.fit(); },
   };
   const actions = bindActions(page);
   rebuild();
+  map.fit();
   void useDemo();
   requestAnimationFrame(tick);
   return page;

@@ -222,6 +222,10 @@ Files: `packages/studio/src/timeline/`.
 - A 1280×720 mannequin bundle loads in a `model-arena` record.
 - README walkthrough tried from a clean clone by someone outside the project.
 
+### Beat Path (12 November, branch `feat/beat-path`)
+
+A lean one-screen page, `packages/studio/path.html`, for a short demo: draw a path, add music, the movement and the camera lock to the beat, export a guide. A new surface over the same engine: the page state is a shot script applied to the core's `beatPathBase` (glider, clip of 5 or 8 s, camera rig); the CLI (`new --character glider --clip 8`) and the MCP server (`new_recipe { character: "glider", clip }`) start from the same base, and a test checks page, CLI and MCP give the same recipe for every example script. Core additions: the `glider` kind (bundle schema 0.5.0), `corners` on walk and camera paths in the script (`rootShape`, `camera.corners`, `corners.ts`), `camera.followHeight`, locks on `path` blocks (hold stops the path, punch pushes along the view), lock hits within a quarter beat of a block's edge dropped (a block starting on a kick no longer jumps; this changes existing recipes only where they jumped). Design system and themes: [design.md](design.md). Verified by unit tests (control → recipe fields, strength 0 and lock off equal the unlocked frames and camera, corners round trip, parity) and `npm run smoke` (`scripts/smoke-beat-path.mjs`). Not built: the second (follower) figure.
+
 ### Cut line
 
 Everything above is the first milestone. **Below the line, not in the first milestone:**

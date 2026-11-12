@@ -107,6 +107,7 @@ export function fromScript(text: string, base: BeatPathState): { state: BeatPath
   const clip = /^#\s*clip:\s*(\d+)/im.exec(text);
   if (clip) state.clip = Number(clip[1]) <= 6 ? 5 : 8;
   let lockSeen = false, hitSeen = false;
+  const orbits: { index: number; degrees: number; line: number }[] = [];
   const readLock = (cell: string) => {
     const m = /lock\s+(beat|kick|snare|hat)(?:\s+([\d.]+))?/.exec(cell);
     if (!m) return false;
@@ -138,7 +139,11 @@ export function fromScript(text: string, base: BeatPathState): { state: BeatPath
     let word: CameraWord = "behind";
     if (/^(follow behind|chase)\b/.test(c)) word = "behind";
     else if (/^(follow side|side)\b/.test(c)) word = "side";
-    else if (/^orbit\b/.test(c)) word = "orbit";
+    else if (/^orbit\b/.test(c)) {
+      word = "orbit";
+      const deg = /^orbit\s+(-?[\d.]+)/.exec(c);
+      if (deg) orbits.push({ index: state.cameraLane.length, degrees: Number(deg[1]), line: row.line });
+    }
     else if (/^top\b/.test(c)) word = "top";
     else if (/^path\b/.test(c)) {
       word = "path";
@@ -148,6 +153,10 @@ export function fromScript(text: string, base: BeatPathState): { state: BeatPath
     else notes.push(`line ${row.line}: camera "${c}" reads as follow behind`);
     if (readLock(c)) { state.onHit = /\bpunch\b/.test(c) ? "punch" : /\bhold\b/.test(c) ? "hold" : "move"; hitSeen = true; }
     state.cameraLane.push({ from: row.from, to: row.to, word });
+  }
+  for (const o of orbits) {
+    const b = state.cameraLane[o.index];
+    if (Math.abs(o.degrees - CAMERA_AMOUNTS.orbitPerBeat * (b.to - b.from)) > 1e-6) notes.push(`line ${o.line}: orbits turn ${CAMERA_AMOUNTS.orbitPerBeat}° a beat here`);
   }
   if (!lockSeen) state.lock = "off";
   else if (!hitSeen) state.onHit = "move";

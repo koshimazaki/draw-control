@@ -87,13 +87,13 @@ export function bindActions(p: Page) {
     items.push("-",
       { label: `Split at beat ${Math.round(beat * 2) / 2}`, disabled: !splitAt(blocks, i, beat), run: () => set(splitAt(blocks, i, beat)) },
       { label: "Remove (the block before takes its beats)", disabled: blocks.length < 2, run: () => set(removeAt(blocks, i)) });
-    view.render(i);
-    p.menu.show(anchor, `${key === "character" ? "Character" : "Camera"} · beats ${b.from}–${b.to}`, items, () => view.render());
+    view.render(i);   // marks the block open; it replaces the clicked element, so anchor on the new one
+    p.menu.show((view.root.children[i] as HTMLElement) ?? anchor, `${key === "character" ? "Character" : "Camera"} · beats ${b.from}–${b.to}`, items, () => view.render());
   }
 
   // Examples
   $("examples").onclick = () => p.menu.show($("examples"), "Examples", EXAMPLES.map((ex, i) => ({
-    label: ex.label, run: () => { const s = exampleState(i); p.update(fitLanes(s, clipBeats(s.clip, p.info?.bpm ?? 120))); p.say(`Example: ${ex.label}`); },
+    label: ex.label, run: () => { const s = exampleState(i); p.load(fitLanes(s, clipBeats(s.clip, p.info?.bpm ?? 120))); p.say(`Example: ${ex.label}`); },
   })));
   $("copyPrompt").onclick = () => void copy(p.state.prompt ?? "", "Prompt copied");
 
@@ -109,7 +109,7 @@ export function bindActions(p: Page) {
       const { state, notes } = fromScript(text, p.state);
       const next = fitLanes(state, clipBeats(state.clip, p.info?.bpm ?? 120));
       beatPathRecipe(next, p.info, p.track && p.drive ? { drive: p.drive, bands: p.drive.bands } : {});
-      p.update(next);
+      p.load(next);
       p.say(notes.length ? `Script applied; ${notes.join("; ")}` : "Script applied");
       return null;
     } catch (e) { return (e as Error).message; }

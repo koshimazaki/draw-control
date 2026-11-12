@@ -94,6 +94,9 @@ function checkBundle(zipBytes, label, expect) {
 
 const server = await createServer({ root: new URL("../packages/studio/", import.meta.url).pathname, server: { port: 5181, host: "127.0.0.1" }, logLevel: "warn" });
 await server.listen();
+// The port Vite actually took (5181, or the next free one if another dev server holds it), so the run never tests someone else's server.
+const BASE = server.resolvedUrls.local[0].replace(/\/$/, "");
+console.log(`dev server: ${BASE}`);
 const browser = await chromium.launch(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : { channel: "chrome", headless: true });
 try {
   const page = await browser.newPage({ viewport: { width: 1400, height: 900 }, acceptDownloads: true });
@@ -101,7 +104,7 @@ try {
   page.on("pageerror", e => errors.push(e.message));
   page.on("console", m => { if (m.type() === "error") errors.push(m.text()); });
   page.on("dialog", d => { errors.push(`browser dialog shown: ${d.message()}`); void d.dismiss(); });
-  await page.goto("http://127.0.0.1:5181/");
+  await page.goto(`${BASE}/`);
   await page.waitForSelector("#viewport canvas");
   console.log("WebCodecs:", await page.evaluate(() => ({ video: typeof VideoEncoder, audio: typeof AudioEncoder })));
   // The rigged mannequin is the default; this run covers the procedural figure's library moves.
@@ -209,7 +212,7 @@ try {
   checkBundle((await import("node:fs")).readFileSync(file), "file", { kind: "file", audio: true, width: 1280, height: 720 });
 
   // 5. Editor features on a fresh page with the default rigged mannequin.
-  await page.goto("http://127.0.0.1:5181/");
+  await page.goto(`${BASE}/`);
   await page.waitForFunction(() => document.querySelector("#clipPalette button"), null, { timeout: 30_000 });
   await smokeBands(page, { fail, OUT });
   await smokeBlocks(page, { fail, OUT });
@@ -220,8 +223,9 @@ try {
 
   if (errors.length) fail(`page errors: ${errors.join(" | ")}`);
 
+  await page.close();   // the studio page holds dev-server connections open; Beat Path gets its own page
   // 6. The Beat Path page (path.html): first run, a drawn path, lock on kick, a lane menu, a pasted script, an export.
-  await smokeBeatPath(browser, "http://127.0.0.1:5181", { fail, OUT, SHOTS: new URL("../out/", import.meta.url).pathname });
+  await smokeBeatPath(browser, BASE, { fail, OUT, SHOTS: new URL("../out/", import.meta.url).pathname });
 } finally {
   await browser.close();
   await server.close();
