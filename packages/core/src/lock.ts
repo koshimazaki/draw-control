@@ -55,26 +55,49 @@ export function lockHits(grid: BeatGrid, bands: BandAnalysis | undefined, target
   return bandOnsets(bands, target).map(o => beatAtSeconds(grid, o.seconds)).filter(inside);
 }
 
+/**
+ * The bands with the recipe's muted hits taken out (`mutedHits`, seconds): muted kicks,
+ * snares and hats are skipped by every lock (stations, camera hits, move pulses). Script
+ * anchors (@kick 2) still count every onset. Cached per bands object and list.
+ */
+const mutedCache = new WeakMap<BandAnalysis, { key: string; bands: BandAnalysis }>();
+export function unmutedBands(bands: BandAnalysis | undefined, muted: readonly number[] | undefined): BandAnalysis | undefined {
+  if (!bands || !muted?.length) return bands;
+  const key = muted.join(","), hit = mutedCache.get(bands);
+  if (hit?.key === key) return hit.bands;
+  const keep = (o: { seconds: number }) => !muted.some(m => Math.abs(m - o.seconds) < MUTE_TOLERANCE);
+  const out = { ...bands, low: bands.low.filter(keep), mid: bands.mid.filter(keep), high: bands.high.filter(keep) };
+  mutedCache.set(bands, { key, bands: out });
+  return out;
+}
+/** A muted hit matches an onset within this many seconds. */
+export const MUTE_TOLERANCE = 0.012;
+
 /** The keys of a locked range: its start, each hit, its end. */
 const keysOf = (from: number, to: number, hits: readonly number[]) => [from, ...hits, to];
 
 /**
  * Progress 0–1 through a range under a lock: at the k-th hit (of N) it is exactly k/(N+1)
- * when `strength` is 1; between hits it eases in, after a hit it holds for up to
+ * (spacing "even") or the steady progress at that hit (spacing "time") when `strength` is 1; between hits it eases in, after a hit it holds for up to
  * STATION_HOLD_BEATS. `strength` blends with the steady progress. Outside the range it is
  * clamped to 0 or 1.
  */
-export function stationProgress(beat: number, from: number, to: number, hits: readonly number[], strength: number): number {
+export function stationProgress(beat: number, from: number, to: number, hits: readonly number[], strength: number, spacing: StationSpacing = "even"): number {
   const steady = clamp01((beat - from) / (to - from));
   if (strength <= 0 || !hits.length || beat <= from || beat >= to) return steady;
   const keys = keysOf(from, to, hits), legs = keys.length - 1;
   let k = 0;
   while (k < legs - 1 && beat >= keys[k + 1]) k++;
   const a = keys[k], b = keys[k + 1], len = b - a;
-  const hold = k > 0 ? Math.min(STATION_HOLD_BEATS, 0.35 * len) : 0;
-  const stepped = (k + ease((beat - a - hold) / Math.max(1e-9, len - hold))) / legs;
+  // Where the stations sit: evenly spaced (k/N), or where steady travel is on each hit, so
+  // every leg moves at the same average speed and a short leg is never a dash.
+  const at = (i: number) => (spacing === "even" ? i / legs : (keys[i] - from) / (to - from));
+  const hold = k > 0 ? Math.min(STATION_HOLD_BEATS, (spacing === "even" ? 0.35 : 0.25) * len) : 0;
+  const stepped = at(k) + (at(k + 1) - at(k)) * ease((beat - a - hold) / Math.max(1e-9, len - hold));
   return steady + (stepped - steady) * strength;
 }
+/** Station spacing: "even" (programmed camera moves: equal steps) or "time" (travel: equal speed per leg). */
+export type StationSpacing = "even" | "time";
 
 /**
  * The beat a locked clip plays at: inside each leg between hits, playback runs at

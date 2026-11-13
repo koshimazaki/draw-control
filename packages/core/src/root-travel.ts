@@ -1,12 +1,13 @@
 /**
  * Where the character's root is at a beat: the walk path (recipe `rootPath`), with an
  * optional height per point (a glide can rise as well as slide), re-timed by the travel
- * lock (`travelLock`) so the figure arrives at evenly spaced stations on each locked hit.
+ * lock (`travelLock`) so the figure arrives at a station on each locked hit (where steady
+ * travel would be then, so every leg has the same average speed) and holds briefly.
  * The travel range is from the path's first move to its last point; the lock changes only
  * when the figure is where, never where it starts or ends.
  */
 import type { AudioDrive } from "./audio-drive";
-import { DEFAULT_LOCK_STRENGTH, lockHits, stationProgress } from "./lock";
+import { DEFAULT_LOCK_STRENGTH, lockHits, stationProgress, unmutedBands } from "./lock";
 import type { Recipe, RootPoint } from "./recipe";
 
 const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
@@ -40,7 +41,7 @@ export function travelRange(points: readonly RootPoint[]): { from: number; to: n
 export function travelStations(recipe: Recipe, drive?: AudioDrive): number[] {
   const lock = recipe.travelLock, range = travelRange(recipe.rootPath);
   if (!lock?.lock || !range) return [];
-  return lockHits(recipe.beatGrid, drive?.bands, lock.lock, range.from, range.to);
+  return lockHits(recipe.beatGrid, unmutedBands(drive?.bands, recipe.mutedHits), lock.lock, range.from, range.to);
 }
 
 /** The root at a beat, after the travel lock. */
@@ -48,6 +49,7 @@ export function rootAt(recipe: Recipe, beat: number, drive?: AudioDrive) {
   const lock = recipe.travelLock, range = lock?.lock ? travelRange(recipe.rootPath) : null;
   if (!lock || !range || !(lock.strength ?? DEFAULT_LOCK_STRENGTH) || beat <= range.from || beat >= range.to) return sampleRootPath(recipe.rootPath, beat);
   const hits = travelStations(recipe, drive);
-  const p = stationProgress(beat, range.from, range.to, hits, lock.strength ?? DEFAULT_LOCK_STRENGTH);
+  // Stations where steady travel is on each hit: every leg at the same average speed (no dash in a short leg).
+  const p = stationProgress(beat, range.from, range.to, hits, lock.strength ?? DEFAULT_LOCK_STRENGTH, "time");
   return sampleRootPath(recipe.rootPath, range.from + (range.to - range.from) * p);
 }

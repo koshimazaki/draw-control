@@ -21,6 +21,13 @@ import { buildSpline } from "./spline";
 import { subjectAt } from "./subject";
 import { rootAt } from "./root-travel";
 import { cornerPath, polylineSpline } from "./corners";
+import { guardFraming } from "./camera-guard";
+import { unmutedBands } from "./lock";
+
+/** Over the shoulder: turned this far (radians) from straight behind, this share closer, this much higher (metres). */
+export const SHOULDER = { angle: 0.38, closer: 0.45, higher: 0.35 } as const;
+/** The subject's centre above its root, metres (the framing guard keeps this point in frame). */
+export const SUBJECT_CENTRE = 0.6;
 import { programCamera, type ProgrammedCamera } from "./camera-shots";
 import { inLane, laneAt } from "./automation";
 
@@ -86,7 +93,7 @@ export function planCamera(recipe: Recipe, drive?: AudioDrive, frames = 0): Came
     aimY: new Float64Array(total), cx: new Float64Array(total), cz: new Float64Array(total),
   };
   const subject = (n: number) => subjectAt(recipe, beatAtSeconds(g, n * dt), drive);
-  const prog = programCamera(config, g, drive?.bands, total, fps);
+  const prog = programCamera(config, g, unmutedBands(drive?.bands, recipe.mutedHits), total, fps);
   const d0 = config.distance, dMin = d0 * 0.55, dMax = d0 * 1.7;
   const hMin = 0.3, hMax = config.height + RISE_METRES + 1;
   // State: base yaw (follow), orbit yaw, dolly, crane, aim, centre.
@@ -96,9 +103,12 @@ export function planCamera(recipe: Recipe, drive?: AudioDrive, frames = 0): Came
   let cx = s0.x, cz = s0.z, cvx = 0, cvz = 0;
   const startModes = modesAt(config, beatAtSeconds(g, 0));
   const followOffset = (m: readonly CameraMode[]) => { for (const k of m) if (FOLLOW_ANGLES[k] !== undefined) return FOLLOW_ANGLES[k]!; return null; };
+  const segAt = (beat: number) => config.segments.find(s => beat >= s.fromBeat && beat < s.toBeat);
+  // Over the shoulder: the chase angle turned a little to one side, closer and a little higher (eased in and out).
+  let shoulderW = segAt(0)?.shoulder ? 1 : 0;
   const yaw0 = config.startYaw * Math.PI / 180;
   const off0 = followOffset(startModes);
-  if (off0 !== null) followYaw = s0.heading + off0 - yaw0;
+  if (off0 !== null) followYaw = s0.heading + off0 - SHOULDER.angle * shoulderW - yaw0;
   const rangeSeconds = (beat: number) => {
     const seg = config.segments.find(s => beat >= s.fromBeat && beat < s.toBeat);
     return seg ? (seg.toBeat - seg.fromBeat) * beatSeconds : Infinity;
@@ -109,7 +119,9 @@ export function planCamera(recipe: Recipe, drive?: AudioDrive, frames = 0): Came
     const beat = beatAtSeconds(g, n * dt);
     const modes = modesAt(config, beat);
     const e = energyAtFrame(drive, n);
-    const k = speedFactor(config.intensity, e);
+    const segNow = segAt(beat), pace = segNow?.pace === "fast" ? 1.8 : segNow?.pace === "slow" ? 0.55 : 1;
+    const k = speedFactor(config.intensity, e) * pace;
+    shoulderW = slew(shoulderW, segNow?.shoulder ? 1 : 0, 1.5 * dt * pace);
     const span = rangeSeconds(beat);
     if (n > 0) {
       // Orbit: yaw rate from the base speed and the energy, slew-limited.
@@ -134,20 +146,20 @@ export function planCamera(recipe: Recipe, drive?: AudioDrive, frames = 0): Came
       [cx, cvx] = followStep(cx, cvx, s.x, (s.x - sp.x) / dt, 6, CAMERA_LIMITS.centreAccel, dt);
       [cz, cvz] = followStep(cz, cvz, s.z, (s.z - sp.z) / dt, 6, CAMERA_LIMITS.centreAccel, dt);
       // Lead / chase: swing the base yaw so the camera sits in front of or behind the heading.
-      const off = followOffset(modes);
+      const rig = followOffset(modes), off = rig === null ? null : rig - SHOULDER.angle * shoulderW;
       if (off !== null) {
         let want = s.heading + off - yaw0 - orbit;
         want += 2 * Math.PI * Math.round((followYaw - want) / (2 * Math.PI));
         const headingV = (s.heading - sp.heading) / dt;
-        [followYaw, followV] = followStep(followYaw, followV, want, headingV - orbitRate, 2.2, CAMERA_LIMITS.yawAccel, dt);
+        [followYaw, followV] = followStep(followYaw, followV, want, headingV - orbitRate, 2.2 * Math.sqrt(pace), CAMERA_LIMITS.yawAccel * pace, dt);
       } else {
         followV = slew(followV, 0, CAMERA_LIMITS.yawAccel * dt);
         followYaw += followV * dt;
       }
     }
     ch.yaw[n] = yaw0 + followYaw + orbit + prog.orbit[n];
-    ch.distance[n] = prog.distance[n] + dolly - prog.punch[n];
-    ch.height[n] = prog.height[n] + crane;
+    ch.distance[n] = (prog.distance[n] + dolly) * (1 - SHOULDER.closer * shoulderW) - prog.punch[n];
+    ch.height[n] = prog.height[n] + crane + SHOULDER.higher * shoulderW;
     ch.aimY[n] = prog.aim[n] + aim;
     ch.cx[n] = cx; ch.cz[n] = cz;
   }
@@ -216,7 +228,8 @@ export function planCamera(recipe: Recipe, drive?: AudioDrive, frames = 0): Came
   let topW = 0, fixW = 0, anchor: Vec3 | null = null, heightClamped = 0;
   for (let n = 0; n < total; n++) {
     const modes = modesAt(config, beatAtSeconds(g, n * dt));
-    topW = slew(topW, modes.includes("top") ? 1 : 0, 2 * dt);
+    const segPace = segAt(beatAtSeconds(g, n * dt))?.pace;
+    topW = slew(topW, modes.includes("top") ? 1 : 0, (segPace === "fast" ? 4 : segPace === "slow" ? 0.8 : 2) * dt);
     const yaw = ch.yaw[n];
     const ease = (w: number) => 0.5 - 0.5 * Math.cos(Math.PI * w);
     const tw = ease(topW), d = ch.distance[n] * (1 - 0.92 * tw);
@@ -254,6 +267,12 @@ export function planCamera(recipe: Recipe, drive?: AudioDrive, frames = 0): Came
     }
     if (position[1] > CAMERA_MAX_HEIGHT + 1e-9) { heightClamped++; position = [position[0], CAMERA_MAX_HEIGHT, position[2]]; ch.height[n] = CAMERA_MAX_HEIGHT; }
     samples[n] = { position, target, fov: fovAt(n), energy: energyAtFrame(drive, n) };
+  }
+  // Beat Path: the camera never loses the subject (camera-guard.ts).
+  if (config.keepInFrame) {
+    const subject: Vec3[] = [];
+    for (let n = 0; n < total; n++) { const r = rootAt(recipe, beatAtSeconds(g, n * dt), drive); subject.push([r.x, r.y + SUBJECT_CENTRE, r.z]); }
+    guardFraming(samples, subject);
   }
   for (let n = 1; n < total; n++) {
     // Unwrap yaw recomputed by atan2 so it stays continuous.

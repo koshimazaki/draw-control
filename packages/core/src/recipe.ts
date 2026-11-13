@@ -108,6 +108,8 @@ export type Recipe = {
   rootShape?: RootShape;
   /** Landmark blocks around the scene (landmarks.ts), placed from `seed` clear of both paths. Absent: none. */
   landmarks?: { seed: number; on: boolean };
+  /** Hits switched off (onset times, seconds): skipped by every lock (lock.ts `unmutedBands`). Absent or empty: none. */
+  mutedHits?: number[];
 };
 export type RootShape = { corners: number; points: { x: number; z: number; y?: number }[] };
 
@@ -180,7 +182,7 @@ function validateMove(input: unknown, where: string, durationBeats: number): Mov
 /** Strict validation for agent-supplied JSON and imported recipes. Returns a fresh copy. */
 export function validateRecipe(input: unknown): Recipe {
   if (!isObject(input)) return fail("expected an object");
-  only(input, ["version", "fps", "durationBeats", "beatGrid", "character", "energy", "moves", "rootPath", "jumps", "audio", "camera", "reactive", "steps", "energyCurve", "envelope", "travelLock", "rootShape", "landmarks"], "recipe");
+  only(input, ["version", "fps", "durationBeats", "beatGrid", "character", "energy", "moves", "rootPath", "jumps", "audio", "camera", "reactive", "steps", "energyCurve", "envelope", "travelLock", "rootShape", "landmarks", "mutedHits"], "recipe");
   if (input.version !== RECIPE_VERSION) fail(`expected version ${RECIPE_VERSION}`);
   if (input.fps !== 24) fail("fps must be 24");
   if (!Number.isInteger(input.durationBeats) || !finite(input.durationBeats, 1, 512)) fail("durationBeats must be a whole number 1–512");
@@ -255,6 +257,11 @@ export function validateRecipe(input: unknown): Recipe {
     if (lock.lock) recipe.travelLock = lock;
   }
   if (input.rootShape !== undefined) recipe.rootShape = validateRootShape(input.rootShape);
+  if (input.mutedHits !== undefined) {
+    if (!Array.isArray(input.mutedHits) || input.mutedHits.length > 512 || input.mutedHits.some(t => !finite(t, 0, 3600))) fail("mutedHits must be up to 512 times, 0–3600 s");
+    const list = [...new Set((input.mutedHits as number[]).map(t => Math.round(t * 1000) / 1000))].sort((a, b) => a - b);
+    if (list.length) recipe.mutedHits = list;
+  }
   if (input.landmarks !== undefined) {
     const l = input.landmarks;
     if (!isObject(l)) return fail("landmarks must be an object");

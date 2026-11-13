@@ -18,6 +18,8 @@ const rootX = (r: Recipe, beat: number, d: AudioDrive = drive) => frameAt(r, Mat
 describe("time warps", () => {
   it("stations: k/(N+1) on each hit, holds after it, identity at the edges, steady at strength 0", () => {
     const hits = [5, 7.5, 10];
+    // spacing "time": the steady progress on each hit
+    hits.forEach(h => expect(stationProgress(h, 4, 12, hits, 1, "time")).toBeCloseTo((h - 4) / 8, 9));
     hits.forEach((h, k) => expect(stationProgress(h, 4, 12, hits, 1)).toBeCloseTo((k + 1) / 4, 9));
     expect(stationProgress(7.6, 4, 12, hits, 1)).toBeCloseTo(0.5, 9);
     expect(stationProgress(4, 4, 12, hits, 1)).toBe(0);
@@ -49,9 +51,10 @@ describe("glide travel", () => {
 
 describe("beat-locked travel", () => {
   const locked = glide("mannequin", { lock: "kick", strength: 1 });
-  it("stations land within one frame of the kicks, evenly spaced", () => {
+  it("stations land within one frame of the kicks, where steady travel is then (equal speed per leg)", () => {
     expect(travelStations(locked, drive)).toEqual([5, 7.5, 10]);
-    [5, 7.5, 10].forEach((b, k) => expect(rootX(locked, b)).toBeCloseTo(8 * (k + 1) / 4, 1));
+    const plain = glide("mannequin");
+    [5, 7.5, 10].forEach(b => expect(rootX(locked, b)).toBeCloseTo(rootX(plain, b), 1));
     // Within a frame of the hit the figure is already (or still) at the station.
     expect(Math.abs(rootX(locked, 7.5 + 1 / 12) - rootX(locked, 7.5))).toBeLessThan(0.01);
   });

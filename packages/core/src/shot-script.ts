@@ -38,7 +38,10 @@ export const CAMERA_WORDS: Record<string, CameraMode> = {
   "follow behind": "chase", "follow front": "lead", "follow side": "side",
   "dolly in": "pushIn", "push in": "pushIn", "dolly out": "pullOut", "pull out": "pullOut",
   "truck left": "truck", "truck right": "truck", rise: "rise", "jib up": "rise", "jib down": "rise",
+  "over shoulder": "chase", shoulder: "chase", above: "top",
 };
+/** Pace words for a camera block (how quickly it reaches its target). */
+export const PACE_WORDS = ["slow", "even", "fast"] as const;
 
 const isRigged = (r: Recipe) => r.character.kind === "rigged";
 /** The moves the recipe's character can play, by word. */
@@ -47,7 +50,7 @@ export function actionVocabulary(r: Recipe): string[] {
   return [...words, ...(isRigged(r) ? Object.keys(LOOP_CLIPS) : MOVE_KEYS)];
 }
 export const accentVocabulary = (): string[] => [...ACCENT_KEYS];
-export const cameraVocabulary = (): string[] => [...Object.keys(CAMERA_WORDS), "continue"];
+export const cameraVocabulary = (): string[] => [...Object.keys(CAMERA_WORDS), "continue", "then (chains two moves)", "slow | even | fast (pace)"];
 
 /** The word for a move: the first spoken word that maps to it, or its own name. */
 export function wordForMove(r: Recipe, name: string): string {
@@ -108,11 +111,12 @@ export function cameraWords(s: CameraSegment, path?: readonly { x: number; y: nu
         if (s.amount !== undefined) return `jib ${s.amount < 0 ? "down" : "up"} ${metres(Math.abs(s.amount))}`;
         return "rise";
       case "threeQuarter": return "three-quarter";
+      case "chase": return s.shoulder ? "over shoulder" : "chase";
       case "path": return path ? `path ${pointWords(path)}${corners !== undefined ? ` corners ${fmt(corners)}` : ""}` : "path";
       default: return m;
     }
   };
-  let out = s.modes.map(part).join(" + ");
+  let out = s.modes.map(part).join(" + ") + (s.pace ? ` ${s.pace}` : "");
   if (s.lock) {
     out += ` lock ${s.lock}${s.strength !== undefined ? ` ${fmt(s.strength)}` : ""}`;
     if (s.onHit === "punch") out += ` punch${s.punch !== undefined ? ` ${metres(s.punch)}` : ""}`;
@@ -205,7 +209,7 @@ export function printScript(r: Recipe, bands?: BandAnalysis): string {
   // Columns line up, but a long cell (a path's points) does not pad every other row.
   const widths = rows.reduce((w, cells) => cells.map((c, k) => Math.max(w[k] ?? 0, Math.min(COLUMN_MAX, c.length))), [] as number[]);
   // Settings lines first: whether the landmark blocks are on (and their seed).
-  const settings = r.landmarks ? `landmarks: ${r.landmarks.on ? `on seed ${r.landmarks.seed}` : "off"}\n` : "";
+  const settings = (r.landmarks ? `landmarks: ${r.landmarks.on ? `on seed ${r.landmarks.seed}` : "off"}\n` : "") + (r.mutedHits?.length ? `muted: ${r.mutedHits.map(fmt).join(" ")}\n` : "");
   return settings + rows.map(cells => cells.map((c, k) => (k < cells.length - 1 ? c.padEnd(widths[k]) : c)).join(" | ")).join("\n") + "\n";
 }
 

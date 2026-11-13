@@ -54,7 +54,14 @@ type Values = { d: number; h: number; f: number; a: number; orbit: number; truck
 
 /** The progress 0–1 of a programmed move through its range (eased, re-timed by a lock). */
 function progressOf(s: CameraSegment, hits: number[], beat: number): number {
-  const base = ease((beat - s.fromBeat) / (s.toBeat - s.fromBeat));
+  const u = (beat - s.fromBeat) / (s.toBeat - s.fromBeat);
+  // Pace: fast arrives early (on the first locked hit when it falls in the block's first part), slow late.
+  if (s.pace === "fast") {
+    const first = s.lock && hits.length ? (hits[0] - s.fromBeat) / (s.toBeat - s.fromBeat) : 0;
+    return ease(u / (first >= 0.15 && first <= 0.7 ? first : 0.45));
+  }
+  if (s.pace === "slow") return ease(Math.pow(Math.max(0, u), 1.6));
+  const base = ease(u);
   if (!s.lock || s.onHit === "punch" || !hits.length) return base;
   const k = s.strength ?? DEFAULT_LOCK_STRENGTH;
   return base + (stationProgress(beat, s.fromBeat, s.toBeat, hits, 1) - base) * k;
@@ -62,7 +69,7 @@ function progressOf(s: CameraSegment, hits: number[], beat: number): number {
 
 /** The programmed values inside range `s` at `beat`, starting from `v`. */
 function valuesIn(s: CameraSegment, v: Values, hits: number[], beat: number): Values {
-  const len = s.toBeat - s.fromBeat, t = Math.min(1, len / 2);
+  const len = s.toBeat - s.fromBeat, t = s.pace === "fast" ? Math.min(0.5, len / 3) : s.pace === "slow" ? Math.min(2.5, len * 0.8) : Math.min(1, len / 2);
   const w = s.cut ? 1 : ease((beat - s.fromBeat) / t);
   const preset = s.shot ? SHOT_PRESETS[s.shot] : null;
   const p = progressOf(s, hits, beat);

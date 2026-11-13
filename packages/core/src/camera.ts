@@ -66,7 +66,13 @@ export type CameraSegment = {
   shot?: Shot; cut?: boolean;
   amount?: number; from?: number; to?: number;
   lock?: LockTarget; strength?: number; onHit?: OnHit; punch?: number;
+  /** With `chase`: over the shoulder (close behind, to one side, slightly above). */
+  shoulder?: boolean;
+  /** How quickly the block reaches its target: `fast` early (on the first locked hit when locked), `slow` late. Absent: even. */
+  pace?: Pace;
 };
+export const PACES = ["slow", "fast"] as const;
+export type Pace = (typeof PACES)[number];
 export type CameraConfig = {
   /** Modes per beat range, in order, not overlapping. Beats outside every range hold (static). */
   segments: CameraSegment[];
@@ -88,6 +94,8 @@ export type CameraConfig = {
   lanes?: Partial<Record<CameraLane, Envelope>>;
   /** The camera rises and aims with the subject's height (the walk path's `y`), so a figure in flight stays framed. Absent: it does not. */
   followHeight?: boolean;
+  /** The framing guard (camera-guard.ts): the aim turns towards the subject wherever it nears the frame's edge. Absent: off (as before). */
+  keepInFrame?: boolean;
   /** Corner rounding of the drawn path, 0 (straight segments) to 1 (round), corners.ts. Absent: the smooth spline through the points. */
   corners?: number;
 };
@@ -99,13 +107,13 @@ export const DEFAULT_CAMERA: CameraConfig = {
 
 export function validateCamera(input: unknown, durationBeats: number): CameraConfig {
   if (!isObject(input)) return fail("camera must be an object");
-  only(input, ["segments", "intensity", "orbitDegreesPerBeat", "distance", "height", "fov", "startYaw", "path", "lanes", "followHeight", "corners"], "camera");
+  only(input, ["segments", "intensity", "orbitDegreesPerBeat", "distance", "height", "fov", "startYaw", "path", "lanes", "followHeight", "corners", "keepInFrame"], "camera");
   if (!Array.isArray(input.segments) || input.segments.length < 1 || input.segments.length > 32) fail("camera.segments needs 1–32 ranges");
   let last = -Infinity;
   const segments = (input.segments as unknown[]).map((s, i): CameraSegment => {
     const where = `camera.segments[${i}]`;
     if (!isObject(s)) return fail(`${where} must be an object`);
-    only(s, ["fromBeat", "toBeat", "modes", "shot", "cut", "amount", "from", "to", "lock", "strength", "onHit", "punch"], where);
+    only(s, ["fromBeat", "toBeat", "modes", "shot", "cut", "amount", "from", "to", "lock", "strength", "onHit", "punch", "shoulder", "pace"], where);
     const fromBeat = num(s.fromBeat, 0, durationBeats, `${where}.fromBeat`);
     const toBeat = num(s.toBeat, 0, durationBeats, `${where}.toBeat`);
     if (toBeat <= fromBeat) fail(`${where}.toBeat must be after fromBeat`);
@@ -144,6 +152,7 @@ export function validateCamera(input: unknown, durationBeats: number): CameraCon
     startYaw: num(input.startYaw, -360, 360, "camera.startYaw"),
   };
   if (path) out.path = path;
+  if (input.keepInFrame !== undefined) { if (typeof input.keepInFrame !== "boolean") fail("camera.keepInFrame must be true or false"); if (input.keepInFrame) out.keepInFrame = true; }
   if (input.corners !== undefined) out.corners = num(input.corners, 0, 1, "camera.corners");
   if (input.followHeight !== undefined) {
     if (typeof input.followHeight !== "boolean") fail("camera.followHeight must be true or false");
@@ -176,6 +185,15 @@ function validateSegmentExtras(s: Record<string, unknown>, where: string, seg: C
   if (seg.amount !== undefined && seg.to !== undefined) fail(`${where}: give an amount or an end value (to), not both`);
   if (seg.modes.includes("truck") && seg.amount === undefined) fail(`${where}: truck needs an amount in metres (+ right, - left)`);
   validateLock(s, where, seg);
+  if (s.shoulder !== undefined) {
+    if (typeof s.shoulder !== "boolean") fail(`${where}.shoulder must be true or false`);
+    if (s.shoulder && !seg.modes.includes("chase")) fail(`${where}.shoulder goes with chase (over the shoulder is a follow-behind rig)`);
+    if (s.shoulder) seg.shoulder = true;
+  }
+  if (s.pace !== undefined && s.pace !== "even") {
+    if (!PACES.includes(s.pace as Pace)) fail(`${where}.pace must be slow, even or fast`);
+    seg.pace = s.pace as Pace;
+  }
   if (s.onHit !== undefined) {
     if (!ON_HIT.includes(s.onHit as OnHit)) fail(`${where}.onHit must be hold or punch`);
     if (seg.lock) seg.onHit = s.onHit as OnHit;

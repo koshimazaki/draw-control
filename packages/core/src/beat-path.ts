@@ -24,7 +24,7 @@ export function beatPathBase(opts: { seconds: number; bpm?: number; offsetSecond
     character: { ...GLIDER_CHARACTER },
     rootPath: [{ beat: 0, x: 0, z: 0, yaw: 0 }],
     ...(opts.audio ? { audio: { name: opts.audio.name.slice(0, 120), licence: opts.audio.licence.slice(0, 120) } } : {}),
-    camera: { segments: [{ fromBeat: 0, toBeat: beats, modes: ["chase"] }], ...BEAT_PATH_RIG, followHeight: true },
+    camera: { segments: [{ fromBeat: 0, toBeat: beats, modes: ["chase"] }], ...BEAT_PATH_RIG, followHeight: true, keepInFrame: true },
     // Landmark blocks on: the stills then show travel and parallax (a script's "landmarks:" line turns them off).
     landmarks: { ...DEFAULT_LANDMARKS },
   });

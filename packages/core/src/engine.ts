@@ -9,7 +9,7 @@ import { POSES, mixPoses, neutralPose, scalePose, type Pose } from "./poses";
 import { moveBeats, phaseBeats, type Expression, type Recipe } from "./recipe";
 import type { AudioDrive } from "./audio-drive";
 import type { BandAnalysis } from "./audio-bands";
-import { DEFAULT_LOCK_STRENGTH, lockHits, pulseBeat } from "./lock";
+import { DEFAULT_LOCK_STRENGTH, lockHits, pulseBeat, unmutedBands } from "./lock";
 import { rootAt } from "./root-travel";
 export { sampleRootPath } from "./root-travel";
 
@@ -75,7 +75,7 @@ export function lockedMoveBeat(recipe: Recipe, moveIndex: number, beat: number, 
   if (!m.lock) return beat;
   const strength = m.strength ?? DEFAULT_LOCK_STRENGTH, end = moveEndBeat(recipe, moveIndex);
   if (strength <= 0 || beat <= m.atBeat || beat >= end) return beat;
-  return pulseBeat(beat, m.atBeat, end, lockHits(recipe.beatGrid, bands, m.lock, m.atBeat, end), strength);
+  return pulseBeat(beat, m.atBeat, end, lockHits(recipe.beatGrid, unmutedBands(bands, recipe.mutedHits), m.lock, m.atBeat, end), strength);
 }
 
 /** Evaluate one move at a beat, as if it were the only move playing. */
