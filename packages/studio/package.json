@@ -7,6 +7,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:beat-path": "vite build --mode beat-path",
     "preview": "vite preview"
   },
   "dependencies": {

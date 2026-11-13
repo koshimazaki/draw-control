@@ -36,6 +36,17 @@ export async function smokeBeatPath(browser, base, { fail, OUT, SHOTS }) {
   await page.screenshot({ path: `${SHOTS}beat-path-playing.png` });
   await page.click("#play");
 
+  // Switching Side ↔ Top and Subject ↔ Camera keeps the drawn path on the map (no stale canvas).
+  const orange = () => page.evaluate(() => {
+    const c = document.getElementById("map"), d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data;
+    let n = 0; for (let i = 0; i < d.length; i += 16) if (d[i] > 200 && d[i + 1] > 90 && d[i + 1] < 180 && d[i + 2] < 110) n++; return n;
+  });
+  const orange0 = await orange();
+  for (const sel of ['[data-control="view"] [data-value="side"]', '[data-control="view"] [data-value="top"]', '[data-control="tool"] [data-value="camera"]', '[data-control="tool"] [data-value="subject"]']) await page.click(sel);
+  const orange1 = await orange();
+  console.log(`beat path: path pixels on the map before ${orange0}, after Side/Top and Camera/Subject ${orange1}`);
+  if (!orange0 || orange1 < orange0 * 0.8) fail("the drawn path faded from the map after switching views or tools");
+
   // Draw the subject's path with the mouse: a stroke from (-6, 4) through (0, -3) to (6, 3).
   await page.click('[data-control="tool"] [data-value="subject"]');
   const at = q => page.evaluate(q => window.__beatPath.mapPoint(q), q);
@@ -145,8 +156,15 @@ export async function smokeBeatPath(browser, base, { fail, OUT, SHOTS }) {
   if (!mem.files["guide.mp4"] || !mem.files["recipe.json"] || !mem.prompt) fail("exportGuideInMemory did not return the bundle's files and the prompt");
   if (/\(-?\d|lock (beat|kick|snare)|punch \d/.test(mem.prompt)) fail(`script words in the prompt: ${mem.prompt}`);
   // Generate (faked in dev): the output pane appears beside the preview, with a divider.
+  // Generate through the vendored embed with its fake provider (dev): the page's own cost dialog, then the result player.
+  await page.waitForFunction(() => document.querySelector("#keySlot arena-key"), null, { timeout: 30_000 });
   await page.click("#runGenerate");
-  await page.waitForFunction(() => !document.getElementById("screenOutput").hidden && document.querySelector("#generateSlot video"), null, { timeout: 120_000 });
+  await page.waitForSelector("#costDialog:not([hidden])", { timeout: 120_000 });
+  console.log(`beat path: cost dialog: ${await page.textContent("#costText")}`);
+  await page.click("#costOk");
+  await page.waitForFunction(() => !document.getElementById("screenOutput").hidden && document.querySelector("#generateSlot arena-player"), null, { timeout: 120_000 });
+  if (await page.isHidden("#addToGallery")) fail("no Add to gallery after a result");
+  await page.click("#addToGallery");
   if (await page.isHidden("#divider")) fail("no divider between the preview and the output");
   await page.click("#play");
   await page.waitForTimeout(900);

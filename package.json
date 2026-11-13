@@ -15,6 +15,9 @@
   "scripts": {
     "dev": "npm run dev -w @motion-studio/studio",
     "build": "npm run build -w @motion-studio/studio",
+    "build:beat-path": "npm run build:beat-path -w @motion-studio/studio",
+    "static-check": "node scripts/static-check.mjs",
+    "vendor:arena": "node scripts/vendor-arena.mjs",
     "test": "vitest run",
     "typecheck": "tsc -p packages/core && tsc -p packages/studio && tsc -p cli && tsc -p mcp",
     "lint": "eslint .",

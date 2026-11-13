@@ -49,6 +49,7 @@ export const LAYOUT = `
       <div class="divider" id="divider" role="separator" aria-orientation="vertical" tabindex="0" hidden data-tip="Drag to resize · double-click resets"></div>
       <div class="screen" id="screenOutput" hidden>
         <div class="output-frame" id="generateSlot"><p id="outputNote" class="muted">Output</p><div class="progress" id="genProgress" hidden><span></span></div></div>
+        <button type="button" id="addToGallery" class="btn outline add-gallery" hidden>Add to gallery</button>
         <button type="button" id="swapScreens" class="btn ghost swap" data-tip="Swap the two sides">⇄</button>
       </div>
     </div>
@@ -103,10 +104,18 @@ export const LAYOUT = `
   <h2 id="galleryTitle">Gallery</h2>
   <p class="muted">The three examples with their inputs (guide, music, shot description, references) and outputs.</p>
   <div class="gallery-grid" id="gallerySlot"></div>
+  <div id="arenaGallerySlot" class="arena-gallery-slot"></div>
 </section>
 <footer class="site-foot">
   <div class="oss-panel"><strong>Open source.</strong> <a href="${REPO_URL}" target="_blank" rel="noopener">Get the code</a> · ${LICENCE} licence · Runs in your browser with your own Runware key.</div>
   <span class="muted" id="credit">${APP_NAME} · built on Runware · unofficial demo</span>
 </footer>
 <div class="menu" id="menu" role="menu" hidden></div>
+<div class="dialog" id="costDialog" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="costTitle">
+    <strong id="costTitle">Generate with this model?</strong>
+    <p id="costText" class="muted" style="margin:0"></p>
+    <div class="row"><button type="button" id="costCancel" class="btn ghost">Cancel</button><button type="button" id="costOk" class="btn primary">Generate</button></div>
+  </div>
+</div>
 `;

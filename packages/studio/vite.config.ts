@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, renameSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { defineConfig, type Plugin } from "vite";
 
@@ -25,14 +25,37 @@ function localMixamo(): Plugin {
   };
 }
 
-export default defineConfig({
-  plugins: [localMixamo()],
-  server: { host: "127.0.0.1", port: 5180 },
-  // Scan both pages for dependencies up front, so opening the second one never re-optimises and reloads.
-  optimizeDeps: { entries: ["index.html", "path.html"] },
-  build: {
-    target: "es2022", chunkSizeWarningLimit: 1200,
-    // Two pages: the studio (index.html) and Beat Path (path.html).
-    rollupOptions: { input: { main: fileURLToPath(new URL("./index.html", import.meta.url)), path: fileURLToPath(new URL("./path.html", import.meta.url)) } },
-  },
+/**
+ * `--mode beat-path` builds only the Beat Path page, as plain static files with relative
+ * asset paths, its page renamed to index.html so it is the site root (docs/deploy.md).
+ */
+function beatPathAsIndex(outDir: string): Plugin {
+  return {
+    name: "beat-path-as-index",
+    apply: "build",
+    closeBundle() {
+      const from = `${outDir}/path.html`;
+      if (existsSync(from)) renameSync(from, `${outDir}/index.html`);
+    },
+  };
+}
+
+export default defineConfig(({ mode }) => {
+  const beatPathOnly = mode === "beat-path";
+  const outDir = fileURLToPath(new URL(beatPathOnly ? "./dist-beat-path" : "./dist", import.meta.url));
+  const inputs: Record<string, string> = { path: fileURLToPath(new URL("./path.html", import.meta.url)) };
+  if (!beatPathOnly) inputs.main = fileURLToPath(new URL("./index.html", import.meta.url));
+  return {
+    plugins: [localMixamo(), ...(beatPathOnly ? [beatPathAsIndex(outDir)] : [])],
+    // Relative asset paths: the build works from any folder or sub-path, with no server.
+    base: "./",
+    server: { host: "127.0.0.1", port: 5180 },
+    // Scan both pages for dependencies up front, so opening the second one never re-optimises and reloads.
+    optimizeDeps: { entries: ["index.html", "path.html"] },
+    build: {
+      target: "es2022", chunkSizeWarningLimit: 1200, outDir, emptyOutDir: true,
+      // The studio (index.html) and Beat Path (path.html); Beat Path alone with --mode beat-path.
+      rollupOptions: { input: inputs },
+    },
+  };
 });

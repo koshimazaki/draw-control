@@ -1,15 +1,17 @@
 /**
- * Generate in place: the reference drops, the model, Generate, the output pane beside the
- * preview (absent until there is a result; a draggable divider, double-click resets, a swap
- * control; the split remembered for the session), the output following the page's playhead,
- * the in-memory guide export, and the Gallery. The sibling repo's module supplies the key
- * panel, the generate call and a result player (vendor/); until then a faked result (the
- * guide itself, tinted) sits behind a dev flag (`?fake=1`, on in dev) so the layout can be judged.
- * A model receives the guide video, the reference images and the shot description only.
+ * Generate in place, through the Model Arena embed (arena.ts): the key panel in the header,
+ * the model choice and the composed prompt under the shot fields, the reference drops,
+ * Generate (the guide from exportGuideInMemory(), the reference blobs, the shot; the cost
+ * confirmed in the page's own dialog), progress and the result in the output pane beside
+ * the preview (absent until there is a result; a draggable divider, double-click resets, a
+ * swap control, the split remembered for the session), the result player following the
+ * page's clock, "Add to gallery", and the Gallery. A model receives the guide video, the
+ * reference images and the shot description only.
  */
 import { exportBundle } from "../export/bundle";
+import { ARENA_THEME, fakeFetch, loadArena, type ArenaKeyElement, type ArenaModule } from "./arena";
 import { EXAMPLES, exampleState } from "./examples";
-import { composePrompt, MODELS, type ModelId, type References } from "./generate";
+import { composePrompt, ERROR_MESSAGES, MAX_PRICE, MODELS, type ModelId, type References } from "./generate";
 import type { Page } from "./page";
 import { exportRange } from "./recipe-map";
 import { legendFor } from "./script";
@@ -17,20 +19,25 @@ import { EXAMPLE_TRACKS } from "./tracks";
 
 const EXPORT = { width: 1280, height: 720 } as const;
 const store = (() => { try { return window.sessionStorage; } catch { return null; } })();
+type Player = HTMLElement & { currentTime: number; play(): void; pause(): void };
 
 export function bindGenerate(p: Page) {
   const { $ } = p;
-  const refs = new Map<string, References>(), outputs = new Map<string, string>();
-  let model: ModelId = MODELS[0].id, swapped = false;
+  const refs = new Map<string, References>(), outputs = new Map<string, { url: string; record: unknown }>();
+  let model: ModelId = MODELS[0].id, swapped = false, arena: ArenaModule | null = null, key: ArenaKeyElement | null = null;
+  let player: Player | null = null, fakeResult = "";
   const fake = import.meta.env.DEV || new URLSearchParams(location.search).has("fake");
-  const video = document.createElement("video");
-  video.muted = true; video.playsInline = true; video.className = "output-video";
+  const style = document.createElement("style");
+  style.textContent = ARENA_THEME;
+  document.head.appendChild(style);
 
-  /**
-   * The guide bundle in memory: every file as a Blob (the same content as the zip), the
-   * references and the shot description. This is what a generate call works from; it sends
-   * the model guide.mp4, the references and the prompt from the shot description only.
-   */
+  /** The shot for a model: the three fields and the legend built from the figure's colours. */
+  const shot = () => ({ ...p.state.shot, legend: legendFor(p.state.figure) });
+  const currentPrompt = () => arena
+    ? arena.composePrompt(shot(), model, { character: !!refs.get(p.slot)?.character, environment: !!refs.get(p.slot)?.environment }, { seconds: p.state.clip, hasAudio: !!p.track }).prompt
+    : composePrompt(p.state.shot, legendFor(p.state.figure));
+
+  /** The guide bundle in memory: every file as a Blob (the same content as the zip), the references, the shot and the prompt. */
   async function exportGuideInMemory(onProgress?: (done: number, total: number) => void) {
     const recipe = p.recipe, range = exportRange(recipe, p.state.clip);
     const result = await exportBundle({ recipe, range, viewport: p.viewport, ...EXPORT, audio: p.track?.buffer ?? null, drive: p.drive, onProgress });
@@ -38,19 +45,23 @@ export function bindGenerate(p: Page) {
     const files = Object.fromEntries(Object.entries(result.contents).map(([name, bytes]) => [name, new Blob([bytes as BlobPart], { type: type(name) })]));
     return { files, references: { ...refs.get(p.slot) }, shot: recipe.shot ?? null, prompt: currentPrompt() };
   }
-  const currentPrompt = () => composePrompt(p.state.shot, legendFor(p.state.figure));
   (window as unknown as { beatPath: unknown }).beatPath = { exportGuideInMemory, prompt: currentPrompt };
 
-  // The two screens: the output pane exists only once there is a result.
+  // The two screens: the output pane exists only once there is a result (or a run in progress).
   const screens = $("screens");
   const setSplit = (f: number) => { screens.style.setProperty("--split", String(Math.max(0.2, Math.min(0.8, f)))); try { store?.setItem("beatPath.split", String(f)); } catch { /* storage off */ } };
   setSplit(Number(store?.getItem("beatPath.split") ?? 0.5) || 0.5);
-  function showOutput(url: string | null) {
-    $("screenOutput").hidden = !url;
-    $("divider").hidden = !url;
-    screens.classList.toggle("split", !!url);
-    if (url) { video.src = url; $("generateSlot").replaceChildren(video); }
-    p.viewport.canvas.dispatchEvent(new Event("resize"));
+  function setOutputPane(on: boolean) { $("screenOutput").hidden = !on; $("divider").hidden = !on; screens.classList.toggle("split", on); }
+  function showResult(url: string | null) {
+    setOutputPane(!!url);
+    $("addToGallery").hidden = !url || !arena;
+    if (!url) return;
+    player = document.createElement(arena ? "arena-player" : "video") as Player;
+    if (arena) { player.setAttribute("controls", "none"); player.setAttribute("label", "Output"); }
+    else Object.assign(player, { muted: true, playsInline: true });
+    player.className = "output-video";
+    player.setAttribute("src", url);
+    $("generateSlot").replaceChildren(player);
   }
   const divider = $("divider");
   divider.addEventListener("pointerdown", e => {
@@ -64,12 +75,12 @@ export function bindGenerate(p: Page) {
   divider.addEventListener("dblclick", () => setSplit(0.5));
   $("swapScreens").onclick = () => { swapped = !swapped; screens.classList.toggle("swapped", swapped); };
 
-  // The output follows the page's clock.
+  // The result follows the page's clock: its time set every frame (the embed's player matches it within a frame).
   const follow = () => {
-    if (!$("screenOutput").hidden && video.src) {
+    if (player && !$("screenOutput").hidden) {
       const t = Math.max(0, p.head - p.window0());
-      if (Math.abs(video.currentTime - t) > 0.08) video.currentTime = t;
-      if (p.player.playing && video.paused) void video.play().catch(() => {}); else if (!p.player.playing && !video.paused) video.pause();
+      if (arena) player.currentTime = t;
+      else if (Math.abs(player.currentTime - t) > 0.08) player.currentTime = t;
     }
     requestAnimationFrame(follow);
   };
@@ -77,59 +88,87 @@ export function bindGenerate(p: Page) {
 
   // References: per example, never in the recipe or the script.
   const thumb = (id: string, blob?: Blob) => { const el = $(id); el.style.backgroundImage = blob ? `url(${URL.createObjectURL(blob)})` : ""; el.classList.toggle("set", !!blob); };
-  for (const [key, input, th] of [["character", "refCharacter", "thumbCharacter"], ["environment", "refEnvironment", "thumbEnvironment"]] as const) {
+  for (const [k, input, th] of [["character", "refCharacter", "thumbCharacter"], ["environment", "refEnvironment", "thumbEnvironment"]] as const) {
     $<HTMLInputElement>(input).onchange = () => {
       const file = $<HTMLInputElement>(input).files?.[0];
       if (!file || !file.type.startsWith("image/")) return;
-      refs.set(p.slot, { ...refs.get(p.slot), [key]: file });
+      refs.set(p.slot, { ...refs.get(p.slot), [k]: file });
       thumb(th, file);
-      p.say(`${key === "character" ? "Character sheet" : "Environment"}: ${file.name}`);
+      sync();
+      p.say(`${k === "character" ? "Character sheet" : "Environment"}: ${file.name}`);
     };
   }
 
-  // Model and Generate.
-  const syncModel = () => document.querySelectorAll<HTMLButtonElement>('[data-control="model"] button').forEach(b => b.classList.toggle("on", b.dataset.value === model));
+  // Model choice and the prompt it will get.
+  const labelOf = (id: string) => arena?.offeredModels().find(m => m.key === id)?.name ?? MODELS.find(m => m.id === id)?.label ?? id;
+  function sync() {
+    document.querySelectorAll<HTMLButtonElement>('[data-control="model"] button').forEach(b => { b.classList.toggle("on", b.dataset.value === model); b.textContent = labelOf(b.dataset.value!); });
+    $("shotLegend").textContent = currentPrompt();
+    $("shotLegend").title = "The prompt this model gets: the shot description, the colour legend and how this model names its inputs";
+  }
   document.querySelector('[data-control="model"]')!.addEventListener("click", e => {
     const v = (e.target as HTMLElement).closest("button")?.dataset.value as ModelId | undefined;
-    if (v) { model = v; syncModel(); }
+    if (v) { model = v; sync(); }
   });
-  syncModel();
+
+  /** The page's own cost dialog: resolves true only on Generate. */
+  const confirmCost = (q: { usd: number; modelName: string; inputs: unknown[] }) => new Promise<boolean>(resolve => {
+    $("costText").textContent = `Up to ${q.usd.toFixed(2)} USD on ${q.modelName} (limit ${MAX_PRICE} USD). It sends the guide video${(q.inputs?.length ?? 0) > 1 ? ", the reference images" : ""} and the prompt from your shot description.${fake && !key?.connected ? " Local preview: nothing is sent and nothing is charged." : ""}`;
+    $("costDialog").hidden = false;
+    $("costOk").focus();
+    const done = (v: boolean) => { $("costDialog").hidden = true; resolve(v); };
+    $("costOk").onclick = () => done(true);
+    $("costCancel").onclick = () => done(false);
+  });
+
   $("runGenerate").onclick = async () => {
     if (p.busy) return;
-    const label = MODELS.find(m => m.id === model)!.label;
-    if (!fake) { p.say(`Add your Runware API key to generate with ${label} (the key panel arrives with the generate module)`); return; }
+    if (!arena) { p.say("Generate needs the Model Arena embed in vendor/ (npm run vendor:arena)."); return; }
+    if (!key?.connected && !fake) { p.say("Add your Runware API key first (top right)."); return; }
     p.busy = true;
-    showOutput(outputs.get(p.slot) ?? null);
-    $("screenOutput").hidden = false; $("divider").hidden = false; screens.classList.add("split");
-    const bar = $("genProgress"), note = $("outputNote");
-    bar.hidden = false; note.textContent = `Generating with ${label}…`;
+    const bar = $("genProgress"), note = $("outputNote"), fill = bar.firstElementChild as HTMLElement;
+    setOutputPane(true); $("addToGallery").hidden = true;
+    bar.hidden = false; note.textContent = "Rendering the guide…"; fill.style.width = "0%";
     $("generateSlot").replaceChildren(note, bar);
     try {
-      const bundle = await exportGuideInMemory((d, t) => { (bar.firstElementChild as HTMLElement).style.width = `${Math.round(d / t * 100)}%`; });
-      // Faked result (dev flag): the guide itself stands in for the model's clip.
-      const url = URL.createObjectURL(bundle.files["guide.mp4"]);
-      outputs.set(p.slot, url);
-      showOutput(url);
-      video.classList.add("fake");
-      p.say(`Faked result (dev): the ${label} call is not wired yet; the prompt was "${bundle.prompt}"`);
+      const bundle = await exportGuideInMemory((d, t) => { fill.style.width = `${Math.round(d / t * 40)}%`; });
+      fakeResult = URL.createObjectURL(bundle.files["guide.mp4"]);
+      const r = refs.get(p.slot) ?? {};
+      const result = await arena.generateFromGuide({
+        guide: bundle.files, model, shot: shot(), references: { character: r.character, environment: r.environment }, maxPrice: MAX_PRICE,
+        key: key?.connected ? key : "local-preview-key-0000000000000000", confirm: confirmCost,
+        onProgress: (g: { stage: string; message: string; progress?: number }) => { note.textContent = g.message; fill.style.width = `${40 + Math.round((g.progress ?? ({ plan: 5, confirm: 10, upload: 30, submit: 40, poll: 60, done: 100 } as Record<string, number>)[g.stage] ?? 50) * 0.6)}%`; },
+        ...(fake && !key?.connected ? { fetch: fakeFetch(() => fakeResult), poll: { initialDelayMs: 100, intervalMs: 100, maxIntervalMs: 200 } } : {}),
+      });
+      outputs.set(p.slot, { url: result.videoURL, record: result.record });
+      showResult(result.videoURL);
+      if (fake && !key?.connected) player?.classList.add("fake");
+      p.say(`${labelOf(model)}: done${result.costUsd !== null ? `, ${result.costUsd.toFixed(2)} USD` : ""}${fake && !key?.connected ? " (local preview: the guide stands in for the result)" : ""}`);
       renderGallery();
-    } catch (e) { note.textContent = `Generate failed: ${(e as Error).message}`; }
-    finally { p.busy = false; bar.hidden = true; }
+    } catch (e) {
+      const err = e as { code?: string; message: string };
+      const plain = err.code ? ERROR_MESSAGES[err.code] ?? err.message : err.message;
+      note.textContent = err.code === "refused" || err.code === "provider" ? `${plain}: ${err.message}` : plain;
+      p.say(note.textContent);
+      if (!outputs.get(p.slot)) { bar.hidden = true; } else showResult(outputs.get(p.slot)!.url);
+    } finally { p.busy = false; bar.hidden = true; }
+  };
+  $("addToGallery").onclick = () => {
+    const out = outputs.get(p.slot), gallery = document.querySelector("arena-gallery") as (HTMLElement & { add(r: unknown): void }) | null;
+    if (out && gallery) { gallery.add(out.record); p.say("Added to the gallery below"); }
   };
 
-  // The Gallery: the three examples with their inputs and outputs.
+  // The Gallery: the three examples with their inputs and outputs, then the runs added this session.
   function renderGallery() {
-    const grid = $("gallerySlot");
-    grid.replaceChildren(...EXAMPLES.map((ex, i) => {
-      const s = exampleState(i), card = document.createElement("article");
+    $("gallerySlot").replaceChildren(...EXAMPLES.map((ex, i) => {
+      const s = exampleState(i), card = document.createElement("article"), t = EXAMPLE_TRACKS[ex.id], out = outputs.get(String(i));
       card.className = "gallery-card panel";
-      const t = EXAMPLE_TRACKS[ex.id], out = outputs.get(String(i));
       const h = document.createElement("h3"); h.textContent = `Example ${i + 1}: ${ex.label}`;
       const media = document.createElement("div"); media.className = "gallery-media";
-      if (out) { const v = document.createElement("video"); v.src = out; v.muted = true; v.loop = true; v.controls = true; media.append(v); }
+      if (out) { const v = document.createElement("video"); v.src = out.url; v.muted = true; v.loop = true; v.controls = true; media.append(v); }
       else { const ph = document.createElement("p"); ph.className = "muted"; ph.textContent = "No clip yet: load the example and press Generate."; media.append(ph); }
       const meta = document.createElement("dl");
-      for (const [k, v] of [["Figure", s.figure.shape], ["Music", `${t.name}`], ["Subject", s.shot.subject], ["Environment", s.shot.environment], ["Action", s.shot.action]]) {
+      for (const [k, v] of [["Figure", s.figure.shape], ["Music", t.name], ["Subject", s.shot.subject], ["Environment", s.shot.environment], ["Action", s.shot.action]]) {
         const dt = document.createElement("dt"), dd = document.createElement("dd"); dt.textContent = k; dd.textContent = v; meta.append(dt, dd);
       }
       const open = document.createElement("button"); open.type = "button"; open.className = "btn outline"; open.textContent = "Load this example";
@@ -140,13 +179,28 @@ export function bindGenerate(p: Page) {
   }
   renderGallery();
 
+  // The embed: the key panel in the header, the model names, the gallery element.
+  void loadArena().then(m => {
+    arena = m;
+    if (m) {
+      key = document.createElement("arena-key") as ArenaKeyElement;
+      key.setAttribute("signup-url", "https://runware.ai");
+      $("keySlot").replaceChildren(key);
+      key.addEventListener("arena-key-change", () => p.say(key!.connected ? "Runware key connected (kept in this tab only)" : "Runware key removed"));
+      $("arenaGallerySlot").replaceChildren(document.createElement("arena-gallery"));
+    }
+    sync();
+  });
+  sync();
+
   return {
-    exportGuideInMemory,
+    exportGuideInMemory, sync,
     /** A new slot: its references, its output (if any). */
     onSlot(slot: string) {
       const r = refs.get(slot);
       thumb("thumbCharacter", r?.character); thumb("thumbEnvironment", r?.environment);
-      showOutput(outputs.get(slot) ?? null);
+      showResult(outputs.get(slot)?.url ?? null);
+      sync();
     },
   };
 }

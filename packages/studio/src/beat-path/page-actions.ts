@@ -12,7 +12,7 @@ import { DEFAULT_CAMERA_PATH } from "./examples";
 import { removeAt, splitAt, type LaneView, type MenuField, type MenuItem } from "./lanes";
 import type { Page } from "./page";
 import { beatPathRecipe, exportRange } from "./recipe-map";
-import { HIT_CHOICES, LABELS, LOCK_CHOICES, legendFor, fitLanes, setWord, toScript, type BeatPathState, type Block, type CameraWord, type ClipChoice } from "./script";
+import { HIT_CHOICES, LABELS, LOCK_CHOICES, fitLanes, setWord, toScript, type BeatPathState, type Block, type CameraWord, type ClipChoice } from "./script";
 
 /** What each block's shape on the map is, said in its popover. */
 const CAMERA_NOTES: Record<CameraWord, string> = {
@@ -72,7 +72,6 @@ export function bindActions(p: Page) {
       const el = input(`shot${k[0].toUpperCase()}${k.slice(1)}`);
       if (document.activeElement !== el) el.value = s.shot[k];
     }
-    $("shotLegend").textContent = `Legend: ${legendFor(s.figure)}.`;
     const pts = p.tool === "subject" ? s.subject : s.camera;
     const empty = $("mapEmpty");
     empty.hidden = pts.length >= 2;

@@ -154,6 +154,7 @@ export function startBeatPath(root: HTMLElement) {
     $("resetMarkers").textContent = `Reset markers (${state.muted.length})`;
     characterLane.render(); cameraLane.render();
     actions.sync();
+    hooks.generate?.sync();
     head = Math.max(t0, Math.min(t1, head));
     dirty = true;
   }
@@ -262,7 +263,7 @@ export function startBeatPath(root: HTMLElement) {
     else { state = fitLanes(state, totalBeats()); rebuild(); }
     map.fit();
     actions.sync();
-    generate.onSlot(next);
+    hooks.generate?.onSlot(next);
   }
   async function useFile(file: File) {
     strip.message = `Decoding ${file.name}…`;
@@ -271,6 +272,8 @@ export function startBeatPath(root: HTMLElement) {
     catch (e) { strip.message = ""; rebuild(); say(`Could not read the track: ${(e as Error).message}`); }
   }
 
+  /** Bound after the page object exists (it needs the page); the rebuild reaches it through here. */
+  const hooks: { generate?: ReturnType<typeof bindGenerate> } = {};
   const page = {
     $, map, menu, viewport, strip, player,
     get state() { return state; }, get recipe() { return recipe; }, get tool() { return tool; }, get view() { return view; },
@@ -287,11 +290,11 @@ export function startBeatPath(root: HTMLElement) {
     load(next: BeatPathState) { update(next); map.fit(); },
   };
   const actions = bindActions(page);
-  const generate = bindGenerate(page);
+  hooks.generate = bindGenerate(page);
   rebuild();
   map.fit();
   // First run: Example 1 with its own music, ready after one click on Play.
-  void useExampleTrack(state.track ?? "flyer").then(() => { map.fit(); generate.onSlot(slot); });
+  void useExampleTrack(state.track ?? "flyer").then(() => { map.fit(); hooks.generate?.onSlot(slot); });
   requestAnimationFrame(tick);
   return page;
 }
