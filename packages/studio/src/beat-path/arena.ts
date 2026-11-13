@@ -44,7 +44,7 @@ export function fakeFetch(result: () => string) {
 /** The embed's tokens from the page's (both themes). */
 export const ARENA_THEME = `arena-key, arena-player, arena-gallery {
   --ma-bg: var(--surface-sunk); --ma-card: var(--surface); --ma-fg: var(--text); --ma-muted: var(--text-muted); --ma-line: var(--border);
-  --ma-input: var(--surface-2); --ma-chip: var(--surface-hover); --ma-accent: var(--accent); --ma-accent-fg: var(--on-accent);
-  --ma-warn: var(--danger); --ma-ok: var(--accent); --ma-radius: var(--radius-md); --ma-radius-lg: var(--radius-lg); --ma-gap: 8px;
+  --ma-input: var(--surface-2); --ma-chip: var(--surface-hover); --ma-accent: var(--text); --ma-accent-fg: var(--bg);
+  --ma-warn: var(--danger); --ma-ok: var(--rail-fill); --ma-radius: var(--radius-md); --ma-radius-lg: var(--radius-lg); --ma-gap: 8px;
   --ma-font: var(--font-sans); --ma-mono: var(--font-mono);
 }`;

@@ -41,7 +41,7 @@ export class LaneView<W extends string> {
       d.setAttribute("role", "listitem");
       const text = b.phrase ?? this.host.label(b.word);
       d.setAttribute("aria-label", `${text}, beats ${b.from} to ${b.to}`);
-      if (b.phrase) d.title = b.phrase;
+      d.title = text;   // the full words when the block is too short to show them
       d.append(el("i"), el("span", "", text));
       d.addEventListener("click", e => { if (!(e.target as HTMLElement).classList.contains("edge")) this.host.open(d, i, this.beatAt(e.clientX)); });
       d.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); this.host.open(d, i, (b.from + b.to) / 2); } });
@@ -131,7 +131,7 @@ export class Menu {
     const r = anchor.getBoundingClientRect(), m = this.root.getBoundingClientRect();
     const top = r.top - m.height - 6 > 8 ? r.top - m.height - 6 : r.bottom + 6;
     this.root.style.left = `${Math.max(8, Math.min(window.innerWidth - m.width - 8, r.left))}px`;
-    this.root.style.top = `${top}px`;
+    this.root.style.top = `${Math.max(8, Math.min(window.innerHeight - m.height - 8, top))}px`;   // always inside the viewport
     const buttons = [...this.root.querySelectorAll<HTMLButtonElement>("button:not(:disabled)")];
     if (input) input.focus(); else (buttons.find(b => b.classList.contains("on")) ?? buttons[0])?.focus();
     const key = (e: KeyboardEvent) => {

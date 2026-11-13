@@ -75,17 +75,18 @@ export function bindActions(p: Page) {
     for (const k of ["subject", "environment", "action"] as const) {
       const el = input(`shot${k[0].toUpperCase()}${k.slice(1)}`);
       if (document.activeElement !== el) el.value = s.shot[k];
+      el.title = s.shot[k];   // the whole text on hover when the field cuts it
     }
     const pts = p.tool === "subject" ? s.subject : p.tool === "camera" ? s.camera : [];
     const empty = $("mapEmpty");
     const rigs = p.tool === "camera" && pts.length < 2 && !s.cameraLane.some(b => b.word === "path");
     empty.hidden = pts.length >= 2 || p.tool === "blocks" || rigs;
     empty.textContent = p.view === "side" ? `Draw the ${p.tool} path in the top view first.` : `No ${p.tool} path yet: press Draw new, then drag on the map or click to place points.`;
-    $("mapHint").textContent = rigs ? "The camera is following the blocks in the Camera lane (its track is drawn). Draw new to fly your own path for a block."
-      : p.tool === "blocks" ? (p.pen === "draw" ? "Drag a rectangle to add a block · Escape stops" : "Click a block to select · drag to move · drag a corner to resize · Cmd/Ctrl-D duplicates · Delete removes")
+    $("mapHint").textContent = rigs ? "The camera follows the Camera lane · Draw new flies your own path"
+      : p.tool === "blocks" ? (p.pen === "draw" ? "Drag a rectangle to add a block · Esc stops" : "Click to select · drag to move · corners resize · ⌘D duplicates · Delete removes")
       : p.view !== "top" ? `Drag a point up or down to set the ${p.tool}’s height`
-      : p.pen === "draw" ? "Drawing a new path: drag a stroke, or click to place points · Escape stops"
-      : "Drag a point to move it · Delete removes the selected point · Draw new to start a path";
+      : p.pen === "draw" ? "Drag a stroke or click points · Esc stops"
+      : "Drag points to move · Delete removes · Draw new starts a path";
     $("mapHint").title = $("mapHint").textContent ?? "";   // the full hint when two lines cut it
     $("map").classList.toggle("pen", p.pen === "draw");
   }

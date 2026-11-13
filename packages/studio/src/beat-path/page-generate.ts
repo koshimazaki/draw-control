@@ -100,7 +100,7 @@ export function bindGenerate(p: Page) {
   function sync() {
     document.querySelectorAll<HTMLButtonElement>('[data-control="model"] button').forEach(b => { b.classList.toggle("on", b.dataset.value === model); b.textContent = labelOf(b.dataset.value!); });
     $("shotLegend").textContent = currentPrompt();
-    $("shotLegend").title = "The prompt this model gets: the shot description, the colour legend and how this model names its inputs";
+    $("shotLegend").title = `The prompt this model gets:\n\n${$("shotLegend").textContent}`;
   }
   document.querySelector('[data-control="model"]')!.addEventListener("click", e => {
     const v = (e.target as HTMLElement).closest("button")?.dataset.value as ModelId | undefined;

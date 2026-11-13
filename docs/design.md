@@ -17,18 +17,52 @@ Lineage, in three lines:
 
 **Since 13 November the Runware theme is dark** (the site's own dark look), with the map as a light paper surface; the neutral theme stays the repo default and stays dark (the studio's palette): one set of tokens, two palettes, and a third small set (`--map-*`) for the map's surface so it can differ from the page.
 
+## Round 5 (13 November): re-based on the owner's post draft
+
+The `runware` theme now follows **the owner's post draft** (a private blog draft; only its visual system is taken, none of its text) first and runware.ai's CSS second: where they differ, the draft wins. The draft itself reads its tokens from the Runware blog, so most values agree; the differences are below.
+
+| Token here | Value | From the owner's post draft | Was (site) |
+| --- | --- | --- | --- |
+| `--bg` | `#1a1a1a` | `--background` | same |
+| `--surface`, `--popover` | `#1c1c1c` | `--card` | same |
+| `--surface-2`, `--block-bg` | `#292929` | `--muted` (chips, code, tiles) | `#252525` |
+| `--surface-sunk` (fields) | `#2e2e2e` | `--input` | `#1b1b1b` |
+| `--border`, `--seg-on` | `#454545` | `--border` | `#393939` |
+| `--text` | `#f2f2f2` | `--foreground` | same |
+| `--text-muted` | `#d9d9d9` | `--muted-foreground` (secondary text) | `#9a9a9a` |
+| `--text-dim` (labels, placeholders) | `#8f8f8f` | the draft's dim `#6b6b6b`, lifted to 4.5:1 on `#1c1c1c` at 12 px | new |
+| `--accent` (Generate only) | `#afff9f` | `--primary` | same |
+| `--accent-hover` | lime at 60 % | `.btn:hover` (`color-mix(primary 60 %, transparent)`) | `#90f77c` |
+| `--rail-fill` | `#4f8a44` | the rail's fill `--accent #345c2d` and its edge `#4f8a44` (the edge colour, so a 1 px line reads on video) | new |
+| `--rail`, `--rail-dot` | `#454545`, `#f2f2f2` | `.rail-line` border colour; the rail dot (lime in the draft, light here: lime is Generate's) | new |
+| `--warn` | `#ffff7d` | `--yellow` | new |
+| `--radius-sm` / `-md` / `-lg` | `5px` / `8px` / `12px` | chips 5 px, buttons and tiles 8 px, cards 12 px | `4.2` / `5.6` / `7px` |
+| `--text-xs` / `-sm` / `-md` / `-lg` | `12` / `13` / `14` / `15px` | labels and chips 12, small text 13, table and controls 14, body 15 | `11` / `12` / `13` / `15px` (neutral keeps these) |
+| `--control-h` | `32px` | between the draft's 28 px list buttons and 36 px call to action; one screen at 1280×720 | `30px` |
+| fonts | Figtree, JetBrains Mono | the draft's faces (both OFL, Google Fonts) | same |
+
+**Player.** The draft's player is a dark glass circle (black at 50 %, a 1 px white ring at 20 %, a 4 px blur) with a filled rounded-triangle play glyph, bottom left over the frame; its timeline is a 1 px rail with a deep green fill and a 7 px dot; numbers sit in 12 px mono. Beat Path uses exactly that: one slim bar over the bottom of the screens (shown while paused, on hover, on keyboard focus), the same button for the dock and the gallery rows in a quiet outlined form. The big Play overlay is gone; a click on the picture toggles. Glyph shapes after Lucide's play and pause (ISC).
+
+**Hierarchy.** Lime is Generate's alone. Selected segments, toggles, slider thumbs, the playhead, the focus ring, menu ticks, lock chips and the key dot read in text colours (the connected key dot in the rail green). Mono is kept for numbers and beat readouts (HUD, time, lock values, slider values, map distances); typed camera phrases and labels use the sans face. Uppercase labels follow the draft's kicker: 12 px, `.05em`.
+
+**Rhythm.** One 4 px scale (`--s-1` … `--s-6`); the page gap is `--s-4` and the side padding `--s-5`. The right column has two rows (screens, shot fields): the screens fill the flexible row and each picture keeps 16:9 inside it by container units, so nothing jumps when a result arrives or the divider moves. The map pane has three rows (tool row, canvas, a fixed-height footer).
+
+**Map.** Distance labels on the top and left edges, spaced 2 to 64 m so they never touch, with a halo of the paper colour; camera block labels in the sans face with the same halo. Truncated text (shot fields, the prompt line, the map hint, lane blocks) shows in full on hover.
+
+**Favicon and header mark.** A short curved path with two beat ticks and a dot travelling it, lime on the page's dark square (`public/icons/beat-path.svg`, a 32 px PNG fallback beside it); the header mark is the same drawing.
+
 ## Files
 
 | File | What |
 | --- | --- |
-| `packages/studio/src/beat-path/ui/components.css` | Scales (type, spacing, motion) and the components: button (`.btn`, `.primary`, `.ghost`, `.outline`), icon button (`.icon-btn`, play and pause), segmented control (`.seg`), slider (`.slider`), toggle (`.toggle`), menu (`.menu`), lane and lane block (`.lane`, `.block`), panel (`.panel`), tooltip (`[data-tip]`), dialog. Every state: hover, `:focus-visible` (a 2 px ring in `--ring`), active (1 px press), disabled (45 % opacity). Transitions 120–200 ms on one easing. |
+| `packages/studio/src/beat-path/ui/components.css` | Scales (type, spacing, motion) and the components: button (`.btn`, `.primary`, `.ghost`, `.outline`, `.overlay`), play button (`.play-btn`, `.quiet`; glyphs in `ui/glyph.ts`), segmented control (`.seg`), slider (`.slider`), toggle (`.toggle`), menu (`.menu`), lane and lane block (`.lane`, `.block`), panel (`.panel`), tooltip (`[data-tip]`), dialog. Every state: hover, `:focus-visible` (a 2 px ring in `--ring`), active (1 px press), disabled (45 % opacity). Transitions 120–200 ms on one easing. |
 | `themes/neutral.css` | The default: unbranded, the studio's dark palette. |
-| `themes/runware.css` | `?theme=runware`: light, lime accent, Figtree. Loads Figtree and JetBrains Mono from Google Fonts only in this theme. |
+| `themes/runware.css` | `?theme=runware`: dark, the owner's post draft's tokens (above), lime for Generate only, Figtree. Loads Figtree and JetBrains Mono from Google Fonts only in this theme. |
 | `beat-path.css` | The page layout; tokens and components only. |
 
 Switch: open `path.html?theme=runware`. The parameter sets `data-theme="runware"` on `<html>`; both theme files are bundled, the neutral one applies otherwise. The Runware theme adds the footer-style line "Built on Runware · unofficial demo" in the header; there is no Runware logo, wordmark or favicon anywhere.
 
-## Runware dark theme (13 November): values and sources
+## Runware dark theme (13 November): values and sources (partly superseded by round 5 above)
 
 From `https://runware.ai/` `:root` custom properties (its dark site theme), read 12 and 13 November 2026.
 

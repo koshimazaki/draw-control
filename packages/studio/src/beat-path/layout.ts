@@ -13,15 +13,18 @@ import { PLAY_GLYPH } from "./ui/glyph";
 const seg = (name: string, values: readonly (string | number)[], labels: Record<string, string>, tip = "") =>
   `<div class="seg" role="radiogroup" data-control="${name}"${tip ? ` aria-label="${tip}"` : ""}>${values.map(v => `<button type="button" role="radio" data-value="${v}">${labels[v]}</button>`).join("")}</div>`;
 
+/** The header mark: the favicon's drawing (a curved path, two beat ticks, a dot travelling it). */
+const MARK = `<svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><rect x="0.5" y="0.5" width="31" height="31" rx="7.5" fill="#1a1a1a" stroke="#454545"/><path d="M6 23C11 8 21 26 26 9" fill="none" stroke="#afff9f" stroke-width="2.6" stroke-linecap="round"/><path d="M12.2 13.2v6.6M19.6 13.6v6.6" stroke="#afff9f" stroke-width="2" stroke-linecap="round" opacity=".85"/><circle cx="26" cy="9" r="3.4" fill="#afff9f" stroke="#1a1a1a" stroke-width="1.4"/></svg>`;
+
 export const LAYOUT = `
 <div class="editor" id="editor">
 <header class="top">
-  <div class="brand"><span class="mark" aria-hidden="true"></span><h1>${APP_NAME}</h1></div>
+  <div class="brand">${MARK}<h1>${APP_NAME}</h1></div>
   ${seg("example", ["0", "1", "2", "own"], { 0: "Example 1", 1: "Example 2", 2: "Example 3", own: "Your own" }, "Example")}
   <div class="top-right">
     <a class="btn ghost" href="#gallery">Gallery</a>
     <a class="btn ghost oss tip-below" href="${REPO_URL}" target="_blank" rel="noopener" data-tip="Open source (${LICENCE}). Runs in your browser with your own Runware key">Get the code ↗</a>
-    <div class="key-slot" id="keySlot"><button type="button" class="btn outline key-placeholder tip-below" id="keyButton" data-tip="The key panel mounts here when it is installed (vendor/)"><span class="key-dot" aria-hidden="true"></span><span>Add your Runware API key</span></button></div>
+    <div class="key-slot" id="keySlot"><button type="button" class="btn outline key-placeholder tip-below tip-end" id="keyButton" data-tip="The key panel mounts here when it is installed (vendor/)"><span class="key-dot" aria-hidden="true"></span><span>Add your Runware API key</span></button></div>
   </div>
 </header>
 <main class="stage">
@@ -36,11 +39,11 @@ export const LAYOUT = `
       <p class="map-empty" id="mapEmpty" hidden></p>
     </div>
     <div class="map-bar map-foot">
-      <div class="map-zoom"><button type="button" id="zoomIn" class="btn ghost" aria-label="Zoom in" data-tip="Zoom in (ctrl/cmd + wheel)">+</button><button type="button" id="zoomOut" class="btn ghost" aria-label="Zoom out">−</button><button type="button" id="zoomFit" class="btn ghost" data-tip="Frame everything (pan: scroll, middle button, or drag with Space held)">Fit</button></div>
+      <div class="map-zoom"><button type="button" id="zoomIn" class="btn ghost tip-start" aria-label="Zoom in" data-tip="Zoom in (ctrl/cmd + wheel)">+</button><button type="button" id="zoomOut" class="btn ghost" aria-label="Zoom out">−</button><button type="button" id="zoomFit" class="btn ghost tip-start" data-tip="Frame everything (pan: scroll, middle button, or drag with Space held)">Fit</button></div>
       <p class="map-hint muted" id="mapHint"></p>
       <div class="map-tools end">
         <label class="pick" id="boxHeightRow" hidden>Height <input id="boxHeight" class="field num" type="number" min="0.2" max="60" step="0.5" /> m</label>
-        <label class="slider" id="cornersRow" data-tip="From sharp corners (hard turns) to a round curve"><span>Corners</span><input id="corners" type="range" min="0" max="1" step="0.05" /><output id="cornersOut"></output></label>
+        <label class="slider tip-end" id="cornersRow" data-tip="From sharp corners (hard turns) to a round curve"><span>Corners</span><input id="corners" type="range" min="0" max="1" step="0.05" /><output id="cornersOut"></output></label>
         <button type="button" id="clearPath" class="btn ghost">Clear</button>
       </div>
     </div>
@@ -55,7 +58,7 @@ export const LAYOUT = `
       <div class="divider" id="divider" role="separator" aria-orientation="vertical" tabindex="0" hidden data-tip="Drag to resize · double-click resets"></div>
       <div class="screen" id="screenOutput" hidden>
         <div class="output-frame" id="generateSlot"><p id="outputNote" class="muted">Output</p><div class="progress" id="genProgress" hidden><span></span></div></div>
-        <div class="screen-actions"><button type="button" id="addToGallery" class="btn overlay" hidden>Add to gallery</button><button type="button" id="swapScreens" class="btn overlay swap tip-below" aria-label="Swap the two sides" data-tip="Swap the two sides">⇄</button></div>
+        <div class="screen-actions"><button type="button" id="addToGallery" class="btn overlay" hidden>Add to gallery</button><button type="button" id="swapScreens" class="btn overlay swap tip-below tip-end" aria-label="Swap the two sides" data-tip="Swap the two sides">⇄</button></div>
       </div>
       <!-- One slim bar over the bottom of the screens: shown while paused and on hover. -->
       <div class="vbar" id="pageTransport">

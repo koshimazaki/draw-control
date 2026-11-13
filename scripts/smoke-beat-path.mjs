@@ -140,7 +140,7 @@ export async function smokeBeatPath(browser, base, { fail, OUT, SHOTS }) {
   await page.screenshot({ path: `${SHOTS}beat-path-blocks.png` });
   await page.click('[data-control="tool"] [data-value="camera"]');
   const hint = await page.textContent("#mapHint");
-  if (!/following the blocks in the Camera lane/.test(hint ?? "")) fail(`the camera tool does not say the camera follows the lane: ${hint}`);
+  if (!/camera follows the Camera lane/.test(hint ?? "")) fail(`the camera tool does not say the camera follows the lane: ${hint}`);
   await page.click('[data-control="tool"] [data-value="subject"]');
 
   // Every example loads framed: each path point, camera-track point and scenery box inside the map.

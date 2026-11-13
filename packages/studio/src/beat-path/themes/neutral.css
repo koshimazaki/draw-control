@@ -7,16 +7,17 @@
   --radius-sm: 5px; --radius-md: 7px; --radius-lg: 10px; --radius-pill: 999px;
   --shadow-xs: 0 1px 1px rgba(0, 0, 0, .25); --shadow-sm: 0 1px 3px rgba(0, 0, 0, .3); --shadow-lg: 0 10px 30px rgba(0, 0, 0, .45);
 
-  --bg: #121316; --surface: #18191c; --surface-2: #202227; --surface-sunk: #15161a; --surface-hover: #2a2d33; --seg-on: #2e3138; --popover: #1d1f23;
-  --border: #2a2d33; --border-strong: #464a52; --text: #e9eaec; --text-muted: #9196a0;
-  --accent: #ffd34d; --accent-hover: #ffdd70; --accent-ink: #ffd34d; --on-accent: #17181b; --ring: #ffd34d;
+  --bg: #121316; --surface: #18191c; --surface-2: #202227; --surface-sunk: #15161a; --surface-hover: #2a2d33; --seg-on: #34373f; --popover: #1d1f23;
+  --border: #2a2d33; --border-strong: #464a52; --text: #e9eaec; --text-muted: #a3a8b1; --text-dim: #6f747c;
+  /* the accent is Generate's alone; selection, focus and the playhead read in text colours */
+  --accent: #ffd34d; --accent-hover: #ffdd70; --accent-ink: #e9eaec; --on-accent: #17181b; --ring: #a3a8b1;
   --track: #353840; --thumb: #e9eaec;
   --rail: #3a3e45; --rail-fill: #8c7426; --rail-dot: #e9eaec;
   --block-bg: #23262c; --block-border: #30343b; --block-hover: #2b2f36;
-  --tooltip-bg: #e9eaec; --tooltip-text: #17181b; --scrim: rgba(8, 9, 11, .6); --danger: #ff7a8a;
+  --tooltip-bg: #e9eaec; --tooltip-text: #17181b; --scrim: rgba(8, 9, 11, .6); --danger: #ff7a8a; --warn: #ffd34d;
 
   --subject: #ff8a3d; --camera: #6cc4ff; --kick: #ff5d73; --snare: #a594ff; --station: #ff5d73;
   --map-subject: #ff8a3d; --map-camera: #6cc4ff; --map-station: #ff5d73;
   --map-bg: #16181b; --map-minor: #202328; --map-major: #2b2f35; --map-axis: #3a3e45; --map-text: #6f747c;
-  --wave: #4b5059; --wave-bg: #1a1c20; --beat-line: #24272c; --bar-line: #30343b; --playhead: #ffd34d; --played: rgba(255, 211, 77, .1);
+  --wave: #4b5059; --wave-bg: #1a1c20; --beat-line: #24272c; --bar-line: #30343b; --playhead: #e9eaec; --played: rgba(233, 234, 236, .06);
 }

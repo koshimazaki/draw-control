@@ -113,6 +113,8 @@ export class MapView {
   /** Re-read the theme's colours. */
   retheme() {
     for (const k of ["map-bg", "map-minor", "map-major", "map-axis", "map-text", "text", "bg"]) this.colours[k] = token(`--${k}`);
+    // The theme's faces for the map's labels: sans for words, mono for numbers.
+    this.colours.sans = token("--font-sans") || "system-ui, sans-serif"; this.colours.mono = token("--font-mono") || "ui-monospace, monospace";
     // The map has its own surface (a light paper in the Runware theme): its path colours are its own tokens.
     for (const k of ["subject", "camera", "station"]) this.colours[k] = token(`--map-${k}`) || token(`--${k}`);
     this.resize();
@@ -292,6 +294,12 @@ export class MapView {
     }
   }
 
+  /** Text with a halo of the map's own surface, so it reads over grid lines, blocks and paths. */
+  private label(g: CanvasRenderingContext2D, text: string, x: number, y: number, colour: string, align: CanvasTextAlign) {
+    g.save(); g.textAlign = align; g.lineJoin = "round"; g.lineWidth = 3; g.strokeStyle = this.colours["map-bg"];
+    g.strokeText(text, x, y); g.fillStyle = colour; g.fillText(text, x, y); g.restore();
+  }
+
   private paintBase() {
     const g = this.base.getContext("2d")!, C = this.colours;
     g.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
@@ -305,11 +313,9 @@ export class MapView {
       g.beginPath(); g.moveTo(Math.round(x) + 0.5, 0); g.lineTo(Math.round(x) + 0.5, this.h); g.stroke();
       g.beginPath(); g.moveTo(0, Math.round(y) + 0.5); g.lineTo(this.w, Math.round(y) + 0.5); g.stroke();
     }
-    g.fillStyle = C["map-text"]; g.font = "10px ui-monospace, Menlo, monospace";
-    for (let m = -16; m <= 16; m += 4) if (m) { const [x, y] = this.top({ x: m, z: 0 }); g.fillText(`${m} m`, x + 3, y - 4); }
     const s = this.scene, tool = this.host.tool();
     // Scenery blocks: filled footprints with their height; the selected one (blocks tool) highlighted with corner handles.
-    g.lineWidth = 1.2; g.setLineDash([]); g.font = "10px ui-monospace, Menlo, monospace";
+    g.lineWidth = 1.2; g.setLineDash([]); g.font = `10px ${C.mono}`;
     const chosen = tool === "blocks" ? this.host.selectedBox?.() ?? -1 : -1;
     s.landmarks.forEach((b, k) => {
       const c = Math.cos(b.yaw), sn = Math.sin(b.yaw);
@@ -323,7 +329,7 @@ export class MapView {
       if (k === chosen) for (const [x, y] of pts) { g.fillStyle = C.camera; g.fillRect(x - 4, y - 4, 8, 8); }
     });
     // The camera's track, block by block: alternate solid and dashed, each labelled at its middle.
-    g.font = "10px system-ui, sans-serif";
+    g.font = `500 11px ${C.sans}`;
     s.cameraSegments.forEach((seg, k) => {
       if (seg.points.length < 2) return;
       const alpha = seg.emphasis === "selected" ? 1 : seg.emphasis === "dim" ? 0.25 : 0.7;
@@ -333,7 +339,7 @@ export class MapView {
       const len = Math.hypot(x2 - x, y2 - y) || 1, nx = -(y2 - y) / len, ny = (x2 - x) / len, lx = x + nx * 22, ly = y + ny * 22;
       g.globalAlpha = Math.max(0.45, alpha);
       g.strokeStyle = C.camera; g.lineWidth = 1; g.beginPath(); g.moveTo(x + nx * 5, y + ny * 5); g.lineTo(lx - nx * 3, ly - ny * 3); g.stroke();
-      g.fillStyle = C.camera; g.textAlign = nx < 0 ? "right" : "left"; g.fillText(seg.label, lx + (nx < 0 ? -2 : 2), ly + 3); g.textAlign = "left"; g.globalAlpha = 1;
+      this.label(g, seg.label, lx + (nx < 0 ? -2 : 2), ly + 4, C.camera, nx < 0 ? "right" : "left"); g.globalAlpha = 1;
     });
     this.line(g, s.floor.map(p => this.top(p)), C.subject, 3.2);
     // Beat ticks: a small dot on each beat along both tracks; the camera on each of its hits, a ring.
@@ -352,12 +358,20 @@ export class MapView {
       if (active && pts.length >= 2) this.line(g, pts.map(p => this.top(p)), colour, 1, 0.35, [3, 4]);
       this.handles(g, pts.map(p => this.top(p)), colour, active, t);
     }
+    // Distance labels along the top and left edges, drawn last with a halo (over blocks and paths), spaced so they never touch.
+    g.font = `10px ${C.mono}`;
+    const step = [2, 4, 8, 16, 32, 64].find(v => v * this.scale >= 56) ?? 64;
+    for (let m = Math.ceil(-ext / step) * step; m <= ext; m += step) {
+      const [x] = this.top({ x: m, z: 0 }), [, y] = this.top({ x: 0, z: m });
+      if (x > 28 && x < this.w - 24) this.label(g, `${m} m`, x, 12, C["map-text"], "center");
+      if (y > 24 && y < this.h - 8) this.label(g, `${m} m`, 4, y + 3, C["map-text"], "left");
+    }
   }
 
   /** Side view: the active path unrolled, its heights against distance along it. */
   private paintSide(g: CanvasRenderingContext2D) {
     const C = this.colours, tool = pathOf(this.host.tool()), f = this.sideFrame(), colour = tool === "camera" ? C.camera : C.subject;
-    g.lineWidth = 1; g.font = "10px ui-monospace, Menlo, monospace"; g.fillStyle = C["map-text"];
+    g.lineWidth = 1; g.font = `10px ${C.mono}`; g.fillStyle = C["map-text"];
     for (let y = 0; y <= f.ymax; y++) {
       const [, py] = f.at(0, y);
       g.strokeStyle = y === 0 ? C["map-axis"] : C["map-minor"];
