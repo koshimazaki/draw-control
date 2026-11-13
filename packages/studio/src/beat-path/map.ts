@@ -41,6 +41,8 @@ export type MapHost = {
   blocksDown?(e: PointerEvent, world: PathPt, toScreen: (p: PathPt) => [number, number], fromScreen: (x: number, y: number) => PathPt): boolean;
   /** The selected scenery box, drawn highlighted with corner handles. */
   selectedBox?(): number;
+  /** A word for the status line (a click that did nothing says why). */
+  hint?(text: string): void;
 };
 type Live = { subject?: { x: number; z: number; yaw: number }; camera?: { x: number; z: number; tx: number; tz: number; fov: number } };
 
@@ -213,7 +215,7 @@ export class MapView {
 
   private down(e: PointerEvent) {
     if (this.host.view() === "top" && (e.button === 1 || (e.button === 0 && this.spaceHeld))) { e.preventDefault(); this.panDrag(e); return; }
-    if (e.button !== 0 || e.detail > 1) return;
+    if (e.button !== 0) return;
     e.preventDefault();
     if (this.host.tool() === "blocks") {
       if (this.host.view() === "top" && this.host.blocksDown?.(e, this.fromTop(...this.local(e)), p => this.top(p), (x, y) => this.fromTop(x, y))) this.refresh();
@@ -236,7 +238,7 @@ export class MapView {
       revert = () => this.host.change(tool, original, true);
     } else {
       // Only an armed pen draws; otherwise a click on empty ground just clears the selection.
-      if (view !== "top" || this.host.pen() !== "draw") { this.host.select(null); this.refresh(); return; }
+      if (view !== "top" || this.host.pen() !== "draw") { this.host.select(null); this.host.hint?.(view === "top" ? "Press Draw new to draw a path (Edit only moves points)" : ""); this.refresh(); return; }
       const y = original.at(-1)?.y ?? (DEFAULT_Y[pathOf(tool)] || undefined);
       const first = this.clamp(this.fromTop(...start)), stroke = [first];
       let drawing = false;

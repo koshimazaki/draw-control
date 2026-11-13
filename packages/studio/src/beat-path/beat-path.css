@@ -32,13 +32,17 @@ h1 { margin: 0; font-size: var(--text-lg); font-weight: var(--weight-semibold); 
 .legend-line { flex: 1; min-width: 0; margin: 0; font-size: var(--text-xs); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .stage { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--gap); padding: var(--gap) var(--pad) 0; min-height: 0; }
-.map-pane { position: relative; min-height: 0; overflow: hidden; background: var(--map-bg); }
+/* The map pane: its toolbar and its footer are real rows around the canvas, so they never sit over it or vanish when it narrows. */
+.map-pane { position: relative; min-height: 0; overflow: hidden; background: var(--map-bg); display: grid; grid-template-rows: auto minmax(0, 1fr) auto; }
+.map-bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2); padding: var(--s-2); background: var(--surface); }
+.map-bar.map-tools { border-bottom: 1px solid var(--border); }
+.map-foot { border-top: 1px solid var(--border); }
+.map-canvas { position: relative; min-height: 0; }
 #map { display: block; width: 100%; height: 100%; touch-action: none; cursor: default; user-select: none; -webkit-user-select: none; }
 #map:focus-visible { outline-offset: -2px; }
 #map.over-point { cursor: grab; } #map.dragging { cursor: grabbing; }
-.map-tools { position: absolute; top: var(--s-2); left: var(--s-2); display: flex; gap: var(--s-2); align-items: center; }
-.map-tools.end { top: auto; bottom: var(--s-2); left: auto; right: var(--s-2); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 0 0 0 var(--s-3); }
-.map-hint { position: absolute; left: var(--s-3); top: 50px; max-width: calc(100% - 24px); margin: 0; font-size: var(--text-xs); pointer-events: none; }
+.map-tools.end { display: flex; align-items: center; gap: var(--s-2); margin-left: auto; }
+.map-hint { flex: 1 1 160px; min-width: 0; margin: 0; font-size: var(--text-xs); line-height: 1.3; }
 .map-empty { position: absolute; inset: 0; margin: auto; height: fit-content; width: fit-content; max-width: 70%; padding: var(--s-3) var(--s-4); text-align: center; pointer-events: none;
   background: var(--surface); border: 1px dashed var(--border-strong); border-radius: var(--radius-lg); color: var(--text-muted); }
 .map-empty[hidden] { display: none; }
@@ -47,7 +51,7 @@ h1 { margin: 0; font-size: var(--text-lg); font-weight: var(--weight-semibold); 
   display: grid; grid-template-rows: auto minmax(0, 1fr); gap: var(--gap); min-height: 0; width: min(58vw, calc(var(--screen-h) * 16 / 9)); }
 /* With an output, the two screens sit side by side and the right column takes more of the width. */
 .stage:has(.screens.split) .side { width: min(66vw, calc(var(--screen-h) * 16 / 9 * 2 + 12px)); }
-.map-tools { flex-wrap: wrap; right: var(--s-2); }
+
 .screens { --split: .5; position: relative; display: flex; gap: 0; align-items: stretch; }
 .screens .screen { position: relative; min-width: 0; }
 .screens:not(.split) #screenPreview { flex: 1; }
@@ -157,9 +161,9 @@ select:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
 .key-pop[hidden] { display: none; }
 .key-placeholder.connected .key-dot { background: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 40%, transparent); }
 .key-placeholder:not(.connected) .key-dot { background: var(--text-muted); box-shadow: none; }
-.stage:has(.screens.split) .map-hint { display: none; }
+
 .add-gallery { position: absolute; left: 8px; bottom: 8px; height: 26px; }
-.map-zoom { position: absolute; left: var(--s-2); bottom: var(--s-2); display: flex; gap: 2px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 2px; }
+.map-zoom { display: flex; gap: 2px; background: var(--surface-sunk); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 2px; }
 .map-zoom .btn { height: 26px; min-width: 28px; padding: 0 8px; }
 #map.panning { cursor: grab; }
 .field.num { width: 64px; flex: none; }

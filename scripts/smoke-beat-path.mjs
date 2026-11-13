@@ -10,6 +10,7 @@
  */
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { unzipSync, strFromU8 } from "fflate";
+import { smokeBeatPathMap } from "./smoke-beat-path-map.mjs";
 
 
 export async function smokeBeatPath(browser, base, { fail, OUT, SHOTS }) {
@@ -246,6 +247,7 @@ export async function smokeBeatPath(browser, base, { fail, OUT, SHOTS }) {
   await page.screenshot({ path: `${SHOTS}beat-path-runware-full.png`, fullPage: true });
   if (errors.length) fail(`Beat Path page errors: ${errors.join(" | ")}`);
   await page.close();
+  await smokeBeatPathMap(browser, base, { fail, SHOTS });
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

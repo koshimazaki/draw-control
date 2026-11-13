@@ -25,20 +25,24 @@ export const LAYOUT = `
 </header>
 <main class="stage">
   <section class="map-pane panel" aria-label="Map">
-    <canvas id="map" tabindex="0" aria-label="Map: Edit points moves points, Draw new draws a path"></canvas>
-    <div class="map-tools">
+    <div class="map-bar map-tools" id="mapTools">
       ${seg("tool", ["subject", "camera", "blocks"], { subject: "Subject", camera: "Camera", blocks: "Blocks" }, "What the map edits: the subject's path, the camera's path, the scenery blocks")}
       ${seg("view", ["top", "side"], { top: "Top", side: "Side" })}
       ${seg("pen", ["edit", "draw"], { edit: "Edit", draw: "Draw new" })}
     </div>
-    <div class="map-zoom"><button type="button" id="zoomIn" class="btn ghost" aria-label="Zoom in" data-tip="Zoom in (ctrl/cmd + wheel)">+</button><button type="button" id="zoomOut" class="btn ghost" aria-label="Zoom out">−</button><button type="button" id="zoomFit" class="btn ghost" data-tip="Frame everything (pan: drag with space held, middle button, or scroll)">Fit</button></div>
-    <div class="map-tools end">
-      <label class="pick" id="boxHeightRow" hidden>Height <input id="boxHeight" class="field num" type="number" min="0.2" max="60" step="0.5" /> m</label>
-      <label class="slider" id="cornersRow" data-tip="From sharp corners (hard turns) to a round curve"><span>Corners</span><input id="corners" type="range" min="0" max="1" step="0.05" /><output id="cornersOut"></output></label>
-      <button type="button" id="clearPath" class="btn ghost">Clear</button>
+    <div class="map-canvas">
+      <canvas id="map" tabindex="0" aria-label="Map: Edit moves points, Draw new draws a path"></canvas>
+      <p class="map-empty" id="mapEmpty" hidden></p>
     </div>
-    <p class="map-empty" id="mapEmpty" hidden></p>
-    <p class="map-hint muted" id="mapHint"></p>
+    <div class="map-bar map-foot">
+      <div class="map-zoom"><button type="button" id="zoomIn" class="btn ghost" aria-label="Zoom in" data-tip="Zoom in (ctrl/cmd + wheel)">+</button><button type="button" id="zoomOut" class="btn ghost" aria-label="Zoom out">−</button><button type="button" id="zoomFit" class="btn ghost" data-tip="Frame everything (pan: scroll, middle button, or drag with Space held)">Fit</button></div>
+      <p class="map-hint muted" id="mapHint"></p>
+      <div class="map-tools end">
+        <label class="pick" id="boxHeightRow" hidden>Height <input id="boxHeight" class="field num" type="number" min="0.2" max="60" step="0.5" /> m</label>
+        <label class="slider" id="cornersRow" data-tip="From sharp corners (hard turns) to a round curve"><span>Corners</span><input id="corners" type="range" min="0" max="1" step="0.05" /><output id="cornersOut"></output></label>
+        <button type="button" id="clearPath" class="btn ghost">Clear</button>
+      </div>
+    </div>
   </section>
   <section class="side">
     <div class="screens" id="screens">

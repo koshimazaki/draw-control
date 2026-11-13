@@ -83,19 +83,27 @@ export function startBeatPath(root: HTMLElement) {
     corners: t => (t === "camera" ? state.cameraCorners : state.subjectCorners),
     change: (t, points, final) => {
       const next = { ...state, ...(t === "subject" ? { subject: points } : { camera: points }) };
-      // A camera path drawn new flies the selected camera block (or the block at the playhead), never the whole clip.
-      if (t === "camera" && final && points.length >= 2 && state.camera.length < 2 && !next.cameraLane.some(b => b.word === "path")) {
-        const beat = beatAtSeconds(recipe.beatGrid, head);
-        const k = selection?.kind === "block" && selection.lane === "cameraLane" ? selection.index : Math.max(0, next.cameraLane.findIndex(b => beat >= b.from && beat < b.to));
-        next.cameraLane = next.cameraLane.map((b, i) => (i === k ? { from: b.from, to: b.to, word: "path" as const } : b));
-        say(`Block ${k + 1} of the Camera lane now flies your path`);
+      // A drawn camera path flies a block: the selected camera block, else the block under the playhead
+      // (a new "path" block when the lane is empty). It is never silently stored with nothing using it.
+      if (t === "camera" && final && points.length >= 2) {
+        const sel = selection?.kind === "block" && selection.lane === "cameraLane" ? selection.index : -1;
+        const used = next.cameraLane.findIndex(b => b.word === "path");
+        if (sel >= 0 || used < 0) {
+          const beat = beatAtSeconds(recipe.beatGrid, head);
+          const k = sel >= 0 ? sel : next.cameraLane.findIndex(b => beat >= b.from && beat < b.to);
+          if (k < 0) next.cameraLane = [...next.cameraLane, { from: 0, to: totalBeats(), word: "path" as const }];
+          else next.cameraLane = next.cameraLane.map((b, i) => (i === k ? { from: b.from, to: b.to, word: "path" as const } : b));
+          say(k < 0 ? "A new path block on the Camera lane flies your path" : `Block ${k + 1} of the Camera lane now flies your path`);
+        } else say(`Block ${used + 1} of the Camera lane flies your path`);
       }
       update(next, final);
     },
     blocksDown: (e, w, toScreen, fromScreen) => blocks.down(e, w, toScreen, fromScreen),
     selectedBox: () => blocks.selected,
     pen: () => pen,
-    drew: () => page.setPen("edit"),
+    // Draw new stays armed after a stroke (Escape or Edit disarms it), so a second stroke draws too.
+    drew: () => {},
+    hint: text => { if (text) say(text); },
     selected: () => (selection?.kind === "point" ? { tool: selection.tool, index: selection.index } : null),
     select: sel => { selection = sel ? { kind: "point", ...sel } : null; },
   });
