@@ -46,7 +46,7 @@ export { describeRecipe } from "./describe";
 
 // Camera rig: shots, programmed moves, beat locks, automation lanes, the per-frame plan.
 export {
-  CAMERA_MODES, CAMERA_MAX_HEIGHT, FOLLOW_LIMITS, FOLLOW_MODES, DEFAULT_CAMERA, SHOTS, SHOT_PRESETS,
+  CAMERA_MODES, CAMERA_MAX_HEIGHT, FOLLOW_LIMITS, FOLLOW_MODES, FOV_RANGE, DEFAULT_CAMERA, SHOTS, SHOT_PRESETS,
   type CameraConfig, type CameraSegment, type CameraMode, type FollowOffset, type Shot,
 } from "./camera";
 export { planCamera, cameraAtFrame, cameraAtSeconds, fovForAspect, type CameraPlan, type CameraSample, type Vec3 } from "./camera-rig";

@@ -126,6 +126,7 @@ The walk path drawn in the top view (or `setRootPath`) is stored here: up to 48 
 | `lock`, `strength` | `beat`, `kick`, `snare`, `hat`; 0–1 (default 1) | Beat lock on the block. A programmed move arrives at evenly spaced stations on each locked hit and holds briefly, still ending on its exact amount; an energy-driven move stops for the hold instead, and so does a `path` block (since 12 November 2026; before, a lock on a path block did nothing). Strength 0 is exactly the unlocked block. A hit within a quarter beat of a block's edge is not a station (a block starting on a kick would otherwise jump). |
 | `shoulder` | `true`, with `chase` | Over the shoulder: the chase angle turned 0.38 rad to one side, half the distance, 0.4 m higher, the aim 0.55 m aside (eased in and out). Script `over shoulder`. |
 | `follow` | `{ distance?, height?, angle? }`, with a follow rig (chase, lead, side, threeQuarter) | A follow block's offset, eased in like a shot and winning over its distance and height: `distance` 1–30 m, `height` 0.2–8 m (CAMERA_MAX_HEIGHT), `angle` −180–180° turned around the subject from the rig's own angle (180 on side = the subject's right). It stays a follow: the line is the subject's path offset. Script `follow side right distance 20m height 2m angle 10` (`left` is the default side). Added 13 November 2026 (round 6). |
+| `fov` | number 15–110, any mode | The block's lens: vertical field of view in degrees, eased in like a shot (100+ reads as a very wide, fisheye-like lens). Script `fov 100` anywhere in a camera cell. Added 13 November 2026 (round 8). |
 | `pace` | `slow` or `fast` (absent: even) | How quickly the block reaches its target: a programmed move or a shot eases in early with `fast` (on the first locked hit when it falls in the block's first part), late with `slow`; energy-driven rates and the follow swing scale too. Script words `slow`, `even`, `fast`. |
 | `onHit`, `punch` | `hold` (default) or `punch`; 0–3 m (default 0.4) | With `punch` each locked hit pushes the camera in by `punch` metres and back, instead of holding. |
 
@@ -200,3 +201,20 @@ The wind-up ("anticipation") has no field of its own: it is the span from the ac
 `{ points: [[frame, value], ...] }`: the amplitude envelope (the Action track's automation lane), 1–8192 breakpoints with straight lines between them, frames whole and increasing, values 0–3 (1 = as authored). Before the first point and after the last the value holds. It multiplies every move's size on that frame: the pose angles of the procedural figures, the clip amplitude of the rigged mannequin. A freehand stroke is stored as the fewest breakpoints within 0.01 of it. Missing: 1 on every frame.
 
 The camera lanes (`camera.lanes`) use the same shape and the same commands (`paintEnvelope`, `drawEnvelope`, `setEnvelopePoints`, `setEnvelopePoint`, `removeEnvelopePoint`, `clearEnvelope`, each with `lane`: `distance` 0.3–30 m, `height` 0.05–30 m, `yaw` -720 to 720°, `fov` 10–100°). An edit on a camera lane covers only the frames it touches, so a stroke never spreads an override over the whole clip.
+
+## Drawn camera paths are paced to the subject (round 8)
+
+A camera `path` block no longer runs on its own clock: the camera is as far along its drawn path as the subject is along its own over the clip (the same fraction of distance travelled), so a camera path drawn along a parallel street stays abreast of the subject without hand timing. A path block that starts mid-clip joins its path at the subject's fraction. When the subject does not travel (under 0.5 m in the clip), the old pacing applies (energy-driven, covered by the end of the last path block). The camera aims at the subject for the whole block, as before.
+
+## Authoring a shot from the CLI (round 8, Examples 1 and 2)
+
+```
+motion-studio groove straight --bars 9 --out straight.wav        # the example's music (the page's own synth)
+motion-studio analyse straight.wav --out straight.json
+motion-studio new --character glider --clip 8 --analysis straight.json --out base.json
+motion-studio script base.json examples/scripts/beat-path-ex1-flyer.txt --analysis straight.json --out ex1.json
+motion-studio describe ex1.json --analysis straight.json --script   # prints the script back
+motion-studio render ex1.json --audio straight.wav --out ex1-bundle --grid --start 0 --length 8 --unit seconds
+```
+
+The MCP server takes the same steps as tool calls: `analyse_audio`, `new_recipe`, `apply_script`, `get_script`, `render`.

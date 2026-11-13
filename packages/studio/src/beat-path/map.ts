@@ -143,6 +143,9 @@ export class MapView {
   }
   /** Escape: cancel the stroke or drag in progress. */
   cancelStroke() { this.cancel?.(); }
+  /** Draw new was armed (or the tool changed while armed): the next click starts a new path. */
+  startNew() { this.fresh = true; }
+  private fresh = false;
   get busy() { return !!this.cancel; }
 
   // Top view: metres to pixels.
@@ -244,22 +247,28 @@ export class MapView {
       // Only an armed pen draws; otherwise a click on empty ground just clears the selection.
       if (view !== "top" || this.host.pen() !== "draw") { this.host.select(null); this.host.hint?.(view === "top" ? "Press Draw new to draw a path (Edit only moves points)" : ""); this.refresh(); return; }
       const y = original.at(-1)?.y ?? (DEFAULT_Y[pathOf(tool)] || undefined);
-      const first = this.clamp(this.fromTop(...start)), stroke = [first];
+      // Draw new starts a new path: the first click after arming it does not add to the old one.
+      const base = this.fresh ? [] : original;
+      // Shift keeps a segment on the grid's axes (a street-straight line in two clicks, or a straight stroke).
+      const axis = (p: PathPt, from: PathPt | undefined, shift: boolean) => (!shift || !from ? p : Math.abs(p.x - from.x) >= Math.abs(p.z - from.z) ? { ...p, z: from.z } : { ...p, x: from.x });
+      const first = axis(this.clamp(this.fromTop(...start)), base.at(-1), e.shiftKey), stroke = [first];
       let drawing = false;
       move = ev => {
         const [px, py] = this.local(ev);
         if (!drawing && Math.hypot(px - start[0], py - start[1]) < 5) return;
         drawing = true;
         const p = this.clamp(this.fromTop(px, py)), last = stroke[stroke.length - 1];
+        if (ev.shiftKey) { stroke.length = 1; stroke.push(axis(p, first, true)); this.stroke = stroke; this.draw(); return; }
         if (Math.hypot(p.x - last.x, p.z - last.z) > 0.08) { stroke.push(p); this.stroke = stroke; this.draw(); }
       };
       up = () => {
+        this.fresh = false;
         this.stroke = null;
         const withY = (p: PathPt): PathPt => ({ x: r2(p.x), z: r2(p.z), ...(y ? { y } : {}) });
         let length = 0;
         for (let k = 1; k < stroke.length; k++) length += Math.hypot(stroke[k].x - stroke[k - 1].x, stroke[k].z - stroke[k - 1].z);
         if (drawing && length > 0.6) { this.host.change(tool, simplifyPen(stroke).map(withY), true); this.host.drew(); }
-        else if (!drawing) this.host.change(tool, [...original, withY(first)].slice(-MAX_POINTS * 2), true);   // in draw mode a click adds a point
+        else if (!drawing) this.host.change(tool, [...base, withY(first)].slice(-MAX_POINTS * 2), true);   // in draw mode a click adds a point
         this.draw();
       };
       revert = () => { this.stroke = null; this.draw(); };

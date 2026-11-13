@@ -101,3 +101,27 @@ export function followProbe(recipe: Recipe, drive: AudioDrive | undefined, block
   for (const v of hidden) { run = v ? run + 1 : 0; longest = Math.max(longest, run); total += v; }
   return { right, blocks: blocks.length, longest, maxRun: Math.floor(PASSES.maxHiddenSeconds * 24 / 2), share: total / Math.max(1, hidden.length), maxShare: PASSES.maxHiddenShare };
 }
+
+/**
+ * "Parallel street" in one click: Follow side, on the side of the subject's path that has the
+ * blocks, far enough out to clear the farthest of them near the path (+4 m), with Pass in front on.
+ */
+export function parallelStreet(subject: { x: number; z: number }[], boxes: { x: number; z: number; w: number; d: number }[]): FollowOffset & { side: "left" | "right" } {
+  const reach = { left: 0, right: 0 }, count = { left: 0, right: 0 };
+  for (const b of boxes) {
+    let best = { d: Infinity, side: 1 };
+    for (let i = 1; i < subject.length; i++) {
+      const a = subject[i - 1], q = subject[i], dx = q.x - a.x, dz = q.z - a.z, L = Math.hypot(dx, dz) || 1;
+      const t = Math.max(0, Math.min(1, ((b.x - a.x) * dx + (b.z - a.z) * dz) / (L * L))), px = a.x + dx * t, pz = a.z + dz * t;
+      const d = Math.hypot(b.x - px, b.z - pz);
+      // The subject's right, facing along the segment, is (-dz, dx) (heading 0 = +Z, right = -X).
+      if (d < best.d) best = { d, side: Math.sign(-(dz / L) * (b.x - px) + (dx / L) * (b.z - pz)) || 1 };
+    }
+    if (best.d > 25) continue;
+    const s = best.side > 0 ? "right" : "left";
+    count[s]++; reach[s] = Math.max(reach[s], best.d + Math.max(b.w, b.d) / 2);
+  }
+  const side = count.right >= count.left ? "right" : "left";
+  const distance = Math.round(Math.max(6, Math.min(FOLLOW_LIMITS.distance[1], (reach[side] || 8) + 4)) * 10) / 10;
+  return { side, distance, ...(side === "right" ? { angle: 180 } : {}) };
+}

@@ -76,7 +76,11 @@ export type CameraSegment = {
    * angle (degrees; 180 puts follow side on the subject's right). It stays a follow: the line is the subject's path offset.
    */
   follow?: FollowOffset;
+  /** The block's lens: vertical field of view in degrees (FOV_RANGE), eased in like a shot; 100+ reads as a very wide, fisheye-like lens. */
+  fov?: number;
 };
+/** The range a block's lens may take, degrees of vertical field of view. */
+export const FOV_RANGE = [15, 110] as const;
 export type FollowOffset = { distance?: number; height?: number; angle?: number };
 /** The range a follow offset may take: far enough to film past a row of street or city blocks (BUILDINGS.block is 14 m). */
 export const FOLLOW_LIMITS = { distance: [1, 30], height: [0.2, 8], angle: [-180, 180] } as const;
@@ -122,7 +126,7 @@ export function validateCamera(input: unknown, durationBeats: number): CameraCon
   const segments = (input.segments as unknown[]).map((s, i): CameraSegment => {
     const where = `camera.segments[${i}]`;
     if (!isObject(s)) return fail(`${where} must be an object`);
-    only(s, ["fromBeat", "toBeat", "modes", "shot", "cut", "amount", "from", "to", "lock", "strength", "onHit", "punch", "shoulder", "pace", "follow"], where);
+    only(s, ["fromBeat", "toBeat", "modes", "shot", "cut", "amount", "from", "to", "lock", "strength", "onHit", "punch", "shoulder", "pace", "follow", "fov"], where);
     const fromBeat = num(s.fromBeat, 0, durationBeats, `${where}.fromBeat`);
     const toBeat = num(s.toBeat, 0, durationBeats, `${where}.toBeat`);
     if (toBeat <= fromBeat) fail(`${where}.toBeat must be after fromBeat`);
@@ -210,6 +214,7 @@ function validateSegmentExtras(s: Record<string, unknown>, where: string, seg: C
     if (fo.angle !== undefined) out.angle = num(fo.angle, FOLLOW_LIMITS.angle[0], FOLLOW_LIMITS.angle[1], `${where}.follow.angle`);
     if (Object.keys(out).length) seg.follow = out;
   }
+  if (s.fov !== undefined) seg.fov = num(s.fov, FOV_RANGE[0], FOV_RANGE[1], `${where}.fov`);
   if (s.pace !== undefined && s.pace !== "even") {
     if (!PACES.includes(s.pace as Pace)) fail(`${where}.pace must be slow, even or fast`);
     seg.pace = s.pace as Pace;

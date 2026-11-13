@@ -13,6 +13,7 @@ import { unzipSync, strFromU8 } from "fflate";
 import { smokeBeatPathMap } from "./smoke-beat-path-map.mjs";
 import { smokeBeatPathHunt } from "./smoke-beat-path-hunt.mjs";
 import { smokeBeatPathFollow } from "./smoke-beat-path-follow.mjs";
+import { smokeBeatPathParallel } from "./smoke-beat-path-parallel.mjs";
 
 
 export async function smokeBeatPath(browser, base, { fail, OUT, SHOTS }) {
@@ -122,23 +123,26 @@ export async function smokeBeatPath(browser, base, { fail, OUT, SHOTS }) {
   // Blocks: draw a block, move it, duplicate, delete, undo (the preset's boxes become explicit on the first edit).
   await page.click('[data-control="tool"] [data-value="blocks"]');
   await page.click('[data-control="pen"] [data-value="draw"]');
-  const a = await at({ x: 3, z: -9 }), b = await at({ x: 7, z: -6 });
+  // Example 1's placed blocks (round 8) leave this corner clear, between the block row and the camera's street.
+  const a = await at({ x: -18, z: 12 }), b = await at({ x: -14, z: 15 });
   await page.mouse.move(a.x, a.y); await page.mouse.down(); await page.mouse.move(b.x, b.y, { steps: 6 }); await page.mouse.up();
   let boxes = (await probe()).state.boxes ?? [];
   const added = boxes.at(-1);
   console.log(`beat path: blocks tool drew ${JSON.stringify(added)} (${boxes.length} boxes)`);
   if (!added || Math.abs(added.w - 4) > 0.3 || Math.abs(added.d - 3) > 0.3) fail("the Blocks tool did not draw a 4 × 3 m block");
   await page.click('[data-control="pen"] [data-value="edit"]');
-  const mid = await at({ x: 5, z: -7.5 }), to = await at({ x: 8, z: -7.5 });
+  const mid = await at({ x: -16, z: 13.5 }), to = await at({ x: -13, z: 13.5 });
   await page.mouse.move(mid.x, mid.y); await page.mouse.down(); await page.mouse.move(to.x, to.y, { steps: 6 }); await page.mouse.up();
   boxes = (await probe()).state.boxes;
-  if (Math.abs(boxes.at(-1).x - 8) > 0.3) fail(`dragging the block did not move it (x ${boxes.at(-1).x})`);
+  if (Math.abs(boxes.at(-1).x + 13) > 0.3) fail(`dragging the block did not move it (x ${boxes.at(-1).x})`);
   await page.keyboard.press("ControlOrMeta+d");
   if ((await probe()).state.boxes.length !== boxes.length + 1) fail("Cmd/Ctrl-D did not duplicate the block");
   await page.keyboard.press("Delete");
   if ((await probe()).state.boxes.length !== boxes.length) fail("Delete did not remove the block");
   await page.mouse.move(mid.x, mid.y);
   await page.screenshot({ path: `${SHOTS}beat-path-blocks.png` });
+  // Example 3's camera follows its lane (no drawn path): the camera tool says so.
+  await page.click('[data-control="example"] [data-value="2"]');
   await page.click('[data-control="tool"] [data-value="camera"]');
   const hint = await page.textContent("#mapHint");
   if (!/camera follows the Camera lane/.test(hint ?? "")) fail(`the camera tool does not say the camera follows the lane: ${hint}`);
@@ -256,6 +260,7 @@ export async function smokeBeatPath(browser, base, { fail, OUT, SHOTS }) {
   await smokeBeatPathMap(browser, base, { fail, SHOTS });
   await smokeBeatPathHunt(browser, base, { fail });
   await smokeBeatPathFollow(browser, base, { fail, SHOTS });
+  await smokeBeatPathParallel(browser, base, { fail, SHOTS });
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

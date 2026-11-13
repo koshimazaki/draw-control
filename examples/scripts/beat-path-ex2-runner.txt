@@ -1,13 +1,22 @@
-# Beat Path example 2: a runner along a city pavement with a leap, then a hop at the end, filmed from the far side of a colonnade (sight passes). The figure is a runner shape.
+# Beat Path example 2: a skateboarder along one street, seen from the parallel street through the gaps between the blocks; the camera comes over, goes round to the front, and the clip ends on a very wide lens as the rail trick lands. The figure is a runner shape.
 # track: drive
 # clip: 8 s · figure: runner · Beat Path
 landmarks: on seed 7
 figure: shape runner body #ff6a13 head #f2a35e
 scenery: street sight passes
-shot subject: a young runner in a loose jacket and trainers, drawn in a hand-drawn animation style with clean outlines and flat colours (the orange figure; white marks the chest)
-shot environment: a city street at golden hour, shopfronts and parked bikes along the pavement
-shot action: she sprints along the pavement, leaps over a gap, lands and hops on the last beat
+box: -18 -7 3.5 4 9
+box: -10 -7 3.5 4 12
+box: -2 -7 3.5 4 8
+box: 16 0 7 0.25 0.7
+box: -16 8 7 6 14
+box: -4 8 7 6 10
+box: 8 8 7 6 13
+shot subject: an anime-style skateboarder in a loose hoodie, drawn with clean outlines and flat colours (the orange figure; white marks the chest)
+shot environment: a city street in the afternoon, people passing by on the pavement, shopfronts, a metal rail at the end of the street
+shot action: skateboarding along the street, seen between the buildings from the next street; they ollie onto the rail and land a trick, very wide lens at the end
 shot legend: the orange figure is the character; grey blocks are placeholders for the environment
-beats 0-14  | action: walk on path (-16,0) (-6,0.4) (-1,0,1.3) (3,0) (10,-0.6) (18,-2) corners 0.8 lock kick 0.6 | camera: follow side lock snare 1 hold | shot: wide
-beats 14-17 | action: continue | camera: push in to 2.6m lock snare 1 hold | shot: wide
-beats 17-19 | action: rest, jump @beat 18 | camera: continue
+beats 0-10  | action: walk on path (-22,0) (10,0) (13,0,0.7) (19.5,0,0.7) corners 0.3 lock kick 0.6 | camera: path (-22,-14,1.6) (19.5,-14,1.6) corners 0.5 lock snare 1 hold | shot: -
+beats 10-13 | action: continue | camera: follow side distance 3m lock snare 1 hold | shot: wide
+beats 13-14 | action: continue | camera: follow front distance 4m height 0.6m lock snare 1 hold | shot: wide
+beats 14-16 | action: rest, jump @beat 15 | camera: continue
+beats 16-19 | action: rest, spin @beat 17.5 | camera: follow front distance 2.5m height 0.4m fov 100 lock snare 1 hold | shot: wide

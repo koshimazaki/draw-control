@@ -1,6 +1,7 @@
 /**
  * motion-studio: the studio's edit commands from a terminal or an agent.
  *   analyse <audio> --out analysis.json
+ *   groove <straight|drive|laidback> [--bars 9] --out track.wav   (the Beat Path examples' in-repo drum music)
  *   new [--character rigged|mannequin|block|stick|blob|glider] [--clip 5|8] [--analysis a.json] --out recipe.json
  *   apply <recipe.json> <commands.json> [--analysis a.json] [--out next.json]
  *   set <recipe.json> <path> <value> [--out next.json]
@@ -15,7 +16,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { basename } from "node:path";
 import {
-  DEFAULT_RECIPE, PROCEDURAL_KINDS, beatPathBase, applyCommands, commandHelp, defaultRiggedRecipe, describeRecipe, printScript, validateRecipe, type CommandContext, type MotionCommand, type Recipe,
+  DEFAULT_RECIPE, GROOVES, PROCEDURAL_KINDS, beatPathBase, encodeWav, grooveTimes, synthDrums, applyCommands, commandHelp, defaultRiggedRecipe, describeRecipe, printScript, validateRecipe, type CommandContext, type MotionCommand, type Recipe,
 } from "../../packages/core/src/index.ts";
 import { decodeAudioFile } from "./audio-file.ts";
 import { analyse, driveFrom, parseAnalysis, type AnalysisJson } from "./analysis.ts";
@@ -78,6 +79,15 @@ export async function main(argv: string[], out: (s: string) => void = s => conso
   const [cmd, ...rest] = pos;
   try {
     switch (cmd) {
+      case "groove": {
+        // The examples' music, the same synth the page uses (tracks.ts): no audio file ships with the repo.
+        const style = rest[0] as keyof typeof GROOVES, path = flagStr(flags, "out");
+        if (!GROOVES[style] || !path) throw new Error("groove <straight|drive|laidback> [--bars 9] --out track.wav");
+        const bars = Number(flagStr(flags, "bars") ?? 9), bpm = GROOVES[style].bpm, seconds = 0.1 + bars * 4 * 60 / bpm + 0.5;
+        writeFileSync(path, encodeWav([synthDrums(grooveTimes(style, bars, 0.1), seconds)], 44100, 0, seconds));
+        err(`${style}: ${bpm} BPM, ${bars} bars, ${seconds.toFixed(2)} s; wrote ${path}`);
+        return 0;
+      }
       case "analyse": case "analyze": {
         if (!rest[0]) throw new Error("analyse <audio> --out analysis.json");
         const a = analyse(decodeAudioFile(rest[0]), rest[0]);

@@ -52,6 +52,7 @@ export const LAYOUT = `
         </div>
         <label class="pick" id="boxHeightRow" hidden>Height <span class="unit-field"><input id="boxHeight" class="field num" type="number" min="0.2" max="60" step="0.5" /><i>m</i></span></label>
         <label class="slider tip-end" id="cornersRow" data-tip="From sharp corners (hard turns) to a round curve"><span>Corners</span><input id="corners" type="range" min="0" max="1" step="0.05" /><output id="cornersOut"></output></label>
+        <button type="button" id="wholeClip" class="btn ghost" hidden data-tip="Your drawn camera path flies the whole clip (one Camera block)">Whole clip</button>
         <button type="button" id="clearPath" class="btn ghost">${icon("trash")}Clear</button>
       </div>
     </div>

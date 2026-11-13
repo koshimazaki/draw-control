@@ -44,6 +44,17 @@ describe("follow offset words", () => {
   });
 });
 
+describe("a block's lens (fov)", () => {
+  it("reads, prints back and reaches the camera", () => {
+    const r = run("follow front distance 3m fov 100 lock kick 1 hold");
+    expect(r.camera!.segments[0]).toMatchObject({ modes: ["lead"], fov: 100, follow: { distance: 3 } });
+    expect(printScript(r)).toMatch(/camera: lead distance 3m fov 100 lock kick 1 hold/);
+    expect(applyScript(base(), { script: printScript(r) }, ctx)).toEqual(r);
+    expect(planCamera(r, drive, 200).samples[150].fov).toBeGreaterThan(90);
+    expect(() => run("follow behind fov 150")).toThrow(/fov/);
+  });
+});
+
 describe("the rig follows the offset", () => {
   it("follow side: left by default, right when asked, at the distance and height given", () => {
     const left = offsetAt(run("follow side"), 120), right = offsetAt(run("follow side right distance 18m height 3m"), 120);

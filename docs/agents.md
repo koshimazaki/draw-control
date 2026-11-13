@@ -175,3 +175,32 @@ beats 13-17    | action: continue           | camera: dolly in 2m    | shot: wid
 
 Then, with the CLI: `motion-studio analyse track.wav --out a.json`, `motion-studio new --character glider --clip 8 --analysis a.json --out base.json`, `motion-studio script base.json examples/scripts/voice-freeze-orbit.txt --analysis a.json --out shot.json`, `motion-studio render shot.json --audio track.wav --out bundle`. Over MCP: `analyse_audio` (or `load_analysis`), `new_recipe { character: "glider", clip: 8 }`, `apply_script`, `render`. Both give the same recipe (`mcp/test/voice-freeze.test.ts`, which also checks the figure hangs in the air through the freeze, lands after it, and the camera circles meanwhile). `rise 6m to 1m` cranes down: rise takes descending heights. Commands for agents added with Beat Path: `setSceneryBoxes`, `addSceneryBox`, `removeSceneryBox` and `setScenerySight` (build a street box by box: `box: 6 4 5 8 12` lines, or `scenery: street sight passes` for columns between camera and subject), `setLandmarks`, `setScenery` ("put it in a big city": `{ "type": "setScenery", "preset": "city" }` or the script line `scenery: city`), `muteHit`, `resetMutedHits`, `setFigure` (`shape`: glider, car, flyer, runner), `setShot`; the camera grammar (`over shoulder`, `above`, `slow|even|fast`, `then`, `at 2s`) and the settings lines are in [recipe.md](recipe.md#shot-script).
 
+
+## Worked example: a parallel-street shot (Beat Path Examples 1 and 2, round 8)
+
+The owner's shot: the subject travels along one street, the camera along the parallel street,
+blocks in between, so the subject is seen through the gaps; camera and subject start apart.
+Both examples were written as shot scripts and applied with the CLI (Example 2 also over MCP);
+the page loads the same files (`examples/scripts/beat-path-ex1-flyer.txt`, `-ex2-runner.txt`).
+
+```
+motion-studio groove drive --bars 10 --out drive.wav               # the example's own music
+motion-studio analyse drive.wav --out drive.json
+motion-studio new --character glider --clip 8 --analysis drive.json --out base.json
+motion-studio script base.json examples/scripts/beat-path-ex2-runner.txt --analysis drive.json --out ex2.json
+motion-studio describe ex2.json --analysis drive.json --script
+motion-studio render ex2.json --audio drive.wav --out ex2-bundle --grid --start 0 --length 8 --unit seconds
+```
+
+Over MCP: `analyse_audio {path: "drive.wav"}`, `new_recipe {character: "glider", clip: 8}`,
+`apply_script {script}`, `get_script`, `render {out, audio, start: 0, length: 8, unit: "seconds"}`.
+
+What the script says, and what was added for it:
+- **Placed blocks** (`box: x z w d h`) between the streets, `scenery: … sight passes` so they may cross the line of sight (placed boxes are kept as given; the caps apply to presets only).
+- **A camera on the parallel street**: `camera: path (-22,-14,1.6) (19.5,-14,1.6)`. New: a drawn path is paced to the subject's progress, so camera and subject stay abreast without timing it by hand.
+- **Behind, then across**: rows `follow behind` then `path …` (the rig cross-fades).
+- **Coming over, a front view, a very wide lens**: `follow side distance 3m`, `follow front distance 4m height 0.6m`, `follow front distance 2.5m height 0.4m fov 100`. New: `fov N` (a block's lens) and the follow offsets (round 6).
+- **A rail**: a low box (`box: 16 0 7 0.25 0.7`) and a path that rises onto it (`(13,0,0.7) (19.5,0,0.7)`), then `rest, jump @beat 15` and `rest, spin @beat 17.5` on it.
+- **New CLI command**: `groove` writes the examples' drum music (the page's own synth) so `analyse` has a file.
+
+Not expressible yet: a skateboard prop under the figure (the runner shape stands in); people passing by (the shot text asks the model for them).

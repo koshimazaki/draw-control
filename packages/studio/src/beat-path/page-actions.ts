@@ -14,7 +14,7 @@ import type { Page } from "./page";
 import { beatPathRecipe, exportRange } from "./recipe-map";
 import { HIT_CHOICES, LABELS, LOCK_CHOICES, fitLanes, setWord, toScript, type BeatPathState, type Block, type CameraWord, type ClipChoice } from "./script";
 import { isTyping } from "./drag";
-import { bindFollowFields, followProbe } from "./page-follow";
+import { bindFollowFields, followProbe, parallelStreet } from "./page-follow";
 
 /** What each block's shape on the map is, said in its popover. */
 const CAMERA_NOTES: Record<CameraWord, string> = {
@@ -71,6 +71,8 @@ export function bindActions(p: Page) {
     const corners = p.tool === "camera" ? s.cameraCorners : s.subjectCorners;
     const box = p.tool === "blocks" ? p.blocks.selected : -1, boxes = p.tool === "blocks" ? (s.boxes ?? null) : null;
     $("boxHeightRow").hidden = box < 0; $("cornersRow").hidden = p.tool === "blocks";
+    // A drawn camera path that flies only some blocks: one click makes it the whole clip.
+    $("wholeClip").hidden = !(p.tool === "camera" && s.camera.length >= 2 && s.cameraLane.some(b => b.word === "path") && !(s.cameraLane.length === 1 && !s.cameraLane[0].phrase));
     followFields.sync();
     if (box >= 0 && document.activeElement !== input("boxHeight")) input("boxHeight").value = String((boxes ?? [])[box]?.h ?? 8);
     input("corners").value = String(corners);
@@ -142,6 +144,10 @@ export function bindActions(p: Page) {
   $<HTMLSelectElement>("figureShape").onchange = () => p.update({ ...p.state, figure: { ...p.state.figure, shape: $<HTMLSelectElement>("figureShape").value as BeatPathState["figure"]["shape"] } });
   input("sightPasses").onchange = () => p.update({ ...p.state, sight: input("sightPasses").checked ? "passes" : "clear" });
   input("gridExport").onchange = () => { p.viewport.setExportGrid(input("gridExport").checked); p.viewport.setGrid(input("gridExport").checked); p.rebuild(); };
+  $("wholeClip").onclick = () => {
+    p.update({ ...p.state, cameraLane: [{ from: 0, to: p.totalBeats(), word: "path" }] });
+    p.say("Your camera path flies the whole clip (one Camera block)");
+  };
   $("clearPath").onclick = () => {
     const s = p.state;
     if (p.tool === "blocks") { p.update({ ...s, boxes: [] }); return; }
@@ -162,6 +168,14 @@ export function bindActions(p: Page) {
         set(setWord(blocks, i, w, single).map((x, k) => (k === i ? { from: x.from, to: x.to, word: x.word } : x)), extra);
       },
     }));
+    if (key === "cameraLane") items.push("-", {
+      label: "Parallel street (Follow side beyond the blocks, Pass in front on)",
+      run: () => {
+        const ps = parallelStreet(p.state.subject, p.blocks.host.boxes()), { side, ...follow } = ps;
+        set((blocks as unknown as Block<CameraWord>[]).map((x, k) => (k === i ? { from: x.from, to: x.to, word: "side" as const, follow } : x)) as unknown as Block<W>[], { sight: "passes" });
+        p.say(`Parallel street: Follow side, ${side}, ${follow.distance} m out, Pass in front on · drag the line or type the numbers to adjust`);
+      },
+    });
     items.push("-",
       { label: `Split at beat ${Math.round(beat * 2) / 2}`, disabled: !splitAt(blocks, i, beat), run: () => set(splitAt(blocks, i, beat)) },
       { label: "Remove (the block before takes its beats)", disabled: blocks.length < 2, run: () => set(removeAt(blocks, i)) });

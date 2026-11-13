@@ -77,7 +77,8 @@ function valuesIn(s: CameraSegment, v: Values, hits: number[], beat: number): Va
   const td = s.follow?.distance ?? preset?.distance, th = s.follow?.height ?? preset?.height;
   let d = td !== undefined ? v.d + (td - v.d) * w : v.d;
   let h = th !== undefined ? v.h + (th - v.h) * w : v.h;
-  const f = preset ? v.f + (preset.fov - v.f) * w : v.f;
+  const tf = s.fov ?? preset?.fov;
+  const f = tf !== undefined ? v.f + (tf - v.f) * w : v.f;
   const a = preset ? v.a + (preset.aim - v.a) * w : v.a;
   if (isDolly(s)) {
     if (s.to !== undefined) d = v.d + (s.to - v.d) * p;

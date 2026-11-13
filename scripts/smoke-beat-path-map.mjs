@@ -64,7 +64,7 @@ export async function smokeBeatPathMap(browser, base, { fail, SHOTS }) {
       if (JSON.stringify(s1.camera) === before || s1.camera.length < 2) fail(`at ${width} px a camera stroke did not draw on example ${slot}`);
       if (!s1.cameraLane.some(b => b.word === "path")) fail(`example ${slot}: the drawn camera path is not flown by any block`);
       const status = await page.textContent("#status");
-      if (!/Camera lane/.test(status ?? "")) fail(`example ${slot}: the page did not say which block flies the path (${status})`);
+      if (!/Camera lane|whole clip/.test(status ?? "")) fail(`example ${slot}: the page did not say which block flies the path (${status})`);
       // The pen stays armed: a second stroke draws again.
       await stroke(page, { x: -4, z: -5 }, { x: 4, z: -3 });
       const s2 = await page.evaluate(() => window.__beatPath.state());

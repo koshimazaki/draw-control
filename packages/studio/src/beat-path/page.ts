@@ -98,7 +98,7 @@ export function startBeatPath(root: HTMLElement) {
           const k = sel >= 0 ? sel : next.cameraLane.findIndex(b => beat >= b.from && beat < b.to);
           if (k < 0) next.cameraLane = [...next.cameraLane, { from: 0, to: totalBeats(), word: "path" as const }];
           else next.cameraLane = next.cameraLane.map((b, i) => (i === k ? { from: b.from, to: b.to, word: "path" as const } : b));
-          say(k < 0 ? "A new path block on the Camera lane flies your path" : `Block ${k + 1} of the Camera lane now flies your path`);
+          say(k < 0 ? "A new path block on the Camera lane flies your path" : next.cameraLane.length > 1 ? `Block ${k + 1} of the Camera lane now flies your path · Whole clip (map footer) makes it fly all of it` : "Your path flies the whole clip");
         } else say(`Block ${used + 1} of the Camera lane flies your path`);
       }
       update(next, final);
@@ -338,10 +338,10 @@ export function startBeatPath(root: HTMLElement) {
     get state() { return state; }, get recipe() { return recipe; }, get tool() { return tool; }, get view() { return view; },
     get track() { return track; }, get drive() { return live(); }, get info() { return info; }, get busy() { return busy; }, set busy(v: boolean) { busy = v; dirty = true; },
     get head() { return head; }, get shown() { return shown; }, get slot() { return slot; }, get followSegs() { return followSegs; }, blocks, seek, removeTrack, totalBeats, window0, window1, update, undo, rebuild, setPlaying, switchSlot, useFile, say,
-    setTool(t: Tool) { tool = t; map.refresh(); actions.sync(); },
+    setTool(t: Tool) { tool = t; if (pen === "draw") map.startNew(); map.refresh(); actions.sync(); },
     setView(v: View) { view = v; map.refresh(); actions.sync(); },
     get pen() { return pen; },
-    setPen(v: "edit" | "draw") { pen = v; actions.sync(); },
+    setPen(v: "edit" | "draw") { if (v === "draw" && pen !== "draw") map.startNew(); pen = v; actions.sync(); },
     get selection() { return selection; },
     setSelection(v: typeof selection) { selection = v; rebuild(); },
     retheme() { map.retheme(); strip.retheme(); },

@@ -93,7 +93,9 @@ export function planCamera(recipe: Recipe, drive?: AudioDrive, frames = 0): Came
     yaw: new Float64Array(total), distance: new Float64Array(total), height: new Float64Array(total),
     aimY: new Float64Array(total), cx: new Float64Array(total), cz: new Float64Array(total),
   };
-  const subject = (n: number) => subjectAt(recipe, beatAtSeconds(g, n * dt), drive);
+  // The subject per frame, computed once (the follow loop and the path pacing both read it).
+  const seen = new Map<number, ReturnType<typeof subjectAt>>();
+  const subject = (n: number) => { let s = seen.get(n); if (!s) { s = subjectAt(recipe, beatAtSeconds(g, n * dt), drive); seen.set(n, s); } return s; };
   const prog = programCamera(config, g, unmutedBands(drive?.bands, recipe.mutedHits), total, fps);
   const d0 = config.distance, dMin = d0 * 0.55, dMax = d0 * 1.7;
   const hMin = 0.3, hMax = config.height + RISE_METRES + 1;
@@ -102,7 +104,8 @@ export function planCamera(recipe: Recipe, drive?: AudioDrive, frames = 0): Came
   let followYaw = 0, followV = 0, orbit = 0, orbitRate = 0;
   let dolly = 0, dollyRate = 0, crane = 0, craneRate = 0, aim = 0, aimRate = 0;
   let cx = s0.x, cz = s0.z, cvx = 0, cvz = 0;
-  const startModes = modesAt(config, beatAtSeconds(g, 0));
+  // Before the first beat (the track's lead-in) the first block already holds, so a clip starts in its own framing.
+  const startModes = modesAt(config, Math.max(0, beatAtSeconds(g, 0)));
   const followOffset = (m: readonly CameraMode[]) => { for (const k of m) if (FOLLOW_ANGLES[k] !== undefined) return FOLLOW_ANGLES[k]!; return null; };
   const segAt = (beat: number) => config.segments.find(s => beat >= s.fromBeat && beat < s.toBeat);
   // Over the shoulder: the chase angle turned a little to one side, closer and a little higher (eased in and out).
@@ -212,10 +215,10 @@ export function planCamera(recipe: Recipe, drive?: AudioDrive, frames = 0): Came
   const usesPath = !!config.path && config.segments.some(s => s.modes.includes("path"));
   const pathS = new Float64Array(total), pathW = new Float64Array(total);
   if (usesPath) {
-    let cum = 0, rate = 0, w = modesAt(config, beatAtSeconds(g, 0)).includes("path") ? 1 : 0;
+    let cum = 0, rate = 0, w = modesAt(config, Math.max(0, beatAtSeconds(g, 0))).includes("path") ? 1 : 0;
     const cums = new Float64Array(total);
     for (let n = 0; n < total; n++) {
-      const on = modesAt(config, beatAtSeconds(g, n * dt)).includes("path");
+      const on = modesAt(config, Math.max(0, beatAtSeconds(g, n * dt))).includes("path");
       rate = slew(rate, on ? speedFactor(config.intensity, energyAtFrame(drive, n)) : 0, 2 * dt);
       cum += rate * (1 - prog.gate[n]) * dt;   // a locked hold on a path block stops it on each hit
       cums[n] = cum;
@@ -226,6 +229,14 @@ export function planCamera(recipe: Recipe, drive?: AudioDrive, frames = 0): Came
     const lastBeat = Math.max(...config.segments.filter(s => s.modes.includes("path")).map(s => s.toBeat));
     const end = cums[Math.min(total - 1, Math.round(secondsAtBeat(g, lastBeat) * fps))] || cum;
     for (let n = 0; n < total; n++) pathS[n] = end > 0 ? Math.min(1, cums[n] / end) : 0;
+    // Paced to the subject (round 8, the default when the subject travels): the camera is as far along its path as the
+    // subject is along its own over the clip, so a camera on a parallel street stays abreast without hand timing.
+    const clipEnd = Math.min(total - 1, Math.round(secondsAtBeat(g, recipe.durationBeats) * fps));
+    const along = new Float64Array(total);
+    let prev = subject(0);
+    for (let n = 1; n < total; n++) { const q = subject(Math.min(n, clipEnd)); along[n] = along[n - 1] + Math.hypot(q.x - prev.x, q.z - prev.z); prev = q; }
+    const travelled = along[clipEnd];
+    if (travelled > 0.5) for (let n = 0; n < total; n++) pathS[n] = Math.min(1, along[n] / travelled);
   }
   const spline = !usesPath ? null : config.corners !== undefined ? polylineSpline(cornerPath(config.path!, config.corners).map(p => ({ x: p.x, y: p.y ?? 0, z: p.z }))) : buildSpline(config.path!);
   const samples: CameraSample[] = new Array(total);

@@ -118,7 +118,7 @@ export function cameraWords(s: CameraSegment, path?: readonly { x: number; y: nu
     }
   };
   const withFollow = (m: CameraMode) => { const w = FOLLOW_MODES.includes(m) ? followWords(m, s.follow) : ""; return part(m) + (w ? ` ${w}` : ""); };
-  let out = s.modes.map(withFollow).join(" + ") + (s.pace ? ` ${s.pace}` : "");
+  let out = s.modes.map(withFollow).join(" + ") + (s.pace ? ` ${s.pace}` : "") + (s.fov !== undefined ? ` fov ${fmt(s.fov)}` : "");
   if (s.lock) {
     out += ` lock ${s.lock}${s.strength !== undefined ? ` ${fmt(s.strength)}` : ""}`;
     if (s.onHit === "punch") out += ` punch${s.punch !== undefined ? ` ${metres(s.punch)}` : ""}`;

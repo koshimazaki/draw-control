@@ -2,7 +2,7 @@
  * Follow cameras on the map, called from smoke-beat-path.mjs:
  * 1. Example 1: drag the Follow behind line outwards; the block is still Follow behind with a
  *    larger distance, and Cmd/Ctrl-Z takes the drag back in one step;
- * 2. Example 2 (a street, sight "passes"): Follow side → Right, distance 20 m typed; the block
+ * 2. Your own on a preset street, sight "passes": Follow side → Right, distance 20 m typed; the block
  *    stays Follow side, the camera is on the subject's right beyond the row of blocks, and the
  *    blocks between hide the subject within the caps;
  * any console error or warning fails the run.
@@ -36,16 +36,21 @@ export async function smokeBeatPathFollow(browser, base, { fail, SHOTS }) {
   await page.locator("#map").focus(); await page.keyboard.press("ControlOrMeta+z");
   if (JSON.stringify((await lane())[seg.block]) !== JSON.stringify(before)) fail("undo did not take the follow drag back in one step");
 
-  // 2. Example 2: Follow side, right, 20 m, beyond the street's row, sight passes.
-  await page.click('[data-control="example"] [data-value="1"]');
-  await page.waitForFunction(() => window.__beatPath.trackName() === "generated-drive-140.wav", null, { timeout: 30_000 });
+  // 2. Your own on a preset street with Pass in front (Examples 1 and 2 have placed blocks since round 8):
+  //    Follow side, right, 20 m.
+  await page.click('[data-control="example"] [data-value="own"]');
+  await page.waitForTimeout(300);
+  await page.click("#settings summary");
+  await page.selectOption("#scenery", "street");
+  if (!(await page.isChecked("#sightPasses"))) await page.click("label:has(#sightPasses)");
+  await page.click("#settings summary");
   await page.click('[data-control="tool"] [data-value="camera"]');
-  if (!(await page.evaluate(() => window.__beatPath.state().sight === "passes"))) fail("Example 2 is not set to sight passes");
+  await page.click("#laneCamera .block >> nth=0"); await page.click('#menu button:has-text("Follow side")');
   await page.click("#followRight");
   await page.fill("#followDistance", "20"); await page.press("#followDistance", "Enter"); await page.locator("#map").focus();
   await page.waitForTimeout(200);
   const b0 = (await lane())[0], probe = await page.evaluate(() => window.__beatPath.followProbe(0));
-  console.log(`beat path follow: Example 2 block ${JSON.stringify(b0)}; camera ${probe.right.toFixed(1)} m right; ${probe.blocks} blocks, longest hidden ${probe.longest}/${probe.maxRun} samples, share ${(probe.share * 100).toFixed(1)} %/${probe.maxShare * 100} %`);
+  console.log(`beat path follow: Your own block ${JSON.stringify(b0)}; camera ${probe.right.toFixed(1)} m right; ${probe.blocks} blocks, longest hidden ${probe.longest}/${probe.maxRun} samples, share ${(probe.share * 100).toFixed(1)} %/${probe.maxShare * 100} %`);
   if (b0.word !== "side" || b0.phrase || Math.abs(b0.follow?.angle ?? 0) < 90 || b0.follow?.distance !== 20) fail(`the side block did not stay Follow side, right, 20 m: ${JSON.stringify(b0)}`);
   if (!(probe.right > 14)) fail(`the side camera is not on the far (right) side (${probe.right.toFixed(1)} m)`);
   if (probe.longest > probe.maxRun || probe.share > probe.maxShare + 1e-9) fail(`the blocks hide the subject beyond the caps (${probe.longest} samples, ${(probe.share * 100).toFixed(1)} %)`);

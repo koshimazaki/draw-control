@@ -27,7 +27,7 @@ type Lock = { lock: LockTarget; strength?: number };
 type Hit = { accent: AccentKey; band: string; index: number };
 type Row = { from: number; to: number; line: number; action?: string; camera?: string; shot?: string };
 type Point = { x: number; z: number; y?: number };
-type Cam = { path?: Point[]; corners?: number; startSeconds?: number; shoulder?: boolean; follow?: FollowOffset; pace?: "slow" | "fast"; then?: Cam[]; modes: CameraMode[]; amount?: number; from?: number; to?: number; lock?: LockTarget; strength?: number; onHit?: "hold" | "punch"; punch?: number; at?: { band: string; index: number } };
+type Cam = { path?: Point[]; corners?: number; startSeconds?: number; shoulder?: boolean; follow?: FollowOffset; fov?: number; pace?: "slow" | "fast"; then?: Cam[]; modes: CameraMode[]; amount?: number; from?: number; to?: number; lock?: LockTarget; strength?: number; onHit?: "hold" | "punch"; punch?: number; at?: { band: string; index: number } };
 
 const bad = (row: Row, msg: string): never => { throw new RecipeError(`script line ${row.line}: ${msg}`); };
 const number = (row: Row, t: string, what: string) => {
@@ -210,6 +210,9 @@ function parseCameraWords(row: Row, text: string, points: Point[] | undefined, c
   // "at 2s": the block starts at that time (the camera holds until then), as a spoken direction says it.
   const atS = words.findIndex((w, i) => w === "at" && /^\d+(\.\d+)?s$/.test(words[i + 1] ?? ""));
   if (atS >= 0) { cam.startSeconds = Number(words[atS + 1].slice(0, -1)); words = words.filter((_, i) => i !== atS && i !== atS + 1); }
+  // "fov 100": the block's lens (vertical degrees), anywhere in the cell.
+  const fovAt = words.indexOf("fov");
+  if (fovAt >= 0) { cam.fov = number(row, words[fovAt + 1] ?? "", "fov"); words = words.filter((_, i) => i !== fovAt && i !== fovAt + 1); }
   const paceAt = words.findIndex(w => w === "slow" || w === "even" || w === "fast");
   if (paceAt >= 0) { if (words[paceAt] !== "even") cam.pace = words[paceAt] as "slow" | "fast"; words = words.filter((_, i) => i !== paceAt); }
   const taken = { points }, shaped = { corners };
