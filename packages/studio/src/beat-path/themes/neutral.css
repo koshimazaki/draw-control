@@ -9,8 +9,9 @@
 
   --bg: #121316; --surface: #18191c; --surface-2: #202227; --surface-sunk: #15161a; --surface-hover: #2a2d33; --seg-on: #34373f; --popover: #1d1f23;
   --border: #2a2d33; --border-strong: #464a52; --text: #e9eaec; --text-muted: #a3a8b1; --text-dim: #6f747c;
-  /* the accent is Generate's alone; selection, focus and the playhead read in text colours */
-  --accent: #ffd34d; --accent-hover: #ffdd70; --accent-ink: #e9eaec; --on-accent: #17181b; --ring: #a3a8b1;
+  /* the accent on whatever is selected (round 7); the playhead reads in the text colour */
+  --accent: #ffd34d; --accent-hover: #ffdd70; --accent-ink: #ffd34d; --on-accent: #17181b; --ring: #ffd34d;
+  --sel-bg: color-mix(in oklab, #ffd34d 8%, #18191c); --sel-glow: rgba(255, 211, 77, .18); --map-select: #ffd34d;
   --track: #353840; --thumb: #e9eaec;
   --rail: #3a3e45; --rail-fill: #8c7426; --rail-dot: #e9eaec;
   --block-bg: #23262c; --block-border: #30343b; --block-hover: #2b2f36;

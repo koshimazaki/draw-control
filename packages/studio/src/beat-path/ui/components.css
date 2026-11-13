@@ -35,11 +35,40 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .btn[hidden] { display: none; }
 .btn.running { background: var(--surface-2); border-color: var(--border-strong); color: var(--text); }
 .btn.running:hover:not(:disabled) { background: var(--surface-hover); border-color: var(--border-strong); }
-.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: var(--weight-semibold); }
+/* Primary: the accent fill, near-black text, an icon at the left. Secondary (.btn, .outline): a 1 px border, white text.
+   Ghost: no border, white text and an icon; disabled reads grey. */
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: var(--weight-medium); }
 .btn.primary:hover:not(:disabled) { background: var(--accent-hover); border-color: var(--accent-hover); }
-.btn.ghost { background: transparent; border-color: transparent; color: var(--text-muted); }
+.btn.ghost { background: transparent; border-color: transparent; color: var(--text); }
 .btn.ghost:hover:not(:disabled) { background: var(--surface-hover); color: var(--text); border-color: transparent; }
+.btn.ghost:disabled { color: var(--text-dim); opacity: 1; }
 .btn.outline { background: transparent; }
+.btn .icon { margin-left: -2px; }
+.btn .icon.trail { width: 13px; height: 13px; margin: 0 -2px 0 -4px; opacity: .8; }
+/* Line icons (ui/icons.ts): 16 px, 1.5 px stroke, the control's text colour. */
+.icon { display: block; width: 16px; height: 16px; flex: none; }
+
+/* Link that acts: accent text with an arrow ("Load into the editor →"). */
+.link-act { display: inline-flex; align-items: center; gap: var(--s-1); padding: 0; border: 0; background: none; cursor: pointer; color: var(--accent-ink);
+  font-weight: var(--weight-medium); font-size: var(--text-sm); text-decoration: none; white-space: nowrap; }
+.link-act .icon { width: 14px; height: 14px; transition: transform var(--dur-fast) var(--ease); }
+.link-act:hover { text-decoration: underline; text-underline-offset: 3px; }
+.link-act:hover .icon { transform: translateX(2px); }
+.link-act[hidden] { display: none; }
+
+/* Selected (a list or menu item, a lane block, an open lock chip): accent text, a 1 px accent outline with a faint glow, a tinted fill. */
+.is-selected, .menu button.on, .block.open, .chip[aria-expanded="true"] {
+  color: var(--accent-ink); background: var(--sel-bg); border-color: var(--accent-ink); box-shadow: 0 0 0 1px var(--accent-ink) inset, 0 0 10px var(--sel-glow); }
+
+/* Badge: mono capitals in a 1 px grey outline ("FLYER"); .tag: a capability chip in the accent on a tint. */
+.badge { display: inline-flex; align-items: center; height: 18px; padding: 0 6px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
+  font: var(--weight-medium) 10px/1 var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--text-muted); white-space: nowrap; }
+.badge.tag { color: var(--accent-ink); background: var(--sel-bg); border-color: color-mix(in srgb, var(--accent-ink) 35%, transparent); }
+
+/* Input with a unit inside it ("m", "°"), in grey. */
+.unit-field { position: relative; display: inline-flex; align-items: center; }
+.unit-field > i { position: absolute; right: 7px; font-style: normal; font-size: var(--text-xs); color: var(--text-dim); pointer-events: none; }
+.unit-field > input { padding-right: 18px !important; }
 
 /* Play button: one control for every play on the page. On a picture: a dark glass circle (the post
    draft's player button). Quiet (the dock, the gallery rows): outlined, muted, never the accent. */
@@ -57,11 +86,13 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .play-btn.quiet.playing { color: var(--text); }
 
 /* Segmented control */
-.seg { display: inline-flex; padding: 2px; gap: 2px; background: var(--surface-sunk); border: 1px solid var(--border); border-radius: var(--radius-md); }
+/* Segmented control: a 1 px bordered container; the selected segment is the accent fill with dark text. */
+.seg { display: inline-flex; padding: 2px; gap: 2px; background: transparent; border: 1px solid var(--border); border-radius: var(--radius-md); }
 .seg button { height: calc(var(--control-h) - 6px); padding: 0 var(--s-3); border: 0; border-radius: calc(var(--radius-md) - 2px); background: transparent;
-  color: var(--text-muted); cursor: pointer; white-space: nowrap; user-select: none; transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease); }
+  color: var(--text); cursor: pointer; white-space: nowrap; user-select: none; transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease); }
 .seg button:hover { color: var(--text); background: var(--surface-hover); }
-.seg button.on { background: var(--seg-on); color: var(--text); box-shadow: var(--shadow-xs); }
+.seg button.on { background: var(--accent); color: var(--on-accent); font-weight: var(--weight-medium); }
+.seg button.on:hover { background: var(--accent-hover); }
 .seg button:active { transform: translateY(1px); }
 .seg button:focus-visible { outline-offset: -2px; }
 .seg.off { opacity: .45; pointer-events: none; }
@@ -80,10 +111,13 @@ button, input, select, textarea { font: inherit; color: inherit; }
 /* Toggle */
 .toggle { display: inline-flex; align-items: center; gap: var(--s-2); cursor: pointer; user-select: none; color: var(--text-muted); font-size: var(--text-sm); }
 .toggle input { position: absolute; opacity: 0; width: 0; height: 0; }
-.toggle .knob { width: 28px; height: 16px; border-radius: var(--radius-pill); background: var(--track); position: relative; transition: background var(--dur) var(--ease); }
-.toggle .knob::after { content: ""; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: var(--thumb); transition: transform var(--dur) var(--ease); }
-.toggle input:checked + .knob { background: var(--accent-ink); }
-.toggle input:checked + .knob::after { transform: translateX(12px); background: var(--surface); }
+/* Toggle: off a grey pill with a light knob; on the accent pill with "ON" in small dark capitals and a dark knob. */
+.toggle .knob { width: 38px; height: 20px; flex: none; border-radius: var(--radius-pill); background: var(--track); position: relative; transition: background var(--dur) var(--ease); }
+.toggle .knob::after { content: ""; position: absolute; top: 3px; left: 3px; width: 14px; height: 14px; border-radius: 50%; background: var(--thumb); transition: transform var(--dur) var(--ease), background var(--dur) var(--ease); }
+.toggle .knob::before { content: "ON"; position: absolute; left: 6px; top: 50%; transform: translateY(-50%); font: 700 8px/1 var(--font-sans); letter-spacing: .04em; color: var(--on-accent); opacity: 0; transition: opacity var(--dur) var(--ease); }
+.toggle input:checked + .knob { background: var(--accent); }
+.toggle input:checked + .knob::before { opacity: 1; }
+.toggle input:checked + .knob::after { transform: translateX(18px); background: var(--on-accent); }
 .toggle input:focus-visible + .knob { outline: 2px solid var(--ring); outline-offset: 2px; }
 .toggle:hover { color: var(--text); }
 
@@ -94,7 +128,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .menu button { display: flex; width: 100%; align-items: center; gap: var(--s-2); height: 28px; padding: 0 var(--s-2); border: 0; border-radius: var(--radius-sm);
   background: transparent; text-align: left; cursor: pointer; color: var(--text); }
 .menu button:hover, .menu button:focus-visible { background: var(--surface-hover); outline: none; }
-.menu button.on::after { content: ""; margin-left: auto; width: 6px; height: 6px; border-radius: 50%; background: var(--accent-ink); }
+.menu button.on { border: 0; }
 .menu button:disabled { opacity: .45; cursor: default; }
 .menu hr { border: 0; border-top: 1px solid var(--border); margin: var(--s-1) 0; }
 .menu .menu-field { display: grid; gap: 4px; padding: var(--s-1) var(--s-2); font-size: var(--text-xs); color: var(--text-muted); }
@@ -115,7 +149,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
   transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease); }
 .block:hover { background: var(--block-hover); }
 .block:focus-visible { outline: 2px solid var(--ring); outline-offset: 0; }
-.block.open { border-color: var(--accent-ink); }
+.block.open i { background: var(--accent-ink); }
 .block span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .block i { width: 6px; height: 6px; border-radius: 2px; margin-right: 6px; flex: none; background: var(--block-mark, var(--text-muted)); }
 .block .edge { position: absolute; top: 0; right: -5px; width: 10px; height: 100%; cursor: ew-resize; z-index: 2; }

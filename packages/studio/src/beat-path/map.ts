@@ -114,7 +114,7 @@ export class MapView {
 
   /** Re-read the theme's colours. */
   retheme() {
-    for (const k of ["map-bg", "map-minor", "map-major", "map-axis", "map-text", "text", "bg"]) this.colours[k] = token(`--${k}`);
+    for (const k of ["map-bg", "map-minor", "map-major", "map-axis", "map-text", "map-select", "text", "bg"]) this.colours[k] = token(`--${k}`);
     // The theme's faces for the map's labels: sans for words, mono for numbers.
     this.colours.sans = token("--font-sans") || "system-ui, sans-serif"; this.colours.mono = token("--font-mono") || "ui-monospace, monospace";
     // The map has its own surface (a light paper in the Runware theme): its path colours are its own tokens.
@@ -327,10 +327,10 @@ export class MapView {
       const pts = [corner(-b.w / 2, -b.d / 2), corner(b.w / 2, -b.d / 2), corner(b.w / 2, b.d / 2), corner(-b.w / 2, b.d / 2)];
       g.beginPath(); pts.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y))); g.closePath();
       g.globalAlpha = tool === "blocks" ? 0.22 : 0.12; g.fillStyle = C["map-text"]; g.fill(); g.globalAlpha = 1;
-      g.strokeStyle = k === chosen ? C.camera : C["map-text"]; g.lineWidth = k === chosen ? 2 : 1.2; g.stroke();
+      g.strokeStyle = k === chosen ? C["map-select"] : C["map-text"]; g.lineWidth = k === chosen ? 2 : 1.2; g.stroke();
       const [cxp, cyp] = this.top(b), size = Math.min(Math.hypot(pts[1][0] - pts[0][0], pts[1][1] - pts[0][1]), Math.hypot(pts[3][0] - pts[0][0], pts[3][1] - pts[0][1]));
       if (size > 26) { g.fillStyle = C["map-text"]; g.textAlign = "center"; g.fillText(`${Math.round(b.h)} m`, cxp, cyp + 3); g.textAlign = "left"; }
-      if (k === chosen) for (const [x, y] of pts) { g.fillStyle = C.camera; g.fillRect(x - 4, y - 4, 8, 8); }
+      if (k === chosen) for (const [x, y] of pts) { g.fillStyle = C["map-select"]; g.fillRect(x - 4, y - 4, 8, 8); }
     });
     // The camera's track, block by block: alternate solid and dashed, each labelled at its middle.
     g.font = `500 11px ${C.sans}`;

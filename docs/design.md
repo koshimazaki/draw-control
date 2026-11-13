@@ -17,6 +17,34 @@ Lineage, in three lines:
 
 **Since 13 November the Runware theme is dark** (the site's own dark look), with the map as a light paper surface; the neutral theme stays the repo default and stays dark (the studio's palette): one set of tokens, two palettes, and a third small set (`--map-*`) for the map's surface so it can differ from the page.
 
+## Round 7 (13 November): components after Runware's dashboard
+
+The component set follows Runware's dashboard as a complement to it (dark, panels a shade lighter than the page, 1 px `#333` borders, 6–8 px radius on controls, 12 px on cards). **This replaces round 5's "lime on Generate only": the accent marks whatever is selected.** The neutral theme keeps its own accent (yellow) through the same tokens.
+
+| Component | Class | Treatment | Used for |
+| --- | --- | --- | --- |
+| Primary button | `.btn.primary` | accent fill, near-black text, medium weight, a line icon at the left | Generate (fills its row, a bolt; a stop square while running), the cost dialog's Generate |
+| Secondary button | `.btn`, `.btn.outline` | panel fill or none, 1 px border, white text, icon left | Your track, Download guide, lock buttons, Cancel |
+| Ghost button | `.btn.ghost` | no border, white text, icon left; disabled grey | Gallery, Get the code, Settings, No music, Clear, zoom |
+| Link that acts | `.link-act` | accent text and an arrow | Load into the editor, Reset markers |
+| Segmented control | `.seg` | 1 px bordered container; selected = accent fill, dark text | examples, Subject/Camera/Blocks, Top/Side, Edit/Draw new, 5 s/8 s, the model, Left/Right |
+| Toggle | `.toggle` | on = accent pill, "ON" in small dark capitals, a dark knob | Snap, Ground grid, Pass in front |
+| Selected item | `.is-selected`, `.menu button.on`, `.block.open`, `.chip[aria-expanded=true]` | accent text, 1 px accent outline with a faint glow, a tinted fill (`--sel-bg`, `--sel-glow`) | the chosen menu item, the lane block whose menu is open, the open lock chip |
+| Badge / tag | `.badge`, `.badge.tag` | mono capitals in a 1 px grey outline; a tag in the accent on a tint | the figure shape in each gallery row |
+| Section heading | `.lab` | mono capitals, dim | Settings rows (Clip, Locks, Guide, Figure, Guide file) |
+| Input | `.field`, `.unit-field` | a shade lighter than the panel, 1 px border, the unit in grey inside | shot fields, follow distance / height / angle, box height |
+| Card | `.panel`, `.gallery-row` | 1 px border, 12 px radius | map pane, gallery rows, menus, popovers |
+| Notification row | `.audio-info .status` | a small green dot, then the text | the status line |
+| Icons | `ui/icons.ts` | 16 px line icons, 1.5 px stroke, the control's colour | the actions above |
+
+**Icons** are Lucide's shapes (lucide.dev), ISC licence: "Copyright (c) for portions of Lucide are held by Cole Bemis 2013-2022 as part of Feather (MIT). All other copyright (c) for Lucide are held by Lucide Contributors 2022." Permission to use, copy, modify and distribute with or without fee is granted under the ISC terms. The set: zap, plus, download, upload, layout-grid (gallery), code, key-round, chevron-down/right, trash-2, undo-2, sliders-horizontal, arrow-right, arrow-up-right, music, film, image, x, arrow-left-right (swap), square. No Runware icon, logo or wordmark is used.
+
+**On the paper map** the accent lime has too little contrast (1.2:1 on `#f2f2f2`), so the map's own selection (the selected scenery block and its corner handles) uses `--map-select`: a deep green `#2f6b23` (5.9:1) in the Runware theme, the accent in the neutral theme's dark map. Paths keep their own colours.
+
+**Type.** One sans face for all interface text (the header's: Figtree in the Runware theme, the system face in neutral); mono for numbers, readouts (HUD, time, lock values), badges and the Settings section headings.
+
+**Not taken.** Keycap chips on Generate (the page has no Generate shortcut; behaviour is unchanged); required asterisks and info icons on field labels (the shot fields carry placeholders, not labels, to keep one screen); an icon tile on each gallery card.
+
 ## Round 5 (13 November): re-based on the owner's post draft
 
 The `runware` theme now follows **the owner's post draft** (a private blog draft; only its visual system is taken, none of its text) first and runware.ai's CSS second: where they differ, the draft wins. The draft itself reads its tokens from the Runware blog, so most values agree; the differences are below.
@@ -43,7 +71,7 @@ The `runware` theme now follows **the owner's post draft** (a private blog draft
 
 **Player.** The draft's player is a dark glass circle (black at 50 %, a 1 px white ring at 20 %, a 4 px blur) with a filled rounded-triangle play glyph, bottom left over the frame; its timeline is a 1 px rail with a deep green fill and a 7 px dot; numbers sit in 12 px mono. Beat Path uses exactly that: one slim bar over the bottom of the screens (shown while paused, on hover, on keyboard focus), the same button for the dock and the gallery rows in a quiet outlined form. The big Play overlay is gone; a click on the picture toggles. Glyph shapes after Lucide's play and pause (ISC).
 
-**Hierarchy.** Lime is Generate's alone. Selected segments, toggles, slider thumbs, the playhead, the focus ring, menu ticks, lock chips and the key dot read in text colours (the connected key dot in the rail green). Mono is kept for numbers and beat readouts (HUD, time, lock values, slider values, map distances); typed camera phrases and labels use the sans face. Uppercase labels follow the draft's kicker: 12 px, `.05em`.
+**Hierarchy (superseded by round 7: the accent now marks the selection).** Lime is Generate's alone. Selected segments, toggles, slider thumbs, the playhead, the focus ring, menu ticks, lock chips and the key dot read in text colours (the connected key dot in the rail green). Mono is kept for numbers and beat readouts (HUD, time, lock values, slider values, map distances); typed camera phrases and labels use the sans face. Uppercase labels follow the draft's kicker: 12 px, `.05em`.
 
 **Rhythm.** One 4 px scale (`--s-1` … `--s-6`); the page gap is `--s-4` and the side padding `--s-5`. The right column has two rows (screens, shot fields): the screens fill the flexible row and each picture keeps 16:9 inside it by container units, so nothing jumps when a result arrives or the divider moves. The map pane has three rows (tool row, canvas, a fixed-height footer).
 

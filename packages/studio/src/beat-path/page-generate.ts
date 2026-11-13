@@ -126,7 +126,7 @@ export function bindGenerate(p: Page) {
   // and a second run looked them up by id and found nothing (it threw and left the button on Stop).
   const bar = $("genProgress"), note = $("outputNote");
   const runButton = $<HTMLButtonElement>("runGenerate");
-  const setRunning = (c: AbortController | null) => { running = c; runButton.textContent = c ? "Stop" : "Generate"; runButton.classList.toggle("running", !!c); };
+  const setRunning = (c: AbortController | null) => { running = c; runButton.querySelector(".btn-label")!.textContent = c ? "Stop" : "Generate"; runButton.classList.toggle("running", !!c); };
   runButton.onclick = async () => {
     if (running) { running.abort(); p.say("Stopping…"); return; }
     if (p.busy) return;

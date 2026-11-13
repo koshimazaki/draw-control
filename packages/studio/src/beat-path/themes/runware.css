@@ -14,19 +14,22 @@
   /* the draft's type: 12 px labels and chips, 13 px small text, 14 px controls, 15 px body */
   --text-xs: 12px; --text-sm: 13px; --text-md: 14px; --text-lg: 15px;
   --control-h: 32px;
-  /* the draft's radii: 5 px chips, 8 px buttons and tiles, 12 px cards */
-  --radius-sm: 5px; --radius-md: 8px; --radius-lg: 12px; --radius-pill: 999px;
+  /* round 7, the dashboard: 6 px chips and inputs, 8 px controls, 12 px cards */
+  --radius-sm: 6px; --radius-md: 8px; --radius-lg: 12px; --radius-pill: 999px;
   --shadow-xs: 0 1px 1px rgb(0 0 0 / .3); --shadow-sm: 0 1px 3px rgb(0 0 0 / .35); --shadow-lg: 0 12px 32px rgb(0 0 0 / .5);
 
-  /* the draft's surfaces: background, card, muted, input, border */
-  --bg: #1a1a1a; --surface: #1c1c1c; --surface-2: #292929; --surface-sunk: #2e2e2e; --surface-hover: #333333; --seg-on: #454545; --popover: #1c1c1c;
-  --border: #454545; --border-strong: #5c5c5c; --text: #f2f2f2; --text-muted: #d9d9d9; --text-dim: #8f8f8f;
-  /* the draft's primary (Generate only) and its hover; everything else selected reads in text colours */
-  --accent: #afff9f; --accent-hover: color-mix(in oklab, #afff9f 60%, transparent); --accent-ink: #f2f2f2; --on-accent: #1c1c1c; --ring: #d9d9d9;
-  --track: #454545; --thumb: #f2f2f2;
+  /* round 7, the dashboard: the page, panels a shade lighter, inputs a shade lighter again, 1 px borders */
+  --bg: #1a1a1a; --surface: #1f1f1f; --surface-2: #262626; --surface-sunk: #262626; --surface-hover: #2e2e2e; --seg-on: #333333; --popover: #1f1f1f;
+  --border: #333333; --border-strong: #4a4a4a; --text: #f2f2f2; --text-muted: #b8b8b8; --text-dim: #8f8f8f;
+  /* the accent on whatever is selected: fills (primary, a selected segment, a toggle on), and accent text with an outline (a selected item) */
+  --accent: #afff9f; --accent-hover: #c4ffb8; --accent-ink: #afff9f; --on-accent: #141414; --ring: #afff9f;
+  --sel-bg: color-mix(in oklab, #afff9f 8%, #1f1f1f); --sel-glow: rgb(175 255 159 / .2);
+  /* selection drawn on the light paper map: a deep green (5.9:1 on #f2f2f2) */
+  --map-select: #2f6b23;
+  --track: #4a4a4a; --thumb: #f2f2f2;
   /* the draft's rail: a 1 px line, its deep green fill (#345c2d, edged #4f8a44), a small dot */
   --rail: #454545; --rail-fill: #4f8a44; --rail-dot: #f2f2f2;
-  --block-bg: #292929; --block-border: #454545; --block-hover: #333333;
+  --block-bg: #262626; --block-border: #333333; --block-hover: #2e2e2e;
   --tooltip-bg: #f2f2f2; --tooltip-text: #1c1c1c; --scrim: rgb(0 0 0 / .6); --danger: oklch(82% .12 20); --warn: #ffff7d;
 
   /* the path colours: light on the dark page, deep on the paper map */

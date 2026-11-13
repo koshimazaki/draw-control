@@ -19,6 +19,7 @@ import { beatPathRecipe, exportRange, type TrackInfo } from "./recipe-map";
 import { legendFor } from "./script";
 import { EXAMPLE_TRACKS } from "./tracks";
 import { PLAY_GLYPH } from "./ui/glyph";
+import { icon } from "./ui/icons";
 
 export type Run = { slot: string; model: string; modelName: string; url: string; prompt: string };
 type Media = { guide: string; audio: string } | null;
@@ -114,8 +115,9 @@ export function bindGallery(opts: { root: HTMLElement; load(slot: string): void;
   function exampleRow(i: number): HTMLElement {
     const ex = EXAMPLES[i], s = exampleState(i), row = el("article", "gallery-row panel"), t = EXAMPLE_TRACKS[ex.id];
     const head = el("header", "row-head"), player = rowPlayer(row, media.get(i)?.audio ?? null);
-    const open = el("button", "btn outline", "Load into the editor"); open.type = "button"; open.onclick = () => { opts.load(String(i)); window.scrollTo({ top: 0 }); };
-    head.append(player.button, el("h3", "", `Example ${i + 1}: ${ex.label}`), el("span", "muted", `${s.figure.shape} · ${t.name}`), open);
+    const open = el("button", "link-act", "Load into the editor"); open.type = "button"; open.insertAdjacentHTML("beforeend", icon("arrow-right")); open.onclick = () => { opts.load(String(i)); window.scrollTo({ top: 0 }); };
+    const badge = el("span", "badge", s.figure.shape);
+    head.append(player.button, el("h3", "", `Example ${i + 1}: ${ex.label}`), badge, el("span", "muted", t.name), open);
     const strip = el("div", "row-strip");
     strip.append(tile("Path", thumbnail(i)));
     const guide = tile("Guide", media.get(i) ? video(media.get(i)!.guide) : "Rendering the guide…");

@@ -128,6 +128,7 @@ export class Menu {
       this.root.appendChild(b);
     }
     this.root.hidden = false;
+    anchor.setAttribute("aria-expanded", "true");   // the open lock chip or block reads as selected
     const r = anchor.getBoundingClientRect(), m = this.root.getBoundingClientRect();
     const top = r.top - m.height - 6 > 8 ? r.top - m.height - 6 : r.bottom + 6;
     this.root.style.left = `${Math.max(8, Math.min(window.innerWidth - m.width - 8, r.left))}px`;
@@ -147,6 +148,7 @@ export class Menu {
       window.removeEventListener("pointerdown", outside, true);
       if (this.root.contains(document.activeElement)) (document.activeElement as HTMLElement).blur();
       this.root.hidden = true;
+      anchor.setAttribute("aria-expanded", "false");
       this.close = null;
       onClose();
     };

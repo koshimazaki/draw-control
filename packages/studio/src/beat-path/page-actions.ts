@@ -202,11 +202,11 @@ export function bindActions(p: Page) {
     try {
       const recipe = p.recipe, range = exportRange(recipe, p.state.clip);
       const result = await exportBundle({ recipe, range, viewport: p.viewport, ...EXPORT, audio: p.track?.buffer ?? null, drive: p.drive,
-        onProgress: (d, t) => { button.textContent = `Rendering ${Math.round(d / t * 100)}%`; } });
+        onProgress: (d, t) => { button.querySelector(".btn-label")!.textContent = `Rendering ${Math.round(d / t * 100)}%`; } });
       download(result.zip, "beat-path-guide.zip", "application/zip");
       p.say(`Exported ${result.frames} frames, ${EXPORT.width}×${EXPORT.height}, ${(result.zip.length / 1e6).toFixed(1)} MB`);
     } catch (e) { p.say(`Export failed: ${(e as Error).message}`); }
-    finally { p.busy = false; button.disabled = false; button.textContent = "Download guide (.zip)"; }
+    finally { p.busy = false; button.disabled = false; button.querySelector(".btn-label")!.textContent = "Download guide (.zip)"; }
   };
   // Transport and files
   $("play").onclick = () => p.setPlaying(!p.player.playing);
