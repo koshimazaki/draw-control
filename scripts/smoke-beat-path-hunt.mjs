@@ -105,7 +105,7 @@ export async function smokeBeatPathHunt(browser, base, { fail }) {
   const rows = await page.locator("#gallerySlot .gallery-row").last().locator("video").count();
   if (rows !== 1) fail(`Add to gallery twice added ${rows} clips`);
   await page.evaluate(() => document.getElementById("gallery").scrollIntoView());
-  await page.locator("#gallerySlot .gallery-row .icon-btn").first().click();
+  await page.locator("#gallerySlot .gallery-row .play-btn").first().click();
   await page.waitForTimeout(300);
   await ex("0"); await page.click("#addToGallery");   // re-renders the gallery
   await page.waitForTimeout(300);

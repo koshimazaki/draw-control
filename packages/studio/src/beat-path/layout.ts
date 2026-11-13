@@ -8,6 +8,7 @@
 import { CLIP_CHOICES } from "./script";
 import { APP_NAME, REPO_URL, LICENCE } from "./name";
 import { MODELS } from "./generate";
+import { PLAY_GLYPH } from "./ui/glyph";
 
 const seg = (name: string, values: readonly (string | number)[], labels: Record<string, string>, tip = "") =>
   `<div class="seg" role="radiogroup" data-control="${name}"${tip ? ` aria-label="${tip}"` : ""}>${values.map(v => `<button type="button" role="radio" data-value="${v}">${labels[v]}</button>`).join("")}</div>`;
@@ -49,20 +50,19 @@ export const LAYOUT = `
       <div class="screen" id="screenPreview">
         <div class="preview" id="preview">
           <div class="hud mono"><span id="hudBeat">beat 0.0</span><span class="pulse" id="hudPulse"></span><span id="hudLock"></span></div>
-          <button type="button" id="bigPlay" class="big-play" aria-label="Play or pause"><span class="glyph"></span><span>Play</span></button>
         </div>
       </div>
       <div class="divider" id="divider" role="separator" aria-orientation="vertical" tabindex="0" hidden data-tip="Drag to resize · double-click resets"></div>
       <div class="screen" id="screenOutput" hidden>
         <div class="output-frame" id="generateSlot"><p id="outputNote" class="muted">Output</p><div class="progress" id="genProgress" hidden><span></span></div></div>
-        <button type="button" id="addToGallery" class="btn outline add-gallery" hidden>Add to gallery</button>
-        <button type="button" id="swapScreens" class="btn ghost swap" data-tip="Swap the two sides">⇄</button>
+        <div class="screen-actions"><button type="button" id="addToGallery" class="btn overlay" hidden>Add to gallery</button><button type="button" id="swapScreens" class="btn overlay swap tip-below" aria-label="Swap the two sides" data-tip="Swap the two sides">⇄</button></div>
       </div>
-    </div>
-    <div class="page-transport" id="pageTransport">
-      <button type="button" id="barPlay" class="icon-btn small" aria-label="Play"><span class="glyph"></span></button>
-      <input id="scrub" class="scrub" type="range" min="0" max="1" step="0.0001" value="0" aria-label="Time" />
-      <span class="mono muted" id="transportTime">0.00 / 8.00 s · beat 0.0</span>
+      <!-- One slim bar over the bottom of the screens: shown while paused and on hover. -->
+      <div class="vbar" id="pageTransport">
+        <button type="button" id="barPlay" class="play-btn" aria-label="Play">${PLAY_GLYPH}</button>
+        <input id="scrub" class="scrub" type="range" min="0" max="1" step="0.0001" value="0" aria-label="Time" />
+        <span class="mono" id="transportTime">0.00 / 8.00 s · beat 0.0</span>
+      </div>
     </div>
     <div class="compose">
       <div class="row shot">
@@ -96,7 +96,7 @@ export const LAYOUT = `
 </main>
 <footer class="dock">
   <div class="transport">
-    <button type="button" id="play" class="icon-btn" aria-label="Play"><span class="glyph"></span></button>
+    <button type="button" id="play" class="play-btn quiet" aria-label="Play">${PLAY_GLYPH}</button>
     <button type="button" id="sound" class="btn ghost sound" aria-pressed="true" data-tip="Music on or off (the clock keeps running)">Sound on</button>
   </div>
   <div class="audio-src">

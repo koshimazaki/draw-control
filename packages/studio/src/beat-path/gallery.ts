@@ -18,6 +18,7 @@ import { composePrompt, MODELS } from "./generate";
 import { beatPathRecipe, exportRange, type TrackInfo } from "./recipe-map";
 import { legendFor } from "./script";
 import { EXAMPLE_TRACKS } from "./tracks";
+import { PLAY_GLYPH } from "./ui/glyph";
 
 export type Run = { slot: string; model: string; modelName: string; url: string; prompt: string };
 type Media = { guide: string; audio: string } | null;
@@ -79,7 +80,7 @@ async function renderGuide(i: number): Promise<Media> {
 /** One row's player: the music is the clock, every video in the row follows it. */
 function rowPlayer(row: HTMLElement, audioUrl: string | null) {
   const audio = el("audio"); audio.preload = "auto"; if (audioUrl) audio.src = audioUrl;
-  const button = el("button", "icon-btn small"); button.type = "button"; button.setAttribute("aria-label", "Play the row"); button.append(el("span", "glyph"));
+  const button = el("button", "play-btn quiet"); button.type = "button"; button.setAttribute("aria-label", "Play the row"); button.innerHTML = PLAY_GLYPH;
   button.onclick = () => { if (audio.paused) void audio.play().catch(() => {}); else audio.pause(); };
   audio.onplay = () => button.classList.add("playing"); audio.onpause = () => button.classList.remove("playing");
   // A thin scrub bar under the row's videos, on the row's clock.

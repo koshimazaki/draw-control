@@ -39,7 +39,7 @@ export function startBeatPath(root: HTMLElement) {
   let drive: AudioDrive = flatDrive(24, 1);
   let recipe: Recipe = beatPathRecipe(state, null), plan: CameraPlan;
   let hits: number[] = [];
-  let busy = false, started = false, head = 0, dirty = true;
+  let busy = false, head = 0, dirty = true;
   const past: BeatPathState[] = [], future: BeatPathState[] = [];
   let dragBase: BeatPathState | null = null;
   const player = new Player();
@@ -242,12 +242,11 @@ export function startBeatPath(root: HTMLElement) {
     requestAnimationFrame(tick);
   }
   function setPlaying(on: boolean) {
-    if (on) { if (head >= window1() - 0.05 || head < window0()) head = window0(); player.play(track, head); started = true; }
+    if (on) { if (head >= window1() - 0.05 || head < window0()) head = window0(); player.play(track, head); }
     else { if (player.playing) head = player.position(); player.stop(); }
     for (const id of ["play", "barPlay"]) { $(id).classList.toggle("playing", on); $(id).setAttribute("aria-label", on ? "Pause" : "Play"); }
-    // The overlay is a real toggle: shown whenever the clip is paused, and on hover while it plays.
-    $("bigPlay").classList.toggle("playing", on);
-    $("bigPlay").lastChild!.textContent = on ? "Pause" : started ? "Play" : "Play";
+    // The bar over the screens hides while playing (hover or focus brings it back).
+    $("screens").classList.toggle("playing", on);
     dirty = true;
   }
 

@@ -1,5 +1,5 @@
 /* Beat Path page layout: one screen, no scrolling; tokens and components only (ui/components.css, themes/). */
-:root { --top: 52px; --dock: 136px; --controls: 168px; --gap: 14px; --pad: 20px; }
+:root { --top: 52px; --dock: 136px; --compose: calc(3 * var(--control-h) + 2 * var(--s-2)); --gap: var(--s-4); --pad: var(--s-5); }
 html, body { height: auto; overflow: visible; }
 .editor { display: grid; grid-template-rows: var(--top) minmax(0, 1fr) var(--dock); height: 100vh; }
 html { scroll-behavior: smooth; }
@@ -31,52 +31,61 @@ h1 { margin: 0; font-size: var(--text-lg); font-weight: var(--weight-semibold); 
 .field:focus-visible { outline: 2px solid var(--ring); outline-offset: 0; }
 .legend-line { flex: 1; min-width: 0; margin: 0; font-size: var(--text-xs); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-.stage { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--gap); padding: var(--gap) var(--pad) 0; min-height: 0; }
+.stage { --map-min: 340px; display: grid; grid-template-columns: minmax(var(--map-min), 1fr) auto; gap: var(--gap); padding: var(--gap) var(--pad) 0; min-height: 0; }
 /* The map pane: its toolbar and its footer are real rows around the canvas, so they never sit over it or vanish when it narrows. */
 .map-pane { position: relative; min-height: 0; overflow: hidden; background: var(--map-bg); display: grid; grid-template-rows: auto minmax(0, 1fr) auto; }
 .map-bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2); padding: var(--s-2); background: var(--surface); }
 .map-bar.map-tools { border-bottom: 1px solid var(--border); }
-.map-foot { border-top: 1px solid var(--border); }
+/* The footer keeps one height whatever it shows (the hint clamps to two lines), so selecting a block
+   (which swaps Corners for Height) never resizes the map under the pointer mid-drag. */
+.map-foot { border-top: 1px solid var(--border); flex-wrap: nowrap; height: 48px; }
 .map-canvas { position: relative; min-height: 0; }
 #map { display: block; width: 100%; height: 100%; touch-action: none; cursor: default; user-select: none; -webkit-user-select: none; }
 #map:focus-visible { outline-offset: -2px; }
 #map.over-point { cursor: grab; } #map.dragging { cursor: grabbing; }
-.map-tools.end { display: flex; align-items: center; gap: var(--s-2); margin-left: auto; }
-.map-hint { flex: 1 1 160px; min-width: 0; margin: 0; font-size: var(--text-xs); line-height: 1.3; }
+.map-tools.end { display: flex; flex: none; align-items: center; gap: var(--s-2); margin-left: auto; }
+.map-hint { flex: 1 1 0; min-width: 0; margin: 0; font-size: var(--text-xs); line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .map-empty { position: absolute; inset: 0; margin: auto; height: fit-content; width: fit-content; max-width: 70%; padding: var(--s-3) var(--s-4); text-align: center; pointer-events: none;
   background: var(--surface); border: 1px dashed var(--border-strong); border-radius: var(--radius-lg); color: var(--text-muted); }
 .map-empty[hidden] { display: none; }
 
-.side { --screen-h: calc(100vh - var(--top) - var(--dock) - var(--controls) - 2 * var(--gap));
-  display: grid; grid-template-rows: auto minmax(0, 1fr); gap: var(--gap); min-height: 0; width: min(58vw, calc(var(--screen-h) * 16 / 9)); }
-/* With an output, the two screens sit side by side and the right column takes more of the width. */
-.stage:has(.screens.split) .side { width: min(66vw, calc(var(--screen-h) * 16 / 9 * 2 + 12px)); }
+/* The right column: the screens fill every pixel the shot fields leave (two rows, no free row to
+   stretch into a band), and each picture keeps 16:9 inside its screen (container units), so a
+   result arriving or the divider moving never shifts the fields below. */
+.side { --screen-h: calc(100vh - var(--top) - var(--dock) - var(--compose) - 2 * var(--gap));
+  display: grid; grid-template-rows: minmax(0, 1fr) auto; gap: var(--gap); min-height: 0; width: min(66vw, calc(var(--screen-h) * 16 / 9), calc(100vw - 2 * var(--pad) - var(--gap) - var(--map-min))); }
+/* The map keeps at least --map-min, so its tool row always fits (it wraps, never clips). */
+.stage:has(.screens.split) .side { width: min(70vw, calc(var(--screen-h) * 16 / 9 * 2 + 12px), calc(100vw - 2 * var(--pad) - var(--gap) - var(--map-min))); }
 
-.screens { --split: .5; position: relative; display: flex; gap: 0; align-items: stretch; }
-.screens .screen { position: relative; min-width: 0; }
+.screens { --split: .5; position: relative; display: flex; min-height: 0; border-radius: var(--radius-lg); overflow: hidden; background: #000; border: 1px solid var(--border); }
+.screens .screen { position: relative; min-width: 0; container-type: size; display: grid; place-items: center; }
 .screens:not(.split) #screenPreview { flex: 1; }
 .screens.split #screenPreview { flex: 0 0 calc(var(--split) * (100% - 12px)); }
 .screens.split #screenOutput { flex: 1; }
 .screens.swapped { flex-direction: row-reverse; }
-.divider { flex: 0 0 12px; cursor: col-resize; position: relative; }
+.divider { flex: 0 0 12px; cursor: col-resize; position: relative; background: var(--bg); }
 .divider::after { content: ""; position: absolute; top: 20%; bottom: 20%; left: 5px; width: 2px; border-radius: 1px; background: var(--border-strong); transition: background var(--dur-fast) var(--ease); }
-.divider:hover::after, .divider:focus-visible::after { background: var(--accent-ink); }
+.divider:hover::after, .divider:focus-visible::after { background: var(--text); }
 .divider[hidden], .screen[hidden] { display: none; }
-.output-frame { position: relative; aspect-ratio: 16 / 9; display: grid; place-items: center; gap: var(--s-2); border-radius: var(--radius-lg); overflow: hidden; background: var(--surface-sunk); border: 1px solid var(--border); }
+.output-frame { position: relative; width: min(100cqw, 100cqh * 16 / 9); aspect-ratio: 16 / 9; display: grid; place-content: center; justify-items: center; gap: var(--s-2); overflow: hidden; background: var(--surface-sunk); }
 .output-video { width: 100%; height: 100%; object-fit: cover; display: block; }
 .output-video.fake { filter: saturate(1.6) hue-rotate(160deg) contrast(1.1); }
 .progress { width: 60%; height: 4px; border-radius: 2px; background: var(--track); overflow: hidden; }
-.progress span { display: block; width: 0; height: 100%; background: var(--accent); transition: width var(--dur) var(--ease); }
+.progress span { display: block; width: 0; height: 100%; background: var(--rail-fill); transition: width var(--dur) var(--ease); }
 .progress[hidden] { display: none; }
-.swap { position: absolute; right: 8px; top: 8px; height: 26px; padding: 0 8px; background: rgba(18, 19, 22, .55); color: #e6e7e9; }
+/* Buttons over a picture: dark glass, light text, the same in both themes. */
+.screen-actions { position: absolute; top: var(--s-2); right: var(--s-2); z-index: 3; display: flex; gap: var(--s-1); }
+.btn.overlay { height: 26px; padding: 0 var(--s-2); border: 0; background: rgb(0 0 0 / .55); color: #f2f2f2; box-shadow: 0 0 0 1px rgb(255 255 255 / .16); backdrop-filter: blur(4px); font-size: var(--text-sm); }
+.btn.overlay:hover:not(:disabled) { background: rgb(0 0 0 / .72); border: 0; }
+.btn.overlay[hidden] { display: none; }
 .compose { display: grid; gap: var(--s-2); align-content: start; }
 .compose .row { gap: var(--s-2); }
 .drop { position: relative; display: inline-flex; align-items: center; gap: 6px; height: var(--control-h); padding: 0 var(--s-2) 0 4px; border: 1px dashed var(--border-strong); border-radius: var(--radius-sm);
   color: var(--text-muted); font-size: var(--text-xs); cursor: pointer; white-space: nowrap; transition: border-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease); }
-.drop:hover { border-color: var(--accent-ink); color: var(--text); }
+.drop:hover { border-color: var(--text-muted); color: var(--text); }
 .drop input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
 .drop-thumb { width: 22px; height: 22px; border-radius: 3px; background: var(--surface-2) center / cover no-repeat; }
-.drop-thumb.set { box-shadow: 0 0 0 1px var(--accent-ink); }
+.drop-thumb.set { box-shadow: 0 0 0 1px var(--border-strong); }
 .run-btn { min-width: 108px; }
 .options { position: relative; margin-left: auto; }
 .options summary { list-style: none; }
@@ -102,19 +111,18 @@ select:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
 .oss-panel { font-size: var(--text-sm); color: var(--text-muted); }
 .oss-panel a { color: var(--accent-ink); }
 .oss-panel strong { color: var(--text); }
-.preview { position: relative; aspect-ratio: 16 / 9; border-radius: var(--radius-lg); overflow: hidden; background: #000; border: 1px solid var(--border); }
+.preview { position: relative; width: min(100cqw, 100cqh * 16 / 9); aspect-ratio: 16 / 9; overflow: hidden; background: #000; cursor: pointer; }
 .preview canvas { display: block; width: 100%; height: 100%; }
 .hud { position: absolute; left: var(--s-2); top: var(--s-2); display: flex; align-items: center; gap: var(--s-2); padding: 3px 9px; border-radius: var(--radius-sm);
   background: rgba(18, 19, 22, .6); color: #e6e7e9; font-size: var(--text-xs); pointer-events: none; }
 .pulse { width: 8px; height: 8px; border-radius: 50%; background: #ff5d73; opacity: .15; }
-.big-play { position: absolute; inset: 0; margin: auto; width: 132px; height: 52px; display: flex; align-items: center; justify-content: center; gap: 10px; cursor: pointer;
-  border-radius: var(--radius-pill); border: 0; background: var(--accent); color: var(--on-accent); font-size: var(--text-lg); font-weight: var(--weight-semibold); box-shadow: var(--shadow-lg);
-  transition: transform var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease); }
-.big-play:hover { background: var(--accent-hover); transform: scale(1.03); }
-.big-play .glyph { width: 0; height: 0; border-top: 8px solid transparent; border-bottom: 8px solid transparent; border-left: 13px solid currentColor; }
-.big-play[hidden] { display: none; }
-.big-play.playing { opacity: 0; transition: opacity var(--dur) var(--ease); }
-.preview:hover .big-play.playing, .big-play.playing:focus-visible { opacity: .85; }
+/* The transport: one slim bar over the bottom of the screens (the play button bottom left, as in
+   the post draft's player), shown while paused, on hover and on keyboard focus. */
+.vbar { position: absolute; left: 0; right: 0; bottom: 0; z-index: 4; display: flex; align-items: center; gap: var(--s-3);
+  padding: var(--s-6) var(--s-3) var(--s-2); background: linear-gradient(to bottom, transparent, rgb(0 0 0 / .62)); transition: opacity var(--dur) var(--ease); }
+.screens.playing:not(:hover):not(:focus-within) .vbar { opacity: 0; }
+.vbar #transportTime { flex: none; font-size: var(--text-sm); color: #d9d9d9; text-align: right; min-width: 15.5em; }
+.vbar .scrub { --rail: rgb(255 255 255 / .28); }
 
 .controls { display: grid; grid-template-columns: 84px minmax(0, 1fr); align-items: center; gap: var(--s-2) var(--s-3); align-content: start; }
 .lab { font-size: var(--text-xs); letter-spacing: .06em; text-transform: uppercase; color: var(--text-muted); }
@@ -131,7 +139,7 @@ select:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
 .timeline { display: grid; grid-template-columns: 112px minmax(0, 1fr); grid-template-rows: 44px var(--lane-h) var(--lane-h); gap: 4px var(--s-2); align-items: center; min-width: 0; }
 .lane-lab { font-size: var(--text-xs); color: var(--text-muted); text-align: right; }
 .wave-wrap { height: 100%; border-radius: var(--radius-sm); overflow: hidden; background: var(--wave-bg); border: 1px solid var(--border); transition: border-color var(--dur) var(--ease); }
-.wave-wrap.drop { border-color: var(--accent-ink); }
+.wave-wrap.drop { border-color: var(--text-muted); }
 #wave { display: block; width: 100%; height: 100%; cursor: pointer; }
 .block.w-glide { --block-mark: var(--subject); } .block.w-spin, .block.w-jump { --block-mark: var(--kick); }
 .block.w-behind, .block.w-side, .block.w-orbit, .block.w-top, .block.w-path, .block.w-push { --block-mark: var(--camera); }
@@ -150,7 +158,7 @@ select:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
   background: transparent; color: var(--text-muted); cursor: pointer; line-height: 1.05; transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease); }
 .chip:hover { background: var(--surface-hover); color: var(--text); }
 .chip-name { font-size: var(--text-xs); }
-.chip-lock { font: 10px var(--font-mono); color: var(--accent-ink); }
+.chip-lock { font: var(--text-xs) var(--font-mono); color: var(--text); }
 .chip-lock.off { color: var(--text-muted); }
 #map.pen { cursor: crosshair; }
 .swatches { display: inline-flex; gap: 4px; }
@@ -162,7 +170,6 @@ select:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
 .key-placeholder.connected .key-dot { background: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 40%, transparent); }
 .key-placeholder:not(.connected) .key-dot { background: var(--text-muted); box-shadow: none; }
 
-.add-gallery { position: absolute; left: 8px; bottom: 8px; height: 26px; }
 .map-zoom { display: flex; gap: 2px; background: var(--surface-sunk); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 2px; }
 .map-zoom .btn { height: 26px; min-width: 28px; padding: 0 8px; }
 #map.panning { cursor: grab; }
@@ -174,9 +181,6 @@ select:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
 .row-head { display: flex; align-items: center; gap: var(--s-3); }
 .row-head h3 { margin: 0; font-size: var(--text-md); font-weight: var(--weight-semibold); }
 .row-head .btn { margin-left: auto; }
-.icon-btn.small { width: 32px; height: 32px; }
-.icon-btn.small .glyph { border-top-width: 6px; border-bottom-width: 6px; border-left-width: 10px; }
-.icon-btn.small.playing .glyph { width: 9px; height: 11px; border-left-width: 3px; border-right-width: 3px; }
 .row-strip { display: grid; grid-template-columns: 1.1fr 1.6fr 0.8fr 0.8fr 1.5fr 1.2fr 1.2fr 1.2fr; gap: var(--s-2); align-items: start; }
 .row-tile { margin: 0; display: grid; gap: 4px; min-width: 0; }
 .row-tile > :first-child { aspect-ratio: 16 / 10; width: 100%; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--surface-sunk); object-fit: cover; overflow: hidden; }
@@ -188,10 +192,12 @@ select:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
 .row-text p { margin: 0 0 4px; }
 .row-text.clamp p { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 @media (max-width: 1300px) { .row-strip { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
-.page-transport { display: flex; align-items: center; gap: var(--s-2); }
-.scrub { flex: 1; -webkit-appearance: none; appearance: none; height: 18px; background: transparent; cursor: pointer; }
-.scrub::-webkit-slider-runnable-track { height: 4px; border-radius: 2px; background: linear-gradient(to right, var(--accent) var(--pos, 0%), var(--track) var(--pos, 0%)); }
-.scrub::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; margin-top: -4px; border-radius: 50%; background: var(--thumb); border: 2px solid var(--accent); }
-.scrub:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
-#transportTime { font-size: var(--text-xs); min-width: 170px; text-align: right; }
+/* The scrub rail (the post draft's rail): a 1 px line, a deep green fill, a small dot; an 18 px hit area. */
+.scrub { flex: 1; min-width: 0; -webkit-appearance: none; appearance: none; height: 18px; margin: 0; background: transparent; cursor: pointer; }
+.scrub::-webkit-slider-runnable-track { height: 1px; background: linear-gradient(to right, var(--rail-fill) var(--pos, 0%), var(--rail) var(--pos, 0%)); }
+.scrub::-webkit-slider-thumb { -webkit-appearance: none; width: 7px; height: 7px; margin-top: -3px; border-radius: 50%; background: var(--rail-dot); transition: transform var(--dur-fast) var(--ease); }
+.scrub:hover::-webkit-slider-thumb, .scrub:focus-visible::-webkit-slider-thumb { transform: scale(1.6); }
+.scrub::-moz-range-track { height: 1px; background: var(--rail); } .scrub::-moz-range-progress { height: 1px; background: var(--rail-fill); }
+.scrub::-moz-range-thumb { width: 7px; height: 7px; border: 0; border-radius: 50%; background: var(--rail-dot); }
+.scrub:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; border-radius: 2px; }
 .row-scrub { width: 100%; }

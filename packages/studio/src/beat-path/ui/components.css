@@ -1,6 +1,6 @@
 /*
  * Beat Path design system: plain components on tokens (themes/*.css set the tokens).
- * Components: button, icon button (play/pause), segmented control, slider, toggle, menu,
+ * Components: button, play button, segmented control, slider, toggle, menu,
  * lane and lane block, panel, tooltip. The page uses only these and the tokens.
  */
 :root {
@@ -11,7 +11,7 @@
   /* motion */
   --dur-fast: 120ms; --dur: 160ms; --dur-slow: 200ms; --ease: cubic-bezier(.2, .7, .2, 1);
   /* sizes */
-  --control-h: 30px; --icon-btn: 44px; --lane-h: 28px;
+  --control-h: 30px; --lane-h: 28px;
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--text); }
@@ -38,14 +38,20 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .btn.ghost:hover:not(:disabled) { background: var(--surface-hover); color: var(--text); border-color: transparent; }
 .btn.outline { background: transparent; }
 
-/* Icon button: play / pause */
-.icon-btn { width: var(--icon-btn); height: var(--icon-btn); padding: 0; border-radius: var(--radius-pill); display: grid; place-items: center;
-  border: 0; background: var(--accent); color: var(--on-accent); cursor: pointer; box-shadow: var(--shadow-sm);
-  transition: background var(--dur-fast) var(--ease), transform var(--dur-fast) var(--ease); }
-.icon-btn:hover { background: var(--accent-hover); }
-.icon-btn:active { transform: scale(.96); }
-.icon-btn .glyph { width: 0; height: 0; margin-left: 3px; border-top: 8px solid transparent; border-bottom: 8px solid transparent; border-left: 13px solid currentColor; }
-.icon-btn.playing .glyph { margin: 0; width: 12px; height: 15px; border: 0; border-left: 4px solid currentColor; border-right: 4px solid currentColor; }
+/* Play button: one control for every play on the page. On a picture: a dark glass circle (the post
+   draft's player button). Quiet (the dock, the gallery rows): outlined, muted, never the accent. */
+.play-btn { width: 32px; height: 32px; flex: none; padding: 0; border: 0; border-radius: var(--radius-pill); display: grid; place-items: center; cursor: pointer;
+  background: rgb(0 0 0 / .5); color: #fff; box-shadow: 0 0 0 1px rgb(255 255 255 / .2); backdrop-filter: blur(4px);
+  transition: background var(--dur-fast) var(--ease), transform var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease); }
+.play-btn:hover { background: rgb(0 0 0 / .7); transform: scale(1.06); }
+.play-btn:active { transform: scale(.95); }
+.play-btn svg { width: 14px; height: 14px; fill: currentColor; }
+.play-btn .g-play { transform: translateX(1px); }
+.play-btn .g-pause, .play-btn.playing .g-play { display: none; }
+.play-btn.playing .g-pause { display: block; }
+.play-btn.quiet { background: transparent; color: var(--text-muted); box-shadow: inset 0 0 0 1px var(--border-strong); backdrop-filter: none; }
+.play-btn.quiet:hover { background: var(--surface-hover); color: var(--text); transform: none; }
+.play-btn.quiet.playing { color: var(--text); }
 
 /* Segmented control */
 .seg { display: inline-flex; padding: 2px; gap: 2px; background: var(--surface-sunk); border: 1px solid var(--border); border-radius: var(--radius-md); }

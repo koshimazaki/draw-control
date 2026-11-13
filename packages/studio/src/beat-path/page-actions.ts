@@ -86,6 +86,7 @@ export function bindActions(p: Page) {
       : p.view !== "top" ? `Drag a point up or down to set the ${p.tool}’s height`
       : p.pen === "draw" ? "Drawing a new path: drag a stroke, or click to place points · Escape stops"
       : "Drag a point to move it · Delete removes the selected point · Draw new to start a path";
+    $("mapHint").title = $("mapHint").textContent ?? "";   // the full hint when two lines cut it
     $("map").classList.toggle("pen", p.pen === "draw");
   }
 
@@ -203,7 +204,6 @@ export function bindActions(p: Page) {
   };
   // Transport and files
   $("play").onclick = () => p.setPlaying(!p.player.playing);
-  $("bigPlay").onclick = e => { e.stopPropagation(); p.setPlaying(!p.player.playing); };
   $("barPlay").onclick = () => p.setPlaying(!p.player.playing);
   // A click on the preview or the output toggles play (not on their own buttons).
   for (const id of ["preview", "screenOutput"]) $(id).addEventListener("click", e => { if (!(e.target as HTMLElement).closest("button")) p.setPlaying(!p.player.playing); });

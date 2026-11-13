@@ -18,6 +18,7 @@
   --border: #393939; --border-strong: #585858; --text: #f2f2f2; --text-muted: #9a9a9a;
   --accent: #afff9f; --accent-hover: #90f77c; --accent-ink: #afff9f; --on-accent: #1c1c1c; --ring: #afff9f;
   --track: #444444; --thumb: #f2f2f2;
+  --rail: #454545; --rail-fill: #4f8a44; --rail-dot: #f2f2f2;
   --block-bg: #252525; --block-border: #393939; --block-hover: #2e2e2e;
   --tooltip-bg: #f2f2f2; --tooltip-text: #1b1b1b; --scrim: rgba(0, 0, 0, .55); --danger: oklch(82% .12 20);
 

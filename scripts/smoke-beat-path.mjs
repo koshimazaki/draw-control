@@ -31,7 +31,8 @@ export async function smokeBeatPath(browser, base, { fail, OUT, SHOTS }) {
   if (p.recipe.character.kind !== "glider" || p.recipe.travelLock?.lock !== "kick") fail("Beat Path did not open on the glider locked to the kicks");
   const noScroll = await page.evaluate(() => document.getElementById("editor").offsetHeight <= window.innerHeight + 1 && document.documentElement.scrollWidth <= window.innerWidth + 1);
   if (!noScroll) fail("the Beat Path editor does not fit one screen at 1280×720");
-  await page.click("#bigPlay");
+  // A click on the picture plays (there is no overlay button any more).
+  await page.click("#preview", { position: { x: 200, y: 120 } });
   await page.waitForTimeout(1500);
   p = await probe();
   if (!p.playing || p.head < 0.8) fail(`Beat Path is not playing after one click (head ${p.head})`);
@@ -237,7 +238,7 @@ export async function smokeBeatPath(browser, base, { fail, OUT, SHOTS }) {
   // Themes and sizes.
   await page.goto(`${base}/path.html?theme=runware`);
   await page.waitForFunction(() => window.__beatPath?.recipe().audio, null, { timeout: 30_000 });
-  await page.click("#bigPlay"); await page.waitForTimeout(1200); await page.click("#play");
+  await page.click("#barPlay"); await page.waitForTimeout(1200); await page.click("#play");
   await page.screenshot({ path: `${SHOTS}beat-path-runware.png` });
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.waitForTimeout(300);

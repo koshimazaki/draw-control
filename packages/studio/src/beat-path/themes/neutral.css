@@ -11,6 +11,7 @@
   --border: #2a2d33; --border-strong: #464a52; --text: #e9eaec; --text-muted: #9196a0;
   --accent: #ffd34d; --accent-hover: #ffdd70; --accent-ink: #ffd34d; --on-accent: #17181b; --ring: #ffd34d;
   --track: #353840; --thumb: #e9eaec;
+  --rail: #3a3e45; --rail-fill: #8c7426; --rail-dot: #e9eaec;
   --block-bg: #23262c; --block-border: #30343b; --block-hover: #2b2f36;
   --tooltip-bg: #e9eaec; --tooltip-text: #17181b; --scrim: rgba(8, 9, 11, .6); --danger: #ff7a8a;
 
