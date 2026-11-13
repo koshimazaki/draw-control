@@ -43,6 +43,10 @@ export type BeatPathState = {
   figure: { shape: "glider" | "car" | "flyer" | "runner"; body: string; head: string };
   /** The scenery around the path: none, the seeded scatter, a street of buildings, a city grid. */
   scenery: "none" | "scatter" | "street" | "city";
+  /** "clear": nothing crosses the camera's line of sight; "passes": blocks may cross it briefly. */
+  sight: "clear" | "passes";
+  /** Scenery boxes once edited on the map (they replace the preset's placement). */
+  boxes?: { x: number; z: number; w: number; d: number; h: number; yaw?: number }[];
   /** The example's music (tracks.ts), when it ships its own. */
   track?: "flyer" | "runner" | "car";
   /** The shot description that travels with the guide (the legend line is built from the figure's colours). */
@@ -105,7 +109,8 @@ export function toScript(state: BeatPathState): string {
   if (state.muted.length) lines.push(`muted: ${state.muted.map(f).join(" ")}`);
   if (state.figure.shape !== "glider" || state.figure.body !== FIGURE_DEFAULT.body || state.figure.head !== FIGURE_DEFAULT.head)
     lines.push(`figure: ${state.figure.shape !== "glider" ? `shape ${state.figure.shape} ` : ""}body ${state.figure.body} head ${state.figure.head}`);
-  if (state.scenery !== "scatter") lines.push(`scenery: ${state.scenery}`);
+  if (state.scenery !== "scatter" || state.sight === "passes") lines.push(`scenery: ${state.scenery}${state.sight === "passes" ? " sight passes" : ""}`);
+  for (const b of state.boxes ?? []) lines.push(`box: ${[b.x, b.z, b.w, b.d, b.h, ...(b.yaw ? [b.yaw] : [])].map(f).join(" ")}`);
   if (state.shot.subject || state.shot.environment || state.shot.action) {
     for (const k of ["subject", "environment", "action"] as const) if (state.shot[k]) lines.push(`shot ${k}: ${state.shot[k].replace(/[\r\n#]+/g, " ").trim()}`);
     lines.push(`shot legend: ${legendFor(state.figure)}`);
@@ -163,6 +168,8 @@ export function fromScript(text: string, base: BeatPathState, grid: { bpm: numbe
   state.muted = parsed.muted ?? [];
   state.figure = { shape: parsed.figure?.shape ?? "glider", body: parsed.figure?.body ?? FIGURE_DEFAULT.body, head: parsed.figure?.head ?? FIGURE_DEFAULT.head };
   state.scenery = parsed.scenery ?? (state.landmarks.on ? "scatter" : "none");
+  state.sight = parsed.sight ?? "clear";
+  state.boxes = parsed.boxes;
   const groove = /^#\s*track:\s*(straight|drive|laidback)/im.exec(text);
   state.track = groove ? ({ straight: "flyer", drive: "runner", laidback: "car" } as const)[groove[1] as "straight"] : undefined;
   state.shot = { subject: parsed.shot?.subject ?? "", environment: parsed.shot?.environment ?? "", action: parsed.shot?.action ?? "" };
@@ -266,7 +273,7 @@ export const BLANK_STATE: BeatPathState = {
   clip: 8, subject: [], subjectCorners: 0.5, camera: [], cameraCorners: 0.5,
   character: [{ from: 0, to: 17, word: "hover" }], cameraLane: [{ from: 0, to: 17, word: "behind" }],
   charLock: { lock: "kick", strength: 1 }, camLock: { lock: "kick", strength: 1, onHit: "hold", advance: false },
-  landmarks: { on: true, seed: 7 }, muted: [], figure: { shape: "glider", body: "#ff6a13", head: "#ff6a13" }, scenery: "scatter", shot: { subject: "", environment: "", action: "" },
+  landmarks: { on: true, seed: 7 }, muted: [], figure: { shape: "glider", body: "#ff6a13", head: "#ff6a13" }, scenery: "scatter", sight: "clear", shot: { subject: "", environment: "", action: "" },
 };
 
 /** A camera path to start from when "My path" is picked with none drawn: a slow arc in front. */

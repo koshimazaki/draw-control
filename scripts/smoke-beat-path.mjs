@@ -112,6 +112,41 @@ export async function smokeBeatPath(browser, base, { fail, OUT, SHOTS }) {
   await page.click("#resetMarkers");
   if ((await probe()).recipe.mutedHits) fail("Reset markers did not restore the hits");
 
+  // Blocks: draw a block, move it, duplicate, delete, undo (the preset's boxes become explicit on the first edit).
+  await page.click('[data-control="tool"] [data-value="blocks"]');
+  await page.click('[data-control="pen"] [data-value="draw"]');
+  const a = await at({ x: 3, z: -9 }), b = await at({ x: 7, z: -6 });
+  await page.mouse.move(a.x, a.y); await page.mouse.down(); await page.mouse.move(b.x, b.y, { steps: 6 }); await page.mouse.up();
+  let boxes = (await probe()).state.boxes ?? [];
+  const added = boxes.at(-1);
+  console.log(`beat path: blocks tool drew ${JSON.stringify(added)} (${boxes.length} boxes)`);
+  if (!added || Math.abs(added.w - 4) > 0.3 || Math.abs(added.d - 3) > 0.3) fail("the Blocks tool did not draw a 4 × 3 m block");
+  await page.click('[data-control="pen"] [data-value="edit"]');
+  const mid = await at({ x: 5, z: -7.5 }), to = await at({ x: 8, z: -7.5 });
+  await page.mouse.move(mid.x, mid.y); await page.mouse.down(); await page.mouse.move(to.x, to.y, { steps: 6 }); await page.mouse.up();
+  boxes = (await probe()).state.boxes;
+  if (Math.abs(boxes.at(-1).x - 8) > 0.3) fail(`dragging the block did not move it (x ${boxes.at(-1).x})`);
+  await page.keyboard.press("ControlOrMeta+d");
+  if ((await probe()).state.boxes.length !== boxes.length + 1) fail("Cmd/Ctrl-D did not duplicate the block");
+  await page.keyboard.press("Delete");
+  if ((await probe()).state.boxes.length !== boxes.length) fail("Delete did not remove the block");
+  await page.mouse.move(mid.x, mid.y);
+  await page.screenshot({ path: `${SHOTS}beat-path-blocks.png` });
+  await page.click('[data-control="tool"] [data-value="camera"]');
+  const hint = await page.textContent("#mapHint");
+  if (!/following the blocks in the Camera lane/.test(hint ?? "")) fail(`the camera tool does not say the camera follows the lane: ${hint}`);
+  await page.click('[data-control="tool"] [data-value="subject"]');
+
+  // Every example loads framed: each path point, camera-track point and scenery box inside the map.
+  for (const ex of ["1", "2", "0"]) {
+    await page.click(`[data-control="example"] [data-value="${ex}"]`);
+    await page.waitForTimeout(400);
+    const inside = await page.evaluate(() => window.__beatPath.mapInside());
+    if (!inside) fail(`Example ${Number(ex) + 1} does not fit the map after loading`);
+    await page.screenshot({ path: `${SHOTS}beat-path-fit-example-${Number(ex) + 1}.png` });
+  }
+  console.log("beat path: every example framed on the map after loading");
+
   // The example switcher: each example brings its own figure shape and music; edits stay with their example.
   const edited = (await probe()).state.subject;
   await page.click('[data-control="example"] [data-value="1"]');
@@ -188,6 +223,10 @@ export async function smokeBeatPath(browser, base, { fail, OUT, SHOTS }) {
   const fits = await page.evaluate(() => document.getElementById("editor").offsetHeight <= window.innerHeight + 1);
   if (!fits) fail("the Beat Path editor does not fit one screen at 1440×900");
   await page.screenshot({ path: `${SHOTS}beat-path-runware-1440.png` });
+  await page.evaluate(() => document.getElementById("gallery").scrollIntoView());
+  await page.waitForFunction(() => document.querySelectorAll("#gallerySlot .gallery-row video").length >= 3, null, { timeout: 120_000 }).catch(() => fail("the gallery rows did not render their guides"));
+  await page.locator("#gallery").screenshot({ path: `${SHOTS}beat-path-gallery-rows.png` });
+  await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({ path: `${SHOTS}beat-path-runware-full.png`, fullPage: true });
   if (errors.length) fail(`Beat Path page errors: ${errors.join(" | ")}`);
   await page.close();

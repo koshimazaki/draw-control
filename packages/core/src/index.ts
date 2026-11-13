@@ -11,7 +11,7 @@
 // Recipe: the format, its validator and starting points (docs/recipe.md).
 export {
   RECIPE_VERSION, CHARACTER_KINDS, PROCEDURAL_KINDS, AMPLITUDE_MAX, SPEED_RANGE, RecipeError, validateRecipe, recipeSeconds, secondsPerBeat,
-  FIGURE_SHAPES, type FigureShape, type Recipe, type RootShape, type ShotDescription, type Move, type Phase, type BeatGrid, type CharacterRef, type CharacterKind, type RootPoint, type Jump,
+  FIGURE_SHAPES, type FigureShape, type SceneryBox, type Recipe, type RootShape, type ShotDescription, type Move, type Phase, type BeatGrid, type CharacterRef, type CharacterKind, type RootPoint, type Jump,
 } from "./recipe";
 export { DEFAULT_RECIPE, MOVE_KEYS, MOVE_LIBRARY, makeMove, type MoveKey } from "./moves";
 export { defaultRiggedRecipe } from "./examples";
@@ -26,7 +26,7 @@ export { POSES, JOINTS, mixPoses, scalePose, type Pose, type PoseName, type Join
 export { rootAt, travelRange, travelStations } from "./root-travel";
 export { cornerPath, polylineSpline } from "./corners";
 export { frozenBeat, type Freeze } from "./freeze";
-export { placeLandmarks, sceneryOf, footprintDistance, scenePaths, LANDMARKS, DEFAULT_LANDMARKS, SCENERY, BUILDINGS, type Landmark, type LandmarkKind, type Scenery } from "./landmarks";
+export { placeLandmarks, sceneryOf, footprintDistance, scenePaths, LANDMARKS, DEFAULT_LANDMARKS, SCENERY, BUILDINGS, PASSES, Occlusion, hiddenSamples, type Landmark, type LandmarkKind, type Scenery } from "./landmarks";
 export { exportFrameCount } from "./bundle";
 
 // Beats, audio analysis and onsets (kicks, snares, hats, peaks).

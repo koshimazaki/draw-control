@@ -20,6 +20,7 @@ import { bindGenerate } from "./page-generate";
 import { LaneView, Menu } from "./lanes";
 import { LAYOUT } from "./layout";
 import { MapView, type Tool, type View } from "./map";
+import { BlockTool } from "./map-blocks";
 import { bindActions } from "./page-actions";
 import { beatPathRecipe, type TrackInfo } from "./recipe-map";
 import { LABELS, fitLanes, type BeatPathState, type CameraWord, type CharacterWord } from "./script";
@@ -78,16 +79,32 @@ export function startBeatPath(root: HTMLElement) {
 
   const map = new MapView($<HTMLCanvasElement>("map"), {
     tool: () => tool, view: () => view,
-    points: t => (t === "subject" ? state.subject : state.camera),
-    corners: t => (t === "subject" ? state.subjectCorners : state.cameraCorners),
+    points: t => (t === "subject" ? state.subject : t === "camera" ? state.camera : []),
+    corners: t => (t === "camera" ? state.cameraCorners : state.subjectCorners),
     change: (t, points, final) => {
-      // Drawing a camera path never changes the camera lane: a block flies it only when its word is "My path".
-      update({ ...state, ...(t === "subject" ? { subject: points } : { camera: points }) }, final);
+      const next = { ...state, ...(t === "subject" ? { subject: points } : { camera: points }) };
+      // A camera path drawn new flies the selected camera block (or the block at the playhead), never the whole clip.
+      if (t === "camera" && final && points.length >= 2 && state.camera.length < 2 && !next.cameraLane.some(b => b.word === "path")) {
+        const beat = beatAtSeconds(recipe.beatGrid, head);
+        const k = selection?.kind === "block" && selection.lane === "cameraLane" ? selection.index : Math.max(0, next.cameraLane.findIndex(b => beat >= b.from && beat < b.to));
+        next.cameraLane = next.cameraLane.map((b, i) => (i === k ? { from: b.from, to: b.to, word: "path" as const } : b));
+        say(`Block ${k + 1} of the Camera lane now flies your path`);
+      }
+      update(next, final);
     },
+    blocksDown: (e, w, toScreen, fromScreen) => blocks.down(e, w, toScreen, fromScreen),
+    selectedBox: () => blocks.selected,
     pen: () => pen,
     drew: () => page.setPen("edit"),
     selected: () => (selection?.kind === "point" ? { tool: selection.tool, index: selection.index } : null),
     select: sel => { selection = sel ? { kind: "point", ...sel } : null; },
+  });
+  /** The scenery as editable boxes (map-blocks.ts): explicit once edited, else the placement of the preset. */
+  let lastLandmarks: { x: number; z: number; w: number; d: number; h: number; yaw: number }[] = [], lastFloor: { x: number; z: number }[] = [];
+  const blocks = new BlockTool($<HTMLCanvasElement>("map"), {
+    boxes: () => state.boxes ?? lastLandmarks.map(b => ({ x: b.x, z: b.z, w: b.w, d: b.d, h: b.h, ...(b.yaw ? { yaw: b.yaw } : {}) })),
+    setBoxes: (boxes, final) => update({ ...state, boxes, scenery: state.scenery === "none" ? "street" : state.scenery, landmarks: { ...state.landmarks, on: true } }, final),
+    pen: () => pen, subject: () => lastFloor, say: text => say(text), changed: () => { map.refresh(); actions.sync(); },
   });
   const strip = new AudioStrip($<HTMLCanvasElement>("wave"), seconds => { head = Math.max(window0(), Math.min(window1(), seconds)); if (player.playing) player.play(track, head); dirty = true; },
     seconds => toggleHit(seconds));
@@ -144,6 +161,7 @@ export function startBeatPath(root: HTMLElement) {
     glider.setShape(state.figure.shape);
     const landmarks = placeLandmarks(recipe, plan, live());
     viewport.setLandmarks(landmarks);
+    lastLandmarks = landmarks; lastFloor = floor;
     map.setScene({ floor, stations, trail, landmarks, ...cameraTrack(frames) });
     hits = [...stationBeats, ...plan.programmed.hits.flat()].map(b => secondsAtBeat(recipe.beatGrid, b)).sort((a, b) => a - b);
     const bands = live()?.bands, t0 = window0(), t1 = window1(), inClip = (t: number) => t >= t0 && t <= t1;
@@ -278,7 +296,7 @@ export function startBeatPath(root: HTMLElement) {
     $, map, menu, viewport, strip, player,
     get state() { return state; }, get recipe() { return recipe; }, get tool() { return tool; }, get view() { return view; },
     get track() { return track; }, get drive() { return live(); }, get info() { return info; }, get busy() { return busy; }, set busy(v: boolean) { busy = v; dirty = true; },
-    get head() { return head; }, get slot() { return slot; }, removeTrack, totalBeats, window0, window1, update, undo, rebuild, setPlaying, switchSlot, useFile, say,
+    get head() { return head; }, get slot() { return slot; }, blocks, removeTrack, totalBeats, window0, window1, update, undo, rebuild, setPlaying, switchSlot, useFile, say,
     setTool(t: Tool) { tool = t; map.refresh(); actions.sync(); },
     setView(v: View) { view = v; map.refresh(); actions.sync(); },
     get pen() { return pen; },

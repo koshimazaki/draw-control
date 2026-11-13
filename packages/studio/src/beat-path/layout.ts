@@ -27,12 +27,14 @@ export const LAYOUT = `
   <section class="map-pane panel" aria-label="Map">
     <canvas id="map" tabindex="0" aria-label="Map: Edit points moves points, Draw new draws a path"></canvas>
     <div class="map-tools">
-      ${seg("tool", ["subject", "camera"], { subject: "Subject path", camera: "Camera path" })}
+      ${seg("tool", ["subject", "camera", "blocks"], { subject: "Subject", camera: "Camera", blocks: "Blocks" }, "What the map edits: the subject's path, the camera's path, the scenery blocks")}
       ${seg("view", ["top", "side"], { top: "Top", side: "Side" })}
-      ${seg("pen", ["edit", "draw"], { edit: "Edit points", draw: "Draw new" })}
+      ${seg("pen", ["edit", "draw"], { edit: "Edit", draw: "Draw new" })}
     </div>
+    <div class="map-zoom"><button type="button" id="zoomIn" class="btn ghost" aria-label="Zoom in" data-tip="Zoom in (ctrl/cmd + wheel)">+</button><button type="button" id="zoomOut" class="btn ghost" aria-label="Zoom out">−</button><button type="button" id="zoomFit" class="btn ghost" data-tip="Frame everything (pan: drag with space held, middle button, or scroll)">Fit</button></div>
     <div class="map-tools end">
-      <label class="slider" data-tip="From sharp corners (hard turns) to a round curve"><span>Corners</span><input id="corners" type="range" min="0" max="1" step="0.05" /><output id="cornersOut"></output></label>
+      <label class="pick" id="boxHeightRow" hidden>Height <input id="boxHeight" class="field num" type="number" min="0.2" max="60" step="0.5" /> m</label>
+      <label class="slider" id="cornersRow" data-tip="From sharp corners (hard turns) to a round curve"><span>Corners</span><input id="corners" type="range" min="0" max="1" step="0.05" /><output id="cornersOut"></output></label>
       <button type="button" id="clearPath" class="btn ghost">Clear</button>
     </div>
     <p class="map-empty" id="mapEmpty" hidden></p>
@@ -102,9 +104,8 @@ export const LAYOUT = `
 </div>
 <section class="page-section" id="gallery" aria-labelledby="galleryTitle">
   <h2 id="galleryTitle">Gallery</h2>
-  <p class="muted">The three examples with their inputs (guide, music, shot description, references) and outputs.</p>
-  <div class="gallery-grid" id="gallerySlot"></div>
-  <div id="arenaGallerySlot" class="arena-gallery-slot"></div>
+  <p class="muted">Each example in one row: its path, its guide, the references, the shot description, and a clip per model, on one playhead with its music.</p>
+  <div class="gallery-rows" id="gallerySlot"></div>
 </section>
 <footer class="site-foot">
   <div class="oss-panel"><strong>Open source.</strong> <a href="${REPO_URL}" target="_blank" rel="noopener">Get the code</a> · ${LICENCE} licence · Runs in your browser with your own Runware key.</div>

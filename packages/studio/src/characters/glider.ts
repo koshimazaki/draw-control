@@ -48,13 +48,22 @@ function build(shape: FigureShape, g: THREE.Group, m: Mats) {
     return;
   }
   if (shape === "flyer") {
-    const body = new THREE.ConeGeometry(0.55, 3.2, 4, 1);
-    body.rotateX(Math.PI / 2); body.rotateZ(Math.PI / 4); body.scale(1.4, 0.6, 1);
+    // A tapered body (lathed, nose forward, flattened), short swept wings, a swept tail fin and a white nose.
+    const profile = [[0.001, 1.75], [0.16, 1.45], [0.36, 0.7], [0.44, 0], [0.4, -0.8], [0.26, -1.45], [0.12, -1.6]].map(([r, y]) => new THREE.Vector2(r, y));
+    const body = new THREE.LatheGeometry(profile, 14);
+    body.rotateX(Math.PI / 2); body.scale(1.35, 0.55, 1);
     g.add(mesh(body, m.body, 0, 1.2, 0));
-    const wing = new THREE.BoxGeometry(3.4, 0.08, 0.9);
-    g.add(mesh(wing, m.head, 0, 1.15, -0.35));
-    g.add(mesh(new THREE.BoxGeometry(0.08, 0.7, 0.6), m.head, 0, 1.55, -1.3));
-    g.add(mesh(new THREE.SphereGeometry(0.14, 16, 12), m.front, 0, 1.2, 1.62));
+    const wing = (side: number) => {
+      const sh = new THREE.Shape([new THREE.Vector2(0.35, 0.5), new THREE.Vector2(1.9, -0.55), new THREE.Vector2(1.9, -0.85), new THREE.Vector2(0.35, -0.75)].map(v => new THREE.Vector2(v.x * side, v.y)));
+      const geo = new THREE.ExtrudeGeometry(sh, { depth: 0.06, bevelEnabled: false });
+      geo.rotateX(Math.PI / 2);
+      return mesh(geo, m.head, 0, 1.2, 0);
+    };
+    g.add(wing(1), wing(-1));
+    const fin = new THREE.ExtrudeGeometry(new THREE.Shape([new THREE.Vector2(-0.7, 0), new THREE.Vector2(-1.55, 0.7), new THREE.Vector2(-1.65, 0.7), new THREE.Vector2(-1.5, 0)]), { depth: 0.05, bevelEnabled: false });
+    fin.rotateY(-Math.PI / 2);
+    g.add(mesh(fin, m.head, 0.025, 1.3, 0));
+    g.add(mesh(new THREE.SphereGeometry(0.12, 16, 12), m.front, 0, 1.2, 1.7));
     return;
   }
   if (shape === "runner") {

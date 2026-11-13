@@ -64,7 +64,10 @@ export function bindActions(p: Page) {
     };
     chip("chipCharacterLock", s.charLock);
     chip("chipCameraLock", s.camLock, s.camLock.lock === "off" ? "" : ` · ${s.camLock.advance ? "next" : { move: "moves", hold: "holds", punch: "punches" }[s.camLock.onHit]}`);
-    const corners = p.tool === "subject" ? s.subjectCorners : s.cameraCorners;
+    const corners = p.tool === "camera" ? s.cameraCorners : s.subjectCorners;
+    const box = p.tool === "blocks" ? p.blocks.selected : -1, boxes = p.tool === "blocks" ? (s.boxes ?? null) : null;
+    $("boxHeightRow").hidden = box < 0; $("cornersRow").hidden = p.tool === "blocks";
+    if (box >= 0 && document.activeElement !== input("boxHeight")) input("boxHeight").value = String((boxes ?? [])[box]?.h ?? 8);
     input("corners").value = String(corners);
     $("cornersOut").textContent = corners.toFixed(2);
     $("hudLock").textContent = `figure ${s.charLock.lock === "off" ? "free" : s.charLock.lock} · camera ${s.camLock.lock === "off" ? "free" : s.camLock.lock}`;
@@ -72,11 +75,14 @@ export function bindActions(p: Page) {
       const el = input(`shot${k[0].toUpperCase()}${k.slice(1)}`);
       if (document.activeElement !== el) el.value = s.shot[k];
     }
-    const pts = p.tool === "subject" ? s.subject : s.camera;
+    const pts = p.tool === "subject" ? s.subject : p.tool === "camera" ? s.camera : [];
     const empty = $("mapEmpty");
-    empty.hidden = pts.length >= 2;
+    const rigs = p.tool === "camera" && pts.length < 2 && !s.cameraLane.some(b => b.word === "path");
+    empty.hidden = pts.length >= 2 || p.tool === "blocks" || rigs;
     empty.textContent = p.view === "side" ? `Draw the ${p.tool} path in the top view first.` : `No ${p.tool} path yet: press Draw new, then drag on the map or click to place points.`;
-    $("mapHint").textContent = p.view !== "top" ? `Drag a point up or down to set the ${p.tool}’s height`
+    $("mapHint").textContent = rigs ? "The camera is following the blocks in the Camera lane (its track is drawn). Draw new to fly your own path for a block."
+      : p.tool === "blocks" ? (p.pen === "draw" ? "Drag a rectangle to add a block · Escape stops" : "Click a block to select · drag to move · drag a corner to resize · Cmd/Ctrl-D duplicates · Delete removes")
+      : p.view !== "top" ? `Drag a point up or down to set the ${p.tool}’s height`
       : p.pen === "draw" ? "Drawing a new path: drag a stroke, or click to place points · Escape stops"
       : "Drag a point to move it · Delete removes the selected point · Draw new to start a path";
     $("map").classList.toggle("pen", p.pen === "draw");
@@ -109,7 +115,11 @@ export function bindActions(p: Page) {
   $("setCamLock").onclick = () => lockMenu("camLock", $("setCamLock"));
   $("chipCharacter").onclick = () => lockMenu("charLock");
   $("chipCamera").onclick = () => lockMenu("camLock");
-  const corners = (final: boolean) => { const c = Number(input("corners").value); p.update({ ...p.state, ...(p.tool === "subject" ? { subjectCorners: c } : { cameraCorners: c }) }, final); };
+  const corners = (final: boolean) => { const c = Number(input("corners").value); p.update({ ...p.state, ...(p.tool === "camera" ? { cameraCorners: c } : { subjectCorners: c }) }, final); };
+  input("boxHeight").onchange = () => p.blocks.setHeight(Number(input("boxHeight").value));
+  $("zoomIn").onclick = () => p.map.zoomBy(0.8);
+  $("zoomOut").onclick = () => p.map.zoomBy(1.25);
+  $("zoomFit").onclick = () => p.map.fit();
   input("corners").oninput = () => corners(false);
   input("corners").onchange = () => corners(true);
   /** A colour too close to the landmarks' greys (low chroma, mid lightness) loses the figure: say so. */
@@ -120,11 +130,13 @@ export function bindActions(p: Page) {
     if (final) p.say(greyish(body) || greyish(head) ? "That colour is close to the grey landmarks: the figure may not stand out" : `Figure: body ${body}, head ${head}`);
   };
   for (const id of ["figureBody", "figureHead"]) { input(id).oninput = () => figure(false); input(id).onchange = () => figure(true); }
-  $<HTMLSelectElement>("scenery").onchange = () => { const v = $<HTMLSelectElement>("scenery").value as BeatPathState["scenery"]; p.update({ ...p.state, scenery: v, landmarks: { ...p.state.landmarks, on: v !== "none" } }); };
+  // A preset fills the scene again with its own (editable) boxes.
+  $<HTMLSelectElement>("scenery").onchange = () => { const v = $<HTMLSelectElement>("scenery").value as BeatPathState["scenery"]; p.update({ ...p.state, scenery: v, boxes: undefined, landmarks: { ...p.state.landmarks, on: v !== "none" } }); };
   $<HTMLSelectElement>("figureShape").onchange = () => p.update({ ...p.state, figure: { ...p.state.figure, shape: $<HTMLSelectElement>("figureShape").value as BeatPathState["figure"]["shape"] } });
   input("gridExport").onchange = () => { p.viewport.setExportGrid(input("gridExport").checked); p.viewport.setGrid(input("gridExport").checked); p.rebuild(); };
   $("clearPath").onclick = () => {
     const s = p.state;
+    if (p.tool === "blocks") { p.update({ ...s, boxes: [] }); return; }
     if (p.tool === "subject") p.update({ ...s, subject: [] });
     else p.update({ ...s, camera: [], cameraLane: s.cameraLane.map(b => (b.word === "path" ? { ...b, word: "behind" as const } : b)) });
   };
@@ -218,6 +230,14 @@ export function bindActions(p: Page) {
       return;
     }
     if (typing) return;
+    // The Blocks tool: Delete removes the selected block, Cmd/Ctrl-D duplicates, -C and -V copy and paste at the pointer.
+    if (p.tool === "blocks" && p.blocks.selected >= 0 && !(e.target as HTMLElement).closest("input")) {
+      const mod = e.metaKey || e.ctrlKey, k = e.key.toLowerCase();
+      if ((e.key === "Delete" || e.key === "Backspace") && p.blocks.remove()) { e.preventDefault(); return; }
+      if (mod && k === "d" && p.blocks.duplicate()) { e.preventDefault(); return; }
+      if (mod && k === "c" && p.blocks.copy()) { e.preventDefault(); p.say("Block copied: Cmd/Ctrl-V pastes it at the pointer"); return; }
+    }
+    if (p.tool === "blocks" && (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "v" && p.blocks.paste()) { e.preventDefault(); return; }
     // Delete or Backspace removes the selected lane block or path point (undoable).
     if ((e.key === "Delete" || e.key === "Backspace") && p.selection && !(e.target as HTMLElement).closest("input")) {
       e.preventDefault();
@@ -235,14 +255,14 @@ export function bindActions(p: Page) {
     }
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z") { e.preventDefault(); p.undo(e.shiftKey); return; }
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "y") { e.preventDefault(); p.undo(true); return; }
-    if (e.code === "Space" && !(e.target as HTMLElement).closest("button, [role=listitem]")) { e.preventDefault(); p.setPlaying(!p.player.playing); }
+    if (e.code === "Space" && !p.map.hovering && !(e.target as HTMLElement).closest("button, [role=listitem]")) { e.preventDefault(); p.setPlaying(!p.player.playing); }
   });
 
   if (import.meta.env.DEV) {
     // Dev-only probe for the smoke script.
     (window as unknown as { __beatPath: unknown }).__beatPath = {
       recipe: () => p.recipe, state: () => structuredClone(p.state), script, mapPoint: (q: { x: number; z: number }) => p.map.clientAt(q),
-      playing: () => p.player.playing, head: () => p.head, selection: () => p.selection,
+      playing: () => p.player.playing, head: () => p.head, selection: () => p.selection, mapInside: () => p.map.allInside(),
     };
   }
   return { sync, openBlock };

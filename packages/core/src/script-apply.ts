@@ -35,9 +35,9 @@ const number = (row: Row, t: string, what: string) => {
 };
 
 /** A settings line: `landmarks: on seed 7` or `landmarks: off` (not a row). */
-const SETTING = /^(landmarks|muted|figure|scenery|shot (subject|environment|action|legend))\s*:/i;
+const SETTING = /^(landmarks|muted|figure|scenery|box|shot (subject|environment|action|legend))\s*:/i;
 /** The script's settings lines; a script without one leaves the setting as it was. */
-export type ScriptSettings = { landmarks?: { on: boolean; seed?: number }; muted?: number[]; figure?: { shape?: "car" | "flyer" | "runner"; body: string; head: string }; scenery?: "none" | "scatter" | "street" | "city"; shot?: Partial<Record<"subject" | "environment" | "action" | "legend", string>> };
+export type ScriptSettings = { boxes?: { x: number; z: number; w: number; d: number; h: number; yaw?: number }[]; sight?: "clear" | "passes"; landmarks?: { on: boolean; seed?: number }; muted?: number[]; figure?: { shape?: "car" | "flyer" | "runner"; body: string; head: string }; scenery?: "none" | "scatter" | "street" | "city"; shot?: Partial<Record<"subject" | "environment" | "action" | "legend", string>> };
 export function parseSettings(script: string): ScriptSettings {
   const out: ScriptSettings = {};
   script.split(/\r?\n/).forEach((raw, i) => {
@@ -46,9 +46,16 @@ export function parseSettings(script: string): ScriptSettings {
     const shotLine = /^shot (subject|environment|action|legend)\s*:\s*(.*)$/i.exec(raw.trim());
     if (shotLine) { (out.shot ??= {})[shotLine[1].toLowerCase() as "subject"] = shotLine[2].trim(); return; }
     if (/^scenery\s*:/i.test(text)) {
-      const m = /^scenery\s*:\s*(none|scatter|street|city)\s*$/i.exec(text);
-      if (!m) throw new RecipeError(`script line ${i + 1}: scenery reads "scenery: city" (none, scatter, street, city)`);
+      const m = /^scenery\s*:\s*(none|scatter|street|city)(?:\s+sight\s+(clear|passes))?\s*$/i.exec(text);
+      if (!m) throw new RecipeError(`script line ${i + 1}: scenery reads "scenery: city" or "scenery: street sight passes" (none, scatter, street, city; sight clear or passes)`);
       out.scenery = m[1].toLowerCase() as "city";
+      if (m[2]) out.sight = m[2].toLowerCase() as "passes";
+      return;
+    }
+    if (/^box\s*:/i.test(text)) {
+      const v = text.replace(/^box\s*:/i, "").trim().split(/[\s,]+/).map(Number);
+      if ((v.length !== 5 && v.length !== 6) || v.some(x => !Number.isFinite(x))) throw new RecipeError(`script line ${i + 1}: a box reads "box: x z width depth height [yaw]" in metres`);
+      (out.boxes ??= []).push({ x: v[0], z: v[1], w: v[2], d: v[3], h: v[4], ...(v[5] ? { yaw: v[5] } : {}) });
       return;
     }
     if (/^figure\s*:/i.test(text)) {
@@ -287,7 +294,8 @@ export function applyScript(recipe: Recipe, args: { script: string }, ctx: { ban
   const settings = parseSettings(args.script);
   if (settings.muted) r = validateRecipe({ ...r, mutedHits: settings.muted });
   if (settings.figure) r = validateRecipe({ ...r, figure: settings.figure });
-  if (settings.scenery) r = validateRecipe({ ...r, scenery: settings.scenery });
+  if (settings.scenery) r = validateRecipe({ ...r, scenery: settings.scenery, ...(settings.sight ? { scenerySight: settings.sight } : {}) });
+  if (settings.boxes) r = validateRecipe({ ...r, sceneryBoxes: settings.boxes });
   if (settings.shot) r = validateRecipe({ ...r, shot: { subject: "", environment: "", action: "", legend: "", ...r.shot, ...settings.shot } });
   if (settings.landmarks) r = validateRecipe({ ...r, landmarks: { seed: settings.landmarks.seed ?? recipe.landmarks?.seed ?? 7, on: settings.landmarks.on } });
   // Action track: blocks from rows, a block running on over `continue` rows.

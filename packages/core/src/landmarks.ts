@@ -63,11 +63,14 @@ export function sceneryOf(recipe: Recipe): Scenery {
 
 /** The recipe's scenery blocks (none when off): the scatter, a street or a city, every block clear of both paths and the line of sight. */
 export function placeLandmarks(recipe: Recipe, plan: CameraPlan | null, drive?: AudioDrive): Landmark[] {
+  // Boxes given explicitly (edited on the map, or by an agent) are the scenery as they are.
+  if (recipe.sceneryBoxes) return sceneryOf(recipe) === "none" ? [] : recipe.sceneryBoxes.map(b => ({ kind: "building" as const, x: b.x, z: b.z, w: b.w, d: b.d, h: b.h, yaw: b.yaw ?? 0 }));
   const preset = sceneryOf(recipe);
   if (preset === "none") return [];
   const cfg = { seed: recipe.landmarks?.seed ?? DEFAULT_LANDMARKS.seed };
   const { subject, camera } = scenePaths(recipe, plan, drive);
-  if (preset !== "scatter") return placeBuildings(preset, cfg.seed, subject, camera);
+  const passes = recipe.scenerySight === "passes" ? new Occlusion(subject, camera) : null;
+  if (preset !== "scatter") return placeBuildings(preset, cfg.seed, subject, camera, passes);
   // Lines of sight, every second sample, as points along each line and on past the subject
   // (so no block stands right behind the figure in frame, where its silhouette would merge).
   const sight: P[] = [];
@@ -87,15 +90,16 @@ export function placeLandmarks(recipe: Recipe, plan: CameraPlan | null, drive?: 
       yaw: Math.round(rand01(cfg.seed, i, 7) * Math.PI * 100) / 100,
     };
     const near = (pts: P[], margin: number) => pts.some(p => footprintDistance(b, p) < margin);
-    if (near(subject, LANDMARKS.subjectMargin) || near(camera, LANDMARKS.cameraMargin) || near(sight, LANDMARKS.sightMargin)) continue;
+    if (near(subject, LANDMARKS.subjectMargin) || near(camera, LANDMARKS.cameraMargin) || (!passes && near(sight, LANDMARKS.sightMargin))) continue;
     if (out.some(o => Math.hypot(o.x - b.x, o.z - b.z) < Math.hypot(o.w, o.d) / 2 + Math.hypot(b.w, b.d) / 2 + LANDMARKS.gap)) continue;
+    if (passes && !passes.tryAdd(b)) continue;
     out.push(b);
   }
   return out;
 }
 
 /** The clearances for buildings (metres): a pavement either side of the subject, room for the camera, a clear sight line. */
-export const BUILDINGS = { pavement: 3.2, cameraMargin: 1.6, sightMargin: 0.5, block: 14, street: 10, reach: 24 } as const;
+export const BUILDINGS = { pavement: 3.2, cameraMargin: 1.6, sightMargin: 0.5, block: 14, street: 10, reach: 12 } as const;
 
 function sightPoints(subject: P[], camera: P[]): P[] {
   const out: P[] = [];
@@ -105,10 +109,20 @@ function sightPoints(subject: P[], camera: P[]): P[] {
 }
 
 /** A street of buildings along the subject's path, or a city grid around both paths; clear of the subject, the camera and the sight line. */
-function placeBuildings(preset: "street" | "city", seed: number, subject: P[], camera: P[]): Landmark[] {
+function placeBuildings(preset: "street" | "city", seed: number, subject: P[], camera: P[], passes: Occlusion | null): Landmark[] {
   const sight = sightPoints(subject, camera), out: Landmark[] = [];
-  const clear = (b: Landmark) => !subject.some(p => footprintDistance(b, p) < BUILDINGS.pavement) && !camera.some(p => footprintDistance(b, p) < BUILDINGS.cameraMargin)
-    && !sight.some(p => footprintDistance(b, p) < BUILDINGS.sightMargin) && !out.some(o => Math.hypot(o.x - b.x, o.z - b.z) < (Math.max(o.w, o.d) + Math.max(b.w, b.d)) / 2 * 0.9);
+  const room = (b: Landmark) => !subject.some(p => footprintDistance(b, p) < BUILDINGS.pavement) && !camera.some(p => footprintDistance(b, p) < BUILDINGS.cameraMargin)
+    && !out.some(o => Math.hypot(o.x - b.x, o.z - b.z) < (Math.max(o.w, o.d) + Math.max(b.w, b.d)) / 2 * 0.9);
+  // Clear sight: nothing on the line of sight. Passes: a block may cross it briefly (Occlusion caps); a building that
+  // would hide the subject too long is tried as a column instead, as in a tracking shot through a colonnade.
+  const clear = (b: Landmark) => {
+    if (!room(b)) return false;
+    if (!passes) return !sight.some(p => footprintDistance(b, p) < BUILDINGS.sightMargin);
+    if (passes.tryAdd(b)) return true;
+    const column: Landmark = { ...b, kind: "pillar", w: 0.7, d: 0.7, h: Math.min(b.h, 6) };
+    if (room(column) && passes.tryAdd(column)) { Object.assign(b, column); return true; }
+    return false;
+  };
   const r2 = (x: number) => Math.round(x * 100) / 100;
   if (preset === "street") {
     // Walk the path (extended 10 m at both ends) and set a building either side every 6–9 m.
@@ -134,6 +148,26 @@ function placeBuildings(preset: "street" | "city", seed: number, subject: P[], c
       }
       along += seg;
     }
+    // Passes: a colonnade at the pavement's edge on both sides, columns every 3.5 m, kept only where the subject is hidden briefly.
+    if (passes) {
+      let at = 0, next2 = 0, j = 0;
+      for (let i = 1; i < line.length; i++) {
+        const p = line[i - 1], q = line[i], seg = Math.hypot(q.x - p.x, q.z - p.z);
+        if (seg < 1e-6) continue;
+        const dx = (q.x - p.x) / seg, dz = (q.z - p.z) / seg;
+        while (next2 <= at + seg) {
+          const t = next2 - at, cx = p.x + dx * t, cz = p.z + dz * t, off = BUILDINGS.pavement + 0.35;
+          for (const side of [-1, 1]) {
+            const col: Landmark = { kind: "pillar", w: 0.7, d: 0.7, h: r2(4.5 + 1.5 * rand01(seed, 5000 + j, 1)), x: r2(cx - dz * side * off), z: r2(cz + dx * side * off), yaw: r2(-Math.atan2(dz, dx)) };
+            j++;
+            if (!subject.some(s2 => footprintDistance(col, s2) < BUILDINGS.pavement - 0.2) && !camera.some(c2 => footprintDistance(col, c2) < BUILDINGS.cameraMargin)
+              && !out.some(o => footprintDistance(o, col) < 0.3) && passes.tryAdd(col)) out.push(col);
+          }
+          next2 += 3.5;
+        }
+        at += seg;
+      }
+    }
     return out;
   }
   // City: one building per block of a grid around both paths, smaller where a full block would not clear.
@@ -148,4 +182,44 @@ function placeBuildings(preset: "street" | "city", seed: number, subject: P[], c
     }
   }
   return out;
+}
+
+/** Caps for foreground passes (scenerySight "passes"): the longest the subject may be hidden at once, and the share of the clip. */
+export const PASSES = { maxHiddenSeconds: 0.33, maxHiddenShare: 0.15 } as const;
+
+/** Which samples (every other frame) a block hides the subject on: its footprint crosses the line from the camera to the subject. */
+export function hiddenSamples(b: Landmark, subject: P[], camera: P[]): number[] {
+  const out: number[] = [];
+  for (let i = 0; i < Math.min(subject.length, camera.length); i++) {
+    for (let t = 0.06; t < 0.95; t += 0.04) {
+      if (footprintDistance(b, { x: camera[i].x + (subject[i].x - camera[i].x) * t, z: camera[i].z + (subject[i].z - camera[i].z) * t }) < 0.05) { out.push(i); break; }
+    }
+  }
+  return out;
+}
+
+/** Foreground passes: blocks may hide the subject only briefly (PASSES), counted over all the blocks placed so far. */
+export class Occlusion {
+  private hidden: Uint8Array;
+  private maxRun: number;
+  private subject: P[];
+  private camera: P[];
+  // No parameter properties: the CLI runs core under Node's type stripping.
+  constructor(subject: P[], camera: P[]) {
+    this.subject = subject; this.camera = camera;
+    this.hidden = new Uint8Array(Math.min(subject.length, camera.length));
+    this.maxRun = Math.floor(PASSES.maxHiddenSeconds * 24 / 2);
+  }
+  /** Add a block if the subject stays hidden for no longer than the caps; false (and nothing added) otherwise. */
+  tryAdd(b: Landmark): boolean {
+    const idx = hiddenSamples(b, this.subject, this.camera);
+    if (!idx.length) return true;
+    const next = this.hidden.slice();
+    for (const i of idx) next[i] = 1;
+    let run = 0, longest = 0, total = 0;
+    for (const v of next) { run = v ? run + 1 : 0; longest = Math.max(longest, run); total += v; }
+    if (longest > this.maxRun || total > next.length * PASSES.maxHiddenShare) return false;
+    this.hidden = next;
+    return true;
+  }
 }

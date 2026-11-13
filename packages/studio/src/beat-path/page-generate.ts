@@ -10,12 +10,11 @@
  */
 import { exportBundle } from "../export/bundle";
 import { ARENA_THEME, fakeFetch, loadArena, type ArenaKeyElement, type ArenaModule } from "./arena";
-import { EXAMPLES, exampleState } from "./examples";
 import { composePrompt, ERROR_MESSAGES, MAX_PRICE, MODELS, type ModelId, type References } from "./generate";
 import type { Page } from "./page";
 import { exportRange } from "./recipe-map";
 import { legendFor } from "./script";
-import { EXAMPLE_TRACKS } from "./tracks";
+import { bindGallery, type Run } from "./gallery";
 
 const EXPORT = { width: 1280, height: 720 } as const;
 const store = (() => { try { return window.sessionStorage; } catch { return null; } })();
@@ -23,7 +22,7 @@ type Player = HTMLElement & { currentTime: number; play(): void; pause(): void }
 
 export function bindGenerate(p: Page) {
   const { $ } = p;
-  const refs = new Map<string, References>(), outputs = new Map<string, { url: string; record: unknown }>();
+  const refs = new Map<string, References>(), outputs = new Map<string, { url: string; record: unknown; model: string; prompt: string }>();
   let model: ModelId = MODELS[0].id, swapped = false, arena: ArenaModule | null = null, key: ArenaKeyElement | null = null;
   let player: Player | null = null, fakeResult = "";
   const fake = import.meta.env.DEV || new URLSearchParams(location.search).has("fake");
@@ -140,7 +139,7 @@ export function bindGenerate(p: Page) {
         onProgress: (g: { stage: string; message: string; progress?: number }) => { note.textContent = g.message; fill.style.width = `${40 + Math.round((g.progress ?? ({ plan: 5, confirm: 10, upload: 30, submit: 40, poll: 60, done: 100 } as Record<string, number>)[g.stage] ?? 50) * 0.6)}%`; },
         ...(fake && !key?.connected ? { fetch: fakeFetch(() => fakeResult), poll: { initialDelayMs: 100, intervalMs: 100, maxIntervalMs: 200 } } : {}),
       });
-      outputs.set(p.slot, { url: result.videoURL, record: result.record });
+      outputs.set(p.slot, { url: result.videoURL, record: result.record, model, prompt: currentPrompt() });
       showResult(result.videoURL);
       if (fake && !key?.connected) player?.classList.add("fake");
       p.say(`${labelOf(model)}: done${result.costUsd !== null ? `, ${result.costUsd.toFixed(2)} USD` : ""}${fake && !key?.connected ? " (local preview: the guide stands in for the result)" : ""}`);
@@ -154,30 +153,17 @@ export function bindGenerate(p: Page) {
     } finally { p.busy = false; bar.hidden = true; }
   };
   $("addToGallery").onclick = () => {
-    const out = outputs.get(p.slot), gallery = document.querySelector("arena-gallery") as (HTMLElement & { add(r: unknown): void }) | null;
-    if (out && gallery) { gallery.add(out.record); p.say("Added to the gallery below"); }
+    const out = outputs.get(p.slot);
+    if (!out) return;
+    runs.push({ slot: p.slot, model: out.model, modelName: labelOf(out.model), url: out.url, prompt: out.prompt });
+    renderGallery();
+    p.say("Added to the gallery below");
   };
 
-  // The Gallery: the three examples with their inputs and outputs, then the runs added this session.
-  function renderGallery() {
-    $("gallerySlot").replaceChildren(...EXAMPLES.map((ex, i) => {
-      const s = exampleState(i), card = document.createElement("article"), t = EXAMPLE_TRACKS[ex.id], out = outputs.get(String(i));
-      card.className = "gallery-card panel";
-      const h = document.createElement("h3"); h.textContent = `Example ${i + 1}: ${ex.label}`;
-      const media = document.createElement("div"); media.className = "gallery-media";
-      if (out) { const v = document.createElement("video"); v.src = out.url; v.muted = true; v.loop = true; v.controls = true; media.append(v); }
-      else { const ph = document.createElement("p"); ph.className = "muted"; ph.textContent = "No clip yet: load the example and press Generate."; media.append(ph); }
-      const meta = document.createElement("dl");
-      for (const [k, v] of [["Figure", s.figure.shape], ["Music", t.name], ["Subject", s.shot.subject], ["Environment", s.shot.environment], ["Action", s.shot.action]]) {
-        const dt = document.createElement("dt"), dd = document.createElement("dd"); dt.textContent = k; dd.textContent = v; meta.append(dt, dd);
-      }
-      const open = document.createElement("button"); open.type = "button"; open.className = "btn outline"; open.textContent = "Load this example";
-      open.onclick = () => { void p.switchSlot(String(i)); window.scrollTo({ top: 0 }); };
-      card.append(h, media, meta, open);
-      return card;
-    }));
-  }
-  renderGallery();
+  // The Gallery: one row per example (path, guide, references, shot, outputs per model), then the visitor's runs.
+  const runs: Run[] = [];
+  const gallery = bindGallery({ root: $("gallerySlot"), load: slot => void p.switchSlot(slot), refs: slot => refs.get(slot), runs: () => runs });
+  const renderGallery = () => gallery.render();
 
   // The embed: the key panel in the header, the model names, the gallery element.
   void loadArena().then(m => {
@@ -195,7 +181,6 @@ export function bindGenerate(p: Page) {
       window.addEventListener("keydown", e => { if (e.key === "Escape") pop.hidden = true; });
       key.addEventListener("arena-key-change", () => { label(); if (key!.connected) pop.hidden = true; p.say(key!.connected ? "Runware key connected (kept in this tab only)" : "Runware key removed"); });
       label();
-      $("arenaGallerySlot").replaceChildren(document.createElement("arena-gallery"));
     }
     sync();
   });

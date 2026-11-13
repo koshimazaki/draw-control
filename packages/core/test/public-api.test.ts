@@ -15,7 +15,7 @@ describe("@motion-studio/core public entry", () => {
   it("exports the public names and nothing from the studio", () => {
     for (const k of ["validateRecipe", "frameAt", "applyMotionCommand", "applyCommands", "applyScript", "printScript", "describeRecipe", "beatAtSeconds", "bandOnsets", "analyseSamples", "planCamera", "CAMERA_MODES", "encodeWav"])
       expect(typeof (core as Record<string, unknown>)[k]).not.toBe("undefined");
-    expect(Object.keys(core).length).toBeLessThan(90);
+    expect(Object.keys(core).length).toBeLessThan(115);   // grew with Beat Path (scenery, figure shapes, grooves, freezes, corners)
   });
   it("a script in, frames and camera samples out", () => {
     const r = applyScript(defaultRiggedRecipe(), { script: [

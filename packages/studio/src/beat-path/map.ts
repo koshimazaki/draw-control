@@ -10,7 +10,9 @@
 import { cornerPath, type Landmark } from "@motion-studio/core";
 import type { PathPt } from "./script";
 
-export type Tool = "subject" | "camera";
+export type Tool = "subject" | "camera" | "blocks";
+/** A path tool (the blocks tool shows the subject's path in the side view). */
+const pathOf = (t: Tool): "subject" | "camera" => (t === "blocks" ? "subject" : t);
 export type View = "top" | "side";
 export type MapScene = {
   floor: { x: number; z: number }[];
@@ -35,10 +37,14 @@ export type MapHost = {
   /** The selected point (Delete removes it), or null. */
   selected(): { tool: Tool; index: number } | null;
   select(sel: { tool: Tool; index: number } | null): void;
+  /** The blocks tool: pointer down on the map in the top view (true when it handled it). */
+  blocksDown?(e: PointerEvent, world: PathPt, toScreen: (p: PathPt) => [number, number], fromScreen: (x: number, y: number) => PathPt): boolean;
+  /** The selected scenery box, drawn highlighted with corner handles. */
+  selectedBox?(): number;
 };
 type Live = { subject?: { x: number; z: number; yaw: number }; camera?: { x: number; z: number; tx: number; tz: number; fov: number } };
 
-const HALF = 9, LIMIT = 14, MAX_POINTS = 8, HIT_PX = 12;
+const HALF = 9, LIMIT = 60, MAX_POINTS = 8, HIT_PX = 12;
 const HEIGHT = { subject: [0, 3], camera: [0.2, 6] } as const;
 const DEFAULT_Y = { subject: 0, camera: 2 } as const;
 
@@ -83,6 +89,18 @@ export class MapView {
     this.ctx = canvas.getContext("2d")!;
     new ResizeObserver(() => this.resize()).observe(canvas);
     canvas.addEventListener("pointerdown", e => this.down(e));
+    // Navigation: wheel or two-finger scroll pans, ctrl/cmd + wheel (or a pinch) zooms about the pointer;
+    // middle-button drag, or a drag with the space bar held, pans. None of it draws or moves a point.
+    canvas.addEventListener("wheel", e => {
+      if (this.host.view() !== "top") return;
+      e.preventDefault();
+      if (e.ctrlKey || e.metaKey) this.zoomAt(...this.local(e), Math.exp(e.deltaY * 0.01));
+      else { this.cx += e.deltaX / this.scale; this.cz += e.deltaY / this.scale; this.refresh(); }
+    }, { passive: false });
+    canvas.addEventListener("pointerenter", () => { this.hovering = true; });
+    canvas.addEventListener("pointerleave", () => { this.hovering = false; });
+    window.addEventListener("keydown", e => { if (e.code === "Space" && this.hovering && !(e.target as HTMLElement).closest("input, textarea")) { this.spaceHeld = true; canvas.classList.add("panning"); } });
+    window.addEventListener("keyup", e => { if (e.code === "Space") { this.spaceHeld = false; canvas.classList.remove("panning"); } });
     canvas.addEventListener("pointermove", e => { if (!e.buttons) canvas.classList.toggle("over-point", this.pick(e) >= 0); });
     canvas.addEventListener("dblclick", e => this.remove(e));
     canvas.addEventListener("contextmenu", e => e.preventDefault());
@@ -96,6 +114,26 @@ export class MapView {
     for (const k of ["subject", "camera", "station"]) this.colours[k] = token(`--map-${k}`) || token(`--${k}`);
     this.resize();
   }
+  /** The pointer is over the map (Space then pans instead of playing). */
+  hovering = false;
+  private spaceHeld = false;
+  /** Zoom about a canvas point (factor > 1 zooms out). */
+  zoomAt(px: number, py: number, factor: number) {
+    const before = this.fromTop(px, py);
+    this.half = Math.max(2.5, Math.min(200, this.half * factor));
+    this.scale = Math.min(this.w, this.h) / (2 * this.half);
+    this.cx = before.x - (px - this.w / 2) / this.scale; this.cz = before.z - (py - this.h / 2) / this.scale;
+    this.refresh();
+  }
+  zoomBy(factor: number) { this.zoomAt(this.w / 2, this.h / 2, factor); }
+  /** Every item of the scene inside the canvas (for the smoke test): paths, the camera's track, the scenery. */
+  allInside(): boolean {
+    const pts = [...this.host.points("subject"), ...this.host.points("camera"), ...this.scene.floor, ...this.scene.cameraSegments.flatMap(s => s.points), ...this.boxCorners()];
+    return pts.every(p => { const [x, y] = this.top(p); return x >= 0 && y >= 0 && x <= this.w && y <= this.h; });
+  }
+  private boxCorners(): PathPt[] {
+    return this.scene.landmarks.flatMap(b => { const c = Math.cos(b.yaw), sn = Math.sin(b.yaw); return [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([u, v]) => ({ x: b.x + c * u * b.w / 2 - sn * v * b.d / 2, z: b.z + sn * u * b.w / 2 + c * v * b.d / 2 })); });
+  }
   /** Escape: cancel the stroke or drag in progress. */
   cancelStroke() { this.cancel?.(); }
   get busy() { return !!this.cancel; }
@@ -105,18 +143,21 @@ export class MapView {
   private fromTop(px: number, py: number): PathPt { return { x: (px - this.w / 2) / this.scale + this.cx, z: (py - this.h / 2) / this.scale + this.cz }; }
   /** Frame both paths and the camera's trail (on a new example or script, never while drawing). */
   fit() {
-    const all = [...this.host.points("subject"), ...this.host.points("camera"), ...this.scene.floor, ...(this.scene.trail ?? [])];
+    const all = [...this.host.points("subject"), ...this.host.points("camera"), ...this.scene.floor, ...this.scene.cameraSegments.flatMap(s => s.points), ...this.boxCorners()];
     if (!all.length) { this.cx = this.cz = 0; this.half = HALF; this.resize(); return; }
     const xs = all.map(p => p.x), zs = all.map(p => p.z), aspect = this.w / this.h;
     const x0 = Math.min(...xs), x1 = Math.max(...xs), z0 = Math.min(...zs), z1 = Math.max(...zs);
     this.cx = Math.round((x0 + x1) / 2); this.cz = Math.round((z0 + z1) / 2);
-    const need = Math.max((x1 - x0) / 2 + 1.5, (z1 - z0) / 2 + 1.5) * Math.max(1, aspect < 1 ? 1 / aspect : 1);
-    this.half = Math.max(HALF, Math.min(LIMIT + 2, Math.ceil(need)));
+    this.cx = (x0 + x1) / 2; this.cz = (z0 + z1) / 2;
+    // The shorter side holds 2 × half: fit both extents with a 1.5 m margin and room for the toolbars (12 %).
+    const sx = (x1 - x0) / 2 + 1.5, sz = (z1 - z0) / 2 + 1.5;
+    const need = Math.max(aspect >= 1 ? sx / aspect : sx, aspect >= 1 ? sz : sz * aspect) * 1.12;
+    this.half = Math.max(4, Math.min(200, need));
     this.resize();
   }
   /** Side view: the active path's distance along it (s) and height to pixels. */
   private sideFrame() {
-    const tool = this.host.tool(), pts = this.host.points(tool), cum = [0];
+    const tool = pathOf(this.host.tool()), pts = this.host.points(tool), cum = [0];
     for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot(pts[i].x - pts[i - 1].x, pts[i].z - pts[i - 1].z));
     const L = Math.max(1, cum[cum.length - 1]), [, ymax] = HEIGHT[tool], pad = 44;
     const sx = (this.w - 2 * pad) / L, sy = (this.h - 2 * pad) / (ymax + 0.5);
@@ -159,9 +200,25 @@ export class MapView {
     this.host.change(tool, this.host.points(tool).filter((_, k) => k !== i), true);
   }
 
+  /** Pan by dragging (middle button, or the space bar held). */
+  private panDrag(e: PointerEvent) {
+    const c = this.canvas, start = this.local(e), from = { x: this.cx, z: this.cz };
+    c.setPointerCapture(e.pointerId);
+    c.classList.add("panning");
+    const move = (ev: PointerEvent) => { const [px, py] = this.local(ev); this.cx = from.x - (px - start[0]) / this.scale; this.cz = from.z - (py - start[1]) / this.scale; this.refresh(); };
+    const up = () => { c.removeEventListener("pointermove", move); c.removeEventListener("pointerup", up); if (!this.spaceHeld) c.classList.remove("panning"); };
+    c.addEventListener("pointermove", move);
+    c.addEventListener("pointerup", up);
+  }
+
   private down(e: PointerEvent) {
+    if (this.host.view() === "top" && (e.button === 1 || (e.button === 0 && this.spaceHeld))) { e.preventDefault(); this.panDrag(e); return; }
     if (e.button !== 0 || e.detail > 1) return;
     e.preventDefault();
+    if (this.host.tool() === "blocks") {
+      if (this.host.view() === "top" && this.host.blocksDown?.(e, this.fromTop(...this.local(e)), p => this.top(p), (x, y) => this.fromTop(x, y))) this.refresh();
+      return;
+    }
     const tool = this.host.tool(), view = this.host.view(), i = this.pick(e), c = this.canvas;
     const start = this.local(e), original = this.host.points(tool).map(p => ({ ...p }));
     let move: (ev: PointerEvent) => void, up: (ev: PointerEvent) => void, revert: () => void;
@@ -172,7 +229,7 @@ export class MapView {
       move = ev => {
         const [px, py] = this.local(ev);
         if (view === "top") { const q = this.clamp(this.fromTop(px, py)); pts[i] = { ...pts[i], x: r2(q.x), z: r2(q.z) }; }
-        else { const [lo, hi] = HEIGHT[tool], y = r2(Math.max(lo, Math.min(hi, this.sideFrame().yAt(py)))); pts[i] = { ...pts[i], ...(y > 0 ? { y } : { y: undefined }) }; if (pts[i].y === undefined) delete pts[i].y; }
+        else { const [lo, hi] = HEIGHT[pathOf(tool)], y = r2(Math.max(lo, Math.min(hi, this.sideFrame().yAt(py)))); pts[i] = { ...pts[i], ...(y > 0 ? { y } : { y: undefined }) }; if (pts[i].y === undefined) delete pts[i].y; }
         this.host.change(tool, pts.map(p => ({ ...p })), false);
       };
       up = () => this.host.change(tool, pts, true);
@@ -180,7 +237,7 @@ export class MapView {
     } else {
       // Only an armed pen draws; otherwise a click on empty ground just clears the selection.
       if (view !== "top" || this.host.pen() !== "draw") { this.host.select(null); this.refresh(); return; }
-      const y = original.at(-1)?.y ?? (DEFAULT_Y[tool] || undefined);
+      const y = original.at(-1)?.y ?? (DEFAULT_Y[pathOf(tool)] || undefined);
       const first = this.clamp(this.fromTop(...start)), stroke = [first];
       let drawing = false;
       move = ev => {
@@ -251,23 +308,32 @@ export class MapView {
     g.fillStyle = C["map-text"]; g.font = "10px ui-monospace, Menlo, monospace";
     for (let m = -16; m <= 16; m += 4) if (m) { const [x, y] = this.top({ x: m, z: 0 }); g.fillText(`${m} m`, x + 3, y - 4); }
     const s = this.scene, tool = this.host.tool();
-    // Landmark blocks: plain outlines of their footprints.
-    g.strokeStyle = C["map-text"]; g.lineWidth = 1.2; g.setLineDash([]);
-    for (const b of s.landmarks) {
+    // Scenery blocks: filled footprints with their height; the selected one (blocks tool) highlighted with corner handles.
+    g.lineWidth = 1.2; g.setLineDash([]); g.font = "10px ui-monospace, Menlo, monospace";
+    const chosen = tool === "blocks" ? this.host.selectedBox?.() ?? -1 : -1;
+    s.landmarks.forEach((b, k) => {
       const c = Math.cos(b.yaw), sn = Math.sin(b.yaw);
       const corner = (u: number, v: number) => this.top({ x: b.x + c * u - sn * v, z: b.z + sn * u + c * v });
       const pts = [corner(-b.w / 2, -b.d / 2), corner(b.w / 2, -b.d / 2), corner(b.w / 2, b.d / 2), corner(-b.w / 2, b.d / 2)];
-      g.beginPath(); pts.forEach(([x, y], k) => (k ? g.lineTo(x, y) : g.moveTo(x, y))); g.closePath(); g.stroke();
-      if (b.kind === "pillar") { g.beginPath(); g.moveTo(pts[0][0], pts[0][1]); g.lineTo(pts[2][0], pts[2][1]); g.stroke(); }   // a tall block: crossed
-    }
+      g.beginPath(); pts.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y))); g.closePath();
+      g.globalAlpha = tool === "blocks" ? 0.22 : 0.12; g.fillStyle = C["map-text"]; g.fill(); g.globalAlpha = 1;
+      g.strokeStyle = k === chosen ? C.camera : C["map-text"]; g.lineWidth = k === chosen ? 2 : 1.2; g.stroke();
+      const [cxp, cyp] = this.top(b), size = Math.min(Math.hypot(pts[1][0] - pts[0][0], pts[1][1] - pts[0][1]), Math.hypot(pts[3][0] - pts[0][0], pts[3][1] - pts[0][1]));
+      if (size > 26) { g.fillStyle = C["map-text"]; g.textAlign = "center"; g.fillText(`${Math.round(b.h)} m`, cxp, cyp + 3); g.textAlign = "left"; }
+      if (k === chosen) for (const [x, y] of pts) { g.fillStyle = C.camera; g.fillRect(x - 4, y - 4, 8, 8); }
+    });
     // The camera's track, block by block: alternate solid and dashed, each labelled at its middle.
     g.font = "10px system-ui, sans-serif";
     s.cameraSegments.forEach((seg, k) => {
       if (seg.points.length < 2) return;
       const alpha = seg.emphasis === "selected" ? 1 : seg.emphasis === "dim" ? 0.25 : 0.7;
       this.line(g, seg.points.map(p => this.top(p)), C.camera, seg.emphasis === "selected" ? 3 : 1.8, alpha, k % 2 ? [6, 4] : []);
-      const [x, y] = this.top(seg.points[Math.floor(seg.points.length / 2)]);
-      g.globalAlpha = Math.max(0.45, alpha); g.fillStyle = C.camera; g.fillText(seg.label, x + 6, y - 6); g.globalAlpha = 1;
+      // The label sits off the track along its normal, with a short leader, so it never covers a marker.
+      const m = Math.floor(seg.points.length / 2), [x, y] = this.top(seg.points[m]), [x2, y2] = this.top(seg.points[Math.min(seg.points.length - 1, m + 1)]);
+      const len = Math.hypot(x2 - x, y2 - y) || 1, nx = -(y2 - y) / len, ny = (x2 - x) / len, lx = x + nx * 22, ly = y + ny * 22;
+      g.globalAlpha = Math.max(0.45, alpha);
+      g.strokeStyle = C.camera; g.lineWidth = 1; g.beginPath(); g.moveTo(x + nx * 5, y + ny * 5); g.lineTo(lx - nx * 3, ly - ny * 3); g.stroke();
+      g.fillStyle = C.camera; g.textAlign = nx < 0 ? "right" : "left"; g.fillText(seg.label, lx + (nx < 0 ? -2 : 2), ly + 3); g.textAlign = "left"; g.globalAlpha = 1;
     });
     this.line(g, s.floor.map(p => this.top(p)), C.subject, 3.2);
     // Beat ticks: a small dot on each beat along both tracks; the camera on each of its hits, a ring.
@@ -290,7 +356,7 @@ export class MapView {
 
   /** Side view: the active path unrolled, its heights against distance along it. */
   private paintSide(g: CanvasRenderingContext2D) {
-    const C = this.colours, tool = this.host.tool(), f = this.sideFrame(), colour = tool === "camera" ? C.camera : C.subject;
+    const C = this.colours, tool = pathOf(this.host.tool()), f = this.sideFrame(), colour = tool === "camera" ? C.camera : C.subject;
     g.lineWidth = 1; g.font = "10px ui-monospace, Menlo, monospace"; g.fillStyle = C["map-text"];
     for (let y = 0; y <= f.ymax; y++) {
       const [, py] = f.at(0, y);

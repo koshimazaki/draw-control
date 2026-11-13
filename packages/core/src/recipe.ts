@@ -116,9 +116,14 @@ export type Recipe = {
   freezes?: { fromBeat: number; toBeat: number }[];
   /** Scenery (landmarks.ts): none, the seeded scatter, a street of buildings along the path, or a city grid. Absent: the scatter when `landmarks` is on. */
   scenery?: "none" | "scatter" | "street" | "city";
+  /** Scenery boxes given explicitly (edited on the map or by an agent): they replace the preset's placement. */
+  sceneryBoxes?: SceneryBox[];
+  /** "clear" (default): nothing crosses the camera's line of sight. "passes": a block may cross it briefly (PASSES caps). */
+  scenerySight?: "clear" | "passes";
   /** The shot description that travels with the guide (a generator reads it from recipe.json). */
   shot?: ShotDescription;
 };
+export type SceneryBox = { x: number; z: number; w: number; d: number; h: number; yaw?: number };
 export const FIGURE_SHAPES = ["glider", "car", "flyer", "runner"] as const;
 export type FigureShape = (typeof FIGURE_SHAPES)[number];
 export type ShotDescription = { subject: string; environment: string; action: string; legend: string };
@@ -193,7 +198,7 @@ function validateMove(input: unknown, where: string, durationBeats: number): Mov
 /** Strict validation for agent-supplied JSON and imported recipes. Returns a fresh copy. */
 export function validateRecipe(input: unknown): Recipe {
   if (!isObject(input)) return fail("expected an object");
-  only(input, ["version", "fps", "durationBeats", "beatGrid", "character", "energy", "moves", "rootPath", "jumps", "audio", "camera", "reactive", "steps", "energyCurve", "envelope", "travelLock", "rootShape", "landmarks", "mutedHits", "figure", "freezes", "shot", "scenery"], "recipe");
+  only(input, ["version", "fps", "durationBeats", "beatGrid", "character", "energy", "moves", "rootPath", "jumps", "audio", "camera", "reactive", "steps", "energyCurve", "envelope", "travelLock", "rootShape", "landmarks", "mutedHits", "figure", "freezes", "shot", "scenery", "sceneryBoxes", "scenerySight"], "recipe");
   if (input.version !== RECIPE_VERSION) fail(`expected version ${RECIPE_VERSION}`);
   if (input.fps !== 24) fail("fps must be 24");
   if (!Number.isInteger(input.durationBeats) || !finite(input.durationBeats, 1, 512)) fail("durationBeats must be a whole number 1–512");
@@ -283,6 +288,21 @@ export function validateRecipe(input: unknown): Recipe {
   if (input.scenery !== undefined) {
     if (!["none", "scatter", "street", "city"].includes(input.scenery as string)) fail("scenery must be none, scatter, street or city");
     recipe.scenery = input.scenery as Recipe["scenery"];
+  }
+  if (input.sceneryBoxes !== undefined) {
+    if (!Array.isArray(input.sceneryBoxes) || input.sceneryBoxes.length > 200) fail("sceneryBoxes must be a list of up to 200 boxes");
+    recipe.sceneryBoxes = (input.sceneryBoxes as unknown[]).map((b, i) => {
+      if (!isObject(b)) return fail(`sceneryBoxes[${i}] must be an object`);
+      only(b, ["x", "z", "w", "d", "h", "yaw"], `sceneryBoxes[${i}]`);
+      if (!finite(b.x, -200, 200) || !finite(b.z, -200, 200) || !finite(b.w, 0.2, 80) || !finite(b.d, 0.2, 80) || !finite(b.h, 0.2, 60) || (b.yaw !== undefined && !finite(b.yaw, -7, 7)))
+        fail(`sceneryBoxes[${i}] needs x, z within ±200 m, w and d 0.2–80 m, h 0.2–60 m (yaw radians)`);
+      const r2 = (v: unknown) => Math.round((v as number) * 100) / 100;
+      return { x: r2(b.x), z: r2(b.z), w: r2(b.w), d: r2(b.d), h: r2(b.h), ...(b.yaw ? { yaw: r2(b.yaw) } : {}) };
+    });
+  }
+  if (input.scenerySight !== undefined) {
+    if (input.scenerySight !== "clear" && input.scenerySight !== "passes") fail("scenerySight must be clear or passes");
+    if (input.scenerySight === "passes") recipe.scenerySight = "passes";
   }
   if (input.shot !== undefined) {
     const sh = input.shot;
