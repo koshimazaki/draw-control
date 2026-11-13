@@ -201,9 +201,25 @@ export async function smokeBeatPath(browser, base, { fail, OUT, SHOTS }) {
   if (await page.isHidden("#addToGallery")) fail("no Add to gallery after a result");
   await page.click("#addToGallery");
   if (await page.isHidden("#divider")) fail("no divider between the preview and the output");
-  await page.click("#play");
-  await page.waitForTimeout(900);
-  await page.click("#play");
+  // The transport bar under the screens: play and pause from it; scrub to the middle while paused, and the
+  // preview, the output player and the music playhead agree within a frame; a click on the video toggles play twice.
+  await page.click("#barPlay");
+  await page.waitForTimeout(700);
+  if (!(await probe()).playing) fail("the transport bar did not start playback");
+  await page.click("#barPlay");
+  if ((await probe()).playing) fail("the transport bar did not pause");
+  await page.evaluate(() => { const s = document.getElementById("scrub"); s.value = "0.5"; s.dispatchEvent(new Event("input", { bubbles: true })); });
+  await page.waitForTimeout(300);
+  const clocks = await page.evaluate(() => ({ head: window.__beatPath.head(), shown: window.__beatPath.shown(), t0: window.__beatPath.recipe().beatGrid.offsetSeconds, clip: window.__beatPath.state().clip,
+    output: document.querySelector("#generateSlot arena-player")?.currentTime ?? null }));
+  const middle = clocks.t0 + clocks.clip / 2;
+  console.log(`beat path: scrubbed to the middle: playhead ${clocks.head.toFixed(3)} s, preview ${clocks.shown.toFixed(3)} s, output ${clocks.output?.toFixed(3)} s (clip time), middle ${middle.toFixed(3)} s`);
+  if (Math.abs(clocks.head - middle) > 1 / 24 || Math.abs(clocks.shown - clocks.head) > 1 / 24 || clocks.output === null || Math.abs(clocks.output - (clocks.head - clocks.t0)) > 1 / 24) fail("scrubbing did not move the preview, the output and the playhead together");
+  await page.click("#preview", { position: { x: 60, y: 140 } });
+  await page.waitForTimeout(400);
+  const playingAfterOne = (await probe()).playing;
+  await page.click("#preview", { position: { x: 60, y: 140 } });
+  if (!playingAfterOne || (await probe()).playing) fail("clicking the video did not toggle play twice");
   await page.screenshot({ path: `${SHOTS}beat-path-generated.png` });
   if (!(await page.isVisible("#gallery h2"))) fail("no gallery section");
   // No track: a plain timed clip that still plays and exports.

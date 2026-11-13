@@ -82,9 +82,13 @@ function rowPlayer(row: HTMLElement, audioUrl: string | null) {
   const button = el("button", "icon-btn small"); button.type = "button"; button.setAttribute("aria-label", "Play the row"); button.append(el("span", "glyph"));
   button.onclick = () => { if (audio.paused) void audio.play().catch(() => {}); else audio.pause(); };
   audio.onplay = () => button.classList.add("playing"); audio.onpause = () => button.classList.remove("playing");
-  const tick = () => { for (const v of row.querySelectorAll("video")) { if (Math.abs(v.currentTime - audio.currentTime) > 0.08) v.currentTime = audio.currentTime; if (!audio.paused && v.paused) void v.play().catch(() => {}); if (audio.paused && !v.paused) v.pause(); } requestAnimationFrame(tick); };
+  // A thin scrub bar under the row's videos, on the row's clock.
+  const scrub = el("input", "scrub row-scrub") as HTMLInputElement;
+  scrub.type = "range"; scrub.min = "0"; scrub.max = "1"; scrub.step = "0.0001"; scrub.value = "0"; scrub.setAttribute("aria-label", "Time in this row");
+  scrub.oninput = () => { if (audio.duration) audio.currentTime = Number(scrub.value) * audio.duration; };
+  const tick = () => { if (audio.duration) { const f = audio.currentTime / audio.duration; scrub.value = String(f); scrub.style.setProperty("--pos", `${f * 100}%`); } for (const v of row.querySelectorAll("video")) { if (Math.abs(v.currentTime - audio.currentTime) > 0.08) v.currentTime = audio.currentTime; if (!audio.paused && v.paused) void v.play().catch(() => {}); if (audio.paused && !v.paused) v.pause(); } requestAnimationFrame(tick); };
   requestAnimationFrame(tick);
-  return { button, audio, setAudio: (url: string) => { audio.src = url; } };
+  return { button, audio, scrub, setAudio: (url: string) => { audio.src = url; } };
 }
 
 const tile = (label: string, content: HTMLElement | string) => { const t = el("figure", "row-tile"); const cap = el("figcaption", "", label); const body = typeof content === "string" ? el("div", "row-empty muted", content) : content; t.append(body, cap); return t; };
@@ -114,7 +118,7 @@ export function bindGallery(opts: { root: HTMLElement; load(slot: string): void;
     strip.append(tile("Shot", text));
     const runs = opts.runs().filter(x => x.slot === String(i));
     for (const m of MODELS) { const run = runs.find(x => x.model === m.id); strip.append(tile(m.label, run ? video(run.url) : "No clip yet")); }
-    row.append(head, strip);
+    row.append(head, strip, player.scrub);
     if (!media.has(i)) {
       // Render the guide when the row first comes into view, one row at a time.
       const io = new IntersectionObserver(entries => {
@@ -139,7 +143,7 @@ export function bindGallery(opts: { root: HTMLElement; load(slot: string): void;
     const head = el("header", "row-head"); head.append(player.button, el("h3", "", "Your runs"), el("span", "muted", `${runs.length} added this session`));
     const strip = el("div", "row-strip");
     for (const run of runs) strip.append(tile(`${run.modelName} · Example ${run.slot === "own" ? "yours" : Number(run.slot) + 1}`, video(run.url)));
-    row.append(head, strip);
+    row.append(head, strip, player.scrub);
     return row;
   }
 

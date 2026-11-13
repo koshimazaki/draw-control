@@ -202,7 +202,12 @@ export function bindActions(p: Page) {
   };
   // Transport and files
   $("play").onclick = () => p.setPlaying(!p.player.playing);
-  $("bigPlay").onclick = () => p.setPlaying(true);
+  $("bigPlay").onclick = e => { e.stopPropagation(); p.setPlaying(!p.player.playing); };
+  $("barPlay").onclick = () => p.setPlaying(!p.player.playing);
+  // A click on the preview or the output toggles play (not on their own buttons).
+  for (const id of ["preview", "screenOutput"]) $(id).addEventListener("click", e => { if (!(e.target as HTMLElement).closest("button")) p.setPlaying(!p.player.playing); });
+  // The scrub bar: the same clock as the music strip; scrubbing while playing keeps playing from there.
+  input("scrub").oninput = () => p.seek(p.window0() + Number(input("scrub").value) * p.state.clip);
   $("removeTrack").onclick = () => p.removeTrack();
   $("resetMarkers").onclick = () => p.update({ ...p.state, muted: [] });
   $("sound").onclick = () => {
@@ -255,14 +260,21 @@ export function bindActions(p: Page) {
     }
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z") { e.preventDefault(); p.undo(e.shiftKey); return; }
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "y") { e.preventDefault(); p.undo(true); return; }
-    if (e.code === "Space" && !p.map.hovering && !(e.target as HTMLElement).closest("button, [role=listitem]")) { e.preventDefault(); p.setPlaying(!p.player.playing); }
+    // Arrows step one frame when paused, Shift one beat.
+    if ((e.key === "ArrowLeft" || e.key === "ArrowRight") && !p.player.playing && !(e.target as HTMLElement).closest("input, select")) {
+      e.preventDefault();
+      const dir = e.key === "ArrowRight" ? 1 : -1, step = e.shiftKey ? 60 / p.recipe.beatGrid.bpm : 1 / 24;
+      p.seek(Math.round((p.head + dir * step) * 24) / 24);
+      return;
+    }
+    if (e.code === "Space" && !p.map.hovering && !(e.target as HTMLElement).closest("button, [role=listitem], input, select")) { e.preventDefault(); p.setPlaying(!p.player.playing); }
   });
 
   if (import.meta.env.DEV) {
     // Dev-only probe for the smoke script.
     (window as unknown as { __beatPath: unknown }).__beatPath = {
       recipe: () => p.recipe, state: () => structuredClone(p.state), script, mapPoint: (q: { x: number; z: number }) => p.map.clientAt(q),
-      playing: () => p.player.playing, head: () => p.head, selection: () => p.selection, mapInside: () => p.map.allInside(),
+      playing: () => p.player.playing, head: () => p.head, selection: () => p.selection, mapInside: () => p.map.allInside(), shown: () => p.shown,
     };
   }
   return { sync, openBlock };

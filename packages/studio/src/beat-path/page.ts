@@ -106,7 +106,9 @@ export function startBeatPath(root: HTMLElement) {
     setBoxes: (boxes, final) => update({ ...state, boxes, scenery: state.scenery === "none" ? "street" : state.scenery, landmarks: { ...state.landmarks, on: true } }, final),
     pen: () => pen, subject: () => lastFloor, say: text => say(text), changed: () => { map.refresh(); actions.sync(); },
   });
-  const strip = new AudioStrip($<HTMLCanvasElement>("wave"), seconds => { head = Math.max(window0(), Math.min(window1(), seconds)); if (player.playing) player.play(track, head); dirty = true; },
+  /** One clock for the page: the transport bar, the music strip and the play buttons all move it. */
+  function seek(seconds: number) { head = Math.max(window0(), Math.min(window1(), seconds)); if (player.playing) player.play(track, head); dirty = true; }
+  const strip = new AudioStrip($<HTMLCanvasElement>("wave"), seconds => seek(seconds),
     seconds => toggleHit(seconds));
   /** Switch a kick or snare off for every lock, or back on (undoable, in the recipe and the script). */
   function toggleHit(seconds: number) {
@@ -201,12 +203,19 @@ export function startBeatPath(root: HTMLElement) {
     if (!pending) pending = requestAnimationFrame(() => { pending = 0; rebuild(); });
   }
 
+  let shown = 0;
   function show(seconds: number) {
+    shown = seconds;
     const st = frameAt(recipe, seconds * recipe.fps, live());
     viewport.show(st);
     const cam = cameraAtSeconds(plan, seconds);
     map.setLive({ subject: { x: st.root.x, z: st.root.z, yaw: st.root.yawRadians }, camera: { x: cam.position[0], z: cam.position[2], tx: cam.target[0], tz: cam.target[2], fov: cam.fov } });
     strip.setHead(seconds);
+    // The transport bar under the screens: position, time and beat.
+    const t = seconds - window0(), total = state.clip;
+    $<HTMLInputElement>("scrub").value = String(Math.max(0, Math.min(1, t / total)));
+    $("scrub").style.setProperty("--pos", `${Math.max(0, Math.min(100, t / total * 100))}%`);
+    $("transportTime").textContent = `${Math.max(0, t).toFixed(2)} / ${total.toFixed(2)} s · beat ${Math.max(0, beatAtSeconds(recipe.beatGrid, seconds)).toFixed(1)}`;
     $("hudBeat").textContent = `beat ${Math.max(0, beatAtSeconds(recipe.beatGrid, seconds)).toFixed(1).padStart(4, " ")}`;
     let since = Infinity;
     for (const h of hits) if (h <= seconds + 1e-3) since = seconds - h;
@@ -224,9 +233,10 @@ export function startBeatPath(root: HTMLElement) {
   function setPlaying(on: boolean) {
     if (on) { if (head >= window1() - 0.05 || head < window0()) head = window0(); player.play(track, head); started = true; }
     else { if (player.playing) head = player.position(); player.stop(); }
-    $("play").classList.toggle("playing", on);
-    $("play").setAttribute("aria-label", on ? "Pause" : "Play");
-    $("bigPlay").hidden = started;
+    for (const id of ["play", "barPlay"]) { $(id).classList.toggle("playing", on); $(id).setAttribute("aria-label", on ? "Pause" : "Play"); }
+    // The overlay is a real toggle: shown whenever the clip is paused, and on hover while it plays.
+    $("bigPlay").classList.toggle("playing", on);
+    $("bigPlay").lastChild!.textContent = on ? "Pause" : started ? "Play" : "Play";
     dirty = true;
   }
 
@@ -296,7 +306,7 @@ export function startBeatPath(root: HTMLElement) {
     $, map, menu, viewport, strip, player,
     get state() { return state; }, get recipe() { return recipe; }, get tool() { return tool; }, get view() { return view; },
     get track() { return track; }, get drive() { return live(); }, get info() { return info; }, get busy() { return busy; }, set busy(v: boolean) { busy = v; dirty = true; },
-    get head() { return head; }, get slot() { return slot; }, blocks, removeTrack, totalBeats, window0, window1, update, undo, rebuild, setPlaying, switchSlot, useFile, say,
+    get head() { return head; }, get shown() { return shown; }, get slot() { return slot; }, blocks, seek, removeTrack, totalBeats, window0, window1, update, undo, rebuild, setPlaying, switchSlot, useFile, say,
     setTool(t: Tool) { tool = t; map.refresh(); actions.sync(); },
     setView(v: View) { view = v; map.refresh(); actions.sync(); },
     get pen() { return pen; },
