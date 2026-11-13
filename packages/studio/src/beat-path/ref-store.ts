@@ -10,7 +10,12 @@ export type RefSource =
   | { kind: "gallery"; label: string }
   | { kind: "frame"; of: "preview" | "result" | "guide"; seconds: number }
   | { kind: "generated"; model: string; prompt: string };
-export type Ref = { blob: Blob; url: string; source: RefSource };
+/**
+ * A reference: its image as a Blob with the object URL made for it, or (a generated image the
+ * browser could not fetch, CORS) only its remote URL, `blob` null: it shows and can go to an
+ * image model as a URL, but a video model, which takes Blobs, does not get it.
+ */
+export type Ref = { blob: Blob | null; url: string; source: RefSource };
 
 /** Where a reference came from, in words (its drop's tooltip). */
 export function sourceLabel(s: RefSource): string {
@@ -31,12 +36,12 @@ export class RefStore {
   /** The blobs the generator and the prompt read (the same shape as before). */
   blobs(slot: string): { character?: Blob; environment?: Blob } {
     const s = this.slots.get(slot) ?? {};
-    return { ...(s.character ? { character: s.character.blob } : {}), ...(s.environment ? { environment: s.environment.blob } : {}) };
+    return { ...(s.character?.blob ? { character: s.character.blob } : {}), ...(s.environment?.blob ? { environment: s.environment.blob } : {}) };
   }
-  set(slot: string, kind: RefKind, blob: Blob, source: RefSource): Ref {
+  set(slot: string, kind: RefKind, image: Blob | string, source: RefSource): Ref {
     const s = this.slots.get(slot) ?? {}, old = s[kind];
-    if (old) this.urls.revoke(old.url);
-    const ref: Ref = { blob, url: this.urls.create(blob), source };
+    if (old?.blob) this.urls.revoke(old.url);
+    const ref: Ref = typeof image === "string" ? { blob: null, url: image, source } : { blob: image, url: this.urls.create(image), source };
     this.slots.set(slot, { ...s, [kind]: ref });
     for (const f of this.listeners) f(slot, kind);
     return ref;
@@ -44,7 +49,7 @@ export class RefStore {
   clear(slot: string, kind: RefKind) {
     const s = this.slots.get(slot), old = s?.[kind];
     if (!s || !old) return;
-    this.urls.revoke(old.url);
+    if (old.blob) this.urls.revoke(old.url);
     const next = { ...s };
     delete next[kind];
     this.slots.set(slot, next);

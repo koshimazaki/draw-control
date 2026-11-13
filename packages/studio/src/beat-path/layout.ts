@@ -84,7 +84,9 @@ export const LAYOUT = `
       </div>
       <div class="row">
         <label class="drop" id="dropCharacter" data-tip="A character sheet the model follows"><input type="file" accept="image/*" id="refCharacter" /><span class="drop-thumb" id="thumbCharacter">${icon("image")}</span><span>Character</span><button type="button" class="drop-clear" id="clearCharacter" hidden aria-label="Clear the character image">${icon("x")}</button></label>
+        <button type="button" class="btn outline gen-ref tip-start" id="genCharacter" aria-label="Generate a character image" data-tip="Generate a character image with an image model">${icon("sparkles")}</button>
         <label class="drop" id="dropEnvironment" data-tip="An environment image the model follows"><input type="file" accept="image/*" id="refEnvironment" /><span class="drop-thumb" id="thumbEnvironment">${icon("image")}</span><span>Environment</span><button type="button" class="drop-clear" id="clearEnvironment" hidden aria-label="Clear the environment image">${icon("x")}</button></label>
+        <button type="button" class="btn outline gen-ref" id="genEnvironment" aria-label="Generate an environment image" data-tip="Generate an environment image with an image model">${icon("sparkles")}</button>
         <p id="shotLegend" class="legend-line muted"></p>
       </div>
       <div class="row">

@@ -266,3 +266,19 @@ select:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
 @container (max-width: 480px) { .map-foot .map-hint { display: none; } .map-foot .slider > span { display: none; } .map-foot .slider input[type="range"] { width: 90px; } }
 /* A map under 600 px keeps the follow fields and drops their words (each field names itself on hover and to a screen reader). */
 @container (max-width: 600px) { .follow-row .pick > .word { display: none; } }
+/* Generate a reference image (page-image.ts): a small secondary button beside each drop and a popover above it. */
+.gen-ref { width: var(--control-h); padding: 0; flex: none; }
+.gen-ref .icon { margin: 0; }
+.image-pop { position: fixed; z-index: 45; width: 360px; display: grid; gap: var(--s-2); padding: var(--s-3); background: var(--popover); box-shadow: var(--shadow-lg); }
+.image-pop[hidden] { display: none; }
+.image-pop .ip-prompt { width: 100%; height: auto; padding: var(--s-2); resize: vertical; line-height: 1.4; font-size: var(--text-sm); }
+.image-pop .ip-row { display: flex; gap: var(--s-2); align-items: center; }
+.image-pop .ip-row select { flex: 1; min-width: 0; }
+.image-pop .ip-row.end { justify-content: flex-end; }
+.image-pop .ip-facts, .image-pop .ip-note { margin: 0; font-size: var(--text-xs); line-height: 1.4; }
+.image-pop .ip-refs { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-1) var(--s-2); }
+.image-pop .ip-ref-list { display: contents; }
+.image-pop .ip-other[hidden] { display: none; }
+.ip-chip { gap: 2px; text-transform: none; letter-spacing: 0; font-family: var(--font-sans); max-width: 100%; }
+.ip-chip-x { display: grid; place-items: center; width: 14px; height: 14px; padding: 0; border: 0; background: none; color: inherit; cursor: pointer; }
+.ip-chip-x .icon { width: 10px; height: 10px; }

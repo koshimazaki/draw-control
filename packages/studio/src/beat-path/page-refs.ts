@@ -16,7 +16,7 @@ type Page = {
   say(text: string): void;
 };
 /** What a "Use as reference" control or a drag hands over: the image and where it came from. */
-export type RefGetter = () => Promise<{ blob: Blob; source: RefSource } | null>;
+export type RefGetter = () => Promise<{ blob: Blob | string; source: RefSource } | null>;
 
 const DRAG_TYPE = "application/x-beat-path-ref";
 const KINDS: { kind: RefKind; drop: string; thumb: string; input: string; clear: string; label: string }[] = [
@@ -41,6 +41,7 @@ export const readableVideo = (src: string) => src.startsWith("blob:") || new URL
 
 export function bindRefs(p: Page, store: RefStore, changed: () => void) {
   const { $ } = p;
+  let extra: () => { label: string; take(got: { blob: Blob | string; source: RefSource }): void } | null = () => null;
   const getters = new Map<string, RefGetter>(), controls = new Map<HTMLElement, HTMLButtonElement>();
   let nextId = 0;
 
@@ -62,7 +63,10 @@ export function bindRefs(p: Page, store: RefStore, changed: () => void) {
     b.innerHTML = icon("image-plus");
     b.addEventListener("click", e => {
       e.stopPropagation(); e.preventDefault();
-      p.menu.show(b, "Use as reference", KINDS.map(k => ({ label: k.label, run: () => void use(k.kind, get) })));
+      // While the image panel is open, a third target: its own references.
+      const more = extra(), items: MenuItem[] = KINDS.map(k => ({ label: k.label, run: () => void use(k.kind, get) }));
+      if (more) items.push({ label: more.label, run: () => void get().then(g => { if (g) more.take(g); else p.say("That image cannot be read here"); }) });
+      p.menu.show(b, "Use as reference", items);
     });
     b.addEventListener("pointerdown", e => e.stopPropagation());
     host.append(b);
@@ -102,7 +106,7 @@ export function bindRefs(p: Page, store: RefStore, changed: () => void) {
     });
     $(k.clear).addEventListener("click", e => { e.preventDefault(); e.stopPropagation(); store.clear(p.slot, k.kind); p.say(`${k.label} reference cleared`); });
     // A filled drop's own image drags onto the other drop.
-    attachDrag($(k.thumb), async () => { const r = store.get(p.slot, k.kind); return r ? { blob: r.blob, source: r.source } : null; });
+    attachDrag($(k.thumb), async () => { const r = store.get(p.slot, k.kind); return r ? { blob: r.blob ?? r.url, source: r.source } : null; });
   }
   function attachDrag(el: HTMLElement, get: RefGetter) {
     const id = `r${nextId++}`;
@@ -125,5 +129,5 @@ export function bindRefs(p: Page, store: RefStore, changed: () => void) {
   store.onChange(slot => { if (slot === p.slot) sync(); changed(); });
   /** Show or hide an image's control (a result that cannot be read has none). */
   const showControl = (host: HTMLElement, on: boolean) => { const b = controls.get(host); if (b) b.hidden = !on; host.draggable = on; };
-  return { attach, sync, use, showControl };
+  return { attach, sync, use, showControl, setExtra: (f: typeof extra) => { extra = f; } };
 }

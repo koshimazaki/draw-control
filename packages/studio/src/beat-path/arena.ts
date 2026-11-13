@@ -9,8 +9,23 @@
  */
 export type ArenaModel = { key: string; name: string; line: string };
 export type ArenaResult = { videoURL: string; costUsd: number | null; modelRan: string | null; notes: string[]; record: unknown; estimate?: { usd?: number } };
+/** An image model from the embed's catalogue (imageFamilies()): plain data for a picker. */
+export type ImageModelInfo = {
+  key: string; name: string; family: string;
+  accepts: { referenceImages: { max: number } };
+  prompt: { min: number; max: number };
+  size: { summary: string; default: [number, number] };
+  estimate: { usd: number | null };
+  pricing: { kind: "per-image" | "token" | "compute-time"; summary: string };
+};
+export type ImageFamilyInfo = { family: string; models: ImageModelInfo[] };
+/** What the embed asks before a run (generateFromGuide and generateImage): images may be "unpriced" (no published bound). */
+export type CostQuestion = { model: string; modelName: string; usd: number; maxPrice: number; inputs: unknown[]; prompt: string; priced?: "bound" | "unpriced"; rates?: string; examples?: string };
+export type ImageResult = { imageURL: string; costUsd: number | null; modelRan: string; notes: string[]; taskUUID: string };
 export type ArenaModule = {
   generateFromGuide(o: Record<string, unknown>): Promise<ArenaResult>;
+  imageFamilies?(): ImageFamilyInfo[];
+  generateImage?(o: Record<string, unknown>): Promise<ImageResult>;
   offeredModels(): ArenaModel[];
   composePrompt(shot: Record<string, string>, model: string, references?: { character?: unknown; environment?: unknown }, guide?: { seconds?: number; hasAudio?: boolean }): { prompt: string; notes: string[] };
 };
@@ -24,16 +39,22 @@ export function loadArena(): Promise<ArenaModule | null> {
   return loading;
 }
 
-/** The fake provider: mediaStorage, videoInference and getResponse answered locally; `result` is the clip it "returns". Never touches the network. */
-export function fakeFetch(result: () => string) {
+/** The fake provider: mediaStorage, videoInference, imageInference and getResponse answered locally; `result` is the clip it "returns", `image` the still. Never touches the network. */
+export function fakeFetch(result: () => string, image: () => string = result) {
   let n = 0, polls = 0;
+  const kinds = new Map<string, string>();
   return async (url: string, init: { body: string }) => {
     if (new URL(url).host !== "api.runware.ai") throw new Error("the fake provider only answers api.runware.ai");
     const tasks = JSON.parse(init.body) as { taskType: string; taskUUID: string }[];
     const data = tasks.map(t => {
       if (t.taskType === "mediaStorage") return { taskType: "mediaStorage", taskUUID: t.taskUUID, mediaUUID: `00000000-0000-4000-8000-${String(++n).padStart(12, "0")}` };
-      if (t.taskType === "videoInference") return { taskType: "videoInference", taskUUID: t.taskUUID };
-      if (t.taskType === "getResponse") return ++polls % 2 ? { taskUUID: t.taskUUID, status: "processing", progress: 50 } : { taskType: "videoInference", taskUUID: t.taskUUID, status: "success", videoURL: result(), cost: 0 };
+      if (t.taskType === "videoInference" || t.taskType === "imageInference") { kinds.set(t.taskUUID, t.taskType); return { taskType: t.taskType, taskUUID: t.taskUUID }; }
+      if (t.taskType === "getResponse") {
+        if (++polls % 2) return { taskUUID: t.taskUUID, status: "processing", progress: 50 };
+        return kinds.get(t.taskUUID) === "imageInference"
+          ? { taskType: "imageInference", taskUUID: t.taskUUID, status: "success", imageURL: image(), cost: 0 }
+          : { taskType: "videoInference", taskUUID: t.taskUUID, status: "success", videoURL: result(), cost: 0 };
+      }
       return { taskUUID: t.taskUUID };
     });
     await new Promise(r => setTimeout(r, 60));

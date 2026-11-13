@@ -23,7 +23,8 @@ import { icon } from "./ui/icons";
 import type { Ref } from "./ref-store";
 import { readableVideo, videoFrame, type RefGetter } from "./page-refs";
 
-export type Run = { slot: string; model: string; modelName: string; url: string; prompt: string };
+/** A run added to the gallery: a clip (video), or a still made for a reference (image, with its cost and the drop it was for). */
+export type Run = { slot: string; model: string; modelName: string; url: string; prompt: string; kind?: "video" | "image"; costUsd?: number | null; for?: "character" | "environment"; blob?: Blob | null };
 type Media = { guide: string; audio: string } | null;
 
 const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls = "", text = "") => { const e = document.createElement(tag); if (cls) e.className = cls; if (text) e.textContent = text; return e; };
@@ -140,7 +141,7 @@ export function bindGallery(opts: {
     const r = opts.refs(String(i));
     for (const [k, label] of [["character", "Character"], ["environment", "Environment"]] as const) {
       // The reference's own URL (the store releases it when the image is replaced or cleared).
-      const ref = r?.[k], img = ref ? box(Object.assign(el("img"), { src: ref.url, alt: label }), async () => ({ blob: ref.blob, source: { kind: "gallery", label: `Example ${i + 1}, ${label.toLowerCase()}` } }), `this ${label.toLowerCase()} image`) : null;
+      const ref = r?.[k], img = ref ? box(Object.assign(el("img"), { src: ref.url, alt: label }), async () => ({ blob: ref.blob ?? ref.url, source: { kind: "gallery", label: `Example ${i + 1}, ${label.toLowerCase()}` } }), `this ${label.toLowerCase()} image`) : null;
       strip.append(tile(label, img ?? "No image"));
     }
     const text = el("div", "row-text clamp");
@@ -171,7 +172,16 @@ export function bindGallery(opts: {
     const row = el("article", "gallery-row panel"), player = rowPlayer(row, null);
     const head = el("header", "row-head"); head.append(player.button, el("h3", "", "Your runs"), el("span", "muted", `${runs.length} added this session`));
     const strip = el("div", "row-strip");
-    for (const run of runs) strip.append(tile(`${run.modelName} · Example ${run.slot === "own" ? "yours" : Number(run.slot) + 1}`, runBox(run.url)));
+    const where = (slot: string) => `Example ${slot === "own" ? "yours" : Number(slot) + 1}`;
+    for (const run of runs) {
+      if (run.kind === "image") {
+        // A still made for a reference: its model, what it cost, the prompt on hover; it can be used as a reference like any image.
+        const img = Object.assign(el("img"), { src: run.url, alt: run.prompt });
+        const t = tile(`${run.modelName} · ${run.for ?? "image"}${run.costUsd != null ? ` · ${run.costUsd.toFixed(3)} USD` : ""}`, box(img, async () => ({ blob: run.blob ?? run.url, source: { kind: "generated", model: run.modelName, prompt: run.prompt } }), "this image"));
+        t.title = run.prompt;
+        strip.append(t);
+      } else strip.append(tile(`${run.modelName} · ${where(run.slot)}`, runBox(run.url)));
+    }
     row.append(head, strip, player.scrub);
     return row;
   }

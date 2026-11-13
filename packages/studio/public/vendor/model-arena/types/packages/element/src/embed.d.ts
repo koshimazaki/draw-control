@@ -5,6 +5,13 @@ export type { GuideShot, LoadedGuide, BundleEntry } from "../../../providers/run
 export { composePrompt, offeredModels, guideModels, previewPrompt, comparePrompts, planGuideLane, GUIDE_MODEL_KEYS, COMPARE_MODEL_KEYS } from "../../../providers/runware-api/guide-plan.ts";
 export type { GuideModel, GuideFacts, ComposedForHost } from "../../../providers/runware-api/guide-plan.ts";
 export type { ReferenceInput } from "../../../providers/runware-api/generate.ts";
+export { generateImage } from "../../../providers/runware-api/generate-image.ts";
+export type { GenerateImageOptions, GenerateImageResult, ImageReference } from "../../../providers/runware-api/generate-image.ts";
+export { imageModels, imageFamilies } from "../../../providers/runware-api/image-catalogue.ts";
+export type { ImageModelInfo, ImageFamilyInfo } from "../../../providers/runware-api/image-catalogue.ts";
+export { planImage, runImage, describeSize, checkImagePrice, tokenBound, STILL_FORMATS } from "../../../providers/runware-api/image.ts";
+export type { ImageRequest, ImagePlan, PriceCheck, TokenPricing, StillFormat, ImageFamily, SizeRule, ReferenceRule, ImagePricing } from "../../../providers/runware-api/image.ts";
+export { RunwareClient } from "../../../providers/runware-api/client.ts";
 export { presetFromRecord, parsePreset } from "./generate/preset.ts";
 export type { GeneratePreset } from "./generate/preset.ts";
 export { ArenaPlayer, needsSeek } from "./player.ts";

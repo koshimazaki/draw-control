@@ -18,6 +18,7 @@ import { bindGallery, type Run } from "./gallery";
 import { captureDrag } from "./drag";
 import { RefStore } from "./ref-store";
 import { bindRefs, readableVideo, videoFrame } from "./page-refs";
+import { bindImages } from "./page-image";
 
 const EXPORT = { width: 1280, height: 720 } as const;
 const store = (() => { try { return window.sessionStorage; } catch { return null; } })();
@@ -113,9 +114,9 @@ export function bindGenerate(p: Page) {
     if (v) { model = v; sync(); }
   });
 
-  /** The page's own cost dialog: resolves true only on Generate. */
-  const confirmCost = (q: { usd: number; modelName: string; inputs: unknown[] }) => new Promise<boolean>(resolve => {
-    $("costText").textContent = `Up to ${q.usd.toFixed(2)} USD on ${q.modelName} (limit ${MAX_PRICE} USD). It sends the guide video${(q.inputs?.length ?? 0) > 1 ? ", the reference images" : ""} and the prompt from your shot description.${fake && !key?.connected ? " Local preview: nothing is sent and nothing is charged." : ""}`;
+  /** The page's own cost dialog (video, images, the no-bound notice): resolves true only on its OK button. */
+  const ask = (title: string, text: string, ok = "Generate") => new Promise<boolean>(resolve => {
+    $("costTitle").textContent = title; $("costText").textContent = text; $("costOk").lastChild!.textContent = ok;
     $("costDialog").hidden = false;
     $("costOk").focus();
     const esc = (e: KeyboardEvent) => { if (e.key === "Escape") { e.preventDefault(); done(false); } };
@@ -124,6 +125,9 @@ export function bindGenerate(p: Page) {
     $("costOk").onclick = () => done(true);
     $("costCancel").onclick = () => done(false);
   });
+  const localNote = () => (fake && !key?.connected ? " Local preview: nothing is sent and nothing is charged." : "");
+  const confirmCost = (q: { usd: number; modelName: string; inputs: unknown[] }) => ask("Generate with this model?",
+    `Up to ${q.usd.toFixed(2)} USD on ${q.modelName} (limit ${MAX_PRICE} USD). It sends the guide video${(q.inputs?.length ?? 0) > 1 ? ", the reference images" : ""} and the prompt from your shot description.${localNote()}`);
 
   // One run at a time; while it runs the Generate button stops it. The run belongs to the example it
   // started on: switching examples mid-run files the result there and never shows it on another.
@@ -186,6 +190,11 @@ export function bindGenerate(p: Page) {
   const runs: Run[] = [];
   const gallery = bindGallery({ root: $("gallerySlot"), load: slot => void p.switchSlot(slot), refs: slot => ({ character: refStore.get(slot, "character"), environment: refStore.get(slot, "environment") }), runs: () => runs,
     attach: (host, get, what) => refUi.attach(host, get, what) });
+  // Reference images made with an image model, from the Generate buttons beside the drops (page-image.ts).
+  bindImages({
+    $, slot: () => p.slot, shot: () => p.state.shot, arena: () => arena, key: () => key, fake, ask, store: refStore, runs, renderGallery: () => renderGallery(),
+    fakeFetch: image => fakeFetch(() => fakeResult, image), setExtra: f => refUi.setExtra(f), say: t => p.say(t),
+  });
   const renderGallery = () => gallery.render();
 
   // The embed: the key panel in the header, the model names, the gallery element.

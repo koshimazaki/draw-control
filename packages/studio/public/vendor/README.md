@@ -8,4 +8,4 @@ Nothing here is built by this repository; files placed here are served as they a
 
 ## Vendored
 
-`model-arena/` is a copy of the sibling repository's `dist/embed/` (Model Arena embed: `<arena-key>`, `generateFromGuide()`, `offeredModels()`, `composePrompt()`, `<arena-player>`, `<arena-gallery>`), source commit `28e6b2e`, 193 kB, copied 2026-11-13 by `npm run vendor:arena`. Do not edit it here: change the sibling repository and copy again.
+`model-arena/` is a copy of the sibling repository's `dist/embed/` (Model Arena embed: `<arena-key>`, `generateFromGuide()`, `offeredModels()`, `composePrompt()`, `<arena-player>`, `<arena-gallery>`), source commit `5fc8fe2`, 221 kB, copied 2026-11-13 by `npm run vendor:arena`. Do not edit it here: change the sibling repository and copy again.
