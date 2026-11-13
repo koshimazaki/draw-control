@@ -282,3 +282,13 @@ select:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
 .ip-chip { gap: 2px; text-transform: none; letter-spacing: 0; font-family: var(--font-sans); max-width: 100%; }
 .ip-chip-x { display: grid; place-items: center; width: 14px; height: 14px; padding: 0; border: 0; background: none; color: inherit; cursor: pointer; }
 .ip-chip-x .icon { width: 10px; height: 10px; }
+/* Round 11: the prompt follows the model's guide; once typed in, a quiet pill offers to rewrite it for the model. */
+.image-pop .ip-rewrite { justify-self: start; padding: 2px var(--s-2); border-radius: var(--radius-sm); background: var(--seg-on); font-size: var(--text-xs); }
+.image-pop .ip-rewrite[hidden] { display: none; }
+.image-pop .ip-tips { margin: 0; padding-left: var(--s-4); display: grid; gap: 2px; font-size: var(--text-xs); line-height: 1.35; }
+.image-pop .ip-guide { margin: 0; font-size: var(--text-xs); }
+.image-pop .ip-guide:empty { display: none; }
+.image-pop .ip-quality-row { display: flex; align-items: center; gap: var(--s-2); flex-wrap: wrap; }
+.image-pop .ip-quality-row[hidden] { display: none; }
+.image-pop .ip-quality-note { margin: 0; font-size: var(--text-xs); }
+.image-pop .ip-quality button { padding: 0 var(--s-2); }

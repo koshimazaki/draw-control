@@ -4,6 +4,7 @@
  * (`imageFamilies`). Every fact comes from the table in image-models.ts.
  */
 import type { CostEstimate } from "../types.ts";
+import { type ImageGuide } from "./image-guides.ts";
 import { type ImageFamily, type ImagePricing, type ReferenceRule, type SizeRule } from "./image-models.ts";
 export interface ImageModelInfo {
     key: string;
@@ -17,6 +18,11 @@ export interface ImageModelInfo {
         /** Reference or edit images: how many, and each one's limits. */
         referenceImages: ReferenceRule;
         transparent: boolean;
+        /** `settings.quality` values and default, where the schema has them; null otherwise. */
+        quality: {
+            values: string[];
+            default: string;
+        } | null;
         /** Output formats offered for a still (a subset of the schema's list). */
         outputFormats: string[];
         /** Schema features this planner does not send. */
@@ -34,6 +40,10 @@ export interface ImageModelInfo {
     /** The estimate for a text-to-image still at the default size; `usd: null` means none, and a capped run is refused. */
     estimate: CostEstimate;
     pricing: ImagePricing;
+    /** The Runware prompting guide this model's prompts follow, or url null with "no model guide published". */
+    guide: ImageGuide["guide"];
+    /** Three or four short lines for under a prompt box. */
+    tips: string[];
     schemaUrl: string;
     pageUrl: string;
 }

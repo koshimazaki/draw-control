@@ -91,6 +91,11 @@ export interface ImageModel {
     outputFormats: string[];
     /** `settings.background: "transparent"` exists (and then needs PNG or WEBP). */
     transparency: boolean;
+    /** `settings.quality`, where the schema has it: the values and the schema default. */
+    quality?: {
+        values: string[];
+        default: string;
+    };
     pricing: ImagePricing;
     estimate(q: PriceQuery): CostEstimate;
     /** Token-priced models: the published rates and examples, for the bound and the unpriced path. */

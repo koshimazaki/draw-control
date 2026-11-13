@@ -9,7 +9,7 @@
  * Built with DOM nodes (text set as text): model names come from the embed's catalogue.
  */
 import { icon } from "./ui/icons";
-import { blocker, chooseFamily, imageCostText, initialState, modelOf, needsUnpriced, unpricedNotice, IMAGE_MAX_PRICE, type PanelState } from "./image-panel";
+import { blocker, chooseFamily, composeInput, imageCostText, initialState, modelOf, needsUnpriced, sizeFor, suggestPrompt, unpricedNotice, IMAGE_MAX_PRICE, type PanelState } from "./image-panel";
 import { sourceLabel, type RefKind, type RefSource, type RefStore } from "./ref-store";
 import type { ArenaKeyElement, ArenaModule, CostQuestion, ImageFamilyInfo } from "./arena";
 import type { Run } from "./gallery";
@@ -44,6 +44,16 @@ export function bindImages(d: Deps) {
   pop.hidden = true; pop.setAttribute("role", "dialog"); pop.setAttribute("aria-label", "Generate a reference image");
   const title = node("strong", "ip-title"), prompt = node("textarea", "field ip-prompt"), family = node("select", "ip-family"), model = node("select", "ip-model");
   const facts = node("p", "ip-facts muted"), list = node("div", "ip-ref-list"), note = node("p", "ip-note muted");
+  // Under the prompt: "Rewrite for this model" once the reader has typed, the model's tips, its prompting guide.
+  const rewrite = node("button", "link-act ip-rewrite", "Rewrite for this model"), tips = node("ul", "ip-tips muted"), guide = node("p", "ip-guide muted");
+  rewrite.type = "button"; rewrite.hidden = true;
+  // GPT-Image-2.6: quality (auto by default), with what it does to the cost.
+  const quality = node("div", "seg ip-quality"), qualityNote = node("p", "ip-quality-note muted", "Quality and size set the cost.");
+  quality.setAttribute("role", "radiogroup"); quality.setAttribute("aria-label", "Quality");
+  for (const [v, label] of [["auto", "Auto"], ["low", "Low"], ["medium", "Medium"], ["high", "High"]]) {
+    const b = node("button", v === "auto" ? "on" : "", label); b.type = "button"; b.dataset.value = v; b.setAttribute("role", "radio"); quality.append(b);
+  }
+  const qualityRow = node("div", "ip-quality-row"); qualityRow.append(quality, qualityNote);
   const otherBox = node("label", "toggle ip-other"), otherInput = node("input"), otherLabel = node("span");
   const cancel = node("button", "btn ip-cancel", "Close"), run = node("button", "btn primary ip-run"), runLabel = node("span", "btn-label", "Generate");
   prompt.rows = 4; prompt.setAttribute("aria-label", "Prompt"); family.setAttribute("aria-label", "Model family"); model.setAttribute("aria-label", "Model");
@@ -53,9 +63,12 @@ export function bindImages(d: Deps) {
   const row = (...kids: HTMLElement[]) => { const r = node("div", "ip-row"); r.append(...kids); return r; };
   const refs = node("div", "ip-refs"); refs.append(node("span", "lab", "References"), list, otherBox);
   const foot = row(cancel, run); foot.classList.add("end");
-  pop.append(title, prompt, row(family, model), facts, refs, note, foot);
+  pop.append(title, prompt, rewrite, tips, guide, row(family, model), facts, qualityRow, refs, note, foot);
   document.body.append(pop);
   let state: PanelState | null = null, families: ImageFamilyInfo[] = [], running: AbortController | null = null, anchor: HTMLElement | null = null;
+  /** The text the reader typed, per drop: kept through Escape and reopening; while set, the prompt is not rewritten. */
+  const edited = new Map<RefKind, string>();
+  let qualityValue = "auto";
 
   function open(kind: RefKind, from: HTMLElement) {
     families = d.arena()?.imageFamilies?.() ?? [];
@@ -63,15 +76,29 @@ export function bindImages(d: Deps) {
     state = initialState(kind, d.shot(), families);
     anchor = from; pop.hidden = false;
     title.textContent = kind === "character" ? "Generate a character image" : "Generate an environment image";
-    prompt.value = state.prompt;
     family.replaceChildren(...families.map(f => option(f.family, f.family)));
     otherInput.checked = false;
-    render(); place();
+    compose(); render(); place();
     prompt.focus();
     // While open, "Use as reference" can add an image to this panel's references.
-    d.setExtra(() => (pop.hidden || !state ? null : { label: "Image references (for Generate)", take: got => { state!.refs.push({ image: got.blob, source: got.source, label: sourceLabel(got.source) }); render(); d.say("Added to the image's references"); } }));
+    d.setExtra(() => (pop.hidden || !state ? null : { label: "Image references (for Generate)", take: got => { state!.refs.push({ image: got.blob, source: got.source, label: sourceLabel(got.source) }); compose(); render(); d.say("Added to the image's references"); } }));
   }
   function close() { if (running) return; pop.hidden = true; state = null; d.setExtra(() => null); anchor?.focus(); }
+  /** The references' roles for the prompt, in the order they are sent (the other drop first). */
+  function roles(): { role: "character" | "environment" | "other"; note?: string }[] {
+    const out: { role: "character" | "environment" | "other"; note?: string }[] = state!.refs.map(r => ({ role: "other" as const, note: r.label }));
+    if (d.store.get(d.slot(), other()) && otherInput.checked) out.unshift({ role: other() });
+    return out;
+  }
+  /** Write the prompt the way the chosen model's guide asks, unless the reader has typed their own. */
+  function compose() {
+    if (!state) return;
+    const typed = edited.get(state.kind), m = modelOf(families, state.model), arena = d.arena();
+    const text = typed ?? (arena?.composeImagePrompt ? arena.composeImagePrompt(composeInput(state, d.shot(), roles(), m)).prompt : suggestPrompt(state.kind, d.shot()));
+    state = { ...state, prompt: text };
+    if (prompt.value !== text) prompt.value = text;
+    rewrite.hidden = typed === undefined;
+  }
   function place() {
     if (!anchor) return;
     const r = anchor.getBoundingClientRect(), w = pop.offsetWidth || 360, h = pop.offsetHeight || 380;
@@ -92,23 +119,34 @@ export function bindImages(d: Deps) {
     model.replaceChildren(...(fam?.models ?? []).map(x => option(x.key, x.name)));
     model.value = state.model;
     const max = m?.accepts.referenceImages.max ?? 0;
+    tips.replaceChildren(...(m?.tips ?? []).slice(0, 4).map(t => node("li", "", t)));
+    // The model's prompting guide, or the embed's words where none is published.
+    guide.replaceChildren();
+    if (m?.guide?.url) { const a = node("a", "link-act", "Prompting guide"); a.href = m.guide.url; a.target = "_blank"; a.rel = "noopener noreferrer"; guide.append(a); }
+    else if (m?.guide) guide.textContent = `${m.name}: ${m.guide.note ?? "no model guide published"}.`;
+    qualityRow.hidden = !m?.accepts.quality;
+    quality.querySelectorAll<HTMLButtonElement>("button").forEach(b => { b.classList.toggle("on", b.dataset.value === qualityValue); b.setAttribute("aria-checked", String(b.dataset.value === qualityValue)); });
     facts.textContent = m ? `${m.size.summary} · ${m.pricing.summary} · ${max ? `up to ${max} reference image${max === 1 ? "" : "s"}` : "no reference images"}` : "";
     otherBox.hidden = !d.store.get(d.slot(), other());
     otherLabel.textContent = `Use the ${other()} image`;
     list.replaceChildren(...state.refs.map((r, i) => {
       const chip = node("span", "badge tag ip-chip", r.label.slice(0, 32)), x = node("button", "ip-chip-x");
       chip.title = r.label; x.type = "button"; x.setAttribute("aria-label", `Remove ${r.label}`); x.innerHTML = icon("x");
-      x.onclick = () => { state!.refs.splice(i, 1); render(); };
+      x.onclick = () => { state!.refs.splice(i, 1); compose(); render(); };
       chip.append(x); return chip;
     }));
     const blocked = blocker({ ...state, refs: refList().map(image => ({ image, source: { kind: "upload", name: "" }, label: "" })) }, m, !!d.key()?.connected, d.fake);
     run.disabled = !running && !!blocked;
+    requestAnimationFrame(place);   // the panel's height follows the model (tips, quality): keep it above its button
     if (!running) note.textContent = blocked ?? (needsUnpriced(m) ? "No published upper price: you will be asked before anything is sent." : d.fake && !d.key()?.connected ? "Local preview: nothing is sent and nothing is charged." : "");
   }
-  family.onchange = () => { state = chooseFamily(state!, families, family.value); render(); };
-  model.onchange = () => { state = { ...state!, model: model.value }; render(); };
-  prompt.oninput = () => { state = { ...state!, prompt: prompt.value }; render(); };
-  otherInput.onchange = () => render();
+  family.onchange = () => { state = chooseFamily(state!, families, family.value); compose(); render(); };
+  model.onchange = () => { state = { ...state!, model: model.value }; compose(); render(); };
+  // Typing makes the prompt the reader's own: it is kept for this drop and no longer rewritten.
+  prompt.oninput = () => { state = { ...state!, prompt: prompt.value }; edited.set(state.kind, prompt.value); rewrite.hidden = false; render(); };
+  rewrite.onclick = () => { edited.delete(state!.kind); compose(); render(); prompt.focus(); };
+  quality.addEventListener("click", e => { const v = (e.target as HTMLElement).closest("button")?.dataset.value; if (v) { qualityValue = v; render(); } });
+  otherInput.onchange = () => { compose(); render(); };
   cancel.onclick = () => close();
   pop.addEventListener("keydown", e => { if (e.key === "Escape" && !running) { e.preventDefault(); e.stopPropagation(); close(); } });
 
@@ -125,6 +163,8 @@ export function bindImages(d: Deps) {
       const fakeImage = local ? await placeholder(kind, m.name) : "";
       const r = await arena.generateImage({
         model: m.key, prompt: words, references: refList(), maxPrice: IMAGE_MAX_PRICE, signal: running.signal,
+        ...(sizeFor(m).size ? { size: sizeFor(m).size } : {}),
+        ...(m.accepts.quality ? { quality: qualityValue } : {}),
         ...(needsUnpriced(m) ? { allowUnpriced: true } : {}),
         key: d.key()?.connected ? d.key() : "local-preview-key-0000000000000000",
         confirm: (cq: CostQuestion) => d.ask("Generate this image?", imageCostText(cq, local ? " Local preview: nothing is sent and nothing is charged." : "")),

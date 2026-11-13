@@ -29,6 +29,8 @@ export interface ImageRequest {
     transparent?: boolean;
     /** PNG by default. */
     outputFormat?: StillFormat;
+    /** `settings.quality`, where the schema has it (GPT-Image-2.6); left out, the schema default applies. */
+    quality?: string;
 }
 export interface ImagePlan {
     modelId: string;
@@ -58,7 +60,7 @@ export type PriceCheck = {
     ok: true;
     usd: number;
     basis: string;
-    priced: "bound" | "unpriced";
+    priced: "bound" | "estimate" | "unpriced";
     rates?: string;
     examples?: string;
 } | {

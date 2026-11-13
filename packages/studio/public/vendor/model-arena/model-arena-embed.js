@@ -1,5 +1,5 @@
-const is = (e) => String(e ?? "").replace(/[|\r\n]+/g, " ").trim() || "-", Pt = (e) => e === null ? "-" : `$${e.toFixed(4)}`;
-function ho(e) {
+const vn = (e) => String(e ?? "").replace(/[|\r\n]+/g, " ").trim() || "-", Ct = (e) => e === null ? "-" : `$${e.toFixed(4)}`;
+function Ia(e) {
   return `| ${[
     e.date,
     e.model,
@@ -8,110 +8,110 @@ function ho(e) {
     e.duration,
     e.resolution,
     e.inputs,
-    Pt(e.estimateUsd),
-    Pt(e.costUsd),
+    Ct(e.estimateUsd),
+    Ct(e.costUsd),
     e.seconds === null ? "-" : e.seconds.toFixed(1),
     e.output,
     e.status
-  ].map(is).join(" | ")} |
+  ].map(vn).join(" | ")} |
 `;
 }
-const go = (e) => String(e.resolution ?? `${e.width ?? ""}x${e.height ?? ""}`);
-function as(e, t, o, s, n) {
-  const { inputs: r, taskUUID: i, positivePrompt: d, ...a } = s?.task ?? t.task;
+const Ea = (e) => String(e.resolution ?? `${e.width ?? ""}x${e.height ?? ""}`);
+function xn(e, t, a, n, i) {
+  const { inputs: s, taskUUID: o, positivePrompt: r, ...d } = n?.task ?? t.task;
   return {
     id: e,
     label: t.modelName,
     provider: t.provider,
     model: t.modelId,
     modelName: t.modelName,
-    modelRan: s?.modelRan ?? null,
-    prompt: o.prompt,
+    modelRan: n?.modelRan ?? null,
+    prompt: a.prompt,
     inputsSent: t.inputsSent,
     firstFrameVariant: t.firstFrameVariant,
-    output: n ? { src: n, contentType: "video/mp4", remoteUrl: s?.videoURL } : null,
-    costUsd: s?.costUsd ?? null,
-    generationSeconds: s ? Math.round(s.generationSeconds * 10) / 10 : null,
-    ...o.duration !== void 0 ? { durationSeconds: o.duration } : {},
-    ...s ? { taskUUID: s.taskUUID } : {},
-    ...o.routing ? { routing: { maxPrice: o.routing.maxPrice, requirements: o.routing.requirements } } : {},
-    settings: a,
-    status: s ? "ready" : "pending"
+    output: i ? { src: i, contentType: "video/mp4", remoteUrl: n?.videoURL } : null,
+    costUsd: n?.costUsd ?? null,
+    generationSeconds: n ? Math.round(n.generationSeconds * 10) / 10 : null,
+    ...a.duration !== void 0 ? { durationSeconds: a.duration } : {},
+    ...n ? { taskUUID: n.taskUUID } : {},
+    ...a.routing ? { routing: { maxPrice: a.routing.maxPrice, requirements: a.routing.requirements } } : {},
+    settings: d,
+    status: n ? "ready" : "pending"
   };
 }
-const ds = "https://api.runware.ai/v1";
-class Q extends Error {
-  constructor(t, o) {
+const $n = "https://api.runware.ai/v1";
+class ne extends Error {
+  constructor(t, a) {
     super(
-      o.length ? o.map((s) => `${s.code}: ${s.message}${s.parameter ? ` (${s.parameter})` : ""}`).join("; ") : `Runware API returned HTTP ${t}.`
-    ), this.status = t, this.errors = o, this.name = "RunwareApiError";
+      a.length ? a.map((n) => `${n.code}: ${n.message}${n.parameter ? ` (${n.parameter})` : ""}`).join("; ") : `Runware API returned HTTP ${t}.`
+    ), this.status = t, this.errors = a, this.name = "RunwareApiError";
   }
   status;
   errors;
 }
-const cs = /^[\x21-\x7e]{8,512}$/;
-class Ne {
+const kn = /^[\x21-\x7e]{8,512}$/;
+class Ke {
   getKey;
   fetchImpl;
   constructor(t) {
-    this.getKey = t.getKey, this.fetchImpl = t.fetch ?? ((o, s) => globalThis.fetch(o, s));
+    this.getKey = t.getKey, this.fetchImpl = t.fetch ?? ((a, n) => globalThis.fetch(a, n));
   }
   /** Redacts the key from any text before it is shown. */
   redact(t) {
-    const o = this.getKey();
-    return o ? t.split(o).join("[key]") : t;
+    const a = this.getKey();
+    return a ? t.split(a).join("[key]") : t;
   }
-  async post(t, o) {
-    const s = this.getKey();
-    if (!s) throw new Error("No Runware API key. Set RUNWARE_API_KEY, or paste it into the key panel.");
-    if (!cs.test(s)) throw new Error("That does not look like a Runware API key.");
-    const n = await this.fetchImpl(ds, {
+  async post(t, a) {
+    const n = this.getKey();
+    if (!n) throw new Error("No Runware API key. Set RUNWARE_API_KEY, or paste it into the key panel.");
+    if (!kn.test(n)) throw new Error("That does not look like a Runware API key.");
+    const i = await this.fetchImpl($n, {
       method: "POST",
-      headers: { Authorization: `Bearer ${s}`, "Content-Type": "application/json" },
+      headers: { Authorization: `Bearer ${n}`, "Content-Type": "application/json" },
       body: JSON.stringify(t),
-      signal: o
+      signal: a
     });
-    let r;
+    let s;
     try {
-      r = await n.json();
+      s = await i.json();
     } catch {
-      throw new Q(n.status, []);
+      throw new ne(i.status, []);
     }
-    const i = r ?? {}, d = Array.isArray(i.data) ? i.data : [], a = Array.isArray(i.errors) ? i.errors.map((l) => ({
+    const o = s ?? {}, r = Array.isArray(o.data) ? o.data : [], d = Array.isArray(o.errors) ? o.errors.map((l) => ({
       code: String(l.code ?? "error"),
       message: this.redact(String(l.message ?? "")),
       ...l.parameter ? { parameter: String(l.parameter) } : {},
       ...l.taskUUID ? { taskUUID: String(l.taskUUID) } : {}
     })) : [];
-    if (!n.ok && !d.length) throw new Q(n.status, a);
-    return { data: d, errors: a };
+    if (!i.ok && !r.length) throw new ne(i.status, d);
+    return { data: r, errors: d };
   }
   /** Stores media (data URI, base64 or public URL) and returns its UUID and URL. */
-  async upload(t, o) {
-    const s = globalThis.crypto.randomUUID(), { data: n, errors: r } = await this.post([{ taskType: "mediaStorage", taskUUID: s, operation: "upload", media: t }], o), i = r.filter((a) => !a.taskUUID || a.taskUUID === s);
-    if (i.length) throw new Q(400, i);
-    const d = n.find((a) => a.taskUUID === s) ?? n[0];
-    if (!d || typeof d.mediaUUID != "string") throw new Error("mediaStorage upload returned no mediaUUID.");
-    return { mediaUUID: d.mediaUUID, mediaURL: String(d.mediaURL ?? "") };
+  async upload(t, a) {
+    const n = globalThis.crypto.randomUUID(), { data: i, errors: s } = await this.post([{ taskType: "mediaStorage", taskUUID: n, operation: "upload", media: t }], a), o = s.filter((d) => !d.taskUUID || d.taskUUID === n);
+    if (o.length) throw new ne(400, o);
+    const r = i.find((d) => d.taskUUID === n) ?? i[0];
+    if (!r || typeof r.mediaUUID != "string") throw new Error("mediaStorage upload returned no mediaUUID.");
+    return { mediaUUID: r.mediaUUID, mediaURL: String(r.mediaURL ?? "") };
   }
   /**
    * The account's current balance in USD. The same response lists the team and
    * the API keys; only the number is read and nothing else is kept or returned.
    */
   async balance(t) {
-    const o = globalThis.crypto.randomUUID(), { data: s, errors: n } = await this.post([{ taskType: "accountManagement", taskUUID: o, operation: "getDetails" }], t), r = n.filter((a) => !a.taskUUID || a.taskUUID === o);
-    if (r.length) throw new Q(400, r);
-    const i = (s.find((a) => a.taskUUID === o) ?? s[0])?.balance, d = typeof i == "string" ? Number(i) : i;
-    if (typeof d != "number" || !Number.isFinite(d)) throw new Error("Runware returned no balance.");
-    return d;
+    const a = globalThis.crypto.randomUUID(), { data: n, errors: i } = await this.post([{ taskType: "accountManagement", taskUUID: a, operation: "getDetails" }], t), s = i.filter((d) => !d.taskUUID || d.taskUUID === a);
+    if (s.length) throw new ne(400, s);
+    const o = (n.find((d) => d.taskUUID === a) ?? n[0])?.balance, r = typeof o == "string" ? Number(o) : o;
+    if (typeof r != "number" || !Number.isFinite(r)) throw new Error("Runware returned no balance.");
+    return r;
   }
   /** Reads back the stored request for a task; used to learn which model the router chose. */
-  async taskDetails(t, o) {
-    const { data: s } = await this.post([{ taskType: "getTaskDetails", taskUUID: t }], o);
-    return s[0];
+  async taskDetails(t, a) {
+    const { data: n } = await this.post([{ taskType: "getTaskDetails", taskUUID: t }], a);
+    return n[0];
   }
 }
-const ls = [
+const Sn = [
   "firstFrame",
   "lastFrame",
   "keyframes",
@@ -121,7 +121,7 @@ const ls = [
   "sourceVideo",
   "audioToVideo",
   "elements"
-], lt = [
+], gt = [
   "static",
   "push-in",
   "pull-out",
@@ -132,7 +132,7 @@ const ls = [
   "orbit",
   "handheld",
   "rack-focus"
-], At = ["image", "video", "audio"], Ut = [
+], Vt = ["image", "video", "audio"], Ot = [
   "first-frame",
   "last-frame",
   "keyframe",
@@ -144,164 +144,164 @@ const ls = [
   "motion",
   "source",
   "soundtrack"
-], us = /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/;
-class K extends Error {
-  constructor(t, o) {
-    super(`${t}: ${o}`), this.path = t, this.name = "ShotError";
+], In = /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/;
+class W extends Error {
+  constructor(t, a) {
+    super(`${t}: ${a}`), this.path = t, this.name = "ShotError";
   }
   path;
 }
-const et = (e) => typeof e == "object" && e !== null && !Array.isArray(e);
-function Y(e, t, o, s = !1) {
-  if (!(s && e === void 0) && (typeof e != "string" || e.length > o || us.test(e)))
-    throw new K(t, `must be plain text up to ${o} characters`);
+const st = (e) => typeof e == "object" && e !== null && !Array.isArray(e);
+function ee(e, t, a, n = !1) {
+  if (!(n && e === void 0) && (typeof e != "string" || e.length > a || In.test(e)))
+    throw new W(t, `must be plain text up to ${a} characters`);
 }
-function ms(e, t = "shot") {
-  if (!et(e)) throw new K(t, "must be an object");
-  if (Y(e.subject, `${t}.subject`, 500), Y(e.action, `${t}.action`, 500), Y(e.environment, `${t}.environment`, 500, !0), Y(e.legend, `${t}.legend`, 300, !0), Y(e.focus, `${t}.focus`, 200, !0), Y(e.audio, `${t}.audio`, 500, !0), e.camera !== "guide" && !lt.includes(e.camera))
-    throw new K(`${t}.camera`, `must be "guide" or one of ${lt.join(", ")}`);
-  if (typeof e.duration != "number" || !(e.duration > 0 && e.duration <= 60)) throw new K(`${t}.duration`, "must be 1-60 seconds");
-  if (!Array.isArray(e.references) || e.references.length > 20) throw new K(`${t}.references`, "must be an array of up to 20");
-  if (e.references.forEach((o, s) => {
-    const n = `${t}.references[${s}]`;
-    if (!et(o) || typeof o.id != "string" || !/^[A-Za-z0-9_-]{1,40}$/.test(o.id)) throw new K(`${n}.id`, "must be a short id");
-    if (!At.includes(o.kind)) throw new K(`${n}.kind`, `must be one of ${At.join(", ")}`);
-    if (!Ut.includes(o.role)) throw new K(`${n}.role`, `must be one of ${Ut.join(", ")}`);
-    Y(o.keep, `${n}.keep`, 200, !0), Y(o.replaces, `${n}.replaces`, 200, !0);
+function En(e, t = "shot") {
+  if (!st(e)) throw new W(t, "must be an object");
+  if (ee(e.subject, `${t}.subject`, 500), ee(e.action, `${t}.action`, 500), ee(e.environment, `${t}.environment`, 500, !0), ee(e.legend, `${t}.legend`, 300, !0), ee(e.focus, `${t}.focus`, 200, !0), ee(e.audio, `${t}.audio`, 500, !0), e.camera !== "guide" && !gt.includes(e.camera))
+    throw new W(`${t}.camera`, `must be "guide" or one of ${gt.join(", ")}`);
+  if (typeof e.duration != "number" || !(e.duration > 0 && e.duration <= 60)) throw new W(`${t}.duration`, "must be 1-60 seconds");
+  if (!Array.isArray(e.references) || e.references.length > 20) throw new W(`${t}.references`, "must be an array of up to 20");
+  if (e.references.forEach((a, n) => {
+    const i = `${t}.references[${n}]`;
+    if (!st(a) || typeof a.id != "string" || !/^[A-Za-z0-9_-]{1,40}$/.test(a.id)) throw new W(`${i}.id`, "must be a short id");
+    if (!Vt.includes(a.kind)) throw new W(`${i}.kind`, `must be one of ${Vt.join(", ")}`);
+    if (!Ot.includes(a.role)) throw new W(`${i}.role`, `must be one of ${Ot.join(", ")}`);
+    ee(a.keep, `${i}.keep`, 200, !0), ee(a.replaces, `${i}.replaces`, 200, !0);
   }), e.beats !== void 0) {
-    if (!Array.isArray(e.beats) || e.beats.length > 20) throw new K(`${t}.beats`, "must be an array of up to 20");
-    e.beats.forEach((o, s) => {
-      if (!et(o) || typeof o.start != "number" || typeof o.end != "number" || !(o.end > o.start && o.start >= 0))
-        throw new K(`${t}.beats[${s}]`, "must have start < end, in seconds");
-      Y(o.text, `${t}.beats[${s}].text`, 300);
+    if (!Array.isArray(e.beats) || e.beats.length > 20) throw new W(`${t}.beats`, "must be an array of up to 20");
+    e.beats.forEach((a, n) => {
+      if (!st(a) || typeof a.start != "number" || typeof a.end != "number" || !(a.end > a.start && a.start >= 0))
+        throw new W(`${t}.beats[${n}]`, "must have start < end, in seconds");
+      ee(a.text, `${t}.beats[${n}].text`, 300);
     });
   }
   return e;
 }
-function ps(e) {
-  const t = e.references.map((o) => `${o.role} ${o.kind}`).join(", ");
+function Pn(e) {
+  const t = e.references.map((a) => `${a.role} ${a.kind}`).join(", ");
   return `${e.subject} ${e.action}${e.environment ? `, ${e.environment}` : ""}. Camera: ${e.camera === "guide" ? "from the guide" : e.camera}. ${e.duration} s${t ? `. References: ${t}` : ""}${e.audio ? `. Sound: ${e.audio}` : ""}.`;
 }
-function fs(e) {
+function An(e) {
   return {
     model: e.model,
     ...e.notes.length ? { notes: e.notes.slice(0, 40) } : {},
     ...e.dropped.length ? { dropped: e.dropped.slice(0, 40).map((t) => `${t.ref}: ${t.reason}`) } : {}
   };
 }
-const Rt = 1, bo = /^[a-z0-9][a-z0-9-]{0,63}$/, Mt = [
+const Nt = 1, Pa = /^[a-z0-9][a-z0-9-]{0,63}$/, Dt = [
   "referenceVideo",
   "referenceImage",
   "referenceAudio",
   "frameImage",
   "audio",
   "video"
-], hs = /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/;
-class v extends Error {
-  constructor(t, o) {
-    super(`${t}: ${o}`), this.path = t, this.name = "RecordError";
+], Un = /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/;
+class y extends Error {
+  constructor(t, a) {
+    super(`${t}: ${a}`), this.path = t, this.name = "RecordError";
   }
   path;
 }
-const q = (e) => typeof e == "object" && e !== null && !Array.isArray(e);
-function B(e, t, o, s = 0) {
-  if (typeof e != "string") throw new v(t, "must be a string");
-  if (e.length < s || e.length > o)
-    throw new v(t, `must be ${s}-${o} characters`);
-  if (hs.test(e)) throw new v(t, "must be plain text");
+const ie = (e) => typeof e == "object" && e !== null && !Array.isArray(e);
+function B(e, t, a, n = 0) {
+  if (typeof e != "string") throw new y(t, "must be a string");
+  if (e.length < n || e.length > a)
+    throw new y(t, `must be ${n}-${a} characters`);
+  if (Un.test(e)) throw new y(t, "must be plain text");
   return e;
 }
-function Tt(e, t, o) {
-  e !== void 0 && B(e, t, o);
+function Gt(e, t, a) {
+  e !== void 0 && B(e, t, a);
 }
-function Ft(e, t) {
+function Bt(e, t) {
   if (e !== null && (typeof e != "number" || !Number.isFinite(e) || e < 0))
-    throw new v(t, "must be a non-negative number or null");
+    throw new y(t, "must be a non-negative number or null");
 }
-function Lt(e, t) {
-  if (!q(e)) throw new v(t, "must be an object");
+function Kt(e, t) {
+  if (!ie(e)) throw new y(t, "must be an object");
   B(e.src, `${t}.src`, 2048, 1);
-  for (const o of ["width", "height", "fps", "seconds", "bytes"])
-    if (e[o] !== void 0 && (typeof e[o] != "number" || !(e[o] >= 0)))
-      throw new v(`${t}.${o}`, "must be a non-negative number");
+  for (const a of ["width", "height", "fps", "seconds", "bytes"])
+    if (e[a] !== void 0 && (typeof e[a] != "number" || !(e[a] >= 0)))
+      throw new y(`${t}.${a}`, "must be a non-negative number");
 }
-function gs(e, t = "guide") {
-  if (!q(e)) throw new v(t, "must be an object");
-  if (e.schemaVersion !== 1) throw new v(`${t}.schemaVersion`, "must be 1");
-  Lt(e.video, `${t}.video`);
-  for (const o of ["audio", "firstFrame", "firstFrameStyled", "camera"])
-    e[o] !== void 0 && Lt(e[o], `${t}.${o}`);
-  if (e.beats !== void 0 && (!Array.isArray(e.beats) || e.beats.some((o) => typeof o != "number" || o < 0)))
-    throw new v(`${t}.beats`, "must be non-negative seconds");
-  return e.onsets !== void 0 && wo(e.onsets, `${t}.onsets`), e.peaks !== void 0 && vt(e.peaks, `${t}.peaks`), e;
+function Tn(e, t = "guide") {
+  if (!ie(e)) throw new y(t, "must be an object");
+  if (e.schemaVersion !== 1) throw new y(`${t}.schemaVersion`, "must be 1");
+  Kt(e.video, `${t}.video`);
+  for (const a of ["audio", "firstFrame", "firstFrameStyled", "camera"])
+    e[a] !== void 0 && Kt(e[a], `${t}.${a}`);
+  if (e.beats !== void 0 && (!Array.isArray(e.beats) || e.beats.some((a) => typeof a != "number" || a < 0)))
+    throw new y(`${t}.beats`, "must be non-negative seconds");
+  return e.onsets !== void 0 && Aa(e.onsets, `${t}.onsets`), e.peaks !== void 0 && Pt(e.peaks, `${t}.peaks`), e;
 }
-function vt(e, t) {
-  if (!Array.isArray(e) || e.length > 2e4) throw new v(t, "must be an array");
-  return e.forEach((o, s) => {
-    if (!q(o) || typeof o.seconds != "number" || !(o.seconds >= 0))
-      throw new v(`${t}[${s}].seconds`, "must be non-negative seconds");
-    if (typeof o.strength != "number" || !(o.strength >= 0 && o.strength <= 1))
-      throw new v(`${t}[${s}].strength`, "must be 0-1");
+function Pt(e, t) {
+  if (!Array.isArray(e) || e.length > 2e4) throw new y(t, "must be an array");
+  return e.forEach((a, n) => {
+    if (!ie(a) || typeof a.seconds != "number" || !(a.seconds >= 0))
+      throw new y(`${t}[${n}].seconds`, "must be non-negative seconds");
+    if (typeof a.strength != "number" || !(a.strength >= 0 && a.strength <= 1))
+      throw new y(`${t}[${n}].strength`, "must be 0-1");
   }), e;
 }
-function wo(e, t) {
-  if (!q(e)) throw new v(t, "must be an object");
-  for (const o of ["low", "mid", "high"]) vt(e[o], `${t}.${o}`);
+function Aa(e, t) {
+  if (!ie(e)) throw new y(t, "must be an object");
+  for (const a of ["low", "mid", "high"]) Pt(e[a], `${t}.${a}`);
   return e;
 }
-function bs(e, t) {
-  if (!q(e)) throw new v(t, "must be an object");
-  if (typeof e.id != "string" || !bo.test(e.id)) throw new v(`${t}.id`, "must be a slug");
-  if (Tt(e.label, `${t}.label`, 120), B(e.provider, `${t}.provider`, 40, 1), B(e.model, `${t}.model`, 120, 1), e.modelRan !== null && B(e.modelRan, `${t}.modelRan`, 120, 1), B(e.prompt, `${t}.prompt`, 5e4), !Array.isArray(e.inputsSent)) throw new v(`${t}.inputsSent`, "must be an array");
-  if (e.inputsSent.forEach((o, s) => {
-    const n = `${t}.inputsSent[${s}]`;
-    if (!q(o) || !Mt.includes(o.role))
-      throw new v(n, `role must be one of ${Mt.join(", ")}`);
-    B(o.src, `${n}.src`, 2048, 1);
+function Rn(e, t) {
+  if (!ie(e)) throw new y(t, "must be an object");
+  if (typeof e.id != "string" || !Pa.test(e.id)) throw new y(`${t}.id`, "must be a slug");
+  if (Gt(e.label, `${t}.label`, 120), B(e.provider, `${t}.provider`, 40, 1), B(e.model, `${t}.model`, 120, 1), e.modelRan !== null && B(e.modelRan, `${t}.modelRan`, 120, 1), B(e.prompt, `${t}.prompt`, 5e4), !Array.isArray(e.inputsSent)) throw new y(`${t}.inputsSent`, "must be an array");
+  if (e.inputsSent.forEach((a, n) => {
+    const i = `${t}.inputsSent[${n}]`;
+    if (!ie(a) || !Dt.includes(a.role))
+      throw new y(i, `role must be one of ${Dt.join(", ")}`);
+    B(a.src, `${i}.src`, 2048, 1);
   }), !["A", "B", "C"].includes(e.firstFrameVariant))
-    throw new v(`${t}.firstFrameVariant`, "must be A, B or C");
+    throw new y(`${t}.firstFrameVariant`, "must be A, B or C");
   if (e.output !== null) {
-    if (!q(e.output)) throw new v(`${t}.output`, "must be an object or null");
+    if (!ie(e.output)) throw new y(`${t}.output`, "must be an object or null");
     B(e.output.src, `${t}.output.src`, 2048, 1);
   }
-  if (Ft(e.costUsd, `${t}.costUsd`), Ft(e.generationSeconds, `${t}.generationSeconds`), Tt(e.note, `${t}.note`, 2e3), e.composed !== void 0) {
-    if (!q(e.composed)) throw new v(`${t}.composed`, "must be an object");
+  if (Bt(e.costUsd, `${t}.costUsd`), Bt(e.generationSeconds, `${t}.generationSeconds`), Gt(e.note, `${t}.note`, 2e3), e.composed !== void 0) {
+    if (!ie(e.composed)) throw new y(`${t}.composed`, "must be an object");
     B(e.composed.model, `${t}.composed.model`, 120, 1);
-    for (const o of ["notes", "dropped"]) {
-      const s = e.composed[o];
-      if (s !== void 0) {
-        if (!Array.isArray(s) || s.length > 40) throw new v(`${t}.composed.${o}`, "must be an array");
-        s.forEach((n, r) => B(n, `${t}.composed.${o}[${r}]`, 1e3));
+    for (const a of ["notes", "dropped"]) {
+      const n = e.composed[a];
+      if (n !== void 0) {
+        if (!Array.isArray(n) || n.length > 40) throw new y(`${t}.composed.${a}`, "must be an array");
+        n.forEach((i, s) => B(i, `${t}.composed.${a}[${s}]`, 1e3));
       }
     }
   }
-  return e.shot !== void 0 && vo(e.shot, `${t}.shot`), e;
+  return e.shot !== void 0 && Ua(e.shot, `${t}.shot`), e;
 }
-function vo(e, t) {
+function Ua(e, t) {
   try {
-    ms(e, t);
-  } catch (o) {
-    throw o instanceof K ? new v(o.path, o.message.slice(o.path.length + 2)) : o;
+    En(e, t);
+  } catch (a) {
+    throw a instanceof W ? new y(a.path, a.message.slice(a.path.length + 2)) : a;
   }
 }
-function ue(e) {
-  if (!q(e)) throw new v("record", "must be an object");
-  if (e.schemaVersion !== Rt)
-    throw new v("schemaVersion", `must be ${Rt}`);
-  if (typeof e.id != "string" || !bo.test(e.id)) throw new v("id", "must be a slug");
-  if (B(e.title, "title", 200, 1), e.guide !== void 0 && gs(e.guide), e.shot !== void 0 && vo(e.shot, "shot"), !Array.isArray(e.lanes) || e.lanes.length < 1 || e.lanes.length > 12)
-    throw new v("lanes", "must hold 1-12 lanes");
-  const t = e.lanes.map((s, n) => bs(s, `lanes[${n}]`)), o = new Set(t.map((s) => s.id));
-  if (o.size !== t.length) throw new v("lanes", "lane ids must be distinct");
-  if (e.preferredLane !== void 0 && !o.has(e.preferredLane))
-    throw new v("preferredLane", "must name a lane in this record");
+function ge(e) {
+  if (!ie(e)) throw new y("record", "must be an object");
+  if (e.schemaVersion !== Nt)
+    throw new y("schemaVersion", `must be ${Nt}`);
+  if (typeof e.id != "string" || !Pa.test(e.id)) throw new y("id", "must be a slug");
+  if (B(e.title, "title", 200, 1), e.guide !== void 0 && Tn(e.guide), e.shot !== void 0 && Ua(e.shot, "shot"), !Array.isArray(e.lanes) || e.lanes.length < 1 || e.lanes.length > 12)
+    throw new y("lanes", "must hold 1-12 lanes");
+  const t = e.lanes.map((n, i) => Rn(n, `lanes[${i}]`)), a = new Set(t.map((n) => n.id));
+  if (a.size !== t.length) throw new y("lanes", "lane ids must be distinct");
+  if (e.preferredLane !== void 0 && !a.has(e.preferredLane))
+    throw new y("preferredLane", "must name a lane in this record");
   if (e.observations !== void 0) {
-    if (!Array.isArray(e.observations)) throw new v("observations", "must be an array");
-    e.observations.forEach((s, n) => B(s, `observations[${n}]`, 2e3));
+    if (!Array.isArray(e.observations)) throw new y("observations", "must be an array");
+    e.observations.forEach((n, i) => B(n, `observations[${i}]`, 2e3));
   }
   return e;
 }
-const jt = ["mannequin", "block", "stick", "blob", "glider", "file", "rigged"], ws = [
+const _t = ["mannequin", "block", "stick", "blob", "glider", "file", "rigged"], Mn = [
   "video",
   "audio",
   "firstFrame",
@@ -310,80 +310,80 @@ const jt = ["mannequin", "block", "stick", "blob", "glider", "file", "rigged"], 
   "recipe",
   "beats",
   "camera"
-], vs = /^\d+\.\d+\.\d+$/, ys = ["schemaVersion", "video", "audio", "firstFrame", "firstFrameStyled", "beats", "recipe", "meta", "camera"], Ae = (e) => typeof e == "object" && e !== null && !Array.isArray(e);
-function Se(e, t, o) {
+], Fn = /^\d+\.\d+\.\d+$/, Ln = ["schemaVersion", "video", "audio", "firstFrame", "firstFrameStyled", "beats", "recipe", "meta", "camera"], Le = (e) => typeof e == "object" && e !== null && !Array.isArray(e);
+function Te(e, t, a) {
   if (typeof e != "string" || e.length < 1 || e.length > 255 || /[\\/]|^\.\.?$/.test(e))
-    throw new v(t, "must be a file name inside the bundle");
-  if (o && !o.test(e)) throw new v(t, `must match ${o}`);
+    throw new y(t, "must be a file name inside the bundle");
+  if (a && !a.test(e)) throw new y(t, `must match ${a}`);
   return e;
 }
-function Vt(e, t) {
-  if (!Array.isArray(e) || e.some((o) => typeof o != "number" || !(o >= 0)))
-    throw new v(t, "must be non-negative seconds");
+function zt(e, t) {
+  if (!Array.isArray(e) || e.some((a) => typeof a != "number" || !(a >= 0)))
+    throw new y(t, "must be non-negative seconds");
   return e;
 }
-function yo(e, t = "bundle") {
-  if (!Ae(e)) throw new v(t, "must be an object");
-  if (typeof e.schemaVersion != "string" || !vs.test(e.schemaVersion))
-    throw new v(`${t}.schemaVersion`, "must be x.y.z");
-  for (const o of Object.keys(e))
-    if (!ys.includes(o)) throw new v(`${t}.${o}`, "is not a bundle key");
-  Se(e.video, `${t}.video`, /\.mp4$/), Se(e.firstFrame, `${t}.firstFrame`, /\.png$/);
-  for (const o of ["beats", "recipe", "meta"]) Se(e[o], `${t}.${o}`, /\.json$/);
-  e.camera !== void 0 && Se(e.camera, `${t}.camera`, /\.json$/);
-  for (const o of ["audio", "firstFrameStyled"]) e[o] !== void 0 && Se(e[o], `${t}.${o}`);
+function Ta(e, t = "bundle") {
+  if (!Le(e)) throw new y(t, "must be an object");
+  if (typeof e.schemaVersion != "string" || !Fn.test(e.schemaVersion))
+    throw new y(`${t}.schemaVersion`, "must be x.y.z");
+  for (const a of Object.keys(e))
+    if (!Ln.includes(a)) throw new y(`${t}.${a}`, "is not a bundle key");
+  Te(e.video, `${t}.video`, /\.mp4$/), Te(e.firstFrame, `${t}.firstFrame`, /\.png$/);
+  for (const a of ["beats", "recipe", "meta"]) Te(e[a], `${t}.${a}`, /\.json$/);
+  e.camera !== void 0 && Te(e.camera, `${t}.camera`, /\.json$/);
+  for (const a of ["audio", "firstFrameStyled"]) e[a] !== void 0 && Te(e[a], `${t}.${a}`);
   return e;
 }
-function xo(e, t = "beats") {
-  if (!Ae(e)) throw new v(t, "must be an object");
-  if (typeof e.bpm != "number" || !(e.bpm >= 40 && e.bpm <= 240)) throw new v(`${t}.bpm`, "must be 40-240");
+function Ra(e, t = "beats") {
+  if (!Le(e)) throw new y(t, "must be an object");
+  if (typeof e.bpm != "number" || !(e.bpm >= 40 && e.bpm <= 240)) throw new y(`${t}.bpm`, "must be 40-240");
   if (typeof e.offsetSeconds != "number" || !(e.offsetSeconds >= 0))
-    throw new v(`${t}.offsetSeconds`, "must be non-negative");
+    throw new y(`${t}.offsetSeconds`, "must be non-negative");
   if (!Number.isInteger(e.beatsPerBar) || e.beatsPerBar < 1)
-    throw new v(`${t}.beatsPerBar`, "must be a positive integer");
-  if (e.source !== "manual" && e.source !== "analysis") throw new v(`${t}.source`, "must be manual or analysis");
-  return Vt(e.beats, `${t}.beats`), Vt(e.downbeats, `${t}.downbeats`), e.onsets !== void 0 && wo(e.onsets, `${t}.onsets`), e.peaks !== void 0 && vt(e.peaks, `${t}.peaks`), e;
+    throw new y(`${t}.beatsPerBar`, "must be a positive integer");
+  if (e.source !== "manual" && e.source !== "analysis") throw new y(`${t}.source`, "must be manual or analysis");
+  return zt(e.beats, `${t}.beats`), zt(e.downbeats, `${t}.downbeats`), e.onsets !== void 0 && Aa(e.onsets, `${t}.onsets`), e.peaks !== void 0 && Pt(e.peaks, `${t}.peaks`), e;
 }
-function $o(e, t = "meta") {
-  if (!Ae(e)) throw new v(t, "must be an object");
-  for (const s of ["width", "height", "frames"])
-    if (!Number.isInteger(e[s]) || e[s] < 1) throw new v(`${t}.${s}`, "must be a positive integer");
-  if (e.fps !== 24) throw new v(`${t}.fps`, "must be 24");
-  const o = e.character;
-  if (!Ae(o) || !jt.includes(o.kind) || typeof o.name != "string")
-    throw new v(`${t}.character`, `kind must be one of ${jt.join(", ")}`);
-  if (!Array.isArray(e.assets) || e.assets.length < 1) throw new v(`${t}.assets`, "must list at least one asset");
-  return e.assets.forEach((s, n) => {
-    if (!Ae(s) || !ws.includes(s.role)) throw new v(`${t}.assets[${n}].role`, "unknown role");
-    if (typeof s.licence != "string" || s.licence.length < 1) throw new v(`${t}.assets[${n}].licence`, "is required");
+function Ma(e, t = "meta") {
+  if (!Le(e)) throw new y(t, "must be an object");
+  for (const n of ["width", "height", "frames"])
+    if (!Number.isInteger(e[n]) || e[n] < 1) throw new y(`${t}.${n}`, "must be a positive integer");
+  if (e.fps !== 24) throw new y(`${t}.fps`, "must be 24");
+  const a = e.character;
+  if (!Le(a) || !_t.includes(a.kind) || typeof a.name != "string")
+    throw new y(`${t}.character`, `kind must be one of ${_t.join(", ")}`);
+  if (!Array.isArray(e.assets) || e.assets.length < 1) throw new y(`${t}.assets`, "must list at least one asset");
+  return e.assets.forEach((n, i) => {
+    if (!Le(n) || !Mn.includes(n.role)) throw new y(`${t}.assets[${i}].role`, "unknown role");
+    if (typeof n.licence != "string" || n.licence.length < 1) throw new y(`${t}.assets[${i}].licence`, "is required");
   }), e;
 }
-function xs(e, t, o) {
-  const s = yo(e.manifest), n = xo(e.beats), r = $o(e.meta), i = t.endsWith("/") ? t : `${t}/`, d = (m) => `${i}${m}`, a = r.fps, l = {
+function jn(e, t, a) {
+  const n = Ta(e.manifest), i = Ra(e.beats), s = Ma(e.meta), o = t.endsWith("/") ? t : `${t}/`, r = (m) => `${o}${m}`, d = s.fps, l = {
     schemaVersion: 1,
-    video: { src: d(s.video), contentType: "video/mp4", width: r.width, height: r.height, fps: a, seconds: r.durationSeconds },
-    firstFrame: { src: d(s.firstFrame), contentType: "image/png", width: r.width, height: r.height },
-    beats: n.beats,
-    ...n.onsets ? { onsets: n.onsets } : {},
-    ...n.peaks ? { peaks: n.peaks } : {},
+    video: { src: r(n.video), contentType: "video/mp4", width: s.width, height: s.height, fps: d, seconds: s.durationSeconds },
+    firstFrame: { src: r(n.firstFrame), contentType: "image/png", width: s.width, height: s.height },
+    beats: i.beats,
+    ...i.onsets ? { onsets: i.onsets } : {},
+    ...i.peaks ? { peaks: i.peaks } : {},
     ...e.recipe ? { recipe: e.recipe } : {},
     meta: {
-      licences: r.assets.map((m) => ({ asset: m.file ?? m.name, licence: m.licence })),
-      bundleSchemaVersion: s.schemaVersion,
-      character: r.character,
-      generator: r.generator,
-      bpm: n.bpm,
-      downbeats: n.downbeats
+      licences: s.assets.map((m) => ({ asset: m.file ?? m.name, licence: m.licence })),
+      bundleSchemaVersion: n.schemaVersion,
+      character: s.character,
+      generator: s.generator,
+      bpm: i.bpm,
+      downbeats: i.downbeats
     }
   };
-  return s.audio && (l.audio = { src: d(s.audio) }), s.firstFrameStyled && (l.firstFrameStyled = { src: d(s.firstFrameStyled) }), s.camera && (l.camera = { src: d(s.camera), contentType: "application/json" }), l;
+  return n.audio && (l.audio = { src: r(n.audio) }), n.firstFrameStyled && (l.firstFrameStyled = { src: r(n.firstFrameStyled) }), n.camera && (l.camera = { src: r(n.camera), contentType: "application/json" }), l;
 }
-class G extends Error {
+class K extends Error {
   constructor(t) {
     super(t), this.name = "GuideError";
   }
 }
-const $s = {
+const Cn = {
   mp4: "video/mp4",
   png: "image/png",
   jpg: "image/jpeg",
@@ -392,92 +392,92 @@ const $s = {
   wav: "audio/wav",
   mp3: "audio/mpeg",
   m4a: "audio/mp4"
-}, ks = 2 * 1048576, Ss = 300 * 1048576, Is = /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/;
-function Ue(e) {
-  return $s[e.toLowerCase().split(".").pop() ?? ""];
+}, Vn = 2 * 1048576, On = 300 * 1048576, Nn = /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/;
+function je(e) {
+  return Cn[e.toLowerCase().split(".").pop() ?? ""];
 }
-function Es(e) {
+function Dn(e) {
   let t = "";
-  for (let o = 0; o < e.length; o += 32768) t += String.fromCharCode(...e.subarray(o, o + 32768));
+  for (let a = 0; a < e.length; a += 32768) t += String.fromCharCode(...e.subarray(a, a + 32768));
   return btoa(t);
 }
-function Ps(e) {
+function Gn(e) {
   const t = new DataView(e.buffer, e.byteOffset, e.byteLength);
   if (e.length > 24 && e[0] === 137 && e[1] === 80) return { width: t.getUint32(16), height: t.getUint32(20) };
   if (e.length > 30 && String.fromCharCode(...e.subarray(0, 4)) === "RIFF" && String.fromCharCode(...e.subarray(8, 12)) === "WEBP") {
-    const o = String.fromCharCode(...e.subarray(12, 16));
-    return o === "VP8 " ? { width: t.getUint16(26, !0) & 16383, height: t.getUint16(28, !0) & 16383 } : o === "VP8L" ? { width: 1 + ((e[22] & 63) << 8 | e[21]), height: 1 + ((e[24] & 15) << 10 | e[23] << 2 | (e[22] & 192) >> 6) } : o === "VP8X" ? { width: 1 + (e[24] | e[25] << 8 | e[26] << 16), height: 1 + (e[27] | e[28] << 8 | e[29] << 16) } : void 0;
+    const a = String.fromCharCode(...e.subarray(12, 16));
+    return a === "VP8 " ? { width: t.getUint16(26, !0) & 16383, height: t.getUint16(28, !0) & 16383 } : a === "VP8L" ? { width: 1 + ((e[22] & 63) << 8 | e[21]), height: 1 + ((e[24] & 15) << 10 | e[23] << 2 | (e[22] & 192) >> 6) } : a === "VP8X" ? { width: 1 + (e[24] | e[25] << 8 | e[26] << 16), height: 1 + (e[27] | e[28] << 8 | e[29] << 16) } : void 0;
   }
   if (e.length > 4 && e[0] === 255 && e[1] === 216) {
-    let o = 2;
-    for (; o + 9 < e.length; ) {
-      if (e[o] !== 255) return;
-      const s = e[o + 1], n = t.getUint16(o + 2);
-      if (s >= 192 && s <= 207 && ![196, 200, 204].includes(s))
-        return { height: t.getUint16(o + 5), width: t.getUint16(o + 7) };
-      o += 2 + n;
+    let a = 2;
+    for (; a + 9 < e.length; ) {
+      if (e[a] !== 255) return;
+      const n = e[a + 1], i = t.getUint16(a + 2);
+      if (n >= 192 && n <= 207 && ![196, 200, 204].includes(n))
+        return { height: t.getUint16(a + 5), width: t.getUint16(a + 7) };
+      a += 2 + i;
     }
   }
 }
-async function Ve(e, t, o = {}, s = e.name) {
-  const n = Ue(e.name);
-  if (!n?.startsWith(t)) throw new G(`${e.name}: expected a ${t} file.`);
-  if (e.size > Ss) throw new G(`${e.name} is over 300 MB.`);
-  const r = await e.bytes(), i = t === "image" ? Ps(r) : void 0;
+async function Ge(e, t, a = {}, n = e.name) {
+  const i = je(e.name);
+  if (!i?.startsWith(t)) throw new K(`${e.name}: expected a ${t} file.`);
+  if (e.size > On) throw new K(`${e.name} is over 300 MB.`);
+  const s = await e.bytes(), o = t === "image" ? Gn(s) : void 0;
   return {
     name: e.name,
-    contentType: n,
-    ref: `data:${n};base64,${Es(r)}`,
-    displaySrc: s,
-    info: { ...o, ...i, bytes: e.size }
+    contentType: i,
+    ref: `data:${i};base64,${Dn(s)}`,
+    displaySrc: n,
+    info: { ...a, ...o, bytes: e.size }
   };
 }
-const As = ["image/png", "image/jpeg", "image/webp"];
-async function ko(e, t) {
-  const o = Ue(e.name);
-  if (!o || !As.includes(o))
-    throw new G(`${e.name}: a reference image must be a PNG, JPEG or WebP file (the name ends in .png, .jpg, .jpeg or .webp).`);
-  const s = await Ve(e, "image", {}, t ?? e.name);
-  if (!s.info?.width || !s.info.height)
-    throw new G(`${e.name}: its width and height could not be read, so the model's size limits cannot be checked. Re-save it as a PNG or JPEG.`);
-  return s;
+const Bn = ["image/png", "image/jpeg", "image/webp"];
+async function Fa(e, t) {
+  const a = je(e.name);
+  if (!a || !Bn.includes(a))
+    throw new K(`${e.name}: a reference image must be a PNG, JPEG or WebP file (the name ends in .png, .jpg, .jpeg or .webp).`);
+  const n = await Ge(e, "image", {}, t ?? e.name);
+  if (!n.info?.width || !n.info.height)
+    throw new K(`${e.name}: its width and height could not be read, so the model's size limits cannot be checked. Re-save it as a PNG or JPEG.`);
+  return n;
 }
-async function Fe(e, t) {
-  if (!e) throw new G(`The bundle has no ${t}.`);
-  if (e.size > ks) throw new G(`${t} is over 2 MB.`);
+async function Oe(e, t) {
+  if (!e) throw new K(`The bundle has no ${t}.`);
+  if (e.size > Vn) throw new K(`${t} is over 2 MB.`);
   try {
     return JSON.parse(new TextDecoder().decode(await e.bytes()));
   } catch {
-    throw new G(`${t} is not valid JSON.`);
+    throw new K(`${t} is not valid JSON.`);
   }
 }
-const Le = (e, t) => typeof e == "string" && e.trim().length > 0 && e.length <= t && !Is.test(e);
-function So(e) {
+const Ne = (e, t) => typeof e == "string" && e.trim().length > 0 && e.length <= t && !Nn.test(e);
+function La(e) {
   if (typeof e != "object" || e === null) return;
   const t = e;
-  if (!Le(t.subject, 500) || !(t.action === void 0 || t.action === "" || Le(t.action, 500))) return;
-  const o = { subject: t.subject.trim(), action: typeof t.action == "string" ? t.action.trim() : "" };
-  return Le(t.environment, 500) && (o.environment = t.environment.trim()), Le(t.legend, 300) && (o.legend = t.legend.trim()), (t.camera === "guide" || lt.includes(t.camera)) && (o.camera = t.camera), o;
+  if (!Ne(t.subject, 500) || !(t.action === void 0 || t.action === "" || Ne(t.action, 500))) return;
+  const a = { subject: t.subject.trim(), action: typeof t.action == "string" ? t.action.trim() : "" };
+  return Ne(t.environment, 500) && (a.environment = t.environment.trim()), Ne(t.legend, 300) && (a.legend = t.legend.trim()), (t.camera === "guide" || gt.includes(t.camera)) && (a.camera = t.camera), a;
 }
-async function Io(e, t = {}) {
-  const o = t.base ? t.base.endsWith("/") ? t.base : `${t.base}/` : "./", s = (b) => /^https?:\/\//.test(o) ? new URL(b, o).href : b, n = /* @__PURE__ */ new Map();
-  for (const b of e) n.set(b.name.split(/[\\/]/).pop(), b);
-  let r, i, d;
+async function ja(e, t = {}) {
+  const a = t.base ? t.base.endsWith("/") ? t.base : `${t.base}/` : "./", n = (b) => /^https?:\/\//.test(a) ? new URL(b, a).href : b, i = /* @__PURE__ */ new Map();
+  for (const b of e) i.set(b.name.split(/[\\/]/).pop(), b);
+  let s, o, r;
   try {
-    r = yo(await Fe(n.get("bundle.json"), "bundle.json")), i = $o(await Fe(n.get(r.meta), r.meta)), d = xo(await Fe(n.get(r.beats), r.beats));
+    s = Ta(await Oe(i.get("bundle.json"), "bundle.json")), o = Ma(await Oe(i.get(s.meta), s.meta)), r = Ra(await Oe(i.get(s.beats), s.beats));
   } catch (b) {
-    throw b instanceof G ? b : new G(`The bundle does not match the guide-bundle schema: ${b.message}`);
+    throw b instanceof K ? b : new K(`The bundle does not match the guide-bundle schema: ${b.message}`);
   }
-  const a = n.get(r.recipe), l = a ? await Fe(a, r.recipe) : void 0, m = (b) => {
-    const y = n.get(b);
-    if (!y) throw new G(`The bundle names ${b}, but that file is missing.`);
-    return y;
-  }, u = i.durationSeconds;
-  if (typeof u != "number" || !(u > 0 && u <= 600)) throw new G("meta.json: durationSeconds must be 0-600 seconds.");
-  const p = await Ve(m(r.video), "video", { width: i.width, height: i.height, seconds: u, fps: i.fps, hasAudio: i.audioInVideo === !0 }, s(r.video)), h = await Ve(m(r.firstFrame), "image", {}, s(r.firstFrame)), w = r.audio ? await Ve(m(r.audio), "audio", { seconds: u }, s(r.audio)) : void 0, f = xs({ manifest: r, beats: d, meta: i, ...l ? { recipe: l } : {} }, o), g = So(l?.shot);
-  return { manifest: r, meta: i, beats: d, ...l ? { recipe: l } : {}, ...g ? { shot: g } : {}, video: p, audio: w, firstFrame: h, seconds: u, guide: f };
+  const d = i.get(s.recipe), l = d ? await Oe(d, s.recipe) : void 0, m = (b) => {
+    const x = i.get(b);
+    if (!x) throw new K(`The bundle names ${b}, but that file is missing.`);
+    return x;
+  }, u = o.durationSeconds;
+  if (typeof u != "number" || !(u > 0 && u <= 600)) throw new K("meta.json: durationSeconds must be 0-600 seconds.");
+  const p = await Ge(m(s.video), "video", { width: o.width, height: o.height, seconds: u, fps: o.fps, hasAudio: o.audioInVideo === !0 }, n(s.video)), f = await Ge(m(s.firstFrame), "image", {}, n(s.firstFrame)), w = s.audio ? await Ge(m(s.audio), "audio", { seconds: u }, n(s.audio)) : void 0, h = jn({ manifest: s, beats: r, meta: o, ...l ? { recipe: l } : {} }, a), g = La(l?.shot);
+  return { manifest: s, meta: o, beats: r, ...l ? { recipe: l } : {}, ...g ? { shot: g } : {}, video: p, audio: w, firstFrame: f, seconds: u, guide: h };
 }
-const pe = {
+const we = {
   "first-frame": { noun: "the opening frame", keep: "its composition and pose" },
   "last-frame": { noun: "the closing frame", keep: "its composition and pose" },
   keyframe: { noun: "a keyframe", keep: "its pose" },
@@ -489,7 +489,7 @@ const pe = {
   motion: { noun: "the motion guide", keep: "body motion, timing and camera move" },
   source: { noun: "the source clip", keep: "everything not named in the prompt" },
   soundtrack: { noun: "the soundtrack", keep: "its beat and timing" }
-}, Us = {
+}, Kn = {
   static: "The camera stays still.",
   "push-in": "The camera moves slowly towards the subject.",
   "pull-out": "The camera moves slowly away from the subject.",
@@ -501,70 +501,70 @@ const pe = {
   handheld: "Handheld camera.",
   "rack-focus": "Focus shifts from the foreground to the subject."
 };
-function Rs(e, t, o = "the subject") {
-  const s = e.camera.vocabulary.find((n) => n.move === t && n.phrase);
-  if (s?.phrase) return { text: s.phrase.replaceAll("{subject}", o) };
+function _n(e, t, a = "the subject") {
+  const n = e.camera.vocabulary.find((i) => i.move === t && i.phrase);
+  if (n?.phrase) return { text: n.phrase.replaceAll("{subject}", a) };
   if (e.camera.kind === "parameter") {
-    const n = e.camera.values.find((r) => r.move === t);
-    if (n) return { text: n.meaning };
+    const i = e.camera.values.find((s) => s.move === t);
+    if (i) return { text: i.meaning };
   }
-  return { text: Us[t], note: `"${t}" is not in ${e.name}'s guide vocabulary; plain words are used.` };
+  return { text: Kn[t], note: `"${t}" is not in ${e.name}'s guide vocabulary; plain words are used.` };
 }
-const J = (e) => {
+const Q = (e) => {
   const t = e.trim().replace(/\s+/g, " ");
   if (!t) return "";
-  const o = t[0].toUpperCase() + t.slice(1);
-  return /[.!?]$/.test(o) ? o : `${o}.`;
-}, fe = (e, t) => t.references.find((o) => o.id === e.ref)?.keep ?? pe[e.role].keep, N = (e, t = " ") => e.filter(Boolean).join(t), Be = (e, t = J(`${e.subject} ${e.action}`)) => N([t, e.environment ? J(e.environment) : null]), Ge = (e) => e.legend ? J(e.legend) : null, Ms = (e) => `${e.start}–${e.end} s`;
-function Ts(e, t, o, s) {
-  const n = o.find((a) => a.input === "referenceVideos" && a.role === "motion" && a.address), r = [];
-  if (n) {
-    const a = t.references.find((l) => l.id === n.ref)?.keep;
-    r.push(`Reference only the ${a ?? "motion, camera path and pacing"} of ${n.address}.`);
+  const a = t[0].toUpperCase() + t.slice(1);
+  return /[.!?]$/.test(a) ? a : `${a}.`;
+}, ye = (e, t) => t.references.find((a) => a.id === e.ref)?.keep ?? we[e.role].keep, N = (e, t = " ") => e.filter(Boolean).join(t), We = (e, t = Q(`${e.subject} ${e.action}`)) => N([t, e.environment ? Q(e.environment) : null]), He = (e) => e.legend ? Q(e.legend) : null, zn = (e) => `${e.start}–${e.end} s`;
+function Wn(e, t, a, n) {
+  const i = a.find((d) => d.input === "referenceVideos" && d.role === "motion" && d.address), s = [];
+  if (i) {
+    const d = t.references.find((l) => l.id === i.ref)?.keep;
+    s.push(`Reference only the ${d ?? "motion, camera path and pacing"} of ${i.address}.`);
   }
-  for (const a of o) {
-    if (!a.address || a === n) continue;
-    const l = t.references.find((m) => m.id === a.ref);
-    a.input === "firstFrame" ? r.push(`${a.address} is the first frame.`) : a.input === "lastFrame" ? r.push(`${a.address} is the last frame.`) : n && l?.replaces ? r.push(`Replace ${l.replaces} with ${pe[a.role].noun} in ${a.address}; keep ${fe(a, t)}.`) : r.push(`${a.address} defines ${pe[a.role].noun}; keep ${fe(a, t)}.`);
+  for (const d of a) {
+    if (!d.address || d === i) continue;
+    const l = t.references.find((m) => m.id === d.ref);
+    d.input === "firstFrame" ? s.push(`${d.address} is the first frame.`) : d.input === "lastFrame" ? s.push(`${d.address} is the last frame.`) : i && l?.replaces ? s.push(`Replace ${l.replaces} with ${we[d.role].noun} in ${d.address}; keep ${ye(d, t)}.`) : s.push(`${d.address} defines ${we[d.role].noun}; keep ${ye(d, t)}.`);
   }
-  const i = t.beats?.length ? t.beats.map((a) => `${Ms(a)}: ${J(a.text)}`).join(`
-`) : null, d = t.audio ? `Audio: ${J(t.audio)} No subtitles.` : null;
-  return N([N([...r, Ge(t)]), N([Be(t), s.text]), i, d], `
+  const o = t.beats?.length ? t.beats.map((d) => `${zn(d)}: ${Q(d.text)}`).join(`
+`) : null, r = t.audio ? `Audio: ${Q(t.audio)} No subtitles.` : null;
+  return N([N([...s, He(t)]), N([We(t), n.text]), o, r], `
 
 `);
 }
-function Fs(e, t, o, s) {
-  const n = o.filter((a) => a.address && a.input !== "referenceAudios").map((a) => a.role === "motion" ? `${a.address} is ${pe.motion.noun}: follow its ${fe(a, t)}.` : `${a.address} is ${pe[a.role].noun}; keep ${fe(a, t)}.`), r = o.find((a) => a.input === "referenceAudios"), i = t.audio || r ? N(["Audio:", t.audio ? J(t.audio) : null, r?.address ? `Sync the motion to ${r.address}.` : null]) : null, d = t.beats?.length ? t.beats.map((a) => `[${a.start}-${a.end}s] ${J(a.text)}`).join(`
+function Hn(e, t, a, n) {
+  const i = a.filter((d) => d.address && d.input !== "referenceAudios").map((d) => d.role === "motion" ? `${d.address} is ${we.motion.noun}: follow its ${ye(d, t)}.` : `${d.address} is ${we[d.role].noun}; keep ${ye(d, t)}.`), s = a.find((d) => d.input === "referenceAudios"), o = t.audio || s ? N(["Audio:", t.audio ? Q(t.audio) : null, s?.address ? `Sync the motion to ${s.address}.` : null]) : null, r = t.beats?.length ? t.beats.map((d) => `[${d.start}-${d.end}s] ${Q(d.text)}`).join(`
 `) : null;
-  return N([s.text, N([...n, Ge(t)]), Be(t), d, i], `
+  return N([n.text, N([...i, He(t)]), We(t), r, o], `
 
 `);
 }
-function Ls(e, t, o, s) {
-  const n = o.find((l) => l.role === "motion" && l.address), r = o.filter((l) => l.address && l.input !== "referenceAudios").map((l) => l === n ? `${l.address} is the motion reference: follow its ${fe(l, t)}.` : `${l.address} is ${pe[l.role].noun}; keep ${fe(l, t)}.`), i = Be(t, n ? J(`${t.subject}, moving as in ${n.address}`) : void 0), d = o.some((l) => l.input === "referenceAudios"), a = t.audio || d ? N(["Sound:", t.audio ? J(t.audio) : null, d ? "Follow the reference audio." : null]) : null;
-  return N([N([...r, Ge(t)]), N([i, s.text]), a], `
+function Xn(e, t, a, n) {
+  const i = a.find((l) => l.role === "motion" && l.address), s = a.filter((l) => l.address && l.input !== "referenceAudios").map((l) => l === i ? `${l.address} is the motion reference: follow its ${ye(l, t)}.` : `${l.address} is ${we[l.role].noun}; keep ${ye(l, t)}.`), o = We(t, i ? Q(`${t.subject}, moving as in ${i.address}`) : void 0), r = a.some((l) => l.input === "referenceAudios"), d = t.audio || r ? N(["Sound:", t.audio ? Q(t.audio) : null, r ? "Follow the reference audio." : null]) : null;
+  return N([N([...s, He(t)]), N([o, n.text]), d], `
 
 `);
 }
-function Ct(e, t, o, s) {
-  const n = e.id.startsWith("flux") ? o.map(
-    (i) => i.input === "firstFrame" ? "Use this image as the first frame." : i.input === "lastFrame" ? "Use this image as the last frame." : i.input === "keyframes" ? "Use these images as keyframes, in order." : null
-  ) : [], r = t.audio ? `Audio: ${J(t.audio)}` : null;
-  return N([...new Set(n)], " ") + (n.some(Boolean) ? " " : "") + N([Be(t), Ge(t), s.text, r]);
+function Wt(e, t, a, n) {
+  const i = e.id.startsWith("flux") ? a.map(
+    (o) => o.input === "firstFrame" ? "Use this image as the first frame." : o.input === "lastFrame" ? "Use this image as the last frame." : o.input === "keyframes" ? "Use these images as keyframes, in order." : null
+  ) : [], s = t.audio ? `Audio: ${Q(t.audio)}` : null;
+  return N([...new Set(i)], " ") + (i.some(Boolean) ? " " : "") + N([We(t), He(t), n.text, s]);
 }
-function js(e, t, o, s) {
+function Jn(e, t, a, n) {
   switch (e.prompting.addressing.style) {
     case "tags":
-      return Ts(e, t, o, s);
+      return Wn(e, t, a, n);
     case "at-mentions":
-      return Fs(e, t, o, s);
+      return Hn(e, t, a, n);
     case "plain-words":
-      return e.prompting.addressing.tokens.length ? Ls(e, t, o, s) : Ct(e, t, o, s);
+      return e.prompting.addressing.tokens.length ? Xn(e, t, a, n) : Wt(e, t, a, n);
     default:
-      return Ct(e, t, o, s);
+      return Wt(e, t, a, n);
   }
 }
-const yt = "https://runware.ai/docs/models", we = (e) => `${yt}/${e}`, ve = (e) => `${yt}/${e}/schema.json`, Re = (e, t) => `${yt}/${e}/guides/${t}`, O = 1048576;
+const At = "https://runware.ai/docs/models", ke = (e) => `${At}/${e}`, Se = (e) => `${At}/${e}/schema.json`, Ce = (e, t) => `${At}/${e}/guides/${t}`, D = 1048576;
 function V(e) {
   return {
     secondsEach: null,
@@ -578,21 +578,21 @@ function V(e) {
   };
 }
 const $ = (e, t) => ({ min: e, max: t });
-function S(e, t, o, s = null, n) {
-  return { supported: !0, field: e, maxCount: t, limits: s, source: o, ...n ? { note: n } : {} };
+function S(e, t, a, n = null, i) {
+  return { supported: !0, field: e, maxCount: t, limits: n, source: a, ...i ? { note: i } : {} };
 }
-function M(e, t) {
+function R(e, t) {
   return { supported: !1, field: null, maxCount: null, limits: null, source: e, ...t ? { note: t } : {} };
 }
-const _e = "bfl-flux-3-video", Ie = we(_e), oe = ve(_e), A = (e) => Re(_e, e), j = (e, t, o) => ({ label: e, width: t, height: o }), Vs = {
+const Xe = "bfl-flux-3-video", Re = ke(Xe), oe = Se(Xe), A = (e) => Ce(Xe, e), C = (e, t, a) => ({ label: e, width: t, height: a }), Yn = {
   id: "flux-3-video",
   name: "FLUX 3 Video",
   lab: "Black Forest Labs",
   air: "bfl:flux@3-video",
-  slug: _e,
+  slug: Xe,
   verifiedOn: "2026-11-10",
   sources: {
-    model: Ie,
+    model: Re,
     schema: oe,
     guides: [
       { title: "Prompting", url: A("prompting") },
@@ -605,13 +605,13 @@ const _e = "bfl-flux-3-video", Ie = we(_e), oe = ve(_e), A = (e) => Re(_e, e), j
   inputs: {
     firstFrame: S("inputs.frameImages", 1, A("keyframes")),
     lastFrame: S("inputs.frameImages", 1, A("keyframes")),
-    keyframes: S("inputs.frameImages", 10, Ie, null, "Placed by frame index (24 fps), timestamp, or first/last; unplaced images are spread evenly. Guidance, not a pixel-exact pin."),
-    referenceImages: M(oe),
-    referenceVideos: M(oe),
-    referenceAudios: M(oe),
-    sourceVideo: S("inputs.video", 1, A("video-continuation"), V({ secondsEach: $(null, 15), maxBytesEach: 50 * O }), "Extension only: the clip is continued, not used as a motion reference."),
-    audioToVideo: M(oe, "No audio input; speech is a quoted line with a visible speaker."),
-    elements: M(oe)
+    keyframes: S("inputs.frameImages", 10, Re, null, "Placed by frame index (24 fps), timestamp, or first/last; unplaced images are spread evenly. Guidance, not a pixel-exact pin."),
+    referenceImages: R(oe),
+    referenceVideos: R(oe),
+    referenceAudios: R(oe),
+    sourceVideo: S("inputs.video", 1, A("video-continuation"), V({ secondsEach: $(null, 15), maxBytesEach: 50 * D }), "Extension only: the clip is continued, not used as a motion reference."),
+    audioToVideo: R(oe, "No audio input; speech is a quoted line with a visible speaker."),
+    elements: R(oe)
   },
   combinations: [
     {
@@ -626,7 +626,7 @@ const _e = "bfl-flux-3-video", Ie = we(_e), oe = ve(_e), A = (e) => Re(_e, e), j
       text: "Three or more unplaced frame images need a numeric duration; with any image or video input, safetyTolerance is at most 2.",
       when: ["keyframes"],
       forbidsParams: ["duration:auto"],
-      source: Ie
+      source: Re
     }
   ],
   output: {
@@ -635,20 +635,20 @@ const _e = "bfl-flux-3-video", Ie = we(_e), oe = ve(_e), A = (e) => Re(_e, e), j
     resolutionField: "both",
     resolutions: ["720p", "1080p"],
     sizes: [
-      j("720p (~21:9)", 1440, 608),
-      j("720p (2:1)", 1344, 672),
-      j("720p (~16:9)", 1280, 704),
-      j("720p (~4:3)", 1088, 800),
-      j("720p (1:1)", 960, 960),
-      j("720p (~3:4)", 800, 1088),
-      j("720p (~9:16)", 704, 1280),
-      j("1080p (~21:9)", 2176, 928),
-      j("1080p (~2:1)", 2016, 1024),
-      j("1080p (~16:9)", 1920, 1088),
-      j("1080p (~4:3)", 1632, 1216),
-      j("1080p (1:1)", 1440, 1440),
-      j("1080p (~3:4)", 1216, 1632),
-      j("1080p (~9:16)", 1088, 1920)
+      C("720p (~21:9)", 1440, 608),
+      C("720p (2:1)", 1344, 672),
+      C("720p (~16:9)", 1280, 704),
+      C("720p (~4:3)", 1088, 800),
+      C("720p (1:1)", 960, 960),
+      C("720p (~3:4)", 800, 1088),
+      C("720p (~9:16)", 704, 1280),
+      C("1080p (~21:9)", 2176, 928),
+      C("1080p (~2:1)", 2016, 1024),
+      C("1080p (~16:9)", 1920, 1088),
+      C("1080p (~4:3)", 1632, 1216),
+      C("1080p (1:1)", 1440, 1440),
+      C("1080p (~3:4)", 1216, 1632),
+      C("1080p (~9:16)", 1088, 1920)
     ],
     fps: [24],
     frameCountRule: "duration × 24 frames; numeric keyframe indices count real frames at 24 fps (keyframes guide).",
@@ -671,7 +671,7 @@ const _e = "bfl-flux-3-video", Ie = we(_e), oe = ve(_e), A = (e) => Re(_e, e), j
       { text: "Always give a camera direction; without one the camera drifts.", source: A("prompting") },
       { text: 'Name each audio layer in order of prominence; add "no on-screen text" whenever speech is quoted.', source: A("audio-and-speech") }
     ],
-    seed: { supported: !1, max: null, source: Ie },
+    seed: { supported: !1, max: null, source: Re },
     negativePrompt: !1
   },
   camera: {
@@ -699,7 +699,7 @@ const _e = "bfl-flux-3-video", Ie = we(_e), oe = ve(_e), A = (e) => Re(_e, e), j
       { usdPerSecond: 0.54, tier: "1080p", mode: "video-input", label: "V2V · 1080p" }
     ],
     surcharges: [],
-    source: Ie
+    source: Re
   },
   notes: [
     "fps: no fps field; the keyframes guide states 24 fps.",
@@ -709,16 +709,16 @@ const _e = "bfl-flux-3-video", Ie = we(_e), oe = ve(_e), A = (e) => Re(_e, e), j
     "Prompt length: not stated in the schema or on the model page (no minLength or maxLength); the guides say 10,000 characters.",
     "Draft mode applies to text-to-video only."
   ]
-}, Ke = "klingai-video-4-0", Nt = we(Ke), X = ve(Ke), I = (e) => Re(Ke, e), le = V({ sidePx: $(300, null), maxBytesEach: 30 * O, aspect: $(0.4, 2.5) }), ce = {
+}, Je = "klingai-video-4-0", Ht = ke(Je), Z = Se(Je), I = (e) => Ce(Je, e), fe = V({ sidePx: $(300, null), maxBytesEach: 30 * D, aspect: $(0.4, 2.5) }), he = {
   id: "kling-4",
   name: "Kling VIDEO 4.0",
   lab: "Kling AI",
   air: "klingai:kling-video@4.0",
-  slug: Ke,
+  slug: Je,
   verifiedOn: "2026-11-10",
   sources: {
-    model: Nt,
-    schema: X,
+    model: Ht,
+    schema: Z,
     guides: [
       { title: "Prompting", url: I("prompting") },
       { title: "Reference images", url: I("reference-images") },
@@ -731,39 +731,39 @@ const _e = "bfl-flux-3-video", Ie = we(_e), oe = ve(_e), A = (e) => Re(_e, e), j
     ]
   },
   inputs: {
-    firstFrame: S("inputs.frameImages", 1, X, le),
-    lastFrame: S("inputs.frameImages", 1, X, le),
+    firstFrame: S("inputs.frameImages", 1, Z, fe),
+    lastFrame: S("inputs.frameImages", 1, Z, fe),
     keyframes: S(
       "inputs.frameImages",
       10,
       I("keyframes"),
-      le,
+      fe,
       "3-10 frames (x-modes multiple-frames); only first and last are pinned, the rest are spaced evenly in array order."
     ),
-    referenceImages: S("inputs.referenceImages", 10, X, le),
+    referenceImages: S("inputs.referenceImages", 10, Z, fe),
     referenceVideos: S(
       "inputs.referenceVideos",
       5,
-      X,
+      Z,
       V({
         secondsEach: $(3, 30),
         secondsTotalMax: 30,
         sidePx: $(700, 4553),
         maxAreaPx: 8294400,
         fps: $(24, 60),
-        maxBytesEach: 300 * O,
+        maxBytesEach: 300 * D,
         aspect: $(0.4, 2.5)
       })
     ),
-    referenceAudios: M(X, "No audio input in the schema."),
+    referenceAudios: R(Z, "No audio input in the schema."),
     sourceVideo: S(
       "inputs.video",
       1,
       I("editing-video"),
-      V({ secondsEach: $(3, 30), sidePx: $(700, 4553), maxAreaPx: 8294400, fps: $(24, 60), maxBytesEach: 300 * O, aspect: $(0.4, 2.5) }),
+      V({ secondsEach: $(3, 30), sidePx: $(700, 4553), maxAreaPx: 8294400, fps: $(24, 60), maxBytesEach: 300 * D, aspect: $(0.4, 2.5) }),
       "Prompt-based edit of the source clip."
     ),
-    audioToVideo: M(X),
+    audioToVideo: R(Z),
     elements: S(
       "inputs.elements",
       7,
@@ -785,7 +785,7 @@ const _e = "bfl-flux-3-video", Ie = we(_e), oe = ve(_e), A = (e) => Re(_e, e), j
       text: "Source video, reference videos and element videos share a cap of five files and 30 s in total.",
       when: [],
       sharedMax: { inputs: ["sourceVideo", "referenceVideos"], max: 5 },
-      source: X
+      source: Z
     }
   ],
   output: {
@@ -806,7 +806,7 @@ const _e = "bfl-flux-3-video", Ie = we(_e), oe = ve(_e), A = (e) => Re(_e, e), j
     fps: null,
     frameCountRule: null,
     audio: { generates: !0, toggle: null },
-    source: X
+    source: Z
   },
   prompting: {
     minChars: 1,
@@ -819,7 +819,7 @@ const _e = "bfl-flux-3-video", Ie = we(_e), oe = ve(_e), A = (e) => Re(_e, e), j
         { input: "element", pattern: "<<<element_{n}>>>" }
       ],
       numbering: "Images are numbered across frameImages then referenceImages; videos across video then referenceVideos; elements in array order, separately from images.",
-      source: X
+      source: Z
     },
     rules: [
       { text: "Open with one sentence per input saying what it defines and what to keep from it.", source: I("reference-images") },
@@ -859,7 +859,7 @@ const _e = "bfl-flux-3-video", Ie = we(_e), oe = ve(_e), A = (e) => Re(_e, e), j
       { usdPerSecond: 0.282, tier: "1080p", mode: "video-input", label: "1080p · Video input" }
     ],
     surcharges: [],
-    source: Nt
+    source: Ht
   },
   notes: [
     "Output fps: not stated (the schema says frames = duration × fps, without the fps).",
@@ -871,41 +871,41 @@ const _e = "bfl-flux-3-video", Ie = we(_e), oe = ve(_e), A = (e) => Re(_e, e), j
     "Element `images` is called optional on the model page but required with frontalImage by its own rule.",
     "Resolution preset only with an input; without inputs, width and height are required (schema allOf)."
   ]
-}, xt = "klingai-video-4-0-flash", Ot = we(xt), D = ve(xt), Z = {
-  ...ce,
+}, Ut = "klingai-video-4-0-flash", Xt = ke(Ut), G = Se(Ut), ae = {
+  ...he,
   id: "kling-4-flash",
   name: "Kling VIDEO 4.0 Flash",
   air: "klingai:kling-video@4.0-flash",
-  slug: xt,
-  sources: { model: Ot, schema: D, guides: ce.sources.guides },
+  slug: Ut,
+  sources: { model: Xt, schema: G, guides: he.sources.guides },
   inputs: {
-    ...ce.inputs,
-    firstFrame: S("inputs.frameImages", 1, D, le, "This model only supports the first frame."),
-    lastFrame: M(D, "First frame only."),
-    keyframes: M(D, "First frame only."),
-    referenceImages: S("inputs.referenceImages", 10, D, le),
+    ...he.inputs,
+    firstFrame: S("inputs.frameImages", 1, G, fe, "This model only supports the first frame."),
+    lastFrame: R(G, "First frame only."),
+    keyframes: R(G, "First frame only."),
+    referenceImages: S("inputs.referenceImages", 10, G, fe),
     referenceVideos: S(
       "inputs.referenceVideos",
       5,
-      D,
+      G,
       V({
         secondsEach: $(3, 20),
         secondsTotalMax: 20,
         sidePx: $(700, 4553),
         maxAreaPx: 8294400,
         fps: $(24, 60),
-        maxBytesEach: 300 * O,
+        maxBytesEach: 300 * D,
         aspect: $(0.4, 2.5)
       })
     ),
     sourceVideo: S(
       "inputs.video",
       1,
-      D,
-      V({ secondsEach: $(3, 20), sidePx: $(700, 4553), maxAreaPx: 8294400, fps: $(24, 60), maxBytesEach: 300 * O, aspect: $(0.4, 2.5) }),
+      G,
+      V({ secondsEach: $(3, 20), sidePx: $(700, 4553), maxAreaPx: 8294400, fps: $(24, 60), maxBytesEach: 300 * D, aspect: $(0.4, 2.5) }),
       "Prompt-based edit of the source clip."
     ),
-    elements: S("inputs.elements", 7, D, null, "Voices cannot be used with settings.preserveAudio.")
+    elements: S("inputs.elements", 7, G, null, "Voices cannot be used with settings.preserveAudio.")
   },
   combinations: [
     {
@@ -913,14 +913,14 @@ const _e = "bfl-flux-3-video", Ie = we(_e), oe = ve(_e), A = (e) => Re(_e, e), j
       text: "Frame images and reference images share a cap of ten.",
       when: [],
       sharedMax: { inputs: ["firstFrame", "referenceImages"], max: 10 },
-      source: D
+      source: G
     },
     {
       id: "video-cap",
       text: "Source video, reference videos and element videos share a cap of five files and 20 s in total.",
       when: [],
       sharedMax: { inputs: ["sourceVideo", "referenceVideos"], max: 5 },
-      source: D
+      source: G
     }
   ],
   output: {
@@ -937,11 +937,11 @@ const _e = "bfl-flux-3-video", Ie = we(_e), oe = ve(_e), A = (e) => Re(_e, e), j
     fps: null,
     frameCountRule: null,
     audio: { generates: !0, toggle: null },
-    source: D
+    source: G
   },
   prompting: {
-    ...ce.prompting,
-    addressing: { ...ce.prompting.addressing, source: D }
+    ...he.prompting,
+    addressing: { ...he.prompting.addressing, source: G }
   },
   pricing: {
     rates: [
@@ -949,7 +949,7 @@ const _e = "bfl-flux-3-video", Ie = we(_e), oe = ve(_e), A = (e) => Re(_e, e), j
       { usdPerSecond: 0.126, tier: "720p", mode: "video-input", label: "720p · Video input" }
     ],
     surcharges: [],
-    source: Ot,
+    source: Xt,
     note: "The model page shows two figures per rate ($0.0799 / $0.094, $0.107 / $0.126) without saying which applies; the schema's x-pricing gives the higher, used here."
   },
   notes: [
@@ -959,14 +959,14 @@ const _e = "bfl-flux-3-video", Ie = we(_e), oe = ve(_e), A = (e) => Re(_e, e), j
     "Output fps: not stated. Frame-count rule: not stated.",
     "Seed: no request field; the response returns one."
   ]
-}, Eo = "lightricks-ltx-2-5-pro", Cs = "lightricks-ltx-2-5-fast", T = (e) => Re(Eo, e), Po = [
+}, Ca = "lightricks-ltx-2-5-pro", Zn = "lightricks-ltx-2-5-fast", M = (e) => Ce(Ca, e), Va = [
   { label: "720p (16:9)", width: 1280, height: 720 },
   { label: "720p (9:16)", width: 720, height: 1280 },
   { label: "1080p (16:9)", width: 1920, height: 1080 },
   { label: "1080p (9:16)", width: 1080, height: 1920 }
-], Ao = "No 8k+1 frame rule and no divisibility rule in the API or docs: durations, fps and width/height are fixed lists, so any frame padding is hidden server-side.";
-function Uo(e, t) {
-  const o = we(e), s = ve(e);
+], Oa = "No 8k+1 frame rule and no divisibility rule in the API or docs: durations, fps and width/height are fixed lists, so any frame padding is hidden server-side.";
+function Na(e, t) {
+  const a = ke(e), n = Se(e);
   return {
     id: "ltx-2.5",
     name: "LTX-2.5 Pro",
@@ -975,27 +975,27 @@ function Uo(e, t) {
     slug: e,
     verifiedOn: "2026-11-10",
     sources: {
-      model: o,
-      schema: s,
+      model: a,
+      schema: n,
       guides: [
-        { title: "Prompting", url: T("prompting") },
-        { title: "Camera movement", url: T("camera-movement") },
-        { title: "First and last frame", url: T("first-and-last-frame") },
-        { title: "Audio-driven", url: T("audio-driven") },
-        { title: "Native audio", url: T("native-audio") },
-        { title: "Multi-shot", url: T("multi-shot") }
+        { title: "Prompting", url: M("prompting") },
+        { title: "Camera movement", url: M("camera-movement") },
+        { title: "First and last frame", url: M("first-and-last-frame") },
+        { title: "Audio-driven", url: M("audio-driven") },
+        { title: "Native audio", url: M("native-audio") },
+        { title: "Multi-shot", url: M("multi-shot") }
       ]
     },
     inputs: {
-      firstFrame: S("inputs.frameImages", 1, T("first-and-last-frame")),
-      lastFrame: S("inputs.frameImages", 1, T("first-and-last-frame")),
-      keyframes: M(s, "frameImages holds at most two items (first and last)."),
-      referenceImages: S("inputs.referenceImages", 1, s, null, "Only in audio-driven mode, exactly one."),
-      referenceVideos: M(s),
-      referenceAudios: M(s),
-      sourceVideo: M(s, "Capabilities list Edit/Extend on Pro, but the schema has no source-video field."),
-      audioToVideo: S("inputs.audio", 1, T("audio-driven"), V({ secondsEach: $(2, t) }), "The clip runs as long as the audio."),
-      elements: M(s)
+      firstFrame: S("inputs.frameImages", 1, M("first-and-last-frame")),
+      lastFrame: S("inputs.frameImages", 1, M("first-and-last-frame")),
+      keyframes: R(n, "frameImages holds at most two items (first and last)."),
+      referenceImages: S("inputs.referenceImages", 1, n, null, "Only in audio-driven mode, exactly one."),
+      referenceVideos: R(n),
+      referenceAudios: R(n),
+      sourceVideo: R(n, "Capabilities list Edit/Extend on Pro, but the schema has no source-video field."),
+      audioToVideo: S("inputs.audio", 1, M("audio-driven"), V({ secondsEach: $(2, t) }), "The clip runs as long as the audio."),
+      elements: R(n)
     },
     combinations: [
       {
@@ -1005,14 +1005,14 @@ function Uo(e, t) {
         forbidsInputs: ["firstFrame", "lastFrame"],
         forbidsParams: ["duration", "settings.cameraMovement"],
         requiresExactly: { input: "referenceImages", count: 1 },
-        source: o
+        source: a
       },
       {
         id: "reference-needs-audio",
         text: "A reference image is accepted only beside audio.",
         when: ["referenceImages"],
         requiresOneOf: ["audioToVideo"],
-        source: s
+        source: n
       }
     ],
     output: {
@@ -1020,11 +1020,11 @@ function Uo(e, t) {
       defaultDuration: 6,
       resolutionField: "width-height",
       resolutions: ["720p", "1080p"],
-      sizes: Po,
+      sizes: Va,
       fps: [24, 25, 50],
       frameCountRule: null,
       audio: { generates: !0, toggle: "settings.audio" },
-      source: s
+      source: n
     },
     prompting: {
       minChars: 2,
@@ -1033,16 +1033,16 @@ function Uo(e, t) {
         style: "none",
         tokens: [],
         numbering: "Inputs are not named in the prompt: the image sets the look and the prompt says what happens; with audio, describe the performance, not the words.",
-        source: T("first-and-last-frame")
+        source: M("first-and-last-frame")
       },
       rules: [
-        { text: "Cover six layers: shot, scene, action, character, camera, audio.", source: T("prompting") },
-        { text: "Write one flowing paragraph in the present tense, not a list.", source: T("prompting") },
-        { text: "Keep camera and subject motion in separate clauses, with one main action arc.", source: T("prompting") },
-        { text: "With a cameraMovement preset set, leave the move out of the prompt.", source: T("camera-movement") },
-        { text: "The tighter the shot, the more concrete the nouns.", source: T("prompting") }
+        { text: "Cover six layers: shot, scene, action, character, camera, audio.", source: M("prompting") },
+        { text: "Write one flowing paragraph in the present tense, not a list.", source: M("prompting") },
+        { text: "Keep camera and subject motion in separate clauses, with one main action arc.", source: M("prompting") },
+        { text: "With a cameraMovement preset set, leave the move out of the prompt.", source: M("camera-movement") },
+        { text: "The tighter the shot, the more concrete the nouns.", source: M("prompting") }
       ],
-      seed: { supported: !1, max: null, source: o },
+      seed: { supported: !1, max: null, source: a },
       negativePrompt: !1
     },
     camera: {
@@ -1060,12 +1060,12 @@ function Uo(e, t) {
       ],
       forbiddenWith: ["audioToVideo"],
       vocabulary: [
-        { term: "orbit", source: T("camera-movement"), move: "orbit", phrase: "The camera orbits slowly around the subject and ends facing it." },
-        { term: "handheld", source: T("camera-movement"), move: "handheld", phrase: "Handheld camera, following the subject closely." },
-        { term: "push in, pull back, track, tilt, pan, over-the-shoulder, crane", source: T("camera-movement") },
-        { term: "say where a described move ends", source: T("camera-movement") }
+        { term: "orbit", source: M("camera-movement"), move: "orbit", phrase: "The camera orbits slowly around the subject and ends facing it." },
+        { term: "handheld", source: M("camera-movement"), move: "handheld", phrase: "Handheld camera, following the subject closely." },
+        { term: "push in, pull back, track, tilt, pan, over-the-shoulder, crane", source: M("camera-movement") },
+        { term: "say where a described move ends", source: M("camera-movement") }
       ],
-      source: s
+      source: n
     },
     pricing: {
       rates: [
@@ -1073,10 +1073,10 @@ function Uo(e, t) {
         { usdPerSecond: 0.17, tier: "1080p", mode: "any", label: "1080p" }
       ],
       surcharges: [],
-      source: o
+      source: a
     },
     notes: [
-      Ao,
+      Oa,
       "Frame count = duration × fps (e.g. 6 s at 24 fps is 144 frames, not 8k+1).",
       "Seed: no request field; the response returns one.",
       "settings.audio has no stated default.",
@@ -1085,27 +1085,27 @@ function Uo(e, t) {
     ]
   };
 }
-const Ns = Uo(Eo, 10), re = Uo(Cs, 20), Os = {
-  ...re,
+const Qn = Na(Ca, 10), ce = Na(Zn, 20), qn = {
+  ...ce,
   id: "ltx-2.5-fast",
   name: "LTX-2.5 Fast",
   air: "lightricks:ltx@2.5-fast",
-  inputs: { ...re.inputs, sourceVideo: M(re.sources.schema) },
+  inputs: { ...ce.inputs, sourceVideo: R(ce.sources.schema) },
   combinations: [
-    ...re.combinations,
+    ...ce.combinations,
     {
       id: "long-clip-size",
       text: "Clips over 10 s: no 48/50 fps, no explicit width/height and no 2K/4K (the default 1920×1080 applies).",
       when: [],
-      source: re.sources.schema
+      source: ce.sources.schema
     }
   ],
   output: {
-    ...re.output,
+    ...ce.output,
     durations: { kind: "list", values: [6, 8, 10, 12, 14, 16, 18, 20], auto: !0 },
     resolutions: ["720p", "1080p", "2K", "4K"],
     sizes: [
-      ...Po,
+      ...Va,
       { label: "2K (16:9)", width: 2560, height: 1440 },
       { label: "2K (9:16)", width: 1440, height: 2560 },
       { label: "4K (16:9)", width: 3840, height: 2160 },
@@ -1121,39 +1121,39 @@ const Ns = Uo(Eo, 10), re = Uo(Cs, 20), Os = {
       { usdPerSecond: 0.3, tier: "4K", mode: "any", label: "4K" }
     ],
     surcharges: [],
-    source: re.sources.model
+    source: ce.sources.model
   },
   notes: [
-    Ao,
+    Oa,
     "No Fast guides: prompting and camera rules are from the LTX-2.5 Pro guides, which say Fast shares the prompt structure.",
     "When width or height is sent, or fps is 48/50, duration must be at most 10 s; the page's own 12 s example at 1280×720 breaks this.",
     "Seed: no request field; the response returns one.",
     "settings.audio has no stated default."
   ]
-}, ze = "minimax-h3", Ee = we(ze), _ = ve(ze), R = (e) => Re(ze, e), tt = V({ sidePx: $(256, 5760), maxBytesEach: 30 * O, aspect: $(0.4, 2.5) }), Dt = V({ secondsEach: $(2, 15), secondsTotalMax: 15, maxBytesEach: 15 * O }), Ds = {
+}, Ye = "minimax-h3", Me = ke(Ye), _ = Se(Ye), T = (e) => Ce(Ye, e), ot = V({ sidePx: $(256, 5760), maxBytesEach: 30 * D, aspect: $(0.4, 2.5) }), Jt = V({ secondsEach: $(2, 15), secondsTotalMax: 15, maxBytesEach: 15 * D }), ei = {
   id: "h3",
   name: "MiniMax H3",
   lab: "MiniMax",
   air: "minimax:h3@0",
-  slug: ze,
+  slug: Ye,
   verifiedOn: "2026-11-10",
   sources: {
-    model: Ee,
+    model: Me,
     schema: _,
     guides: [
-      { title: "Generating video", url: R("generating-video") },
-      { title: "Reference-driven consistency", url: R("reference-driven-consistency") },
-      { title: "Motion, camera and performance", url: R("motion-camera-performance") },
-      { title: "First and last frame", url: R("first-and-last-frame") },
-      { title: "Editing video", url: R("editing-video") },
-      { title: "Sound and voice", url: R("sound-and-voice") }
+      { title: "Generating video", url: T("generating-video") },
+      { title: "Reference-driven consistency", url: T("reference-driven-consistency") },
+      { title: "Motion, camera and performance", url: T("motion-camera-performance") },
+      { title: "First and last frame", url: T("first-and-last-frame") },
+      { title: "Editing video", url: T("editing-video") },
+      { title: "Sound and voice", url: T("sound-and-voice") }
     ]
   },
   inputs: {
-    firstFrame: S("inputs.frameImages", 1, R("first-and-last-frame"), tt),
-    lastFrame: S("inputs.frameImages", 1, R("first-and-last-frame"), tt),
-    keyframes: M(_, "frameImages holds at most two items (first and last)."),
-    referenceImages: S("inputs.referenceImages", 9, _, tt, "The guide advises two well-described images over nine loose ones."),
+    firstFrame: S("inputs.frameImages", 1, T("first-and-last-frame"), ot),
+    lastFrame: S("inputs.frameImages", 1, T("first-and-last-frame"), ot),
+    keyframes: R(_, "frameImages holds at most two items (first and last)."),
+    referenceImages: S("inputs.referenceImages", 9, _, ot, "The guide advises two well-described images over nine loose ones."),
     referenceVideos: S(
       "inputs.referenceVideos",
       3,
@@ -1163,15 +1163,15 @@ const Ns = Uo(Eo, 10), re = Uo(Cs, 20), Os = {
         secondsTotalMax: 15,
         sidePx: $(256, 5760),
         fps: $(23.976, 60),
-        maxBytesEach: 50 * O,
+        maxBytesEach: 50 * D,
         aspect: $(0.4, 2.5)
       }),
       "Reference videos and reference audios share the 15 s total. Edits also go through this field."
     ),
-    referenceAudios: S("inputs.referenceAudios", 3, _, Dt, "Needs a reference image or video beside it."),
-    sourceVideo: M(_, "No inputs.video; the editing guide passes the clip to edit as a reference video."),
-    audioToVideo: S("inputs.referenceAudios", 3, _, Dt, "Through reference audio, beside an image or video reference."),
-    elements: M(_)
+    referenceAudios: S("inputs.referenceAudios", 3, _, Jt, "Needs a reference image or video beside it."),
+    sourceVideo: R(_, "No inputs.video; the editing guide passes the clip to edit as a reference video."),
+    audioToVideo: S("inputs.referenceAudios", 3, _, Jt, "Through reference audio, beside an image or video reference."),
+    elements: R(_)
   },
   combinations: [
     {
@@ -1179,14 +1179,14 @@ const Ns = Uo(Eo, 10), re = Uo(Cs, 20), Os = {
       text: "frameImages cannot be used with reference images, videos or audios.",
       when: ["firstFrame"],
       forbidsInputs: ["referenceImages", "referenceVideos", "referenceAudios"],
-      source: Ee
+      source: Me
     },
     {
       id: "audio-needs-visual",
       text: "Reference audio needs a reference image or a reference video beside it.",
       when: ["referenceAudios"],
       requiresOneOf: ["referenceImages", "referenceVideos"],
-      source: Ee
+      source: Me
     },
     {
       id: "reference-cap",
@@ -1230,14 +1230,14 @@ const Ns = Uo(Eo, 10), re = Uo(Cs, 20), Os = {
         { input: "video", pattern: "Video {n}" }
       ],
       numbering: 'Plain words by array position, from one; images and videos each start at one. How to name a reference audio is not stated (examples say "the reference audio").',
-      source: R("reference-driven-consistency")
+      source: T("reference-driven-consistency")
     },
     rules: [
-      { text: "Give each reference a role by its number and say which features to keep.", source: R("reference-driven-consistency") },
-      { text: "For motion transfer, name the reference and describe the subject, not the move.", source: R("motion-camera-performance") },
-      { text: "Write like a cinematographer: camera move, lens, light, pace.", source: R("generating-video") },
-      { text: "Describe the picture first, then close with a Sound: clause tied to moments with as, when, then.", source: R("sound-and-voice") },
-      { text: "With anchor frames, prompt only the motion and the sound.", source: R("first-and-last-frame") }
+      { text: "Give each reference a role by its number and say which features to keep.", source: T("reference-driven-consistency") },
+      { text: "For motion transfer, name the reference and describe the subject, not the move.", source: T("motion-camera-performance") },
+      { text: "Write like a cinematographer: camera move, lens, light, pace.", source: T("generating-video") },
+      { text: "Describe the picture first, then close with a Sound: clause tied to moments with as, when, then.", source: T("sound-and-voice") },
+      { text: "With anchor frames, prompt only the motion and the sound.", source: T("first-and-last-frame") }
     ],
     seed: { supported: !0, max: 4294967295, source: _ },
     negativePrompt: !1
@@ -1245,15 +1245,15 @@ const Ns = Uo(Eo, 10), re = Uo(Cs, 20), Os = {
   camera: {
     kind: "prompt-only",
     vocabulary: [
-      { term: "locked tripod", source: Ee, move: "static", phrase: "Locked tripod; the camera does not move." },
-      { term: "push-in", source: R("generating-video"), move: "push-in", phrase: "Slow cinematic push-in on the subject." },
-      { term: "tracking shot", source: R("generating-video"), move: "track-left", phrase: "Slow tracking shot moving left alongside the subject." },
-      { term: "tracking shot", source: R("generating-video"), move: "track-right", phrase: "Slow tracking shot moving right alongside the subject." },
-      { term: "orbit", source: R("motion-camera-performance"), move: "orbit", phrase: "Smooth cinematic orbit around the subject." },
-      { term: "handheld drift", source: R("first-and-last-frame"), move: "handheld", phrase: "Gentle handheld drift." },
-      { term: "low-angle dolly-in", source: R("generating-video") },
-      { term: "pan", source: R("sound-and-voice") },
-      { term: "lens focal length (85mm, 50mm)", source: R("sound-and-voice") }
+      { term: "locked tripod", source: Me, move: "static", phrase: "Locked tripod; the camera does not move." },
+      { term: "push-in", source: T("generating-video"), move: "push-in", phrase: "Slow cinematic push-in on the subject." },
+      { term: "tracking shot", source: T("generating-video"), move: "track-left", phrase: "Slow tracking shot moving left alongside the subject." },
+      { term: "tracking shot", source: T("generating-video"), move: "track-right", phrase: "Slow tracking shot moving right alongside the subject." },
+      { term: "orbit", source: T("motion-camera-performance"), move: "orbit", phrase: "Smooth cinematic orbit around the subject." },
+      { term: "handheld drift", source: T("first-and-last-frame"), move: "handheld", phrase: "Gentle handheld drift." },
+      { term: "low-angle dolly-in", source: T("generating-video") },
+      { term: "pan", source: T("sound-and-voice") },
+      { term: "lens focal length (85mm, 50mm)", source: T("sound-and-voice") }
     ]
   },
   pricing: {
@@ -1265,7 +1265,7 @@ const Ns = Uo(Eo, 10), re = Uo(Cs, 20), Os = {
       { label: "uploaded video", usd: 0.13, per: "input-video-second" },
       { label: "each image beyond the first five", usd: 0.04, per: "image-beyond-five" }
     ],
-    source: Ee
+    source: Me
   },
   notes: [
     "Output fps: not stated. Frame-count rule: not stated.",
@@ -1276,16 +1276,16 @@ const Ns = Uo(Eo, 10), re = Uo(Cs, 20), Os = {
     "Prompt limit: the guide says 2,000 characters, the schema 7000.",
     "The model description claims continuation; there is no extension field or guide."
   ]
-}, We = "bytedance-seedance-2-5", ot = we(We), se = ve(We), E = (e) => Re(We, e), st = V({ sidePx: $(300, 6e3), maxBytesEach: 30 * O, aspect: $(0.4, 2.5) }), Bs = V({ secondsEach: $(2, 30), secondsTotalMax: 30, sidePx: $(300, 6e3), maxBytesEach: 200 * O, aspect: $(0.4, 2.5) }), Bt = V({ secondsEach: $(2, 30), secondsTotalMax: 30, maxBytesEach: 15 * O }), nt = (e, t) => t.map(([o, s, n]) => ({ label: `${e} (${o})`, width: s, height: n })), Gs = {
+}, Ze = "bytedance-seedance-2-5", rt = ke(Ze), re = Se(Ze), E = (e) => Ce(Ze, e), dt = V({ sidePx: $(300, 6e3), maxBytesEach: 30 * D, aspect: $(0.4, 2.5) }), ti = V({ secondsEach: $(2, 30), secondsTotalMax: 30, sidePx: $(300, 6e3), maxBytesEach: 200 * D, aspect: $(0.4, 2.5) }), Yt = V({ secondsEach: $(2, 30), secondsTotalMax: 30, maxBytesEach: 15 * D }), ct = (e, t) => t.map(([a, n, i]) => ({ label: `${e} (${a})`, width: n, height: i })), ai = {
   id: "seedance-2.5",
   name: "Seedance 2.5",
   lab: "ByteDance",
   air: "bytedance:seedance@2.5",
-  slug: We,
+  slug: Ze,
   verifiedOn: "2026-11-10",
   sources: {
-    model: ot,
-    schema: se,
+    model: rt,
+    schema: re,
     guides: [
       { title: "Prompting", url: E("prompting") },
       { title: "Image to video", url: E("image-to-video") },
@@ -1297,21 +1297,21 @@ const Ns = Uo(Eo, 10), re = Uo(Cs, 20), Os = {
     ]
   },
   inputs: {
-    firstFrame: S("inputs.frameImages", 1, E("image-to-video"), st),
-    lastFrame: S("inputs.frameImages", 1, E("image-to-video"), st, "Only beside a first frame; a last frame alone is rejected."),
-    keyframes: M(se, "frameImages holds at most two items (first and last)."),
-    referenceImages: S("inputs.referenceImages", 30, se, st, "The guide calls 1-8 the stable band."),
-    referenceVideos: S("inputs.referenceVideos", 10, se, Bs, "The guide calls 1-5 the stable band, each about 5-10 s."),
-    referenceAudios: S("inputs.referenceAudios", 10, se, Bt, "Audio can be used on its own."),
+    firstFrame: S("inputs.frameImages", 1, E("image-to-video"), dt),
+    lastFrame: S("inputs.frameImages", 1, E("image-to-video"), dt, "Only beside a first frame; a last frame alone is rejected."),
+    keyframes: R(re, "frameImages holds at most two items (first and last)."),
+    referenceImages: S("inputs.referenceImages", 30, re, dt, "The guide calls 1-8 the stable band."),
+    referenceVideos: S("inputs.referenceVideos", 10, re, ti, "The guide calls 1-5 the stable band, each about 5-10 s."),
+    referenceAudios: S("inputs.referenceAudios", 10, re, Yt, "Audio can be used on its own."),
     sourceVideo: S(
       "inputs.video",
       1,
       E("editing"),
-      V({ secondsEach: $(2, 30), sidePx: $(300, 6e3), maxBytesEach: 200 * O, aspect: $(0.4, 2.5) }),
+      V({ secondsEach: $(2, 30), sidePx: $(300, 6e3), maxBytesEach: 200 * D, aspect: $(0.4, 2.5) }),
       "Edit or extend; settings.operation picks, or the prompt decides."
     ),
-    audioToVideo: S("inputs.referenceAudios", 10, ot, Bt, "Audio-to-video runs through reference audio; there is no separate driving-audio field."),
-    elements: M(se)
+    audioToVideo: S("inputs.referenceAudios", 10, rt, Yt, "Audio-to-video runs through reference audio; there is no separate driving-audio field."),
+    elements: R(re)
   },
   combinations: [
     {
@@ -1342,14 +1342,14 @@ const Ns = Uo(Eo, 10), re = Uo(Cs, 20), Os = {
     resolutionField: "both",
     resolutions: ["480p", "720p", "1080p"],
     sizes: [
-      ...nt("480p", [["~16:9", 854, 480], ["~4:3", 752, 560], ["1:1", 640, 640], ["~3:4", 560, 752], ["~9:16", 480, 854], ["~21:9", 992, 432]]),
-      ...nt("720p", [["16:9", 1280, 720], ["4:3", 1112, 834], ["1:1", 960, 960], ["3:4", 834, 1112], ["9:16", 720, 1280], ["21:9", 1470, 630]]),
-      ...nt("1080p", [["16:9", 1920, 1080], ["4:3", 1664, 1248], ["1:1", 1440, 1440], ["3:4", 1248, 1664], ["9:16", 1080, 1920], ["~21:9", 2206, 946]])
+      ...ct("480p", [["~16:9", 854, 480], ["~4:3", 752, 560], ["1:1", 640, 640], ["~3:4", 560, 752], ["~9:16", 480, 854], ["~21:9", 992, 432]]),
+      ...ct("720p", [["16:9", 1280, 720], ["4:3", 1112, 834], ["1:1", 960, 960], ["3:4", 834, 1112], ["9:16", 720, 1280], ["21:9", 1470, 630]]),
+      ...ct("1080p", [["16:9", 1920, 1080], ["4:3", 1664, 1248], ["1:1", 1440, 1440], ["3:4", 1248, 1664], ["9:16", 1080, 1920], ["~21:9", 2206, 946]])
     ],
     fps: null,
     frameCountRule: null,
     audio: { generates: !0, toggle: "settings.audio" },
-    source: se
+    source: re
   },
   prompting: {
     minChars: 2,
@@ -1371,7 +1371,7 @@ const Ns = Uo(Eo, 10), re = Uo(Cs, 20), Os = {
       { text: "Pace beats with time windows such as [0-3s].", source: E("prompting") },
       { text: "Bind each tag to a role, then use the role name; put audio and negatives at the end.", source: E("multi-reference-production") }
     ],
-    seed: { supported: !0, max: 2147483647, source: se },
+    seed: { supported: !0, max: 2147483647, source: re },
     negativePrompt: !1
   },
   camera: {
@@ -1400,7 +1400,7 @@ const Ns = Uo(Eo, 10), re = Uo(Cs, 20), Os = {
       { usdPerSecond: 0.73415, tier: "1080p", mode: "video-input", label: "Video-to-Video · 1080p" }
     ],
     surcharges: [],
-    source: ot,
+    source: rt,
     note: "Which inputs bill at the Video-to-Video rate (a source video, reference videos, or both) is not stated."
   },
   notes: [
@@ -1410,87 +1410,87 @@ const Ns = Uo(Eo, 10), re = Uo(Cs, 20), Os = {
     "Prompt limit: the guide says 10,000 characters, the schema 50,000.",
     "Seed maximum is 2^31-1 while the text says random seeds use the unsigned 32-bit range."
   ]
-}, Oe = [
-  ce,
-  Z,
-  Gs,
-  Ds,
-  Ns,
-  Os,
-  Vs
+}, _e = [
+  he,
+  ae,
+  ai,
+  ei,
+  Qn,
+  qn,
+  Yn
 ];
-function Ro(e) {
-  const t = Oe.find((o) => o.id === e || o.air === e || o.slug === e);
-  if (!t) throw new Error(`No spec for "${e}". Known: ${Oe.map((o) => o.id).join(", ")}.`);
+function Da(e) {
+  const t = _e.find((a) => a.id === e || a.air === e || a.slug === e);
+  if (!t) throw new Error(`No spec for "${e}". Known: ${_e.map((a) => a.id).join(", ")}.`);
   return t;
 }
-const _s = {
+const ni = {
   "first-frame": "firstFrame",
   "last-frame": "lastFrame",
   keyframe: "keyframes"
-}, Gt = ["firstFrame", "lastFrame", "keyframes"];
-function Ks(e, t) {
-  return t.kind === "image" ? _s[t.role] ?? "referenceImages" : t.kind === "video" ? t.role === "source" ? "sourceVideo" : "referenceVideos" : e.inputs.referenceAudios.supported || !e.inputs.audioToVideo.supported ? "referenceAudios" : "audioToVideo";
+}, Zt = ["firstFrame", "lastFrame", "keyframes"];
+function ii(e, t) {
+  return t.kind === "image" ? ni[t.role] ?? "referenceImages" : t.kind === "video" ? t.role === "source" ? "sourceVideo" : "referenceVideos" : e.inputs.referenceAudios.supported || !e.inputs.audioToVideo.supported ? "referenceAudios" : "audioToVideo";
 }
-function zs(e, t, o) {
-  const s = [], n = [];
-  let r = [];
-  const i = (u, p) => {
-    r = r.filter((h) => h !== u), s.push({ ref: u.ref.id, role: u.ref.role, wanted: u.convertedFrom ?? u.input, reason: p });
-  }, d = (u) => r.some((p) => p.input === u), a = (u) => r.filter((p) => p.input === u).length, l = (u, p) => {
-    u.convertedFrom || (u.convertedFrom = u.input), u.input = "referenceImages", n.push(`${u.ref.id}: sent as a reference image because ${p}`);
+function si(e, t, a) {
+  const n = [], i = [];
+  let s = [];
+  const o = (u, p) => {
+    s = s.filter((f) => f !== u), n.push({ ref: u.ref.id, role: u.ref.role, wanted: u.convertedFrom ?? u.input, reason: p });
+  }, r = (u) => s.some((p) => p.input === u), d = (u) => s.filter((p) => p.input === u).length, l = (u, p) => {
+    u.convertedFrom || (u.convertedFrom = u.input), u.input = "referenceImages", i.push(`${u.ref.id}: sent as a reference image because ${p}`);
   };
   for (const u of t.references) {
-    const p = Ks(e, u), h = { ref: u, input: p };
+    const p = ii(e, u), f = { ref: u, input: p };
     if (!e.inputs[p].supported) {
-      s.push({ ref: u.id, role: u.role, wanted: p, reason: `${e.name} takes no ${_t(p)}.` });
+      n.push({ ref: u.id, role: u.role, wanted: p, reason: `${e.name} takes no ${Qt(p)}.` });
       continue;
     }
     const w = e.inputs[p].maxCount;
-    if (w !== null && a(p) >= w) {
-      s.push({ ref: u.id, role: u.role, wanted: p, reason: `${e.name} takes at most ${w} ${_t(p)}.` });
+    if (w !== null && d(p) >= w) {
+      n.push({ ref: u.id, role: u.role, wanted: p, reason: `${e.name} takes at most ${w} ${Qt(p)}.` });
       continue;
     }
-    r.push(h);
+    s.push(f);
   }
   const m = e.camera.kind === "parameter" ? e.camera.field : null;
   for (let u = 0; u < 4; u++)
     for (const p of e.combinations) {
-      if (p.when.length === 0 || !p.when.every(d)) continue;
-      const h = r.filter((f) => p.when.includes(f.input));
-      if (m && p.forbidsParams?.includes(m) && (o.prefer ?? "camera-parameter") === "camera-parameter" && Mo(e, t.camera)) {
-        for (const f of h) i(f, `${p.text} The camera parameter was kept.`);
+      if (p.when.length === 0 || !p.when.every(r)) continue;
+      const f = s.filter((h) => p.when.includes(h.input));
+      if (m && p.forbidsParams?.includes(m) && (a.prefer ?? "camera-parameter") === "camera-parameter" && Ga(e, t.camera)) {
+        for (const h of f) o(h, `${p.text} The camera parameter was kept.`);
         continue;
       }
-      const w = r.filter((f) => p.forbidsInputs?.includes(f.input));
+      const w = s.filter((h) => p.forbidsInputs?.includes(h.input));
       if (w.length) {
-        const f = e.inputs.referenceImages.supported;
-        if (f && h.every((g) => Gt.includes(g.input)) && !w.every((g) => g.input === "referenceImages" && !g.convertedFrom))
-          for (const g of h) l(g, `${e.name} does not take a frame beside references (${p.id}).`);
-        else if (f && !p.forbidsInputs?.includes("referenceImages") && w.every((g) => Gt.includes(g.input)))
+        const h = e.inputs.referenceImages.supported;
+        if (h && f.every((g) => Zt.includes(g.input)) && !w.every((g) => g.input === "referenceImages" && !g.convertedFrom))
+          for (const g of f) l(g, `${e.name} does not take a frame beside references (${p.id}).`);
+        else if (h && !p.forbidsInputs?.includes("referenceImages") && w.every((g) => Zt.includes(g.input)))
           for (const g of w) l(g, `frame images are not allowed here (${p.id}).`);
         else
-          for (const g of w) i(g, p.text);
+          for (const g of w) o(g, p.text);
       }
       if (p.requiresExactly) {
-        const { input: f, count: g } = p.requiresExactly;
-        for (const b of r.filter((y) => y.input === f).slice(g)) i(b, p.text);
-        if (a(f) < g) for (const b of r.filter((y) => p.when.includes(y.input))) i(b, p.text);
+        const { input: h, count: g } = p.requiresExactly;
+        for (const b of s.filter((x) => x.input === h).slice(g)) o(b, p.text);
+        if (d(h) < g) for (const b of s.filter((x) => p.when.includes(x.input))) o(b, p.text);
       }
-      if (p.requiresOneOf && !p.requiresOneOf.some(d))
-        for (const f of r.filter((g) => p.when.includes(g.input))) i(f, p.text);
+      if (p.requiresOneOf && !p.requiresOneOf.some(r))
+        for (const h of s.filter((g) => p.when.includes(g.input))) o(h, p.text);
     }
   for (const u of e.combinations) {
     if (!u.sharedMax) continue;
-    const p = r.filter((h) => u.sharedMax.inputs.includes(h.input));
-    for (const h of p.slice(u.sharedMax.max)) i(h, u.text);
+    const p = s.filter((f) => u.sharedMax.inputs.includes(f.input));
+    for (const f of p.slice(u.sharedMax.max)) o(f, u.text);
   }
-  return { slots: r, dropped: s, notes: n };
+  return { slots: s, dropped: n, notes: i };
 }
-function Mo(e, t) {
-  return e.camera.kind === "parameter" ? e.camera.values.find((o) => o.move === t)?.value : void 0;
+function Ga(e, t) {
+  return e.camera.kind === "parameter" ? e.camera.values.find((a) => a.move === t)?.value : void 0;
 }
-const Ws = {
+const oi = {
   firstFrame: "first frame",
   lastFrame: "last frame",
   keyframes: "keyframes",
@@ -1500,114 +1500,114 @@ const Ws = {
   sourceVideo: "source video",
   audioToVideo: "driving audio",
   elements: "elements"
-}, _t = (e) => Ws[e];
-function Hs(e, t) {
-  const o = /* @__PURE__ */ new Map(), { style: s, tokens: n } = e.prompting.addressing, r = (a) => n.find((l) => l.input === a)?.pattern, i = (a) => a.flatMap((l) => t.filter((m) => m.input === l)), d = (a, l) => {
-    const m = r(l);
-    a.forEach((u, p) => o.set(u, m ? m.replace("{n}", String(p + 1)) : null));
+}, Qt = (e) => oi[e];
+function ri(e, t) {
+  const a = /* @__PURE__ */ new Map(), { style: n, tokens: i } = e.prompting.addressing, s = (d) => i.find((l) => l.input === d)?.pattern, o = (d) => d.flatMap((l) => t.filter((m) => m.input === l)), r = (d, l) => {
+    const m = s(l);
+    d.forEach((u, p) => a.set(u, m ? m.replace("{n}", String(p + 1)) : null));
   };
-  for (const a of t) o.set(a, null);
-  return s === "tags" ? (d(i(["firstFrame", "lastFrame", "keyframes", "referenceImages"]), "image"), d(i(["sourceVideo", "referenceVideos"]), "video")) : (s === "at-mentions" || s === "plain-words") && (d(i(["referenceImages"]), "image"), d(i(["referenceVideos"]), "video"), d(i(["referenceAudios"]), "audio")), o;
+  for (const d of t) a.set(d, null);
+  return n === "tags" ? (r(o(["firstFrame", "lastFrame", "keyframes", "referenceImages"]), "image"), r(o(["sourceVideo", "referenceVideos"]), "video")) : (n === "at-mentions" || n === "plain-words") && (r(o(["referenceImages"]), "image"), r(o(["referenceVideos"]), "video"), r(o(["referenceAudios"]), "audio")), a;
 }
-function Xs(e, t, o) {
-  const s = e.output.durations;
-  let n;
-  return s.kind === "range" ? n = Math.min(s.max, Math.max(s.min, Math.round(t))) : n = s.values.reduce((r, i) => Math.abs(i - t) < Math.abs(r - t) ? i : r), n !== t && o.push(`Duration ${t} s is not offered; ${n} s is sent.`), n;
+function di(e, t, a) {
+  const n = e.output.durations;
+  let i;
+  return n.kind === "range" ? i = Math.min(n.max, Math.max(n.min, Math.round(t))) : i = n.values.reduce((s, o) => Math.abs(o - t) < Math.abs(s - t) ? o : s), i !== t && a.push(`Duration ${t} s is not offered; ${i} s is sent.`), i;
 }
-function Js(e, t, o = {}) {
-  const s = typeof e == "string" ? Ro(e) : e, { slots: n, dropped: r, notes: i } = zs(s, t, o), d = Hs(s, n), a = n.map((b) => ({
+function ci(e, t, a = {}) {
+  const n = typeof e == "string" ? Da(e) : e, { slots: i, dropped: s, notes: o } = si(n, t, a), r = ri(n, i), d = i.map((b) => ({
     ref: b.ref.id,
     role: b.ref.role,
     input: b.input,
-    field: s.inputs[b.input].field,
-    address: d.get(b) ?? null,
+    field: n.inputs[b.input].field,
+    address: r.get(b) ?? null,
     ...b.convertedFrom ? { convertedFrom: b.convertedFrom } : {}
-  })), l = {}, m = Mo(s, t.camera), u = s.camera.kind === "parameter" ? s.camera.forbiddenWith.some((b) => a.some((y) => y.input === b)) : !0, p = a.some((b) => b.input === "referenceVideos" && b.role === "motion");
-  let h;
+  })), l = {}, m = Ga(n, t.camera), u = n.camera.kind === "parameter" ? n.camera.forbiddenWith.some((b) => d.some((x) => x.input === b)) : !0, p = d.some((b) => b.input === "referenceVideos" && b.role === "motion");
+  let f;
   if (t.camera === "guide") {
-    const b = a.find((y) => y.input === "referenceVideos" && y.role === "motion");
+    const b = d.find((x) => x.input === "referenceVideos" && x.role === "motion");
     if (b) {
-      const y = s.prompting.addressing.style === "at-mentions" && b.address ? `Camera: follow the camera move of ${b.address}.` : null;
-      i.push("The camera comes from the guide video: its camera path and pacing, named in the guide reference; no camera move is written."), h = { move: "guide", mode: "guide-video", text: y };
+      const x = n.prompting.addressing.style === "at-mentions" && b.address ? `Camera: follow the camera move of ${b.address}.` : null;
+      o.push("The camera comes from the guide video: its camera path and pacing, named in the guide reference; no camera move is written."), f = { move: "guide", mode: "guide-video", text: x };
     } else
-      i.push("No guide video reaches this model, so no camera move is written; set shot.camera to choose one."), h = { move: "guide", mode: "prompt", text: null };
-  } else if (s.camera.kind === "parameter" && m && !u)
-    l[s.camera.field] = m, h = { move: t.camera, mode: "parameter", field: s.camera.field, value: m, text: null };
+      o.push("No guide video reaches this model, so no camera move is written; set shot.camera to choose one."), f = { move: "guide", mode: "prompt", text: null };
+  } else if (n.camera.kind === "parameter" && m && !u)
+    l[n.camera.field] = m, f = { move: t.camera, mode: "parameter", field: n.camera.field, value: m, text: null };
   else {
-    const b = Rs(s, t.camera, t.focus);
-    b.note && i.push(b.note), s.camera.kind === "parameter" && !m && i.push(`${s.camera.field} has no value for "${t.camera}"; the move is written into the prompt.`), s.camera.kind === "parameter" && m && u && i.push(`${s.camera.field} is not allowed beside these inputs; the move is written into the prompt.`);
-    const y = p && s.prompting.addressing.style === "tags";
-    y && i.push("The guide video carries the camera path; the prompt references it instead of describing the move."), h = { move: t.camera, mode: p ? "guide-video" : "prompt", text: y ? null : b.text };
+    const b = _n(n, t.camera, t.focus);
+    b.note && o.push(b.note), n.camera.kind === "parameter" && !m && o.push(`${n.camera.field} has no value for "${t.camera}"; the move is written into the prompt.`), n.camera.kind === "parameter" && m && u && o.push(`${n.camera.field} is not allowed beside these inputs; the move is written into the prompt.`);
+    const x = p && n.prompting.addressing.style === "tags";
+    x && o.push("The guide video carries the camera path; the prompt references it instead of describing the move."), f = { move: t.camera, mode: p ? "guide-video" : "prompt", text: x ? null : b.text };
   }
-  const w = a.some((b) => b.input === "audioToVideo"), f = Xs(s, t.duration, i);
-  w ? i.push("Audio-driven: no duration is sent; the clip runs as long as the audio.") : l.duration = f;
-  const g = js(s, t, a, h);
-  return s.prompting.maxChars !== null && g.length > s.prompting.maxChars && i.push(`The prompt is ${g.length} characters; ${s.name} takes ${s.prompting.maxChars}.`), {
-    model: s.id,
-    name: s.name,
+  const w = d.some((b) => b.input === "audioToVideo"), h = di(n, t.duration, o);
+  w ? o.push("Audio-driven: no duration is sent; the clip runs as long as the audio.") : l.duration = h;
+  const g = Jn(n, t, d, f);
+  return n.prompting.maxChars !== null && g.length > n.prompting.maxChars && o.push(`The prompt is ${g.length} characters; ${n.name} takes ${n.prompting.maxChars}.`), {
+    model: n.id,
+    name: n.name,
     prompt: g,
     params: l,
-    camera: h,
-    used: a,
-    dropped: r,
-    cannotTake: ls.filter((b) => !s.inputs[b].supported),
-    duration: { requested: t.duration, sent: f },
-    notes: i
+    camera: f,
+    used: d,
+    dropped: s,
+    cannotTake: Sn.filter((b) => !n.inputs[b].supported),
+    duration: { requested: t.duration, sent: h },
+    notes: o
   };
 }
-class To extends Error {
+class Ba extends Error {
   constructor(t) {
     super(t), this.name = "FitError";
   }
 }
-function Pe(e, t, o, s) {
-  const n = [], r = o.info;
-  if (!r) return n;
-  const { width: i, height: d, seconds: a, fps: l, bytes: m } = r, u = /image/.test(t);
-  return s.minSide && i && d && (i < s.minSide || d < s.minSide) && n.push(
-    `${e} needs ${t} at least ${s.minSide} px on each side; ${o.name} is ${i}×${d}. ` + (u ? `Use a larger image: export or resize it so its shorter side is at least ${s.minSide} px (1024 px is a safe size).` : `Scale it first, e.g. ffmpeg -i in.mp4 -vf scale=-2:${s.minSide <= 720 ? 720 : s.minSide} -c:a copy out.mp4`)
-  ), s.maxSide && i && d && (i > s.maxSide || d > s.maxSide) && n.push(`${e} takes ${t} up to ${s.maxSide} px a side; ${o.name} is ${i}×${d}.${u ? ` Resize it so its longer side is ${s.maxSide} px or less.` : ""}`), s.minRatio && i && d && (i / d < s.minRatio || i / d > (s.maxRatio ?? 1 / 0)) && n.push(
-    `${e} takes ${t} with aspect ${s.minRatio}-${s.maxRatio}; ${o.name} is ${(i / d).toFixed(2)}.${u ? " Crop it closer to square: no side more than 2.5 times the other." : ""}`
-  ), a !== void 0 && s.minSeconds !== void 0 && a < s.minSeconds && n.push(`${e} needs ${t} of at least ${s.minSeconds} s; ${o.name} is ${a.toFixed(2)} s.`), a !== void 0 && s.maxSeconds !== void 0 && a > s.maxSeconds && n.push(`${e} takes ${t} up to ${s.maxSeconds} s; ${o.name} is ${a.toFixed(2)} s. Trim it first.`), l && s.minFps && (l < s.minFps || l > (s.maxFps ?? 1 / 0)) && n.push(`${e} takes ${t} at ${s.minFps}-${s.maxFps} fps; ${o.name} is ${l} fps.`), m && s.maxBytes && m > s.maxBytes && n.push(
-    `${e} takes ${t} up to ${Math.round(s.maxBytes / 1048576)} MB; ${o.name} is ${(m / 1048576).toFixed(1)} MB.${u ? " Save it as a JPEG or at a smaller size." : ""}`
-  ), n;
+function Fe(e, t, a, n) {
+  const i = [], s = a.info;
+  if (!s) return i;
+  const { width: o, height: r, seconds: d, fps: l, bytes: m } = s, u = /image/.test(t);
+  return n.minSide && o && r && (o < n.minSide || r < n.minSide) && i.push(
+    `${e} needs ${t} at least ${n.minSide} px on each side; ${a.name} is ${o}×${r}. ` + (u ? `Use a larger image: export or resize it so its shorter side is at least ${n.minSide} px (1024 px is a safe size).` : `Scale it first, e.g. ffmpeg -i in.mp4 -vf scale=-2:${n.minSide <= 720 ? 720 : n.minSide} -c:a copy out.mp4`)
+  ), n.maxSide && o && r && (o > n.maxSide || r > n.maxSide) && i.push(`${e} takes ${t} up to ${n.maxSide} px a side; ${a.name} is ${o}×${r}.${u ? ` Resize it so its longer side is ${n.maxSide} px or less.` : ""}`), n.minRatio && o && r && (o / r < n.minRatio || o / r > (n.maxRatio ?? 1 / 0)) && i.push(
+    `${e} takes ${t} with aspect ${n.minRatio}-${n.maxRatio}; ${a.name} is ${(o / r).toFixed(2)}.${u ? " Crop it closer to square: no side more than 2.5 times the other." : ""}`
+  ), d !== void 0 && n.minSeconds !== void 0 && d < n.minSeconds && i.push(`${e} needs ${t} of at least ${n.minSeconds} s; ${a.name} is ${d.toFixed(2)} s.`), d !== void 0 && n.maxSeconds !== void 0 && d > n.maxSeconds && i.push(`${e} takes ${t} up to ${n.maxSeconds} s; ${a.name} is ${d.toFixed(2)} s. Trim it first.`), l && n.minFps && (l < n.minFps || l > (n.maxFps ?? 1 / 0)) && i.push(`${e} takes ${t} at ${n.minFps}-${n.maxFps} fps; ${a.name} is ${l} fps.`), m && n.maxBytes && m > n.maxBytes && i.push(
+    `${e} takes ${t} up to ${Math.round(n.maxBytes / 1048576)} MB; ${a.name} is ${(m / 1048576).toFixed(1)} MB.${u ? " Save it as a JPEG or at a smaller size." : ""}`
+  ), i;
 }
-const Kt = (e) => e.reduce((t, o) => t === void 0 || o.info?.seconds === void 0 ? void 0 : t + o.info.seconds, 0);
-function Fo(e, t, o, s, n = !1) {
-  const r = t.sharedSeconds?.max, i = Kt(o), d = Kt(s);
-  if (r === void 0 || !s.length || i === void 0 || d === void 0 || i + d <= r) return { drop: !1 };
-  const a = (l) => `${Math.round(l * 100) / 100} s`;
-  return n ? {
+const qt = (e) => e.reduce((t, a) => t === void 0 || a.info?.seconds === void 0 ? void 0 : t + a.info.seconds, 0);
+function Ka(e, t, a, n, i = !1) {
+  const s = t.sharedSeconds?.max, o = qt(a), r = qt(n);
+  if (s === void 0 || !n.length || o === void 0 || r === void 0 || o + r <= s) return { drop: !1 };
+  const d = (l) => `${Math.round(l * 100) / 100} s`;
+  return i ? {
     drop: !1,
-    problem: `${e} takes reference video and audio up to ${r} s together; got ${a(i)} of video and ${a(d)} of audio, and the audio is required. Use a guide of ${a(Math.max(0, r - d))} or less, or allow the lane to run without the separate audio.`
+    problem: `${e} takes reference video and audio up to ${s} s together; got ${d(o)} of video and ${d(r)} of audio, and the audio is required. Use a guide of ${d(Math.max(0, s - r))} or less, or allow the lane to run without the separate audio.`
   } : {
     drop: !0,
-    note: `Music not sent to ${e}: video and audio together may not exceed ${r} s; timing comes from the guide video (${a(i)} of video, ${a(d)} of audio).`
+    note: `Music not sent to ${e}: video and audio together may not exceed ${s} s; timing comes from the guide video (${d(o)} of video, ${d(r)} of audio).`
   };
 }
-function Ys(e, t) {
-  const o = t.modelName, s = { referenceVideos: [], referenceAudios: [], referenceImages: [], frameImages: [], notes: [] }, n = [], { guideVideo: r, firstFrame: i, character: d, environment: a, audio: l, keyframes: m = [] } = t, u = (p) => n.push(p);
+function li(e, t) {
+  const a = t.modelName, n = { referenceVideos: [], referenceAudios: [], referenceImages: [], frameImages: [], notes: [] }, i = [], { guideVideo: s, firstFrame: o, character: r, environment: d, audio: l, keyframes: m = [] } = t, u = (p) => i.push(p);
   if (e.approach === "reference-video" || e.approach === "router") {
-    !r && e.approach === "reference-video" && u(`${o} is a reference-video lane; pass the guide clip.`), r && (!e.referenceVideos && e.approach === "reference-video" ? u(`${o} takes no reference video.`) : (e.referenceVideos && n.push(...Pe(o, "reference videos", r, e.referenceVideos)), s.referenceVideos.push(r))), d && (e.referenceImages ? (n.push(...Pe(o, "reference images", d, e.referenceImages)), s.referenceImages.push(d)) : u(`${o} takes no reference image for the character.`)), a && (e.referenceImages ? (n.push(...Pe(o, "reference images", a, e.referenceImages)), s.referenceImages.push(a)) : u(`${o} takes no reference image for the environment.`)), i && (e.startFrameWithReferences && e.frameImages ? s.frameImages.push({ media: i, frame: "first" }) : e.referenceImages ? (s.referenceImages.push(i), s.notes.push(
-      `${o} refuses a start frame beside reference videos, so the first frame goes in as an image reference.`
-    )) : u(`${o} cannot take the first frame with a reference video.`)), l && (e.referenceAudios ? (n.push(...Pe(o, "reference audio", l, e.referenceAudios)), s.referenceAudios.push(l)) : u(`${o} takes no reference audio; drop --audio for this lane.`));
-    const p = Fo(o, e, s.referenceVideos, s.referenceAudios, t.requireAudio);
-    p.problem && u(p.problem), p.drop && (s.referenceAudios = [], s.notes.push(p.note)), m.length && u(`${o} is fed the whole clip; keyframes belong to the FLUX 3 Video lane.`);
+    !s && e.approach === "reference-video" && u(`${a} is a reference-video lane; pass the guide clip.`), s && (!e.referenceVideos && e.approach === "reference-video" ? u(`${a} takes no reference video.`) : (e.referenceVideos && i.push(...Fe(a, "reference videos", s, e.referenceVideos)), n.referenceVideos.push(s))), r && (e.referenceImages ? (i.push(...Fe(a, "reference images", r, e.referenceImages)), n.referenceImages.push(r)) : u(`${a} takes no reference image for the character.`)), d && (e.referenceImages ? (i.push(...Fe(a, "reference images", d, e.referenceImages)), n.referenceImages.push(d)) : u(`${a} takes no reference image for the environment.`)), o && (e.startFrameWithReferences && e.frameImages ? n.frameImages.push({ media: o, frame: "first" }) : e.referenceImages ? (n.referenceImages.push(o), n.notes.push(
+      `${a} refuses a start frame beside reference videos, so the first frame goes in as an image reference.`
+    )) : u(`${a} cannot take the first frame with a reference video.`)), l && (e.referenceAudios ? (i.push(...Fe(a, "reference audio", l, e.referenceAudios)), n.referenceAudios.push(l)) : u(`${a} takes no reference audio; drop --audio for this lane.`));
+    const p = Ka(a, e, n.referenceVideos, n.referenceAudios, t.requireAudio);
+    p.problem && u(p.problem), p.drop && (n.referenceAudios = [], n.notes.push(p.note)), m.length && u(`${a} is fed the whole clip; keyframes belong to the FLUX 3 Video lane.`);
   } else if (e.approach === "audio-first-frame")
-    d && u(`${o} takes no character reference beside a guide; pass the still as --first-frame instead.`), a && u(`${o} takes one image only; pass the environment still as --first-frame instead.`), r && u(`${o} takes no reference video. Pass --audio and --first-frame instead of --guide.`), m.length && u(`${o} takes a first frame (and optionally a last), not keyframes.`), l ? e.drivingAudio ? (i || u(`${o} needs a reference image beside the audio; pass --first-frame.`), n.push(...Pe(o, "audio", l, e.drivingAudio)), s.drivingAudio = l, i && (s.referenceImages.push(i), s.notes.push(
-      `${o} with audio takes the still as inputs.referenceImages (its schema forbids frameImages beside audio); the clip length follows the audio.`
-    ))) : u(`${o} takes no audio input.`) : i ? s.frameImages.push({ media: i, frame: "first" }) : u(`${o} needs --first-frame (and --audio for the audio-driven mode).`);
+    r && u(`${a} takes no character reference beside a guide; pass the still as --first-frame instead.`), d && u(`${a} takes one image only; pass the environment still as --first-frame instead.`), s && u(`${a} takes no reference video. Pass --audio and --first-frame instead of --guide.`), m.length && u(`${a} takes a first frame (and optionally a last), not keyframes.`), l ? e.drivingAudio ? (o || u(`${a} needs a reference image beside the audio; pass --first-frame.`), i.push(...Fe(a, "audio", l, e.drivingAudio)), n.drivingAudio = l, o && (n.referenceImages.push(o), n.notes.push(
+      `${a} with audio takes the still as inputs.referenceImages (its schema forbids frameImages beside audio); the clip length follows the audio.`
+    ))) : u(`${a} takes no audio input.`) : o ? n.frameImages.push({ media: o, frame: "first" }) : u(`${a} needs --first-frame (and --audio for the audio-driven mode).`);
   else {
-    r && u(`${o} uses its video input only to extend a clip; send keyframes or a first frame instead.`), l && u(`${o} takes no audio input.`), (d || a) && u(`${o} takes no reference images; pass the still as --first-frame instead.`), i && s.frameImages.push({ media: i, frame: "first" });
+    s && u(`${a} uses its video input only to extend a clip; send keyframes or a first frame instead.`), l && u(`${a} takes no audio input.`), (r || d) && u(`${a} takes no reference images; pass the still as --first-frame instead.`), o && n.frameImages.push({ media: o, frame: "first" });
     for (const p of m)
-      typeof p.frame == "number" && !e.frameImages?.indexPositions && u(`${o} only places frames first or last.`), s.frameImages.push(p);
-    s.frameImages.length || u(`${o} needs --first-frame or keyframes.`);
+      typeof p.frame == "number" && !e.frameImages?.indexPositions && u(`${a} only places frames first or last.`), n.frameImages.push(p);
+    n.frameImages.length || u(`${a} needs --first-frame or keyframes.`);
   }
-  if (e.frameImages && s.frameImages.length > e.frameImages.max && u(`${o} takes at most ${e.frameImages.max} frame images; got ${s.frameImages.length}.`), e.referenceImages && s.referenceImages.length > e.referenceImages.max && u(`${o} takes at most ${e.referenceImages.max} reference images.`), n.length) throw new To(n.join(`
+  if (e.frameImages && n.frameImages.length > e.frameImages.max && u(`${a} takes at most ${e.frameImages.max} frame images; got ${n.frameImages.length}.`), e.referenceImages && n.referenceImages.length > e.referenceImages.max && u(`${a} takes at most ${e.referenceImages.max} reference images.`), i.length) throw new Ba(i.join(`
 `));
-  return s;
+  return n;
 }
-const ye = (e) => `https://runware.ai/docs/models/${e}/schema.json`, ie = { max: 10, minSide: 300, maxBytes: 31457280, minRatio: 0.4, maxRatio: 2.5 }, Ce = {
+const Ie = (e) => `https://runware.ai/docs/models/${e}/schema.json`, le = { max: 10, minSide: 300, maxBytes: 31457280, minRatio: 0.4, maxRatio: 2.5 }, Be = {
   key: "kling-4",
   air: "klingai:kling-video@4.0",
   slug: "klingai-video-4-0",
@@ -1628,8 +1628,8 @@ const ye = (e) => `https://runware.ai/docs/models/${e}/schema.json`, ie = { max:
       minRatio: 0.4,
       maxRatio: 2.5
     },
-    referenceImages: ie,
-    frameImages: { ...ie, indexPositions: !1 },
+    referenceImages: le,
+    frameImages: { ...le, indexPositions: !1 },
     // x-modes lists first-frame+reference-videos.
     startFrameWithReferences: !0
   },
@@ -1643,34 +1643,34 @@ const ye = (e) => `https://runware.ai/docs/models/${e}/schema.json`, ie = { max:
     { usdPerSecond: 0.188, label: "720p · Video input", resolution: "720p", videoInput: !0 },
     { usdPerSecond: 0.282, label: "1080p · Video input", resolution: "1080p", videoInput: !0 }
   ],
-  schemaUrl: ye("klingai-video-4-0")
-}, rt = Z.inputs.referenceVideos.limits, Zs = {
-  ...Ce,
-  key: Z.id,
-  air: Z.air,
-  slug: Z.slug,
-  name: Z.name,
+  schemaUrl: Ie("klingai-video-4-0")
+}, lt = ae.inputs.referenceVideos.limits, ui = {
+  ...Be,
+  key: ae.id,
+  air: ae.air,
+  slug: ae.slug,
+  name: ae.name,
   caps: {
-    ...Ce.caps,
+    ...Be.caps,
     referenceVideos: {
-      ...Ce.caps.referenceVideos,
-      minSeconds: rt.secondsEach.min,
-      maxSeconds: rt.secondsEach.max,
-      totalMaxSeconds: rt.secondsTotalMax
+      ...Be.caps.referenceVideos,
+      minSeconds: lt.secondsEach.min,
+      maxSeconds: lt.secondsEach.max,
+      totalMaxSeconds: lt.secondsTotalMax
     },
-    frameImages: { ...ie, max: Z.inputs.firstFrame.maxCount, indexPositions: !1 }
+    frameImages: { ...le, max: ae.inputs.firstFrame.maxCount, indexPositions: !1 }
   },
   duration: { kind: "range", min: 3, max: 20, auto: !1 },
   resolutions: void 0,
   defaultResolution: "720p",
-  rates: Z.pricing.rates.map((e) => ({
+  rates: ae.pricing.rates.map((e) => ({
     usdPerSecond: e.usdPerSecond,
     label: e.label,
     resolution: e.tier,
     videoInput: e.mode === "video-input"
   })),
-  schemaUrl: Z.sources.schema
-}, Qs = {
+  schemaUrl: ae.sources.schema
+}, mi = {
   key: "seedance-2.5",
   air: "bytedance:seedance@2.5",
   slug: "bytedance-seedance-2-5",
@@ -1689,8 +1689,8 @@ const ye = (e) => `https://runware.ai/docs/models/${e}/schema.json`, ie = { max:
       maxRatio: 2.5
     },
     referenceAudios: { max: 10, minSeconds: 2, maxSeconds: 30, totalMaxSeconds: 30, maxBytes: 15728640 },
-    referenceImages: { ...ie, max: 30, maxSide: 6e3 },
-    frameImages: { ...ie, max: 2, maxSide: 6e3, indexPositions: !1 },
+    referenceImages: { ...le, max: 30, maxSide: 6e3 },
+    frameImages: { ...le, max: 2, maxSide: 6e3, indexPositions: !1 },
     // allOf: frameImages is forbidden beside referenceImages, referenceVideos or video.
     startFrameWithReferences: !1
   },
@@ -1706,8 +1706,8 @@ const ye = (e) => `https://runware.ai/docs/models/${e}/schema.json`, ie = { max:
     { usdPerSecond: 0.2953, label: "Video-to-Video · 720p", resolution: "720p", videoInput: !0 },
     { usdPerSecond: 0.73415, label: "Video-to-Video · 1080p", resolution: "1080p", videoInput: !0 }
   ],
-  schemaUrl: ye("bytedance-seedance-2-5")
-}, qs = {
+  schemaUrl: Ie("bytedance-seedance-2-5")
+}, pi = {
   key: "h3",
   air: "minimax:h3@0",
   slug: "minimax-h3",
@@ -1729,8 +1729,8 @@ const ye = (e) => `https://runware.ai/docs/models/${e}/schema.json`, ie = { max:
       maxRatio: 2.5
     },
     referenceAudios: { max: 3, minSeconds: 2, maxSeconds: 15, totalMaxSeconds: 15, maxBytes: 15728640 },
-    referenceImages: { ...ie, max: 9, minSide: 256, maxSide: 5760 },
-    frameImages: { ...ie, max: 2, minSide: 256, maxSide: 5760, indexPositions: !1 },
+    referenceImages: { ...le, max: 9, minSide: 256, maxSide: 5760 },
+    frameImages: { ...le, max: 2, minSide: 256, maxSide: 5760, indexPositions: !1 },
     // allOf: frameImages is forbidden beside any reference input.
     startFrameWithReferences: !1,
     // x-constraints: duration over inputs.referenceVideos + inputs.referenceAudios, maximum 15, no per-item scope.
@@ -1745,8 +1745,8 @@ const ye = (e) => `https://runware.ai/docs/models/${e}/schema.json`, ie = { max:
     { usdPerSecond: 0.13, label: "2K", resolution: "1440p" }
   ],
   inputVideoUsdPerSecond: 0.13,
-  schemaUrl: ye("minimax-h3")
-}, en = ["dolly_in", "dolly_out", "dolly_left", "dolly_right", "jib_up", "jib_down", "static", "focus_shift"], ut = {
+  schemaUrl: Ie("minimax-h3")
+}, hi = ["dolly_in", "dolly_out", "dolly_left", "dolly_right", "jib_up", "jib_down", "static", "focus_shift"], bt = {
   key: "ltx-2.5",
   air: "lightricks:ltx@2.5-pro",
   slug: "lightricks-ltx-2-5-pro",
@@ -1763,26 +1763,26 @@ const ye = (e) => `https://runware.ai/docs/models/${e}/schema.json`, ie = { max:
   duration: { kind: "enum", values: [6, 8, 10], auto: !0 },
   sizes: { "720p": { width: 1280, height: 720 }, "1080p": { width: 1920, height: 1080 } },
   defaultResolution: "720p",
-  cameraMovements: en,
+  cameraMovements: hi,
   rates: [
     { usdPerSecond: 0.12, label: "720p", resolution: "720p" },
     { usdPerSecond: 0.17, label: "1080p", resolution: "1080p" }
   ],
-  schemaUrl: ye("lightricks-ltx-2-5-pro")
-}, tn = {
-  ...ut,
+  schemaUrl: Ie("lightricks-ltx-2-5-pro")
+}, fi = {
+  ...bt,
   key: "ltx-2.5-fast",
   air: "lightricks:ltx@2.5-fast",
   slug: "lightricks-ltx-2-5-fast",
   name: "LTX-2.5 Fast",
-  caps: { ...ut.caps, drivingAudio: { max: 1, minSeconds: 2, maxSeconds: 20 } },
+  caps: { ...bt.caps, drivingAudio: { max: 1, minSeconds: 2, maxSeconds: 20 } },
   duration: { kind: "enum", values: [6, 8, 10, 12, 14, 16, 18, 20], auto: !0 },
   rates: [
     { usdPerSecond: 0.09, label: "720p", resolution: "720p" },
     { usdPerSecond: 0.13, label: "1080p", resolution: "1080p" }
   ],
-  schemaUrl: ye("lightricks-ltx-2-5-fast")
-}, on = {
+  schemaUrl: Ie("lightricks-ltx-2-5-fast")
+}, gi = {
   key: "flux-3-video",
   air: "bfl:flux@3-video",
   slug: "bfl-flux-3-video",
@@ -1801,8 +1801,8 @@ const ye = (e) => `https://runware.ai/docs/models/${e}/schema.json`, ie = { max:
     { usdPerSecond: 0.17, label: "T2V & I2V. 720p", resolution: "720p" },
     { usdPerSecond: 0.29, label: "T2V & I2V · 1080p", resolution: "1080p" }
   ],
-  schemaUrl: ye("bfl-flux-3-video")
-}, sn = {
+  schemaUrl: Ie("bfl-flux-3-video")
+}, bi = {
   key: "auto",
   air: "auto",
   slug: "model-router",
@@ -1818,58 +1818,58 @@ const ye = (e) => `https://runware.ai/docs/models/${e}/schema.json`, ie = { max:
   duration: { kind: "range", min: 1, max: 30, auto: !1 },
   rates: [],
   schemaUrl: "https://runware.ai/docs/models-api/model-router"
-}, zt = [Ce, Zs, Qs, qs, ut, tn, on, sn];
-function $t(e) {
-  const t = zt.find((o) => o.key === e || o.air === e || o.slug === e);
-  if (!t) throw new Error(`Unknown model "${e}". Use one of: ${zt.map((o) => o.key).join(", ")}.`);
+}, ea = [Be, ui, mi, pi, bt, fi, gi, bi];
+function Tt(e) {
+  const t = ea.find((a) => a.key === e || a.air === e || a.slug === e);
+  if (!t) throw new Error(`Unknown model "${e}". Use one of: ${ea.map((a) => a.key).join(", ")}.`);
   return t;
 }
-const nn = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, Lo = (e, t) => `{{upload:${e}:${t.replace(/[^A-Za-z0-9._-]/g, "_").slice(0, 80)}}}`;
-function rn() {
+const wi = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, _a = (e, t) => `{{upload:${e}:${t.replace(/[^A-Za-z0-9._-]/g, "_").slice(0, 80)}}}`;
+function yi() {
   return globalThis.crypto.randomUUID();
 }
-class x extends Error {
+class v extends Error {
   constructor(t) {
     super(t), this.name = "PlanError";
   }
 }
-function an(e, t) {
+function vi(e, t) {
   if (t === "auto") {
-    if (!e.duration.auto) throw new x(`${e.name} needs a whole number of seconds; "auto" is not in its schema.`);
+    if (!e.duration.auto) throw new v(`${e.name} needs a whole number of seconds; "auto" is not in its schema.`);
     return;
   }
-  if (!Number.isInteger(t)) throw new x(`Duration must be a whole number of seconds; got ${t}.`);
+  if (!Number.isInteger(t)) throw new v(`Duration must be a whole number of seconds; got ${t}.`);
   if (e.duration.kind === "range" && (t < e.duration.min || t > e.duration.max))
-    throw new x(`${e.name} makes ${e.duration.min}-${e.duration.max} s clips; got ${t}.`);
+    throw new v(`${e.name} makes ${e.duration.min}-${e.duration.max} s clips; got ${t}.`);
   if (e.duration.kind === "enum" && !e.duration.values.includes(t))
-    throw new x(`${e.name} makes clips of ${e.duration.values.join(", ")} s only; got ${t}.`);
+    throw new v(`${e.name} makes clips of ${e.duration.values.join(", ")} s only; got ${t}.`);
 }
-function dn(e, t, o) {
-  const s = e.rates.filter((r) => r.resolution === t);
-  return s.find((r) => r.videoInput === void 0 || r.videoInput === o) ?? s[0] ?? e.rates.reduce((r, i) => i.usdPerSecond > r.usdPerSecond ? i : r, e.rates[0]);
+function xi(e, t, a) {
+  const n = e.rates.filter((s) => s.resolution === t);
+  return n.find((s) => s.videoInput === void 0 || s.videoInput === a) ?? n[0] ?? e.rates.reduce((s, o) => o.usdPerSecond > s.usdPerSecond ? o : s, e.rates[0]);
 }
-const cn = (e) => e.duration.kind === "range" ? e.duration.max : Math.max(...e.duration.values);
-function ln(e, t) {
+const $i = (e) => e.duration.kind === "range" ? e.duration.max : Math.max(...e.duration.values);
+function ki(e, t) {
   if (e.key === "auto")
     return { usd: t.maxPrice ?? null, basis: "router: capped server-side by routing.maxPrice" };
-  const o = t.seconds === "auto" ? cn(e) : t.seconds, s = dn(e, t.resolution, t.videoInput);
-  let n = s.usdPerSecond * o, r = `${s.label} at $${s.usdPerSecond}/s × ${o} s${t.seconds === "auto" ? " (auto: bounded by the longest clip)" : ""}`;
+  const a = t.seconds === "auto" ? $i(e) : t.seconds, n = xi(e, t.resolution, t.videoInput);
+  let i = n.usdPerSecond * a, s = `${n.label} at $${n.usdPerSecond}/s × ${a} s${t.seconds === "auto" ? " (auto: bounded by the longest clip)" : ""}`;
   if (e.inputVideoUsdPerSecond && t.videoInput) {
-    const i = t.inputVideoSeconds ?? e.caps.referenceVideos?.totalMaxSeconds ?? 15;
-    n += e.inputVideoUsdPerSecond * i, r += ` + input video $${e.inputVideoUsdPerSecond}/s × ${i.toFixed(2)} s`;
+    const o = t.inputVideoSeconds ?? e.caps.referenceVideos?.totalMaxSeconds ?? 15;
+    i += e.inputVideoUsdPerSecond * o, s += ` + input video $${e.inputVideoUsdPerSecond}/s × ${o.toFixed(2)} s`;
   }
-  return e.key === "h3" && (t.images ?? 0) > 5 && (n += 0.04 * ((t.images ?? 0) - 5), r += " + $0.04 per image beyond five"), { usd: Math.round(n * 1e4) / 1e4, basis: r };
+  return e.key === "h3" && (t.images ?? 0) > 5 && (i += 0.04 * ((t.images ?? 0) - 5), s += " + $0.04 per image beyond five"), { usd: Math.round(i * 1e4) / 1e4, basis: s };
 }
-function jo(e, t = rn()) {
-  const o = $t(e.model), s = e.prompt.trim();
-  if (s.length < o.prompt.min || s.length > o.prompt.max)
-    throw new x(`${o.name} takes a prompt of ${o.prompt.min}-${o.prompt.max} characters.`);
-  if (o.key === "auto" && !(e.routing && e.routing.maxPrice > 0))
-    throw new x("The router lane needs a price cap (routing.maxPrice / --max-price).");
-  let n;
+function za(e, t = yi()) {
+  const a = Tt(e.model), n = e.prompt.trim();
+  if (n.length < a.prompt.min || n.length > a.prompt.max)
+    throw new v(`${a.name} takes a prompt of ${a.prompt.min}-${a.prompt.max} characters.`);
+  if (a.key === "auto" && !(e.routing && e.routing.maxPrice > 0))
+    throw new v("The router lane needs a price cap (routing.maxPrice / --max-price).");
+  let i;
   try {
-    n = Ys(o.caps, {
-      modelName: o.name,
+    i = li(a.caps, {
+      modelName: a.name,
       guideVideo: e.guideVideo,
       firstFrame: e.firstFrame,
       character: e.character,
@@ -1879,131 +1879,131 @@ function jo(e, t = rn()) {
       keyframes: e.keyframes
     });
   } catch (g) {
-    throw g instanceof To ? new x(g.message) : g;
+    throw g instanceof Ba ? new v(g.message) : g;
   }
-  const r = [], i = [], d = (g, b, y) => {
-    if (i.push({
+  const s = [], o = [], r = (g, b, x) => {
+    if (o.push({
       role: b,
       src: g.displaySrc ?? g.name,
       label: g.name,
-      ...y !== void 0 ? { frame: y } : {}
-    }), nn.test(g.ref) || /^https:\/\//.test(g.ref)) return g.ref;
+      ...x !== void 0 ? { frame: x } : {}
+    }), wi.test(g.ref) || /^https:\/\//.test(g.ref)) return g.ref;
     if (!/^data:[a-z]+\/[a-z0-9.+-]+;base64,/i.test(g.ref))
-      throw new x(`${g.name}: media must be an https URL, a media UUID or a data URI.`);
-    const U = r.find((te) => te.media === g);
+      throw new v(`${g.name}: media must be an https URL, a media UUID or a data URI.`);
+    const U = s.find((se) => se.media === g);
     if (U) return U.placeholder;
-    const F = Lo(r.length + 1, g.name);
-    return r.push({ placeholder: F, media: g }), F;
-  }, a = {};
-  n.frameImages.length && (a.frameImages = n.frameImages.map((g) => ({ image: d(g.media, "frameImage", g.frame), frame: g.frame }))), n.referenceImages.length && (a.referenceImages = n.referenceImages.map((g) => d(g, "referenceImage"))), n.referenceVideos.length && (a.referenceVideos = n.referenceVideos.map((g) => d(g, "referenceVideo"))), n.referenceAudios.length && (a.referenceAudios = n.referenceAudios.map((g) => d(g, "referenceAudio"))), n.drivingAudio && (a.audio = d(n.drivingAudio, "audio"));
+    const F = _a(s.length + 1, g.name);
+    return s.push({ placeholder: F, media: g }), F;
+  }, d = {};
+  i.frameImages.length && (d.frameImages = i.frameImages.map((g) => ({ image: r(g.media, "frameImage", g.frame), frame: g.frame }))), i.referenceImages.length && (d.referenceImages = i.referenceImages.map((g) => r(g, "referenceImage"))), i.referenceVideos.length && (d.referenceVideos = i.referenceVideos.map((g) => r(g, "referenceVideo"))), i.referenceAudios.length && (d.referenceAudios = i.referenceAudios.map((g) => r(g, "referenceAudio"))), i.drivingAudio && (d.audio = r(i.drivingAudio, "audio"));
   const l = {
     taskType: "videoInference",
     taskUUID: t,
-    model: o.air,
-    positivePrompt: s
-  }, m = !!n.drivingAudio, u = e.duration ?? (o.duration.kind === "range" ? Math.max(5, o.duration.min) : o.duration.values[0]);
+    model: a.air,
+    positivePrompt: n
+  }, m = !!i.drivingAudio, u = e.duration ?? (a.duration.kind === "range" ? Math.max(5, a.duration.min) : a.duration.values[0]);
   if (m) {
-    if (e.duration !== void 0) throw new x(`${o.name} with audio takes its length from the audio; drop --duration.`);
+    if (e.duration !== void 0) throw new v(`${a.name} with audio takes its length from the audio; drop --duration.`);
   } else
-    an(o, u), l.duration = u;
-  let p = e.resolution ?? o.defaultResolution;
-  if (o.resolutions) {
-    if (p && !o.resolutions.includes(p))
-      throw new x(`${o.name} resolutions: ${o.resolutions.join(", ")}.`);
+    vi(a, u), l.duration = u;
+  let p = e.resolution ?? a.defaultResolution;
+  if (a.resolutions) {
+    if (p && !a.resolutions.includes(p))
+      throw new v(`${a.name} resolutions: ${a.resolutions.join(", ")}.`);
     p && (l.resolution = p);
-  } else if (o.sizes)
+  } else if (a.sizes)
     if (m) p = "1080p";
     else {
-      const g = p ? o.sizes[p] : void 0;
-      if (!g) throw new x(`${o.name} sizes: ${Object.keys(o.sizes).join(", ")}.`);
+      const g = p ? a.sizes[p] : void 0;
+      if (!g) throw new v(`${a.name} sizes: ${Object.keys(a.sizes).join(", ")}.`);
       l.width = g.width, l.height = g.height;
     }
-  else if (o.key !== "auto") {
-    if (e.resolution && e.resolution !== o.defaultResolution)
-      throw new x(`${o.name} makes ${o.defaultResolution} only; the size follows the input.`);
-  } else if (e.resolution) throw new x(`${o.name}: resolution is not set on the router lane; describe it in --requirements.`);
-  if (Object.keys(a).length && (l.inputs = a), e.camera !== void 0) {
-    if (!o.cameraMovements)
-      throw new x(`${o.name} declares no camera parameter in its schema; describe the camera in the prompt.`);
-    if (!o.cameraMovements.includes(e.camera))
-      throw new x(`${o.name} camera movements: ${o.cameraMovements.join(", ")}.`);
-    if (m) throw new x(`${o.name} forbids cameraMovement beside audio.`);
+  else if (a.key !== "auto") {
+    if (e.resolution && e.resolution !== a.defaultResolution)
+      throw new v(`${a.name} makes ${a.defaultResolution} only; the size follows the input.`);
+  } else if (e.resolution) throw new v(`${a.name}: resolution is not set on the router lane; describe it in --requirements.`);
+  if (Object.keys(d).length && (l.inputs = d), e.camera !== void 0) {
+    if (!a.cameraMovements)
+      throw new v(`${a.name} declares no camera parameter in its schema; describe the camera in the prompt.`);
+    if (!a.cameraMovements.includes(e.camera))
+      throw new v(`${a.name} camera movements: ${a.cameraMovements.join(", ")}.`);
+    if (m) throw new v(`${a.name} forbids cameraMovement beside audio.`);
     l.settings = { cameraMovement: e.camera };
   }
-  if (o.key === "auto" && e.routing) {
+  if (a.key === "auto" && e.routing) {
     const g = { maxPrice: e.routing.maxPrice };
     if (e.routing.requirements) {
-      if (e.routing.requirements.length > 3e3) throw new x("routing.requirements is limited to 3000 characters.");
+      if (e.routing.requirements.length > 3e3) throw new v("routing.requirements is limited to 3000 characters.");
       g.requirements = e.routing.requirements;
     }
     e.routing.preferences && (g.preferences = e.routing.preferences), l.routing = g;
   }
   l.deliveryMethod = "async", l.includeCost = !0;
-  const h = n.referenceVideos.length > 0, w = ln(o, {
+  const f = i.referenceVideos.length > 0, w = ki(a, {
     resolution: p,
-    seconds: m ? n.drivingAudio?.info?.seconds ?? o.caps.drivingAudio?.maxSeconds ?? 10 : u,
-    videoInput: h,
-    inputVideoSeconds: n.referenceVideos.reduce(
+    seconds: m ? i.drivingAudio?.info?.seconds ?? a.caps.drivingAudio?.maxSeconds ?? 10 : u,
+    videoInput: f,
+    inputVideoSeconds: i.referenceVideos.reduce(
       (g, b) => b.info?.seconds === void 0 || g === void 0 ? void 0 : g + b.info.seconds,
       0
     ),
-    images: n.referenceImages.length + n.frameImages.length,
+    images: i.referenceImages.length + i.frameImages.length,
     maxPrice: e.routing?.maxPrice
-  }), f = [...n.notes];
-  return o.prompt.tokens && f.push(`${o.name} prompt tokens for inputs: ${o.prompt.tokens}.`), {
+  }), h = [...i.notes];
+  return a.prompt.tokens && h.push(`${a.name} prompt tokens for inputs: ${a.prompt.tokens}.`), {
     provider: "runware-api",
-    modelId: o.air,
-    modelName: o.name,
-    uploads: r,
+    modelId: a.air,
+    modelName: a.name,
+    uploads: s,
     task: l,
-    inputsSent: i,
+    inputsSent: o,
     firstFrameVariant: e.firstFrame ? e.firstFrameVariant ?? "A" : "C",
     estimate: w,
-    notes: f
+    notes: h
   };
 }
-function Vo(e, t) {
-  const o = JSON.stringify(e).replace(/\{\{upload:\d+:[^}]*\}\}/g, (s) => {
-    const n = t.get(s);
-    if (!n) throw new Error(`No media id for ${s}.`);
-    return n;
+function Wa(e, t) {
+  const a = JSON.stringify(e).replace(/\{\{upload:\d+:[^}]*\}\}/g, (n) => {
+    const i = t.get(n);
+    if (!i) throw new Error(`No media id for ${n}.`);
+    return i;
   });
-  return JSON.parse(o);
+  return JSON.parse(a);
 }
-const he = ["kling-4", "seedance-2.5", "h3", "ltx-2.5"], un = ["kling-4", "seedance-2.5", "h3"], it = (e, t) => e && (e.min !== null || e.max !== null) ? `${e.min ?? 0}-${e.max ?? "any"} ${t}` : null, at = (e, t, o) => {
-  const s = e.prompting.addressing.tokens.find((n) => n.input === t);
-  return s ? ` ${s.pattern.replace("{n}", String(o))}` : "";
+const ve = ["kling-4", "seedance-2.5", "h3", "ltx-2.5"], Si = ["kling-4", "seedance-2.5", "h3"], ut = (e, t) => e && (e.min !== null || e.max !== null) ? `${e.min ?? 0}-${e.max ?? "any"} ${t}` : null, mt = (e, t, a) => {
+  const n = e.prompting.addressing.tokens.find((i) => i.input === t);
+  return n ? ` ${n.pattern.replace("{n}", String(a))}` : "";
 };
-function mn(e, t) {
+function Ii(e, t) {
   if (t === "audio-first-frame") {
-    const a = it(e.inputs.audioToVideo.limits?.secondsEach, "s");
-    return `Audio + first frame only: does not use the guide video. Takes the guide's audio${a ? ` (${a})` : ""} and exactly one image: frame 0, your character sheet or your environment image, not both. The clip runs as long as the audio.`;
+    const d = ut(e.inputs.audioToVideo.limits?.secondsEach, "s");
+    return `Audio + first frame only: does not use the guide video. Takes the guide's audio${d ? ` (${d})` : ""} and exactly one image: frame 0, your character sheet or your environment image, not both. The clip runs as long as the audio.`;
   }
-  const o = e.inputs.referenceVideos.limits, s = [it(o?.secondsEach, "s"), o?.sidePx?.min ? `${o.sidePx.min}+ px a side` : null, it(o?.fps, "fps")].filter(Boolean).join(", "), n = $t(e.id).caps.sharedSeconds?.max, r = e.inputs.referenceAudios.supported ? `its audio as reference audio${n ? ` when clip and audio fit ${n} s together` : ""}` : "no audio input", i = e.inputs.referenceImages, d = i.supported ? `; up to ${i.maxCount ?? "several"} reference images beside it: character sheet${at(e, "image", 1)}, environment${at(e, "image", 2)}` : "; no reference images";
-  return `The whole guide clip as a reference video${at(e, "video", 1)} (${s}); ${r}${d}.`;
+  const a = e.inputs.referenceVideos.limits, n = [ut(a?.secondsEach, "s"), a?.sidePx?.min ? `${a.sidePx.min}+ px a side` : null, ut(a?.fps, "fps")].filter(Boolean).join(", "), i = Tt(e.id).caps.sharedSeconds?.max, s = e.inputs.referenceAudios.supported ? `its audio as reference audio${i ? ` when clip and audio fit ${i} s together` : ""}` : "no audio input", o = e.inputs.referenceImages, r = o.supported ? `; up to ${o.maxCount ?? "several"} reference images beside it: character sheet${mt(e, "image", 1)}, environment${mt(e, "image", 2)}` : "; no reference images";
+  return `The whole guide clip as a reference video${mt(e, "video", 1)} (${n}); ${s}${r}.`;
 }
-function pn(e) {
+function Ei(e) {
   const t = e.sources.guides;
-  return t.find((o) => /prompt/i.test(o.title)) ?? t[0] ?? { title: "Model page", url: e.sources.model };
+  return t.find((a) => /prompt/i.test(a.title)) ?? t[0] ?? { title: "Model page", url: e.sources.model };
 }
-function kt(e) {
-  if (!he.includes(e))
-    throw new x(`The generate flow offers ${he.join(", ")}; "${e}" is not one of them.`);
-  const t = Ro(e), o = t.inputs.referenceVideos.supported ? "guide-video" : "audio-first-frame";
-  return { key: e, name: t.name, use: o, line: mn(t, o), guide: pn(t) };
+function Rt(e) {
+  if (!ve.includes(e))
+    throw new v(`The generate flow offers ${ve.join(", ")}; "${e}" is not one of them.`);
+  const t = Da(e), a = t.inputs.referenceVideos.supported ? "guide-video" : "audio-first-frame";
+  return { key: e, name: t.name, use: a, line: Ii(t, a), guide: Ei(t) };
 }
-const Co = () => he.map(kt);
-function fn(e, t, o) {
-  const s = kt(t), n = [], r = [];
-  if (s.use === "guide-video") {
-    r.push({ id: "guide", kind: "video", role: "motion" }), o.hasCharacter && r.push({ id: "character", kind: "image", role: "character", replaces: "the figure in the guide" }), o.hasEnvironment && r.push({ id: "environment", kind: "image", role: "setting", replaces: "the guide's background" });
-    const d = o.hasAudio ? Fo(s.name, $t(s.key).caps, [{ name: "guide", info: { seconds: o.seconds, hasAudio: o.audioInVideo } }], [{ name: "audio", info: { seconds: o.audioSeconds ?? o.seconds } }], o.requireAudio) : { drop: !1 };
-    if (d.problem) throw new x(d.problem);
-    d.drop ? n.push(d.note) : o.hasAudio && r.push({ id: "audio", kind: "audio", role: "soundtrack" });
+const Ha = () => ve.map(Rt);
+function Pi(e, t, a) {
+  const n = Rt(t), i = [], s = [];
+  if (n.use === "guide-video") {
+    s.push({ id: "guide", kind: "video", role: "motion" }), a.hasCharacter && s.push({ id: "character", kind: "image", role: "character", replaces: "the figure in the guide" }), a.hasEnvironment && s.push({ id: "environment", kind: "image", role: "setting", replaces: "the guide's background" });
+    const r = a.hasAudio ? Ka(n.name, Tt(n.key).caps, [{ name: "guide", info: { seconds: a.seconds, hasAudio: a.audioInVideo } }], [{ name: "audio", info: { seconds: a.audioSeconds ?? a.seconds } }], a.requireAudio) : { drop: !1 };
+    if (r.problem) throw new v(r.problem);
+    r.drop ? i.push(r.note) : a.hasAudio && s.push({ id: "audio", kind: "audio", role: "soundtrack" });
   } else {
-    if (o.hasCharacter && o.hasEnvironment)
-      throw new x(`${s.name} takes exactly one image beside the audio: send the character sheet or the environment image, not both.`);
-    r.push({ id: o.hasCharacter ? "character" : o.hasEnvironment ? "environment" : "frame0", kind: "image", role: "first-frame" }), o.hasAudio && r.push({ id: "audio", kind: "audio", role: "soundtrack" });
+    if (a.hasCharacter && a.hasEnvironment)
+      throw new v(`${n.name} takes exactly one image beside the audio: send the character sheet or the environment image, not both.`);
+    s.push({ id: a.hasCharacter ? "character" : a.hasEnvironment ? "environment" : "frame0", kind: "image", role: "first-frame" }), a.hasAudio && s.push({ id: "audio", kind: "audio", role: "soundtrack" });
   }
   return { shot: {
     subject: e.subject,
@@ -2012,211 +2012,211 @@ function fn(e, t, o) {
     ...e.legend ? { legend: e.legend } : {},
     // With no camera named, the guide video carries it (and LTX, without one, gets no camera words).
     camera: e.camera ?? "guide",
-    references: r,
-    duration: Math.max(1, Math.round(o.seconds))
-  }, notes: n };
+    references: s,
+    duration: Math.max(1, Math.round(a.seconds))
+  }, notes: i };
 }
-function He(e, t, o) {
-  const s = kt(t), { shot: n, notes: r } = fn(e, t, o), i = Js(t, n, s.use === "audio-first-frame" ? { prefer: "inputs" } : {});
-  return { model: s, composed: i, shot: n, notes: r };
+function Qe(e, t, a) {
+  const n = Rt(t), { shot: i, notes: s } = Pi(e, t, a), o = ci(t, i, n.use === "audio-first-frame" ? { prefer: "inputs" } : {});
+  return { model: n, composed: o, shot: i, notes: s };
 }
-const hn = (e, t, o = un) => o.map((s) => He(e, s, t));
-function ti(e, t, o = {}, s = {}) {
-  const n = "manifest" in s ? s : void 0, r = {
-    seconds: n ? n.seconds : s.seconds ?? 5,
-    hasAudio: n ? !!n.audio : s.hasAudio ?? !0,
-    audioInVideo: n ? n.meta.audioInVideo === !0 : s.audioInVideo,
-    hasCharacter: !!o.character,
-    hasEnvironment: !!o.environment
-  }, i = He(e, t, r);
+const Ai = (e, t, a = Si) => a.map((n) => Qe(e, n, t));
+function xo(e, t, a = {}, n = {}) {
+  const i = "manifest" in n ? n : void 0, s = {
+    seconds: i ? i.seconds : n.seconds ?? 5,
+    hasAudio: i ? !!i.audio : n.hasAudio ?? !0,
+    audioInVideo: i ? i.meta.audioInVideo === !0 : n.audioInVideo,
+    hasCharacter: !!a.character,
+    hasEnvironment: !!a.environment
+  }, o = Qe(e, t, s);
   return {
-    model: i.model,
-    prompt: i.composed.prompt,
-    tags: i.composed.used.filter((d) => d.address).map((d) => ({ tag: d.address, input: d.ref })),
-    dropped: i.composed.dropped.map((d) => `${d.ref}: ${d.reason}`),
-    notes: [...i.notes, ...i.composed.notes],
-    shot: i.shot
+    model: o.model,
+    prompt: o.composed.prompt,
+    tags: o.composed.used.filter((r) => r.address).map((r) => ({ tag: r.address, input: r.ref })),
+    dropped: o.composed.dropped.map((r) => `${r.ref}: ${r.reason}`),
+    notes: [...o.notes, ...o.composed.notes],
+    shot: o.shot
   };
 }
-const oi = () => Co();
-function No(e, t) {
-  const { guide: o, character: s, environment: n } = e, r = e.prompt?.trim() || void 0, i = e.shot ?? o.shot ?? (r ? { subject: r, action: "" } : void 0);
-  if (!i || !i.subject.trim()) throw new x("Describe the shot (subject and action), or write a prompt.");
-  const d = { seconds: o.seconds, hasAudio: !!o.audio, hasCharacter: !!s, hasEnvironment: !!n, audioInVideo: o.meta.audioInVideo === !0, audioSeconds: o.audio?.info?.seconds, requireAudio: e.requireAudio }, { model: a, composed: l, shot: m, notes: u } = He(i, e.model, d);
-  if (a.use === "audio-first-frame" && !o.audio)
-    throw new x(`${a.name} is driven by the guide's audio, and this bundle has no audio file.`);
-  const p = { guide: o.video, audio: o.audio, character: s, environment: n, frame0: o.firstFrame }, h = { model: a.key, prompt: r ?? l.prompt };
+const $o = () => Ha();
+function Xa(e, t) {
+  const { guide: a, character: n, environment: i } = e, s = e.prompt?.trim() || void 0, o = e.shot ?? a.shot ?? (s ? { subject: s, action: "" } : void 0);
+  if (!o || !o.subject.trim()) throw new v("Describe the shot (subject and action), or write a prompt.");
+  const r = { seconds: a.seconds, hasAudio: !!a.audio, hasCharacter: !!n, hasEnvironment: !!i, audioInVideo: a.meta.audioInVideo === !0, audioSeconds: a.audio?.info?.seconds, requireAudio: e.requireAudio }, { model: d, composed: l, shot: m, notes: u } = Qe(o, e.model, r);
+  if (d.use === "audio-first-frame" && !a.audio)
+    throw new v(`${d.name} is driven by the guide's audio, and this bundle has no audio file.`);
+  const p = { guide: a.video, audio: a.audio, character: n, environment: i, frame0: a.firstFrame }, f = { model: d.key, prompt: s ?? l.prompt };
   for (const g of l.used) {
     const b = p[g.ref];
-    b && (g.role === "motion" ? h.guideVideo = b : g.role === "soundtrack" ? h.audio = b : g.role === "character" ? h.character = b : g.role === "setting" ? h.environment = b : g.role === "first-frame" && (h.firstFrame = b, h.firstFrameVariant = g.ref === "frame0" ? "A" : "B"));
+    b && (g.role === "motion" ? f.guideVideo = b : g.role === "soundtrack" ? f.audio = b : g.role === "character" ? f.character = b : g.role === "setting" ? f.environment = b : g.role === "first-frame" && (f.firstFrame = b, f.firstFrameVariant = g.ref === "frame0" ? "A" : "B"));
   }
-  typeof l.params.duration == "number" && (h.duration = l.params.duration);
+  typeof l.params.duration == "number" && (f.duration = l.params.duration);
   const w = l.params["settings.cameraMovement"];
-  typeof w == "string" && (h.camera = w), e.resolution && (h.resolution = e.resolution), e.requireAudio && (h.requireAudio = !0);
-  const f = jo(h, t);
+  typeof w == "string" && (f.camera = w), e.resolution && (f.resolution = e.resolution), e.requireAudio && (f.requireAudio = !0);
+  const h = za(f, t);
   return {
-    plan: f,
-    request: h,
+    plan: h,
+    request: f,
     composed: l,
     shot: m,
-    ...r ? {} : { marker: fs(l) },
-    model: a,
-    notes: [...u, ...l.notes, ...f.notes]
+    ...s ? {} : { marker: An(l) },
+    model: d,
+    notes: [...u, ...l.notes, ...h.notes]
   };
 }
-function gn(e) {
+function Ui(e) {
   const t = typeof e == "string" ? Number(e) : e;
   return typeof t == "number" && Number.isFinite(t) && t >= 0 ? t : null;
 }
-const bn = (e) => new Promise((t) => setTimeout(t, e));
-function wn(e, t, o, s = "videoURL") {
-  const n = o.filter((l) => l.taskUUID === e || !l.taskUUID);
-  if (n.length) return { state: "error", error: new Q(200, n) };
-  const r = t.filter((l) => l.taskUUID === e), i = r.find((l) => l.status === "success" || typeof l[s] == "string");
-  if (i && typeof i[s] == "string")
+const Ti = (e) => new Promise((t) => setTimeout(t, e));
+function Ri(e, t, a, n = "videoURL") {
+  const i = a.filter((l) => l.taskUUID === e || !l.taskUUID);
+  if (i.length) return { state: "error", error: new ne(200, i) };
+  const s = t.filter((l) => l.taskUUID === e), o = s.find((l) => l.status === "success" || typeof l[n] == "string");
+  if (o && typeof o[n] == "string")
     return {
       state: "success",
       result: {
         taskUUID: e,
-        videoURL: i[s],
-        ...typeof i.videoUUID == "string" ? { videoUUID: i.videoUUID } : {},
-        cost: gn(i.cost),
-        ...typeof i.seed == "number" ? { seed: i.seed } : {},
-        ...typeof i.model == "string" ? { model: i.model } : {}
+        videoURL: o[n],
+        ...typeof o.videoUUID == "string" ? { videoUUID: o.videoUUID } : {},
+        cost: Ui(o.cost),
+        ...typeof o.seed == "number" ? { seed: o.seed } : {},
+        ...typeof o.model == "string" ? { model: o.model } : {}
       }
     };
-  const d = r.find((l) => l.status === "error");
-  if (d) {
-    const l = d.error ?? {};
+  const r = s.find((l) => l.status === "error");
+  if (r) {
+    const l = r.error ?? {};
     return {
       state: "error",
-      error: new Q(200, [{ code: l.code ?? "error", message: l.message ?? "Task failed.", taskUUID: e }])
+      error: new ne(200, [{ code: l.code ?? "error", message: l.message ?? "Task failed.", taskUUID: e }])
     };
   }
-  const a = r.find((l) => l.status === "processing");
-  return a ? { state: "processing", progress: typeof a.progress == "number" ? a.progress : void 0 } : { state: "absent" };
+  const d = s.find((l) => l.status === "processing");
+  return d ? { state: "processing", progress: typeof d.progress == "number" ? d.progress : void 0 } : { state: "absent" };
 }
-async function Oo(e, t, o = {}) {
-  const s = o.sleep ?? bn, n = o.now ?? Date.now, r = o.timeoutMs ?? 45 * 6e4, i = n();
-  let d = o.intervalMs ?? 2e3;
-  const a = o.maxIntervalMs ?? 15e3;
-  for (await s(o.initialDelayMs ?? 5e3); ; ) {
-    if (o.signal?.aborted) throw new Error(`Stopped polling. Resume with taskUUID ${t}.`);
-    const { data: l, errors: m } = await e.post([{ taskType: "getResponse", taskUUID: t }], o.signal), u = wn(t, l, m, o.urlField);
+async function Ja(e, t, a = {}) {
+  const n = a.sleep ?? Ti, i = a.now ?? Date.now, s = a.timeoutMs ?? 45 * 6e4, o = i();
+  let r = a.intervalMs ?? 2e3;
+  const d = a.maxIntervalMs ?? 15e3;
+  for (await n(a.initialDelayMs ?? 5e3); ; ) {
+    if (a.signal?.aborted) throw new Error(`Stopped polling. Resume with taskUUID ${t}.`);
+    const { data: l, errors: m } = await e.post([{ taskType: "getResponse", taskUUID: t }], a.signal), u = Ri(t, l, m, a.urlField);
     if (u.state === "success") return u.result;
     if (u.state === "error") throw u.error;
-    if (o.onProgress?.(u.state, u.state === "processing" ? u.progress : void 0), n() - i > r)
-      throw new Error(`Still running after ${Math.round(r / 6e4)} min. Resume with taskUUID ${t}; do not resubmit.`);
-    await s(d), d = Math.min(a, Math.round(d * 1.5));
+    if (a.onProgress?.(u.state, u.state === "processing" ? u.progress : void 0), i() - o > s)
+      throw new Error(`Still running after ${Math.round(s / 6e4)} min. Resume with taskUUID ${t}; do not resubmit.`);
+    await n(r), r = Math.min(d, Math.round(r * 1.5));
   }
 }
-async function vn(e, t, o = {}) {
-  const s = await Oo(e, t, { initialDelayMs: 1500, timeoutMs: 6e5, ...o, urlField: "imageURL" });
-  return { taskUUID: t, imageURL: s.videoURL, cost: s.cost, ...s.seed !== void 0 ? { seed: s.seed } : {} };
+async function Mi(e, t, a = {}) {
+  const n = await Ja(e, t, { initialDelayMs: 1500, timeoutMs: 6e5, ...a, urlField: "imageURL" });
+  return { taskUUID: t, imageURL: n.videoURL, cost: n.cost, ...n.seed !== void 0 ? { seed: n.seed } : {} };
 }
-async function yn(e, t, o, s, n) {
-  if (s && s !== "auto") return s;
+async function Fi(e, t, a, n, i) {
+  if (n && n !== "auto") return n;
   if (t.modelId !== "auto") return t.modelId;
   try {
-    const r = await e.taskDetails(o, n), i = Array.isArray(r?.request) ? r.request : [], d = i.find((a) => a.taskUUID === o)?.model ?? i[0]?.model;
-    return typeof d == "string" && d !== "auto" ? d : null;
+    const s = await e.taskDetails(a, i), o = Array.isArray(s?.request) ? s.request : [], r = o.find((d) => d.taskUUID === a)?.model ?? o[0]?.model;
+    return typeof r == "string" && r !== "auto" ? r : null;
   } catch {
     return null;
   }
 }
-function xn(e) {
-  const t = new Ne({ getKey: e.getKey, fetch: e.fetch });
-  async function o(s, n, r, i) {
-    const d = String(n.taskUUID), a = await Oo(t, d, {
+function Li(e) {
+  const t = new Ke({ getKey: e.getKey, fetch: e.fetch });
+  async function a(n, i, s, o) {
+    const r = String(i.taskUUID), d = await Ja(t, r, {
       ...e.poll,
-      signal: i.signal,
-      onProgress: (m, u) => i.onProgress?.({ stage: "poll", message: m, progress: u })
-    }), l = await yn(t, s, d, a.model, i.signal);
-    return i.onProgress?.({ stage: "done", message: "done" }), {
-      taskUUID: d,
-      videoURL: a.videoURL,
-      costUsd: a.cost,
-      generationSeconds: (Date.now() - r) / 1e3,
+      signal: o.signal,
+      onProgress: (m, u) => o.onProgress?.({ stage: "poll", message: m, progress: u })
+    }), l = await Fi(t, n, r, d.model, o.signal);
+    return o.onProgress?.({ stage: "done", message: "done" }), {
+      taskUUID: r,
+      videoURL: d.videoURL,
+      costUsd: d.cost,
+      generationSeconds: (Date.now() - s) / 1e3,
       modelRan: l,
-      task: n
+      task: i
     };
   }
   return {
     id: "runware-api",
     client: t,
-    plan: (s) => jo(s),
-    async run(s, n = {}) {
-      const r = Date.now(), i = /* @__PURE__ */ new Map();
-      for (const m of s.uploads) {
-        n.onProgress?.({ stage: "upload", message: `uploading ${m.media.name}` });
-        const { mediaUUID: u } = await t.upload(m.media.ref, n.signal);
-        i.set(m.placeholder, u);
+    plan: (n) => za(n),
+    async run(n, i = {}) {
+      const s = Date.now(), o = /* @__PURE__ */ new Map();
+      for (const m of n.uploads) {
+        i.onProgress?.({ stage: "upload", message: `uploading ${m.media.name}` });
+        const { mediaUUID: u } = await t.upload(m.media.ref, i.signal);
+        o.set(m.placeholder, u);
       }
-      const d = Vo(s.task, i);
-      n.onProgress?.({ stage: "submit", message: "submitting" });
-      const { errors: a } = await t.post([d], n.signal), l = a.filter((m) => !m.taskUUID || m.taskUUID === d.taskUUID);
-      if (l.length) throw new Q(400, l);
-      return o(s, d, r, n);
+      const r = Wa(n.task, o);
+      i.onProgress?.({ stage: "submit", message: "submitting" });
+      const { errors: d } = await t.post([r], i.signal), l = d.filter((m) => !m.taskUUID || m.taskUUID === r.taskUUID);
+      if (l.length) throw new ne(400, l);
+      return a(n, r, s, i);
     },
     /** Polls an already-submitted task without sending it again. */
-    resume(s, n, r = {}) {
-      return o(s, { ...s.task, taskUUID: n }, Date.now(), r);
+    resume(n, i, s = {}) {
+      return a(n, { ...n.task, taskUUID: i }, Date.now(), s);
     }
   };
 }
 class P extends Error {
-  constructor(t, o, s) {
-    super(o), this.code = t, this.taskUUID = s, this.name = "GenerateError";
+  constructor(t, a, n) {
+    super(a), this.code = t, this.taskUUID = n, this.name = "GenerateError";
   }
   code;
   taskUUID;
 }
-const $n = /^[\x21-\x7e]{16,512}$/, kn = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp" }, Sn = (e) => typeof e == "object" && e !== null && "manifest" in e && "video" in e, In = ["image/png", "image/jpeg", "image/webp"], En = 30 * 1048576;
-async function mt(e, t) {
+const ji = /^[\x21-\x7e]{16,512}$/, Ci = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp" }, Vi = (e) => typeof e == "object" && e !== null && "manifest" in e && "video" in e, Oi = ["image/png", "image/jpeg", "image/webp"], Ni = 30 * 1048576;
+async function wt(e, t) {
   if (!e) return;
-  const o = e instanceof Blob ? e : e.blob;
-  if (!(o instanceof Blob)) throw new P("refused", `The ${t} reference must be an image Blob.`);
-  if (!In.includes(o.type)) throw new P("refused", `The ${t} image must be PNG, JPEG or WebP; got ${o.type || "an unknown type"}.`);
-  if (o.size > En) throw new P("refused", `The ${t} image is over 30 MB.`);
-  let n = ((e instanceof Blob ? e.name : e.name ?? e.blob.name) || t).split(/[\\/]/).pop();
-  Ue(n) !== o.type && (n = `${n.replace(/\.[A-Za-z0-9]{1,5}$/, "")}.${kn[o.type]}`);
-  const r = e instanceof Blob ? void 0 : e.src;
+  const a = e instanceof Blob ? e : e.blob;
+  if (!(a instanceof Blob)) throw new P("refused", `The ${t} reference must be an image Blob.`);
+  if (!Oi.includes(a.type)) throw new P("refused", `The ${t} image must be PNG, JPEG or WebP; got ${a.type || "an unknown type"}.`);
+  if (a.size > Ni) throw new P("refused", `The ${t} image is over 30 MB.`);
+  let i = ((e instanceof Blob ? e.name : e.name ?? e.blob.name) || t).split(/[\\/]/).pop();
+  je(i) !== a.type && (i = `${i.replace(/\.[A-Za-z0-9]{1,5}$/, "")}.${Ci[a.type]}`);
+  const s = e instanceof Blob ? void 0 : e.src;
   try {
-    return await ko(De(o, n), r && /^https?:\/\//.test(r) ? r : void 0);
-  } catch (i) {
-    throw new P("refused", `The ${t} image: ${i.message}`);
+    return await Fa(ze(a, i), s && /^https?:\/\//.test(s) ? s : void 0);
+  } catch (o) {
+    throw new P("refused", `The ${t} image: ${o.message}`);
   }
 }
-function De(e, t) {
+function ze(e, t) {
   return { name: t, size: e.size, bytes: async () => new Uint8Array(await e.arrayBuffer()) };
 }
-function Do(e) {
+function Ya(e) {
   const t = typeof e[Symbol.iterator] == "function" || "length" in e ? Array.from(e) : [];
-  return t.length ? t.map((o, s) => De(o, o.name ?? `file-${s}`)) : Object.entries(e).map(([o, s]) => De(s, o));
+  return t.length ? t.map((a, n) => ze(a, a.name ?? `file-${n}`)) : Object.entries(e).map(([a, n]) => ze(n, a));
 }
-function Bo(e, t, o, s) {
+function Za(e, t, a, n) {
   if (e instanceof P) return e;
-  const n = s(e?.message ?? String(e)), r = o ? ` The task was already submitted and may still finish and be billed (taskUUID ${o}); do not resubmit.` : " Nothing was submitted.";
-  return t?.aborted || e?.name === "AbortError" || n.startsWith("Stopped polling") ? new P("aborted", `Stopped.${r}`, o) : n.startsWith("Still running after") ? new P("timeout", n, o) : e instanceof G ? new P("bad-bundle", n) : e instanceof x ? new P("refused", n) : e instanceof Q && (e.status === 401 || e.status === 403 || e.errors.some((d) => /key|auth/i.test(d.code))) || /No Runware API key|does not look like a Runware API key/.test(n) ? new P("invalid-key", "The key was refused. Check it in the key panel; it is sent only to api.runware.ai.") : new P("provider", n, o);
+  const i = n(e?.message ?? String(e)), s = a ? ` The task was already submitted and may still finish and be billed (taskUUID ${a}); do not resubmit.` : " Nothing was submitted.";
+  return t?.aborted || e?.name === "AbortError" || i.startsWith("Stopped polling") ? new P("aborted", `Stopped.${s}`, a) : i.startsWith("Still running after") ? new P("timeout", i, a) : e instanceof K ? new P("bad-bundle", i) : e instanceof v ? new P("refused", i) : e instanceof ne && (e.status === 401 || e.status === 403 || e.errors.some((r) => /key|auth/i.test(r.code))) || /No Runware API key|does not look like a Runware API key/.test(i) ? new P("invalid-key", "The key was refused. Check it in the key panel; it is sent only to api.runware.ai.") : new P("provider", i, a);
 }
-async function Pn(e) {
-  const t = e.key, o = typeof t == "function" ? t : typeof t == "string" ? () => t : () => t.getKey(), s = xn({
-    getKey: o,
+async function Di(e) {
+  const t = e.key, a = typeof t == "function" ? t : typeof t == "string" ? () => t : () => t.getKey(), n = Li({
+    getKey: a,
     fetch: e.fetch,
     poll: { timeoutMs: 20 * 6e4, ...e.poll }
-  }), n = (d) => s.client.redact(d), r = (d) => e.onProgress?.(d);
-  let i;
+  }), i = (r) => n.client.redact(r), s = (r) => e.onProgress?.(r);
+  let o;
   try {
     if (!(typeof e.maxPrice == "number" && Number.isFinite(e.maxPrice) && e.maxPrice > 0 && e.maxPrice <= 100))
       throw new P("refused", "maxPrice must be a positive number of USD up to 100.");
-    const d = o();
-    if (!d || !$n.test(d)) throw new P("invalid-key", "Connect a Runware API key first (16-512 characters, no spaces).");
-    r({ stage: "plan", message: "reading the guide" });
-    const a = Sn(e.guide) ? e.guide : await Io(Do(e.guide)), l = await mt(e.references?.character, "character"), m = await mt(e.references?.environment, "environment"), u = No({ guide: a, model: e.model, shot: e.shot, prompt: e.prompt, character: l, environment: m, resolution: e.resolution, requireAudio: e.requireAudio }, e.taskUUID), { plan: p } = u;
+    const r = a();
+    if (!r || !ji.test(r)) throw new P("invalid-key", "Connect a Runware API key first (16-512 characters, no spaces).");
+    s({ stage: "plan", message: "reading the guide" });
+    const d = Vi(e.guide) ? e.guide : await ja(Ya(e.guide)), l = await wt(e.references?.character, "character"), m = await wt(e.references?.environment, "environment"), u = Xa({ guide: d, model: e.model, shot: e.shot, prompt: e.prompt, character: l, environment: m, resolution: e.resolution, requireAudio: e.requireAudio }, e.taskUUID), { plan: p } = u;
     if (p.estimate.usd === null) throw new P("no-estimate", `No price estimate for ${p.modelName}; it cannot be checked against maxPrice.`);
     if (p.estimate.usd > e.maxPrice)
       throw new P("over-price", `Estimated $${p.estimate.usd.toFixed(2)} (${p.estimate.basis}) is over your cap of $${e.maxPrice.toFixed(2)}.`);
-    if (r({ stage: "confirm", message: `estimated $${p.estimate.usd.toFixed(2)}` }), !await e.confirm({
+    if (s({ stage: "confirm", message: `estimated $${p.estimate.usd.toFixed(2)}` }), !await e.confirm({
       model: p.modelId,
       modelName: p.modelName,
       usd: p.estimate.usd,
@@ -2226,28 +2226,28 @@ async function Pn(e) {
       prompt: u.request.prompt
     })) throw new P("not-confirmed", "Not confirmed; nothing was sent.");
     if (e.signal?.aborted) throw new P("aborted", "Stopped. Nothing was submitted.");
-    const w = await s.run(p, {
+    const w = await n.run(p, {
       signal: e.signal,
       onProgress: (F) => {
-        (F.stage === "submit" || F.stage === "poll") && (i = String(p.task.taskUUID)), r(F);
+        (F.stage === "submit" || F.stage === "poll") && (o = String(p.task.taskUUID)), s(F);
       }
-    }), f = as(e.laneId ?? "lane-1", p, u.request, w, w.videoURL);
-    u.marker && (f.composed = u.marker, f.shot = u.shot);
+    }), h = xn(e.laneId ?? "lane-1", p, u.request, w, w.videoURL);
+    u.marker && (h.composed = u.marker, h.shot = u.shot);
     const g = (/* @__PURE__ */ new Date()).toISOString(), b = {
       schemaVersion: 1,
       id: `gen-${w.taskUUID.slice(0, 8).toLowerCase()}`,
       title: `${p.modelName}: ${(u.shot.subject || u.request.prompt).slice(0, 80)}`,
       createdAt: g,
-      guide: a.guide,
-      lanes: [f],
+      guide: d.guide,
+      lanes: [h],
       ...u.marker ? { shot: u.shot } : {}
-    }, y = {
+    }, x = {
       date: g.slice(0, 10),
       model: p.modelId,
       modelRan: w.modelRan,
       taskUUID: w.taskUUID,
       duration: String(u.request.duration ?? "audio length"),
-      resolution: go(p.task),
+      resolution: Ea(p.task),
       inputs: p.inputsSent.map((F) => F.role).join("+"),
       estimateUsd: p.estimate.usd,
       costUsd: w.costUsd,
@@ -2255,7 +2255,7 @@ async function Pn(e) {
       output: w.videoURL,
       status: "ok (browser)"
     }, U = [...u.notes];
-    return w.costUsd !== null && w.costUsd > e.maxPrice && U.push(`Reported cost $${w.costUsd} is over the cap of $${e.maxPrice}.`), r({ stage: "done", message: "done" }), {
+    return w.costUsd !== null && w.costUsd > e.maxPrice && U.push(`Reported cost $${w.costUsd} is over the cap of $${e.maxPrice}.`), s({ stage: "done", message: "done" }), {
       videoURL: w.videoURL,
       costUsd: w.costUsd,
       generationSeconds: w.generationSeconds,
@@ -2263,55 +2263,55 @@ async function Pn(e) {
       modelRan: w.modelRan,
       estimate: p.estimate,
       inputsSent: p.inputsSent,
-      lane: f,
+      lane: h,
       record: b,
-      costRow: y,
-      costRowText: ho(y),
+      costRow: x,
+      costRowText: Ia(x),
       notes: U,
       task: w.task
     };
-  } catch (d) {
-    throw Bo(d, e.signal, i, n);
+  } catch (r) {
+    throw Za(r, e.signal, o, i);
   }
 }
-function c(e, t = {}, ...o) {
-  const s = document.createElement(e);
-  for (const [n, r] of Object.entries(t)) s.setAttribute(n, r);
-  for (const n of o) n != null && s.append(n);
-  return s;
+function c(e, t = {}, ...a) {
+  const n = document.createElement(e);
+  for (const [i, s] of Object.entries(t)) n.setAttribute(i, s);
+  for (const i of a) i != null && n.append(i);
+  return n;
 }
-function z(e, t) {
+function X(e, t) {
   try {
-    const o = new URL(e, t);
-    return o.protocol === "https:" || o.protocol === "http:" || o.protocol === "blob:" ? o.href : o.protocol === "data:" && /^data:(image|video|audio)\//.test(e) ? e : null;
+    const a = new URL(e, t);
+    return a.protocol === "https:" || a.protocol === "http:" || a.protocol === "blob:" ? a.href : a.protocol === "data:" && /^data:(image|video|audio)\//.test(e) ? e : null;
   } catch {
     return null;
   }
 }
-const An = {
+const Gi = {
   A: "A · raw frame 0",
   B: "B · restyled still",
   C: "C · none"
-}, Un = {
+}, Bi = {
   referenceVideo: "reference video",
   referenceImage: "reference image",
   referenceAudio: "reference audio",
   frameImage: "frame image",
   audio: "audio",
   video: "video"
-}, W = (e) => e === null ? "not recorded" : `$${e.toFixed(e < 1 ? 3 : 2)}`, Xe = (e) => e == null ? "not recorded" : `${e.toFixed(1)} s`;
-function Rn(e, t) {
-  const o = z(e.src, t), s = e.role === "referenceImage" || e.role === "frameImage", n = e.role === "referenceVideo" || e.role === "video";
-  let r;
-  if (o && s) r = c("img", { src: o, alt: e.label ?? e.role, loading: "lazy" });
-  else if (o && n) {
-    const d = c("video", { src: o, muted: "", playsinline: "", preload: "metadata", "aria-label": e.label ?? e.role });
-    d.muted = !0, r = d;
-  } else r = c("div", { class: "ph" }, e.role.includes("udio") ? "audio" : "media");
-  const i = `${Un[e.role]}${e.frame !== void 0 ? ` @ ${e.frame}` : ""}`;
-  return c("div", { class: "input", title: e.label ?? e.src }, r, c("span", {}, i));
+}, J = (e) => e === null ? "not recorded" : `$${e.toFixed(e < 1 ? 3 : 2)}`, qe = (e) => e == null ? "not recorded" : `${e.toFixed(1)} s`;
+function Ki(e, t) {
+  const a = X(e.src, t), n = e.role === "referenceImage" || e.role === "frameImage", i = e.role === "referenceVideo" || e.role === "video";
+  let s;
+  if (a && n) s = c("img", { src: a, alt: e.label ?? e.role, loading: "lazy" });
+  else if (a && i) {
+    const r = c("video", { src: a, muted: "", playsinline: "", preload: "metadata", "aria-label": e.label ?? e.role });
+    r.muted = !0, s = r;
+  } else s = c("div", { class: "ph" }, e.role.includes("udio") ? "audio" : "media");
+  const o = `${Bi[e.role]}${e.frame !== void 0 ? ` @ ${e.frame}` : ""}`;
+  return c("div", { class: "input", title: e.label ?? e.src }, s, c("span", {}, o));
 }
-function Mn(e) {
+function _i(e) {
   const t = c("button", { class: "small", type: "button" }, "Copy prompt");
   return t.addEventListener("click", async () => {
     try {
@@ -2322,22 +2322,22 @@ function Mn(e) {
     setTimeout(() => t.textContent = "Copy prompt", 1500);
   }), t;
 }
-function Tn(e, t, o) {
-  const s = c("button", { class: "small", type: "button", "aria-pressed": "false" }, "Play alone");
-  s.addEventListener("click", o);
-  const r = [
+function zi(e, t, a) {
+  const n = c("button", { class: "small", type: "button", "aria-pressed": "false" }, "Play alone");
+  n.addEventListener("click", a);
+  const s = [
     ["Model ran", e.modelRan ?? (e.status === "placeholder" ? "nothing ran (placeholder)" : "not reported by the provider")],
-    ["First frame", An[e.firstFrameVariant]],
-    ["Cost", W(e.costUsd)],
-    ["Seconds", Xe(e.generationSeconds)]
+    ["First frame", Gi[e.firstFrameVariant]],
+    ["Cost", J(e.costUsd)],
+    ["Seconds", qe(e.generationSeconds)]
   ];
-  e.durationSeconds !== void 0 && r.push(["Clip length", e.durationSeconds === "auto" ? "auto" : `${e.durationSeconds} s asked`]), e.routing && r.push([
+  e.durationSeconds !== void 0 && s.push(["Clip length", e.durationSeconds === "auto" ? "auto" : `${e.durationSeconds} s asked`]), e.routing && s.push([
     "Routing",
     [e.routing.maxPrice !== void 0 ? `cap $${e.routing.maxPrice}` : "", e.routing.requirements ?? ""].filter(Boolean).join(" · ")
   ]);
-  const i = c("dl");
-  for (const [l, m] of r) i.append(c("dt", {}, l), c("dd", {}, m));
-  const d = e.inputsSent.length ? c("div", { class: "inputs" }, ...e.inputsSent.map((l) => Rn(l, t))) : c("div", { class: "note" }, "Inputs sent: prompt only");
+  const o = c("dl");
+  for (const [l, m] of s) o.append(c("dt", {}, l), c("dd", {}, m));
+  const r = e.inputsSent.length ? c("div", { class: "inputs" }, ...e.inputsSent.map((l) => Ki(l, t))) : c("div", { class: "note" }, "Inputs sent: prompt only");
   return { node: c(
     "div",
     { class: "caption" },
@@ -2347,18 +2347,18 @@ function Tn(e, t, o) {
       c("span", { class: "model" }, e.label ?? e.modelName ?? e.model),
       c("span", { class: "id" }, `${e.provider} · ${e.model}`)
     ),
-    e.prompt ? c("div", { class: "prompt" }, c("pre", {}, e.prompt), c("div", { class: "row" }, Mn(e.prompt), s)) : c("div", { class: "row" }, s),
-    c("div", {}, c("div", { class: "id" }, "Inputs sent"), d),
-    i,
+    e.prompt ? c("div", { class: "prompt" }, c("pre", {}, e.prompt), c("div", { class: "row" }, _i(e.prompt), n)) : c("div", { class: "row" }, n),
+    c("div", {}, c("div", { class: "id" }, "Inputs sent"), r),
+    o,
     e.note ? c("div", { class: "note" }, e.note) : null
-  ), solo: s };
+  ), solo: n };
 }
-const je = "model-arena:runware-key";
-class Fn {
-  constructor(t = Ln()) {
+const De = "model-arena:runware-key";
+class Wi {
+  constructor(t = Hi()) {
     this.storage = t;
     try {
-      this.key = this.storage?.getItem(je) ?? void 0;
+      this.key = this.storage?.getItem(De) ?? void 0;
     } catch {
       this.key = void 0;
     }
@@ -2366,45 +2366,45 @@ class Fn {
   storage;
   key;
   get = () => this.key;
-  set(t, o = "memory") {
+  set(t, a = "memory") {
     this.key = t.trim() || void 0;
     try {
-      o === "session" && this.key ? this.storage?.setItem(je, this.key) : this.storage?.removeItem(je);
+      a === "session" && this.key ? this.storage?.setItem(De, this.key) : this.storage?.removeItem(De);
     } catch {
     }
   }
   clear() {
     this.key = void 0;
     try {
-      this.storage?.removeItem(je);
+      this.storage?.removeItem(De);
     } catch {
     }
   }
 }
-function Ln() {
+function Hi() {
   try {
     return typeof sessionStorage > "u" ? void 0 : sessionStorage;
   } catch {
     return;
   }
 }
-const jn = `
+const Xi = `
   --ma-bg: #18181b; --ma-card: #1f1f23; --ma-fg: #f4f4f5; --ma-muted: #a1a1aa;
   --ma-line: #3f3f46; --ma-input: #27272a; --ma-chip: #2e2e33;
-  --ma-accent: #e4e4e7; --ma-accent-fg: #18181b; --ma-warn: #fbbf24; --ma-ok: #86efac;`, Wt = `
+  --ma-accent: #e4e4e7; --ma-accent-fg: #18181b; --ma-warn: #fbbf24; --ma-ok: #86efac;`, ta = `
   --ma-bg: #ffffff; --ma-card: #f7f7f8; --ma-fg: #18181b; --ma-muted: #52525b;
   --ma-line: #d4d4d8; --ma-input: #efeff1; --ma-chip: #e7e7ea;
-  --ma-accent: #27272a; --ma-accent-fg: #ffffff; --ma-warn: #9a5800; --ma-ok: #166534;`, Vn = `
+  --ma-accent: #27272a; --ma-accent-fg: #ffffff; --ma-warn: #9a5800; --ma-ok: #166534;`, Ji = `
   --ma-radius: 7px; --ma-radius-lg: 12px; --ma-gap: 8px;
   --ma-font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --ma-mono: ui-monospace, SFMono-Regular, Menlo, monospace;`, Je = (
+  --ma-mono: ui-monospace, SFMono-Regular, Menlo, monospace;`, et = (
   /* css */
   `
-:host {${jn}${Vn} }
-:host([theme="light"]) {${Wt} }
-@media (prefers-color-scheme: light) { :host([theme="auto"]) {${Wt} } }
+:host {${Xi}${Ji} }
+:host([theme="light"]) {${ta} }
+@media (prefers-color-scheme: light) { :host([theme="auto"]) {${ta} } }
 `
-), Cn = [
+), Yi = [
   "--ma-bg",
   "--ma-card",
   "--ma-fg",
@@ -2421,14 +2421,14 @@ const jn = `
   "--ma-gap",
   "--ma-font",
   "--ma-mono"
-], Nn = /^[\x21-\x7e]{16,512}$/, Ht = "https://runware.ai/";
-function Xt(e) {
-  return e ? /\s/.test(e) ? "A key has no spaces or line breaks." : e.length < 16 ? "That is too short for an API key." : e.length > 512 ? "That is too long for an API key." : Nn.test(e) ? null : "A key uses plain printable characters only." : "Paste your key first.";
+], Zi = /^[\x21-\x7e]{16,512}$/, aa = "https://runware.ai/";
+function na(e) {
+  return e ? /\s/.test(e) ? "A key has no spaces or line breaks." : e.length < 16 ? "That is too short for an API key." : e.length > 512 ? "That is too long for an API key." : Zi.test(e) ? null : "A key uses plain printable characters only." : "Paste your key first.";
 }
-const Jt = (
+const ia = (
   /* css */
   `
-${Je}
+${et}
 :host { display: block; color: var(--ma-fg); font: 400 14px/1.5 var(--ma-font); }
 * { box-sizing: border-box; }
 .panel { display: grid; gap: 8px; padding: 12px; border: 1px solid var(--ma-line); border-radius: var(--ma-radius); background: var(--ma-bg); }
@@ -2449,7 +2449,7 @@ button:focus-visible, input:focus-visible, a:focus-visible { outline: 2px solid 
 a { color: var(--ma-fg); }
 `
 );
-class On extends HTMLElement {
+class Qi extends HTMLElement {
   static observedAttributes = ["signup-url"];
   store;
   root;
@@ -2460,9 +2460,9 @@ class On extends HTMLElement {
   /** Test seam: the fetch the balance call uses. */
   fetch;
   constructor() {
-    super(), this.root = this.attachShadow({ mode: "open" }), this.store = new Fn();
+    super(), this.root = this.attachShadow({ mode: "open" }), this.store = new Wi();
     const t = this.store.get();
-    t && Xt(t) && this.store.clear(), this.remembered = !!this.store.get();
+    t && na(t) && this.store.clear(), this.remembered = !!this.store.get();
   }
   connectedCallback() {
     this.render(), this.connected && this.balanceUsd === null && this.refreshBalance();
@@ -2475,13 +2475,13 @@ class On extends HTMLElement {
   async refreshBalance() {
     const t = ++this.asked;
     if (!this.connected) return null;
-    let o = null, s = "";
+    let a = null, n = "";
     try {
-      o = await new Ne({ getKey: this.getKey, fetch: this.fetch }).balance();
-    } catch (n) {
-      s = `Balance not available: ${new Ne({ getKey: this.getKey }).redact(n instanceof Error ? n.message : "request failed")}`.slice(0, 200);
+      a = await new Ke({ getKey: this.getKey, fetch: this.fetch }).balance();
+    } catch (i) {
+      n = `Balance not available: ${new Ke({ getKey: this.getKey }).redact(i instanceof Error ? i.message : "request failed")}`.slice(0, 200);
     }
-    return t !== this.asked || !this.connected ? null : (this.balanceUsd = o, this.balanceNote = s, this.render(), this.dispatchEvent(new CustomEvent("arena-balance-change", { bubbles: !0, composed: !0, detail: { balance: o } })), o);
+    return t !== this.asked || !this.connected ? null : (this.balanceUsd = a, this.balanceNote = n, this.render(), this.dispatchEvent(new CustomEvent("arena-balance-change", { bubbles: !0, composed: !0, detail: { balance: a } })), a);
   }
   attributeChangedCallback() {
     this.isConnected && this.render();
@@ -2496,18 +2496,18 @@ class On extends HTMLElement {
     this.store.clear(), this.remembered = !1, this.changed();
   }
   /** Connects a key typed or pasted elsewhere; returns the problem, or null. */
-  connect(t, o = !1) {
-    const s = t.trim(), n = Xt(s);
-    return n || (this.store.set(s, o ? "session" : "memory"), this.remembered = o, this.changed(), null);
+  connect(t, a = !1) {
+    const n = t.trim(), i = na(n);
+    return i || (this.store.set(n, a ? "session" : "memory"), this.remembered = a, this.changed(), null);
   }
   changed() {
     this.asked++, this.balanceUsd = null, this.balanceNote = "", this.render(), this.dispatchEvent(new CustomEvent("arena-key-change", { bubbles: !0, composed: !0, detail: { connected: this.connected, remembered: this.remembered } })), this.connected && this.refreshBalance();
   }
   signup() {
-    let t = Ht;
+    let t = aa;
     try {
-      const o = new URL(this.getAttribute("signup-url") ?? Ht);
-      o.protocol === "https:" && (t = o.href);
+      const a = new URL(this.getAttribute("signup-url") ?? aa);
+      a.protocol === "https:" && (t = a.href);
     } catch {
     }
     return c("a", { href: t, target: "_blank", rel: "noopener noreferrer" }, "Get a key");
@@ -2515,20 +2515,20 @@ class On extends HTMLElement {
   render() {
     const t = c("p", { class: "note" }, "Your key stays in your browser and is sent only to api.runware.ai.");
     if (this.connected) {
-      const d = c("button", { type: "button", "data-action": "disconnect" }, "Disconnect");
-      d.addEventListener("click", () => this.disconnect()), this.root.replaceChildren(
-        c("style", {}, Jt),
+      const r = c("button", { type: "button", "data-action": "disconnect" }, "Disconnect");
+      r.addEventListener("click", () => this.disconnect()), this.root.replaceChildren(
+        c("style", {}, ia),
         c(
           "div",
           { class: "panel", part: "panel", "data-state": "connected" },
-          c("div", { class: "row" }, c("span", { class: "state" }, "Key connected"), c("span", { class: "note" }, this.remembered ? "remembered for this tab" : "held in memory until you leave"), d),
+          c("div", { class: "row" }, c("span", { class: "state" }, "Key connected"), c("span", { class: "note" }, this.remembered ? "remembered for this tab" : "held in memory until you leave"), r),
           c("div", { class: "row" }, c("span", { class: "balance", "data-field": "balance" }, this.balanceUsd === null ? "" : `Balance ${this.balanceUsd.toFixed(2)} USD`), c("span", { class: "note", "data-field": "balance-note" }, this.balanceNote)),
           t
         )
       );
       return;
     }
-    const o = c("input", {
+    const a = c("input", {
       type: "password",
       autocomplete: "off",
       spellcheck: "false",
@@ -2536,78 +2536,78 @@ class On extends HTMLElement {
       maxlength: "512",
       "aria-describedby": "where",
       "data-field": "key"
-    }), s = c("input", { type: "checkbox", "data-field": "remember" }), n = c("p", { class: "err", role: "alert" }), r = c("button", { type: "submit", class: "primary", "data-action": "connect" }, "Connect"), i = c(
+    }), n = c("input", { type: "checkbox", "data-field": "remember" }), i = c("p", { class: "err", role: "alert" }), s = c("button", { type: "submit", class: "primary", "data-action": "connect" }, "Connect"), o = c(
       "form",
       { class: "panel", part: "panel", "data-state": "disconnected" },
-      c("div", { class: "row" }, c("label", { class: "field" }, c("span", { class: "lbl" }, "Runware API key"), o), r),
-      c("div", { class: "row" }, c("label", { class: "note" }, s, " Remember for this tab"), this.signup()),
-      n,
+      c("div", { class: "row" }, c("label", { class: "field" }, c("span", { class: "lbl" }, "Runware API key"), a), s),
+      c("div", { class: "row" }, c("label", { class: "note" }, n, " Remember for this tab"), this.signup()),
+      i,
       t
     );
-    t.id = "where", o.addEventListener("input", () => n.textContent = ""), i.addEventListener("submit", (d) => {
-      d.preventDefault();
-      const a = this.connect(o.value, s.checked);
-      a ? n.textContent = a : o.value = "";
-    }), this.root.replaceChildren(c("style", {}, Jt), i);
+    t.id = "where", a.addEventListener("input", () => i.textContent = ""), o.addEventListener("submit", (r) => {
+      r.preventDefault();
+      const d = this.connect(a.value, n.checked);
+      d ? i.textContent = d : a.value = "";
+    }), this.root.replaceChildren(c("style", {}, ia), o);
   }
 }
-function Go(e = "arena-key") {
-  customElements.get(e) || customElements.define(e, On);
+function Qa(e = "arena-key") {
+  customElements.get(e) || customElements.define(e, Qi);
 }
-const pt = [
+const yt = [
   ["subject", "Subject", "Who or what moves"],
   ["environment", "Environment", "Where it happens"],
   ["action", "Action", "What it does along the path"],
   ["legend", "Colour legend", "e.g. The orange figure is the character"]
-], Dn = ["image/png", "image/jpeg", "image/webp"];
-function Yt(e, t) {
-  const o = c("input", { type: "file", accept: Dn.join(","), "data-field": e }), s = c("span", { class: "row", "data-ref": e }), r = c("div", { class: "drop", "data-drop": e }, c("span", { class: "note" }, `${e === "character" ? "Character sheet (optional)" : "Environment image (optional)"}: drop an image or`), o, s);
-  return r.addEventListener("dragover", (i) => (i.preventDefault(), r.classList.add("over"))), r.addEventListener("dragleave", () => r.classList.remove("over")), r.addEventListener("drop", (i) => {
-    i.preventDefault(), r.classList.remove("over"), t(i.dataTransfer?.files[0]);
-  }), o.addEventListener("change", () => t(o.files?.[0])), { node: r, input: o, shown: s };
+], qi = ["image/png", "image/jpeg", "image/webp"];
+function sa(e, t) {
+  const a = c("input", { type: "file", accept: qi.join(","), "data-field": e }), n = c("span", { class: "row", "data-ref": e }), s = c("div", { class: "drop", "data-drop": e }, c("span", { class: "note" }, `${e === "character" ? "Character sheet (optional)" : "Environment image (optional)"}: drop an image or`), a, n);
+  return s.addEventListener("dragover", (o) => (o.preventDefault(), s.classList.add("over"))), s.addEventListener("dragleave", () => s.classList.remove("over")), s.addEventListener("drop", (o) => {
+    o.preventDefault(), s.classList.remove("over"), t(o.dataTransfer?.files[0]);
+  }), a.addEventListener("change", () => t(a.files?.[0])), { node: s, input: a, shown: n };
 }
-function Bn(e) {
-  const t = Co(), o = t.some((f) => f.key === e("model")) ? e("model") : t[0].key, s = t.map((f) => {
-    const g = c("input", { type: "radio", name: "model", value: f.key, "data-model": f.key });
-    return g.checked = f.key === o, { m: f, r: g };
-  }), n = c(
+function es(e) {
+  const t = Ha(), a = t.some((h) => h.key === e("model")) ? e("model") : t[0].key, n = t.map((h) => {
+    const g = c("input", { type: "radio", name: "model", value: h.key, "data-model": h.key });
+    return g.checked = h.key === a, { m: h, r: g };
+  }), i = c(
     "fieldset",
     {},
     c("legend", {}, "Model"),
     c(
       "div",
       { class: "models" },
-      ...s.map(
-        ({ m: f, r: g }) => c(
+      ...n.map(
+        ({ m: h, r: g }) => c(
           "label",
           { class: "model-opt" },
           g,
-          c("span", {}, f.name, f.use === "audio-first-frame" ? c("span", { class: "badge" }, "audio + first frame only") : null),
-          c("span", { class: "line" }, f.line)
+          c("span", {}, h.name, h.use === "audio-first-frame" ? c("span", { class: "badge" }, "audio + first frame only") : null),
+          c("span", { class: "line" }, h.line)
         )
       )
     )
-  ), r = {}, i = c("div", { class: "fields" });
-  for (const [f, g, b] of pt)
-    r[f] = c("input", { type: "text", maxlength: f === "legend" ? "300" : "500", placeholder: b, "data-field": f, value: e(f) ?? "" }), i.append(c("label", { class: "f" }, g, r[f]));
-  const d = c("textarea", { maxlength: "5000", "data-field": "prompt", placeholder: "Leave empty to use the composed prompt" });
-  d.value = e("prompt") ?? "";
-  const a = c("details", {}, c("summary", {}, "Write my own prompt instead"), d);
-  a.open = !!d.value;
-  const l = c("fieldset", {}, c("legend", {}, "Shot description"), i, a), m = c("input", { type: "file", multiple: "", accept: ".json,.mp4,.wav,.mp3,.png,.jpg", "data-field": "bundle" }), u = c("p", { class: "note", "data-guide": "" }, "No guide yet: choose the bundle's files."), p = c("input", { type: "number", min: "0.1", max: "100", step: "0.1", value: e("max-price") ?? "2", "data-field": "max-price" }), h = c("button", { type: "button", class: "primary", "data-action": "run" }, "Run"), w = c("button", { type: "button", "data-action": "stop" }, "Stop");
+  ), s = {}, o = c("div", { class: "fields" });
+  for (const [h, g, b] of yt)
+    s[h] = c("input", { type: "text", maxlength: h === "legend" ? "300" : "500", placeholder: b, "data-field": h, value: e(h) ?? "" }), o.append(c("label", { class: "f" }, g, s[h]));
+  const r = c("textarea", { maxlength: "5000", "data-field": "prompt", placeholder: "Leave empty to use the composed prompt" });
+  r.value = e("prompt") ?? "";
+  const d = c("details", {}, c("summary", {}, "Write my own prompt instead"), r);
+  d.open = !!r.value;
+  const l = c("fieldset", {}, c("legend", {}, "Shot description"), o, d), m = c("input", { type: "file", multiple: "", accept: ".json,.mp4,.wav,.mp3,.png,.jpg", "data-field": "bundle" }), u = c("p", { class: "note", "data-guide": "" }, "No guide yet: choose the bundle's files."), p = c("input", { type: "number", min: "0.1", max: "100", step: "0.1", value: e("max-price") ?? "2", "data-field": "max-price" }), f = c("button", { type: "button", class: "primary", "data-action": "run" }, "Run"), w = c("button", { type: "button", "data-action": "stop" }, "Stop");
   return w.hidden = !0, {
-    radios: s,
-    model: () => s.find(({ r: f }) => f.checked)?.m.key ?? o,
-    setModel: (f) => s.forEach(({ m: g, r: b }) => b.checked = g.key === f),
-    modelSet: n,
-    fields: r,
-    override: d,
-    own: a,
+    radios: n,
+    model: () => n.find(({ r: h }) => h.checked)?.m.key ?? a,
+    setModel: (h) => n.forEach(({ m: g, r: b }) => b.checked = g.key === h),
+    modelSet: i,
+    fields: s,
+    override: r,
+    own: d,
     shotSet: l,
     bundleInput: m,
     guideInfo: u,
     maxPrice: p,
-    run: h,
+    run: f,
     stop: w,
     preview: c("div", { "data-preview": "" }),
     estimate: c("p", { class: "note", "data-estimate": "" }),
@@ -2617,29 +2617,29 @@ function Bn(e) {
     result: c("div", { "data-result": "" })
   };
 }
-const Gn = /^[A-Za-z0-9._-]{1,255}$/, Zt = (e) => typeof e == "object" && e !== null && !Array.isArray(e), Qt = (e) => typeof e == "string" && e.length > 0 && e.length <= 2048 && !/^(javascript|data):/i.test(e.trim());
-function _n(e) {
-  if (!Zt(e)) throw new Error("preset must be an object");
-  if (!Qt(e.bundle)) throw new Error("preset.bundle must be a bundle directory URL");
+const ts = /^[A-Za-z0-9._-]{1,255}$/, oa = (e) => typeof e == "object" && e !== null && !Array.isArray(e), ra = (e) => typeof e == "string" && e.length > 0 && e.length <= 2048 && !/^(javascript|data):/i.test(e.trim());
+function as(e) {
+  if (!oa(e)) throw new Error("preset must be an object");
+  if (!ra(e.bundle)) throw new Error("preset.bundle must be a bundle directory URL");
   const t = { bundle: e.bundle };
   if (e.references !== void 0) {
-    if (!Zt(e.references)) throw new Error("preset.references must be an object");
+    if (!oa(e.references)) throw new Error("preset.references must be an object");
     t.references = {};
-    for (const o of ["character", "environment"]) {
-      const s = e.references[o];
-      if (s !== void 0) {
-        if (!Qt(s)) throw new Error(`preset.references.${o} must be an image URL`);
-        t.references[o] = s;
+    for (const a of ["character", "environment"]) {
+      const n = e.references[a];
+      if (n !== void 0) {
+        if (!ra(n)) throw new Error(`preset.references.${a} must be an image URL`);
+        t.references[a] = n;
       }
     }
   }
   if (e.shot !== void 0) {
-    const o = So(e.shot);
-    if (!o) throw new Error("preset.shot needs a subject (and an action)");
-    t.shot = o;
+    const a = La(e.shot);
+    if (!a) throw new Error("preset.shot needs a subject (and an action)");
+    t.shot = a;
   }
   if (e.model !== void 0) {
-    if (!he.includes(e.model)) throw new Error(`preset.model must be one of ${he.join(", ")}`);
+    if (!ve.includes(e.model)) throw new Error(`preset.model must be one of ${ve.join(", ")}`);
     t.model = e.model;
   }
   if (e.prompt !== void 0) {
@@ -2648,68 +2648,68 @@ function _n(e) {
   }
   return t;
 }
-async function ft(e) {
+async function vt(e) {
   const t = await fetch(e);
   if (!t.ok) throw new Error(`${new URL(e).pathname.split("/").pop()}: HTTP ${t.status}`);
   return t.blob();
 }
-async function qt(e) {
-  const t = e.endsWith("/") ? e : `${e}/`, o = JSON.parse(await (await ft(new URL("bundle.json", t).href)).text()), s = { "bundle.json": new Blob([JSON.stringify(o)], { type: "application/json" }) }, n = /* @__PURE__ */ new Set([o.recipe, o.camera, o.firstFrameStyled]);
-  for (const r of ["video", "audio", "firstFrame", "beats", "recipe", "meta", "camera"]) {
-    const i = o[r];
-    if (!(typeof i != "string" || !Gn.test(i)))
+async function da(e) {
+  const t = e.endsWith("/") ? e : `${e}/`, a = JSON.parse(await (await vt(new URL("bundle.json", t).href)).text()), n = { "bundle.json": new Blob([JSON.stringify(a)], { type: "application/json" }) }, i = /* @__PURE__ */ new Set([a.recipe, a.camera, a.firstFrameStyled]);
+  for (const s of ["video", "audio", "firstFrame", "beats", "recipe", "meta", "camera"]) {
+    const o = a[s];
+    if (!(typeof o != "string" || !ts.test(o)))
       try {
-        s[i] = await ft(new URL(i, t).href);
-      } catch (d) {
-        if (!n.has(i)) throw d;
+        n[o] = await vt(new URL(o, t).href);
+      } catch (r) {
+        if (!i.has(o)) throw r;
       }
   }
-  return { files: s, dir: t };
+  return { files: n, dir: t };
 }
-async function Kn(e) {
-  return { blob: await ft(e), src: e, name: new URL(e).pathname.split("/").pop() || "reference.png" };
+async function ns(e) {
+  return { blob: await vt(e), src: e, name: new URL(e).pathname.split("/").pop() || "reference.png" };
 }
-function zn(e, t) {
+function is(e, t) {
   if (!e.guide) return null;
-  const o = e.lanes.find((a) => a.shot || a.composed) ?? e.lanes[0];
-  if (!o) return null;
-  const s = Oe.find((a) => a.air === o.model || a.id === o.model || a.id === o.composed?.model), n = s && he.includes(s.id) ? s.id : void 0;
-  if (!n) return null;
-  const r = new URL(e.guide.video.src, t), i = { bundle: new URL(".", r).href, model: n }, d = o.shot ?? e.shot;
-  if (d) {
-    i.shot = { subject: d.subject, action: d.action, ...d.environment ? { environment: d.environment } : {}, ...d.legend ? { legend: d.legend } : {}, camera: d.camera };
-    const a = o.inputsSent.filter((m) => m.role === "referenceImage" || m.role === "frameImage"), l = d.references.filter((m) => m.kind === "image").map((m) => m.id);
-    a.forEach((m, u) => {
+  const a = e.lanes.find((d) => d.shot || d.composed) ?? e.lanes[0];
+  if (!a) return null;
+  const n = _e.find((d) => d.air === a.model || d.id === a.model || d.id === a.composed?.model), i = n && ve.includes(n.id) ? n.id : void 0;
+  if (!i) return null;
+  const s = new URL(e.guide.video.src, t), o = { bundle: new URL(".", s).href, model: i }, r = a.shot ?? e.shot;
+  if (r) {
+    o.shot = { subject: r.subject, action: r.action, ...r.environment ? { environment: r.environment } : {}, ...r.legend ? { legend: r.legend } : {}, camera: r.camera };
+    const d = a.inputsSent.filter((m) => m.role === "referenceImage" || m.role === "frameImage"), l = r.references.filter((m) => m.kind === "image").map((m) => m.id);
+    d.forEach((m, u) => {
       const p = l[u];
-      (p === "character" || p === "environment") && (i.references = { ...i.references, [p]: new URL(m.src, t).href });
+      (p === "character" || p === "environment") && (o.references = { ...o.references, [p]: new URL(m.src, t).href });
     });
   }
-  return o.composed || (i.prompt = o.prompt), i;
+  return a.composed || (o.prompt = a.prompt), o;
 }
-const Wn = {
+const ss = {
   guide: "the guide clip",
   audio: "the guide's audio",
   character: "your character sheet",
   environment: "your environment image",
   frame0: "the guide's frame 0"
 };
-function Hn(e) {
-  const t = e.composed.used.filter((o) => o.address).map((o) => `${o.address} = ${Wn[o.ref] ?? o.ref}`);
+function os(e) {
+  const t = e.composed.used.filter((a) => a.address).map((a) => `${a.address} = ${ss[a.ref] ?? a.ref}`);
   return t.length ? `Reference tags: ${t.join(", ")}` : "Reference tags: none; this model is not addressed by tags.";
 }
-function eo(e, t = !1) {
-  const o = e.composed.dropped.map((n) => `${n.ref}: ${n.reason}`), s = [...e.notes, ...o];
+function ca(e, t = !1) {
+  const a = e.composed.dropped.map((i) => `${i.ref}: ${i.reason}`), n = [...e.notes, ...a];
   return c(
     "div",
     { class: t ? "prompt-card compact" : "prompt-card", "data-model": e.model.key },
     c("div", { class: "row spread" }, c("strong", {}, e.model.name), c("a", { href: e.model.guide.url, target: "_blank", rel: "noopener noreferrer" }, /^prompting$/i.test(e.model.guide.title) ? "Prompting guide" : `Prompting guide: ${e.model.guide.title}`)),
     t ? null : c("p", { class: "line" }, e.model.line),
     c("pre", { "data-prompt": e.model.key }, e.composed.prompt),
-    c("p", { class: "tags" }, Hn(e)),
-    s.length ? c("ul", { class: "notes" }, ...s.map((n) => c("li", {}, n))) : null
+    c("p", { class: "tags" }, os(e)),
+    n.length ? c("ul", { class: "notes" }, ...n.map((i) => c("li", {}, i))) : null
   );
 }
-function Xn(e) {
+function rs(e) {
   if (e.override.trim())
     return c(
       "div",
@@ -2720,20 +2720,20 @@ function Xn(e) {
   if (!e.shot || !e.shot.subject.trim()) return c("div", { class: "preview" }, c("p", { class: "note" }, "Describe the subject to see the prompt each model gets."));
   let t;
   try {
-    t = eo(He(e.shot, e.model, e.facts));
-  } catch (s) {
-    t = c("p", { class: "err" }, s.message);
+    t = ca(Qe(e.shot, e.model, e.facts));
+  } catch (n) {
+    t = c("p", { class: "err" }, n.message);
   }
-  const o = c(
+  const a = c(
     "details",
     { class: "compare" },
     c("summary", {}, "Compare prompts"),
-    c("div", { class: "compare-grid" }, ...hn(e.shot, e.facts).map((s) => eo(s, !0)))
+    c("div", { class: "compare-grid" }, ...Ai(e.shot, e.facts).map((n) => ca(n, !0)))
   );
-  return c("div", { class: "preview" }, t, o);
+  return c("div", { class: "preview" }, t, a);
 }
-const Jn = 0.025;
-class to {
+const ds = 0.025;
+class la {
   media = /* @__PURE__ */ new Map();
   generation = 0;
   frame;
@@ -2744,23 +2744,23 @@ class to {
   caf;
   state = { playing: !1, soloing: void 0, time: 0, duration: 0, error: "" };
   constructor(t = {}) {
-    this.maxDrift = t.maxDrift ?? 1 / 48, this.publishEvery = t.publishEvery ?? 100, this.raf = t.raf ?? ((o) => requestAnimationFrame(o)), this.caf = t.caf ?? ((o) => cancelAnimationFrame(o));
+    this.maxDrift = t.maxDrift ?? 1 / 48, this.publishEvery = t.publishEvery ?? 100, this.raf = t.raf ?? ((a) => requestAnimationFrame(a)), this.caf = t.caf ?? ((a) => cancelAnimationFrame(a));
   }
   subscribe(t) {
     return this.listeners.add(t), t(this.state), () => this.listeners.delete(t);
   }
   set(t) {
-    this.state = { ...this.state, ...t }, this.listeners.forEach((o) => o(this.state));
+    this.state = { ...this.state, ...t }, this.listeners.forEach((a) => a(this.state));
   }
-  add(t, o) {
-    this.media.set(t, o), this.loaded();
+  add(t, a) {
+    this.media.set(t, a), this.loaded();
   }
   remove(t) {
     this.media.get(t)?.pause(), this.media.delete(t), this.loaded();
   }
   /** Call on `loadedmetadata`: the shared length is the shortest clip. */
   loaded() {
-    const t = [...this.media.values()].map((o) => o.duration).filter((o) => Number.isFinite(o) && o > 0);
+    const t = [...this.media.values()].map((a) => a.duration).filter((a) => Number.isFinite(a) && a > 0);
     this.set({ duration: t.length ? Math.min(...t) : 0 });
   }
   pause() {
@@ -2768,25 +2768,25 @@ class to {
   }
   seek(t) {
     this.pause();
-    const o = Math.max(0, Math.min(t, this.state.duration || t));
-    this.media.forEach((s) => {
-      s.readyState >= 1 && (s.currentTime = Math.min(o, s.duration));
-    }), this.set({ time: o });
+    const a = Math.max(0, Math.min(t, this.state.duration || t));
+    this.media.forEach((n) => {
+      n.readyState >= 1 && (n.currentTime = Math.min(a, n.duration));
+    }), this.set({ time: a });
   }
   async play() {
     if (this.state.playing) return this.pause();
     this.state.soloing && this.pause();
     const t = ++this.generation;
     this.set({ error: "" });
-    const o = [...this.media.values()];
-    if (!o.length || o.some((i) => i.readyState < 2 || i.error)) {
+    const a = [...this.media.values()];
+    if (!a.length || a.some((o) => o.readyState < 2 || o.error)) {
       this.set({ error: "Wait for every video to load, or replace the unavailable clip." });
       return;
     }
-    const { time: s, duration: n } = this.state, r = s >= n - 0.04 ? 0 : s;
-    o.forEach((i) => i.currentTime = r);
+    const { time: n, duration: i } = this.state, s = n >= i - 0.04 ? 0 : n;
+    a.forEach((o) => o.currentTime = s);
     try {
-      if (await Promise.all(o.map((i) => i.play())), t !== this.generation) return void o.forEach((i) => i.pause());
+      if (await Promise.all(a.map((o) => o.play())), t !== this.generation) return void a.forEach((o) => o.pause());
       this.set({ playing: !0 }), this.startLoop();
     } catch {
       if (t !== this.generation) return;
@@ -2794,23 +2794,23 @@ class to {
     }
   }
   async solo(t) {
-    const o = this.media.get(t);
-    if (!o) return;
+    const a = this.media.get(t);
+    if (!a) return;
     if (this.state.soloing === t) return this.pause();
     this.pause();
-    const s = this.generation;
-    if (this.set({ error: "" }), o.readyState < 2 || o.error) {
+    const n = this.generation;
+    if (this.set({ error: "" }), a.readyState < 2 || a.error) {
       this.set({ error: "Wait for this video to load, or replace the clip." });
       return;
     }
-    (o.ended || o.currentTime >= o.duration - 0.04) && (o.currentTime = 0);
+    (a.ended || a.currentTime >= a.duration - 0.04) && (a.currentTime = 0);
     try {
-      if (await o.play(), s !== this.generation) return o.pause();
-      this.set({ soloing: t }), o.addEventListener("pause", () => this.state.soloing === t && this.set({ soloing: void 0 }), {
+      if (await a.play(), n !== this.generation) return a.pause();
+      this.set({ soloing: t }), a.addEventListener("pause", () => this.state.soloing === t && this.set({ soloing: void 0 }), {
         once: !0
-      }), this.startSoloLoop(t, o);
+      }), this.startSoloLoop(t, a);
     } catch {
-      s === this.generation && this.set({ error: "Playback was interrupted. Press Play to try again." });
+      n === this.generation && this.set({ error: "Playback was interrupted. Press Play to try again." });
     }
   }
   /** Pause everything; call on page hide or element disconnect. */
@@ -2822,48 +2822,48 @@ class to {
   }
   /** One frame of the sync loop; public so tests can drive it. */
   tick(t) {
-    const o = [...this.media.values()], s = o[0], { duration: n } = this.state;
-    if (!s || s.ended || s.currentTime >= n - Jn)
-      return o.forEach((r) => r.pause()), this.stopLoop(), this.set({ playing: !1, time: n }), !1;
-    for (const r of o.slice(1))
-      Math.abs(r.currentTime - s.currentTime) > this.maxDrift && (r.currentTime = s.currentTime);
-    return t - this.published >= this.publishEvery && (this.published = t, this.set({ time: s.currentTime })), !0;
+    const a = [...this.media.values()], n = a[0], { duration: i } = this.state;
+    if (!n || n.ended || n.currentTime >= i - ds)
+      return a.forEach((s) => s.pause()), this.stopLoop(), this.set({ playing: !1, time: i }), !1;
+    for (const s of a.slice(1))
+      Math.abs(s.currentTime - n.currentTime) > this.maxDrift && (s.currentTime = n.currentTime);
+    return t - this.published >= this.publishEvery && (this.published = t, this.set({ time: n.currentTime })), !0;
   }
   published = -1 / 0;
   startLoop() {
     this.stopLoop(), this.published = -1 / 0;
-    const t = (o) => {
-      this.tick(o) && (this.frame = this.raf(t));
+    const t = (a) => {
+      this.tick(a) && (this.frame = this.raf(t));
     };
     this.frame = this.raf(t);
   }
-  startSoloLoop(t, o) {
+  startSoloLoop(t, a) {
     this.stopLoop();
-    const s = () => {
-      this.state.soloing === t && (this.set({ time: o.currentTime }), this.frame = this.raf(s));
+    const n = () => {
+      this.state.soloing === t && (this.set({ time: a.currentTime }), this.frame = this.raf(n));
     };
-    this.frame = this.raf(s);
+    this.frame = this.raf(n);
   }
 }
-const oo = /^[a-z0-9][a-z0-9-]{0,63}$/, ht = (e) => typeof e == "object" && e !== null && !Array.isArray(e), Yn = (e) => ht(e) && Array.isArray(e.tabs);
-function Zn(e) {
-  if (!ht(e)) throw new v("set", "must be an object");
-  if (e.schemaVersion !== 1) throw new v("schemaVersion", "must be 1");
-  if (typeof e.id != "string" || !oo.test(e.id)) throw new v("id", "must be a slug");
-  if (typeof e.title != "string" || e.title.length < 1 || e.title.length > 200) throw new v("title", "must be 1-200 characters");
-  if (!Array.isArray(e.tabs) || e.tabs.length < 1 || e.tabs.length > 8) throw new v("tabs", "must hold 1-8 tabs");
+const ua = /^[a-z0-9][a-z0-9-]{0,63}$/, xt = (e) => typeof e == "object" && e !== null && !Array.isArray(e), cs = (e) => xt(e) && Array.isArray(e.tabs);
+function ls(e) {
+  if (!xt(e)) throw new y("set", "must be an object");
+  if (e.schemaVersion !== 1) throw new y("schemaVersion", "must be 1");
+  if (typeof e.id != "string" || !ua.test(e.id)) throw new y("id", "must be a slug");
+  if (typeof e.title != "string" || e.title.length < 1 || e.title.length > 200) throw new y("title", "must be 1-200 characters");
+  if (!Array.isArray(e.tabs) || e.tabs.length < 1 || e.tabs.length > 8) throw new y("tabs", "must hold 1-8 tabs");
   const t = /* @__PURE__ */ new Set();
-  return e.tabs.forEach((o, s) => {
-    const n = `tabs[${s}]`;
-    if (!ht(o)) throw new v(n, "must be an object");
-    if (typeof o.id != "string" || !oo.test(o.id)) throw new v(`${n}.id`, "must be a slug");
-    if (t.has(o.id)) throw new v(`${n}.id`, "tab ids must be distinct");
-    if (t.add(o.id), typeof o.label != "string" || o.label.length < 1 || o.label.length > 40) throw new v(`${n}.label`, "must be 1-40 characters");
-    if (o.record !== void 0) ue(o.record);
-    else if (typeof o.src != "string" || o.src.length < 1 || o.src.length > 2048) throw new v(`${n}.src`, "must be a record URL, or give an inline record");
+  return e.tabs.forEach((a, n) => {
+    const i = `tabs[${n}]`;
+    if (!xt(a)) throw new y(i, "must be an object");
+    if (typeof a.id != "string" || !ua.test(a.id)) throw new y(`${i}.id`, "must be a slug");
+    if (t.has(a.id)) throw new y(`${i}.id`, "tab ids must be distinct");
+    if (t.add(a.id), typeof a.label != "string" || a.label.length < 1 || a.label.length > 40) throw new y(`${i}.label`, "must be 1-40 characters");
+    if (a.record !== void 0) ge(a.record);
+    else if (typeof a.src != "string" || a.src.length < 1 || a.src.length > 2048) throw new y(`${i}.src`, "must be a record URL, or give an inline record");
   }), e;
 }
-const Qn = (
+const us = (
   /* css */
   `
 /* layout="arena": tiles keep 16:9 from the row height; hero tiles stretch. */
@@ -2952,10 +2952,10 @@ dd { margin: 0; overflow-wrap: anywhere; }
 .lane-prompt summary { cursor: pointer; font-size: 12px; color: var(--ma-muted); }
 .lane-prompt pre { margin: 4px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; font: 11px/1.5 var(--ma-mono); background: var(--ma-input); border-radius: 6px; padding: 6px; max-height: 200px; overflow: auto; }
 `
-), so = (
+), ma = (
   /* css */
   `
-${Je}
+${et}
 :host {
   display: block;
   width: 100%;
@@ -3010,145 +3010,145 @@ input[type="range"] { width: 100%; min-width: 0; accent-color: var(--ma-accent);
 .id { font: 12px var(--ma-mono); color: var(--ma-muted); overflow-wrap: anywhere; }
 .note { color: var(--ma-muted); font-style: italic; margin: 0; }
 .small { font-size: 12px; padding: 2px 8px; min-height: 28px; }
-${Qn}
+${us}
 `
 );
-function Me(e) {
-  return Oe.find((t) => t.air === e.model || t.id === e.model);
+function Ve(e) {
+  return _e.find((t) => t.air === e.model || t.id === e.model);
 }
-function _o(e) {
-  const o = e.settings?.settings?.cameraMovement;
-  return typeof o == "string" ? o : void 0;
+function qa(e) {
+  const a = e.settings?.settings?.cameraMovement;
+  return typeof a == "string" ? a : void 0;
 }
-const no = [
+const pa = [
   { id: "parameter", title: "Camera parameter", text: "The move is a request field the model reads directly." },
   { id: "guide-video", title: "Guide video", text: "A reference video carries the move; the prompt names it." },
   { id: "prompt", title: "Prompt words", text: "The move is written into the prompt and nothing else." }
 ];
-function qn(e) {
-  return _o(e) ? "parameter" : e.inputsSent.some((t) => t.role === "referenceVideo") ? "guide-video" : "prompt";
+function ms(e) {
+  return qa(e) ? "parameter" : e.inputsSent.some((t) => t.role === "referenceVideo") ? "guide-video" : "prompt";
 }
-function er(e, t = Me(e)) {
-  const o = (h) => e.inputsSent.find((w) => w.role === h), s = e.inputsSent.find((h) => h.role === "frameImage" && (h.frame === void 0 || h.frame === "first" || h.frame === 0)), n = e.firstFrameVariant !== "C" ? o("referenceImage") : void 0, r = o("referenceVideo"), i = o("referenceAudio") ?? o("audio"), d = _o(e), a = (h) => h === !1 ? "cannot" : "not-sent", l = s ? { key: "firstFrame", label: "First frame", state: "sent", detail: "as the first frame" } : n ? { key: "firstFrame", label: "First frame", state: "sent", detail: "as a reference image" } : { key: "firstFrame", label: "First frame", state: a(t?.inputs.firstFrame.supported), detail: t?.inputs.firstFrame.supported === !1 ? "cannot take it" : "not sent" }, m = t ? t.inputs.referenceVideos.supported : void 0, u = t ? t.inputs.referenceAudios.supported || t.inputs.audioToVideo.supported : void 0, p = t ? t.camera.kind === "parameter" : void 0;
+function ps(e, t = Ve(e)) {
+  const a = (f) => e.inputsSent.find((w) => w.role === f), n = e.inputsSent.find((f) => f.role === "frameImage" && (f.frame === void 0 || f.frame === "first" || f.frame === 0)), i = e.firstFrameVariant !== "C" ? a("referenceImage") : void 0, s = a("referenceVideo"), o = a("referenceAudio") ?? a("audio"), r = qa(e), d = (f) => f === !1 ? "cannot" : "not-sent", l = n ? { key: "firstFrame", label: "First frame", state: "sent", detail: "as the first frame" } : i ? { key: "firstFrame", label: "First frame", state: "sent", detail: "as a reference image" } : { key: "firstFrame", label: "First frame", state: d(t?.inputs.firstFrame.supported), detail: t?.inputs.firstFrame.supported === !1 ? "cannot take it" : "not sent" }, m = t ? t.inputs.referenceVideos.supported : void 0, u = t ? t.inputs.referenceAudios.supported || t.inputs.audioToVideo.supported : void 0, p = t ? t.camera.kind === "parameter" : void 0;
   return [
     l,
-    r ? { key: "guideVideo", label: "Guide video", state: "sent", detail: "as a reference video" } : { key: "guideVideo", label: "Guide video", state: a(m), detail: m === !1 ? "cannot take it" : "not sent" },
-    i ? { key: "audio", label: "Audio", state: "sent", detail: i.role === "audio" ? "drives the clip" : "as reference audio" } : { key: "audio", label: "Audio", state: a(u), detail: u === !1 ? "cannot take it" : "not sent" },
-    d ? { key: "cameraParam", label: "Camera parameter", state: "sent", detail: d } : { key: "cameraParam", label: "Camera parameter", state: a(p), detail: p === !1 ? "none on this model" : "not sent" },
-    e.prompt ? { key: "prompt", label: "Prompt text", state: "sent", detail: d ? "no camera words" : "carries the move" } : { key: "prompt", label: "Prompt text", state: "not-sent", detail: "no prompt" }
+    s ? { key: "guideVideo", label: "Guide video", state: "sent", detail: "as a reference video" } : { key: "guideVideo", label: "Guide video", state: d(m), detail: m === !1 ? "cannot take it" : "not sent" },
+    o ? { key: "audio", label: "Audio", state: "sent", detail: o.role === "audio" ? "drives the clip" : "as reference audio" } : { key: "audio", label: "Audio", state: d(u), detail: u === !1 ? "cannot take it" : "not sent" },
+    r ? { key: "cameraParam", label: "Camera parameter", state: "sent", detail: r } : { key: "cameraParam", label: "Camera parameter", state: d(p), detail: p === !1 ? "none on this model" : "not sent" },
+    e.prompt ? { key: "prompt", label: "Prompt text", state: "sent", detail: r ? "no camera words" : "carries the move" } : { key: "prompt", label: "Prompt text", state: "not-sent", detail: "no prompt" }
   ];
 }
-function Ko(e, t = Me(e)) {
+function en(e, t = Ve(e)) {
   if (!t || typeof e.durationSeconds != "number") return null;
-  const o = e.inputsSent.some((a) => a.role === "referenceVideo" || a.role === "video"), s = t.pricing.rates.filter((a) => !a.mode.startsWith("draft")), n = s.filter((a) => a.mode === "any" || a.mode === (o ? "video-input" : "no-video-input")), r = n.length ? n : s;
-  if (!r.length) return null;
-  const i = Math.round(Math.min(...r.map((a) => a.usdPerSecond)) * e.durationSeconds * 1e3) / 1e3, d = o ? t.pricing.surcharges.find((a) => a.per === "input-video-second") : void 0;
-  return d ? { usd: i, excludes: `${d.label} at $${d.usd}/s` } : { usd: i };
+  const a = e.inputsSent.some((d) => d.role === "referenceVideo" || d.role === "video"), n = t.pricing.rates.filter((d) => !d.mode.startsWith("draft")), i = n.filter((d) => d.mode === "any" || d.mode === (a ? "video-input" : "no-video-input")), s = i.length ? i : n;
+  if (!s.length) return null;
+  const o = Math.round(Math.min(...s.map((d) => d.usdPerSecond)) * e.durationSeconds * 1e3) / 1e3, r = a ? t.pricing.surcharges.find((d) => d.per === "input-video-second") : void 0;
+  return r ? { usd: o, excludes: `${r.label} at $${r.usd}/s` } : { usd: o };
 }
-const ro = (e) => {
-  const t = Math.floor(e / 60), o = e - t * 60;
-  return `${t}:${o.toFixed(1).padStart(4, "0")}`;
+const ha = (e) => {
+  const t = Math.floor(e / 60), a = e - t * 60;
+  return `${t}:${a.toFixed(1).padStart(4, "0")}`;
 };
-function Ye(e, t = "Play all") {
-  const o = c("button", { class: "primary", type: "button" }, t);
-  o.addEventListener("click", () => {
+function tt(e, t = "Play all") {
+  const a = c("button", { class: "primary", type: "button" }, t);
+  a.addEventListener("click", () => {
     e().play();
   });
-  const s = c("input", { type: "range", min: "0", max: "0", step: String(1 / 24), value: "0", "aria-label": "Playhead" });
-  let n = !1;
-  s.addEventListener("input", () => {
-    n = !0, e().seek(Number(s.value));
-  }), s.addEventListener("change", () => n = !1);
-  const r = c("span", { class: "time" }, "0:00.0 / 0:00.0");
+  const n = c("input", { type: "range", min: "0", max: "0", step: String(1 / 24), value: "0", "aria-label": "Playhead" });
+  let i = !1;
+  n.addEventListener("input", () => {
+    i = !0, e().seek(Number(n.value));
+  }), n.addEventListener("change", () => i = !1);
+  const s = c("span", { class: "time" }, "0:00.0 / 0:00.0");
   return {
-    node: c("div", { class: "transport" }, o, s, r),
-    update(i) {
-      o.textContent = i.playing ? "Pause" : t, s.max = String(i.duration || 0), n || (s.value = String(i.time)), r.textContent = `${ro(i.time)} / ${ro(i.duration)}`;
+    node: c("div", { class: "transport" }, a, n, s),
+    update(o) {
+      a.textContent = o.playing ? "Pause" : t, n.max = String(o.duration || 0), i || (n.value = String(o.time)), s.textContent = `${ha(o.time)} / ${ha(o.duration)}`;
     }
   };
 }
-function ge(e, t, o, s) {
-  const n = c("div", { class: "screen" });
-  let r;
-  e ? (r = c("video", { src: e, muted: "", playsinline: "", preload: "auto", "aria-label": t }), r.muted = !0, r.addEventListener("error", () => o(`${t}: the clip did not load.`)), n.append(r)) : n.append(c("div", { class: "badge" }, "No output")), s && n.append(c("div", { class: "badge" }, s));
-  const i = c("span");
-  return n.append(c("div", { class: "playhead" }, i)), { node: n, video: r, bar: i };
+function xe(e, t, a, n) {
+  const i = c("div", { class: "screen" });
+  let s;
+  e ? (s = c("video", { src: e, muted: "", playsinline: "", preload: "auto", "aria-label": t }), s.muted = !0, s.addEventListener("error", () => a(`${t}: the clip did not load.`)), i.append(s)) : i.append(c("div", { class: "badge" }, "No output")), n && i.append(c("div", { class: "badge" }, n));
+  const o = c("span");
+  return i.append(c("div", { class: "playhead" }, o)), { node: i, video: s, bar: o };
 }
-const Ze = (e) => e.duration ? `${Math.min(100, e.time / e.duration * 100)}%` : "0%", zo = {
+const at = (e) => e.duration ? `${Math.min(100, e.time / e.duration * 100)}%` : "0%", tn = {
   2: [["2-side", "Side by side"], ["2-stack", "Stacked"]],
   3: [["3-row", "Row of 3"], ["3-hero", "1 big + 2"]],
   4: [["4-grid", "2 × 2"], ["4-row", "Row of 4"]],
   5: [["5-3-2", "3 + 2"], ["5-hero", "1 big + 4"]]
 };
-function St(e) {
-  if (e.costUsd !== null) return `${W(e.costUsd)} per clip`;
-  const t = Ko(e, Me(e));
-  return t ? `List price from ${W(t.usd)} per clip${t.excludes ? ` plus ${t.excludes}` : ""} (not run)` : "Cost not recorded";
+function Mt(e) {
+  if (e.costUsd !== null) return `${J(e.costUsd)} per clip`;
+  const t = en(e, Ve(e));
+  return t ? `List price from ${J(t.usd)} per clip${t.excludes ? ` plus ${t.excludes}` : ""} (not run)` : "Cost not recorded";
 }
-function tr(e) {
-  const t = e.costUsd === null ? Ko(e, Me(e)) : null, o = e.costUsd !== null ? W(e.costUsd) : t ? `from ${W(t.usd)}` : "$ —", s = e.generationSeconds !== null ? Xe(e.generationSeconds) : "— s";
-  return `${o} · ${s}`;
+function hs(e) {
+  const t = e.costUsd === null ? en(e, Ve(e)) : null, a = e.costUsd !== null ? J(e.costUsd) : t ? `from ${J(t.usd)}` : "$ —", n = e.generationSeconds !== null ? qe(e.generationSeconds) : "— s";
+  return `${a} · ${n}`;
 }
-function It(e) {
-  const t = typeof e.durationSeconds == "number" ? `${e.durationSeconds} s clip` : null, o = e.generationSeconds !== null ? `${Xe(e.generationSeconds)} to generate` : "generation time not recorded";
-  return [t, o].filter(Boolean).join(" · ");
+function Ft(e) {
+  const t = typeof e.durationSeconds == "number" ? `${e.durationSeconds} s clip` : null, a = e.generationSeconds !== null ? `${qe(e.generationSeconds)} to generate` : "generation time not recorded";
+  return [t, a].filter(Boolean).join(" · ");
 }
-function Wo(e, t) {
-  const o = e.lanes.map((l) => l.id), s = Math.max(1, Math.min(5, o.length)), n = Math.min(s, Math.max(Math.min(2, s), t?.count ?? Math.min(3, s))), r = zo[n] ?? [["single", "Single"]], i = r.some(([l]) => l === t?.layout) ? t.layout : r[0][0], d = [], a = (t?.picks ?? []).filter((l) => o.includes(l));
-  for (let l = 0; l < n; l++) d.push(a[l] ?? o.find((m) => !d.includes(m) && !a.includes(m)) ?? o[l % o.length]);
-  return { count: n, layout: i, picks: d };
+function an(e, t) {
+  const a = e.lanes.map((l) => l.id), n = Math.max(1, Math.min(5, a.length)), i = Math.min(n, Math.max(Math.min(2, n), t?.count ?? Math.min(3, n))), s = tn[i] ?? [["single", "Single"]], o = s.some(([l]) => l === t?.layout) ? t.layout : s[0][0], r = [], d = (t?.picks ?? []).filter((l) => a.includes(l));
+  for (let l = 0; l < i; l++) r.push(d[l] ?? a.find((m) => !r.includes(m) && !d.includes(m)) ?? a[l % a.length]);
+  return { count: i, layout: o, picks: r };
 }
-function io(e, t, o, s) {
-  const n = c("div", { class: "seg", role: "group", "aria-label": e });
-  for (const [r, i] of t) {
-    const d = c("button", { type: "button", "aria-pressed": String(r === o) }, i);
-    d.addEventListener("click", () => s(r)), n.append(d);
+function fa(e, t, a, n) {
+  const i = c("div", { class: "seg", role: "group", "aria-label": e });
+  for (const [s, o] of t) {
+    const r = c("button", { type: "button", "aria-pressed": String(s === a) }, o);
+    r.addEventListener("click", () => n(s)), i.append(r);
   }
-  return n;
+  return i;
 }
-function or(e, t, o) {
-  const { record: s, base: n } = e, r = Ye(e.clock), i = c("div", { class: "stage", "data-layout": t.layout }), d = [], a = /* @__PURE__ */ new Map(), l = new Map(s.lanes.map((h) => [h.id, h])), m = [2, 3, 4, 5].filter((h) => h <= s.lanes.length), u = m.length > 0 ? [
-    io("How many models", m.map((h) => [String(h), `${h} models`]), String(t.count), (h) => o(Wo(s, { ...t, count: Number(h), layout: void 0 }))),
-    io("Layout", zo[t.count] ?? [], t.layout, (h) => o({ ...t, layout: h }))
+function fs(e, t, a) {
+  const { record: n, base: i } = e, s = tt(e.clock), o = c("div", { class: "stage", "data-layout": t.layout }), r = [], d = /* @__PURE__ */ new Map(), l = new Map(n.lanes.map((f) => [f.id, f])), m = [2, 3, 4, 5].filter((f) => f <= n.lanes.length), u = m.length > 0 ? [
+    fa("How many models", m.map((f) => [String(f), `${f} models`]), String(t.count), (f) => a(an(n, { ...t, count: Number(f), layout: void 0 }))),
+    fa("Layout", tn[t.count] ?? [], t.layout, (f) => a({ ...t, layout: f }))
   ] : [];
-  t.picks.forEach((h, w) => {
-    const f = l.get(h), g = `tile-${w}`, b = f.label ?? f.modelName ?? f.model, y = f.output ? z(f.output.src, n) : null, U = ge(y, b, e.error, f.status === "placeholder" ? "Placeholder" : void 0);
-    U.video && (U.video.addEventListener("loadedmetadata", () => e.clock().loaded()), e.clock().add(g, U.video)), d.push(U.bar);
+  t.picks.forEach((f, w) => {
+    const h = l.get(f), g = `tile-${w}`, b = h.label ?? h.modelName ?? h.model, x = h.output ? X(h.output.src, i) : null, U = xe(x, b, e.error, h.status === "placeholder" ? "Placeholder" : void 0);
+    U.video && (U.video.addEventListener("loadedmetadata", () => e.clock().loaded()), e.clock().add(g, U.video)), r.push(U.bar);
     const F = c("select", { "aria-label": `Model for tile ${w + 1}` });
-    for (const H of s.lanes) {
-      const ne = c("option", { value: H.id }, H.label ?? H.modelName ?? H.model);
-      ne.selected = H.id === h, F.append(ne);
+    for (const Y of n.lanes) {
+      const de = c("option", { value: Y.id }, Y.label ?? Y.modelName ?? Y.model);
+      de.selected = Y.id === f, F.append(de);
     }
-    F.addEventListener("change", () => o({ ...t, picks: t.picks.map((H, ne) => ne === w ? F.value : H) }));
-    const te = c("button", { class: "small solo", type: "button", "aria-pressed": "false" }, "Play alone");
-    te.addEventListener("click", () => {
+    F.addEventListener("change", () => a({ ...t, picks: t.picks.map((Y, de) => de === w ? F.value : Y) }));
+    const se = c("button", { class: "small solo", type: "button", "aria-pressed": "false" }, "Play alone");
+    se.addEventListener("click", () => {
       e.clock().solo(g);
-    }), U.video || (te.disabled = !0), a.set(g, te);
-    const xe = c("span", { class: "meta", title: `${St(f)} · ${It(f)}` }, tr(f));
-    i.append(
+    }), U.video || (se.disabled = !0), d.set(g, se);
+    const Pe = c("span", { class: "meta", title: `${Mt(h)} · ${Ft(h)}` }, hs(h));
+    o.append(
       c(
         "figure",
-        { class: `tile${s.preferredLane === f.id ? " preferred" : ""}`, "data-lane": f.id },
+        { class: `tile${n.preferredLane === h.id ? " preferred" : ""}`, "data-lane": h.id },
         U.node,
-        c("figcaption", { class: "overlay" }, F, te, xe)
+        c("figcaption", { class: "overlay" }, F, se, Pe)
       )
     );
   });
-  const p = s.observations?.length ? c("ul", { class: "note" }, ...s.observations.map((h) => c("li", {}, h))) : null;
+  const p = n.observations?.length ? c("ul", { class: "note" }, ...n.observations.map((f) => c("li", {}, f))) : null;
   return {
     controls: u,
-    nodes: [r.node, i, ...p ? [p] : []],
-    update(h) {
-      r.update(h);
-      const w = Ze(h);
-      d.forEach((f) => f.style.width = w);
-      for (const [f, g] of a)
-        g.textContent = h.soloing === f ? "Stop" : "Play alone", g.setAttribute("aria-pressed", String(h.soloing === f));
+    nodes: [s.node, o, ...p ? [p] : []],
+    update(f) {
+      s.update(f);
+      const w = at(f);
+      r.forEach((h) => h.style.width = w);
+      for (const [h, g] of d)
+        g.textContent = f.soloing === h ? "Stop" : "Play alone", g.setAttribute("aria-pressed", String(f.soloing === h));
     }
   };
 }
-const sr = (e) => e.model === "guide" || e.provider === "none";
-function nr(e) {
+const gs = (e) => e.model === "guide" || e.provider === "none";
+function bs(e) {
   const t = c("button", { class: "small", type: "button" }, "Copy prompt");
   return t.addEventListener("click", async () => {
     try {
@@ -3159,158 +3159,158 @@ function nr(e) {
     setTimeout(() => t.textContent = "Copy prompt", 1500);
   }), t;
 }
-function rr(e, t) {
-  const { record: o, base: s } = e, n = o.lanes.filter((k) => !sr(k));
-  let r = n.find((k) => k.id === t) ?? n[0];
-  const i = Ye(e.clock, "Play both"), d = o.guide ? z(o.guide.video.src, s) : null, a = ge(d, "Guide", e.error);
-  a.video && (a.video.addEventListener("loadedmetadata", () => e.clock().loaded()), e.clock().add("guide-clip", a.video));
+function ws(e, t) {
+  const { record: a, base: n } = e, i = a.lanes.filter((k) => !gs(k));
+  let s = i.find((k) => k.id === t) ?? i[0];
+  const o = tt(e.clock, "Play both"), r = a.guide ? X(a.guide.video.src, n) : null, d = xe(r, "Guide", e.error);
+  d.video && (d.video.addEventListener("loadedmetadata", () => e.clock().loaded()), e.clock().add("guide-clip", d.video));
   const l = c(
     "figure",
     { class: "side" },
-    a.node,
-    c("figcaption", {}, c("span", { class: "model" }, "Guide"), c("span", { class: "id" }, o.guide ? o.guide.title ?? "The clip every model was given" : "No guide clip in this record"))
-  ), m = c("div", { class: "side-screen" }), u = c("span", { class: "model" }), p = c("span", { class: "id" }), h = c("figure", { class: "side" }, m, c("figcaption", {}, u, p));
+    d.node,
+    c("figcaption", {}, c("span", { class: "model" }, "Guide"), c("span", { class: "id" }, a.guide ? a.guide.title ?? "The clip every model was given" : "No guide clip in this record"))
+  ), m = c("div", { class: "side-screen" }), u = c("span", { class: "model" }), p = c("span", { class: "id" }), f = c("figure", { class: "side" }, m, c("figcaption", {}, u, p));
   let w = c("span");
-  const f = c("div", { class: "switcher", role: "group", "aria-label": "Model" }), g = /* @__PURE__ */ new Map();
-  for (const k of n) {
-    const L = c("button", { type: "button", "aria-pressed": "false", "data-lane": k.id }, k.label ?? k.modelName ?? k.model);
-    L.addEventListener("click", () => H(k)), g.set(k.id, L), f.append(L);
+  const h = c("div", { class: "switcher", role: "group", "aria-label": "Model" }), g = /* @__PURE__ */ new Map();
+  for (const k of i) {
+    const j = c("button", { type: "button", "aria-pressed": "false", "data-lane": k.id }, k.label ?? k.modelName ?? k.model);
+    j.addEventListener("click", () => Y(k)), g.set(k.id, j), h.append(j);
   }
-  const b = c("ol", { class: "modes", "aria-label": "Three ways a model is steered" }), y = new Map(
-    no.map((k) => {
-      const L = c("li", { "data-mode": k.id }, c("strong", {}, k.title), c("span", {}, k.text));
-      return b.append(L), [k.id, L];
+  const b = c("ol", { class: "modes", "aria-label": "Three ways a model is steered" }), x = new Map(
+    pa.map((k) => {
+      const j = c("li", { "data-mode": k.id }, c("strong", {}, k.title), c("span", {}, k.text));
+      return b.append(j), [k.id, j];
     })
-  ), U = c("ul", { class: "strip", "aria-label": "Inputs this model received" }), F = c("pre"), te = c(
+  ), U = c("ul", { class: "strip", "aria-label": "Inputs this model received" }), F = c("pre"), se = c(
     "div",
     { class: "composed" },
-    c("div", { class: "row spread" }, c("span", { class: "id" }, "Composed prompt"), nr(() => r?.prompt ?? "")),
+    c("div", { class: "row spread" }, c("span", { class: "id" }, "Composed prompt"), bs(() => s?.prompt ?? "")),
     F
-  ), xe = c("p", { class: "note" });
-  function H(k) {
-    r = k;
-    const L = e.clock(), os = L.state.time;
-    L.pause(), L.remove("output");
-    const ss = k.output ? z(k.output.src, s) : null, Qe = k.label ?? k.modelName ?? k.model, $e = ge(ss, Qe, e.error, k.status === "placeholder" ? "Placeholder clip" : void 0);
-    $e.video && ($e.video.addEventListener("loadedmetadata", () => {
-      L.loaded(), L.seek(os);
-    }), L.add("output", $e.video)), m.replaceChildren($e.node), w = $e.bar;
-    const qe = qn(k), ns = no.find((C) => C.id === qe).title;
-    u.textContent = Qe, p.textContent = `Steered by: ${ns} · ${St(k)} · ${It(k)}`;
-    for (const [C, ke] of g) ke.setAttribute("aria-pressed", String(C === k.id));
-    for (const [C, ke] of y)
-      ke.classList.toggle("on", C === qe), C === qe ? ke.setAttribute("aria-current", "true") : ke.removeAttribute("aria-current");
-    const rs = Me(k);
+  ), Pe = c("p", { class: "note" });
+  function Y(k) {
+    s = k;
+    const j = e.clock(), gn = j.state.time;
+    j.pause(), j.remove("output");
+    const bn = k.output ? X(k.output.src, n) : null, nt = k.label ?? k.modelName ?? k.model, Ae = xe(bn, nt, e.error, k.status === "placeholder" ? "Placeholder clip" : void 0);
+    Ae.video && (Ae.video.addEventListener("loadedmetadata", () => {
+      j.loaded(), j.seek(gn);
+    }), j.add("output", Ae.video)), m.replaceChildren(Ae.node), w = Ae.bar;
+    const it = ms(k), wn = pa.find((O) => O.id === it).title;
+    u.textContent = nt, p.textContent = `Steered by: ${wn} · ${Mt(k)} · ${Ft(k)}`;
+    for (const [O, Ue] of g) Ue.setAttribute("aria-pressed", String(O === k.id));
+    for (const [O, Ue] of x)
+      Ue.classList.toggle("on", O === it), O === it ? Ue.setAttribute("aria-current", "true") : Ue.removeAttribute("aria-current");
+    const yn = Ve(k);
     U.replaceChildren(
-      ...er(k, rs).map(
-        (C) => c(
+      ...ps(k, yn).map(
+        (O) => c(
           "li",
-          { class: `slot ${C.state}`, "data-slot": C.key, title: C.state === "cannot" ? `${Qe} cannot take this input` : C.detail },
-          c("strong", {}, C.label),
-          c("span", {}, C.detail)
+          { class: `slot ${O.state}`, "data-slot": O.key, title: O.state === "cannot" ? `${nt} cannot take this input` : O.detail },
+          c("strong", {}, O.label),
+          c("span", {}, O.detail)
         )
       )
-    ), F.textContent = k.prompt || "(no prompt)", xe.textContent = k.note ?? "", xe.hidden = !k.note;
+    ), F.textContent = k.prompt || "(no prompt)", Pe.textContent = k.note ?? "", Pe.hidden = !k.note;
   }
-  r && H(r);
-  const ne = n.length ? null : c("p", { class: "note" }, "This record has no model lanes to compare with the guide.");
+  s && Y(s);
+  const de = i.length ? null : c("p", { class: "note" }, "This record has no model lanes to compare with the guide.");
   return {
-    nodes: [c("div", { class: "pair" }, l, h), i.node, f, b, U, te, xe, ...ne ? [ne] : []],
+    nodes: [c("div", { class: "pair" }, l, f), o.node, h, b, U, se, Pe, ...de ? [de] : []],
     update(k) {
-      i.update(k);
-      const L = Ze(k);
-      a.bar.style.width = L, w.style.width = L;
+      o.update(k);
+      const j = at(k);
+      d.bar.style.width = j, w.style.width = j;
     }
   };
 }
-const ir = (e) => e.model === "guide" || e.provider === "none", ar = /* @__PURE__ */ new Set(["referenceImage", "frameImage"]), dr = { character: "Character sheet", environment: "Environment", frame0: "Guide frame 0" };
-function cr(e) {
+const ys = (e) => e.model === "guide" || e.provider === "none", vs = /* @__PURE__ */ new Set(["referenceImage", "frameImage"]), xs = { character: "Character sheet", environment: "Environment", frame0: "Guide frame 0" };
+function $s(e) {
   const t = /* @__PURE__ */ new Map();
-  for (const o of e) {
-    const s = (o.shot?.references ?? []).filter((n) => n.kind === "image").map((n) => n.id);
-    o.inputsSent.filter((n) => ar.has(n.role)).forEach((n, r) => {
-      t.has(n.src) || t.set(n.src, dr[s[r] ?? ""] ?? n.label ?? "Reference image");
+  for (const a of e) {
+    const n = (a.shot?.references ?? []).filter((i) => i.kind === "image").map((i) => i.id);
+    a.inputsSent.filter((i) => vs.has(i.role)).forEach((i, s) => {
+      t.has(i.src) || t.set(i.src, xs[n[s] ?? ""] ?? i.label ?? "Reference image");
     });
   }
-  return [...t].map(([o, s]) => ({ src: o, label: s }));
+  return [...t].map(([a, n]) => ({ src: a, label: n }));
 }
-function lr(e) {
-  const { record: t, base: o } = e, s = e.clock(), n = Ye(e.clock, "Play all"), r = [], i = t.lanes.filter((b) => !ir(b) && b.output).slice(0, 3), d = cr(t.lanes), a = d.length ? c(
+function ks(e) {
+  const { record: t, base: a } = e, n = e.clock(), i = tt(e.clock, "Play all"), s = [], o = t.lanes.filter((b) => !ys(b) && b.output).slice(0, 3), r = $s(t.lanes), d = r.length ? c(
     "ul",
     { class: "ref-strip", "aria-label": "Reference images sent" },
-    ...d.map((b) => {
-      const y = z(b.src, o);
-      return c("li", {}, y ? c("img", { src: y, alt: b.label, loading: "lazy" }) : c("div", { class: "ph" }, "image"), c("span", {}, b.label));
+    ...r.map((b) => {
+      const x = X(b.src, a);
+      return c("li", {}, x ? c("img", { src: x, alt: b.label, loading: "lazy" }) : c("div", { class: "ph" }, "image"), c("span", {}, b.label));
     })
   ) : null, l = c("div", { class: "inputs-row" });
-  l.style.setProperty("--ma-columns", String(1 + Math.max(1, i.length)));
-  const m = t.guide ? z(t.guide.video.src, o) : null, u = ge(m, "Guide", e.error);
-  u.video && (u.video.addEventListener("loadedmetadata", () => s.loaded()), s.add("guide-clip", u.video)), r.push(u.bar), l.append(c("figure", { class: "side", "data-lane": "guide" }, u.node, c("figcaption", {}, c("span", { class: "model" }, "Guide"), c("span", { class: "id" }, t.guide?.title ?? "The clip every model was given"))));
-  const p = t.guide?.audio ? z(t.guide.audio.src, o) : null;
-  let h;
-  p && (h = c("audio", { src: p, preload: "auto", "data-track": "guide-audio" }), h.addEventListener("loadedmetadata", () => s.loaded()), s.add("guide-audio", h));
+  l.style.setProperty("--ma-columns", String(1 + Math.max(1, o.length)));
+  const m = t.guide ? X(t.guide.video.src, a) : null, u = xe(m, "Guide", e.error);
+  u.video && (u.video.addEventListener("loadedmetadata", () => n.loaded()), n.add("guide-clip", u.video)), s.push(u.bar), l.append(c("figure", { class: "side", "data-lane": "guide" }, u.node, c("figcaption", {}, c("span", { class: "model" }, "Guide"), c("span", { class: "id" }, t.guide?.title ?? "The clip every model was given"))));
+  const p = t.guide?.audio ? X(t.guide.audio.src, a) : null;
+  let f;
+  p && (f = c("audio", { src: p, preload: "auto", "data-track": "guide-audio" }), f.addEventListener("loadedmetadata", () => n.loaded()), n.add("guide-audio", f));
   const w = [];
-  for (const b of i) {
-    const y = ge(z(b.output.src, o), b.label ?? b.modelName ?? b.model, e.error, b.status === "placeholder" ? "Placeholder clip" : void 0);
-    y.video && (y.video.addEventListener("loadedmetadata", () => s.loaded()), s.add(b.id, y.video), w.push(y.video)), r.push(y.bar), l.append(
+  for (const b of o) {
+    const x = xe(X(b.output.src, a), b.label ?? b.modelName ?? b.model, e.error, b.status === "placeholder" ? "Placeholder clip" : void 0);
+    x.video && (x.video.addEventListener("loadedmetadata", () => n.loaded()), n.add(b.id, x.video), w.push(x.video)), s.push(x.bar), l.append(
       c(
         "figure",
         { class: "side", "data-lane": b.id },
-        y.node,
-        c("figcaption", {}, c("span", { class: "model" }, b.label ?? b.modelName ?? b.model), c("span", { class: "id" }, `${St(b)} · ${It(b)}`)),
+        x.node,
+        c("figcaption", {}, c("span", { class: "model" }, b.label ?? b.modelName ?? b.model), c("span", { class: "id" }, `${Mt(b)} · ${Ft(b)}`)),
         c("details", { class: "lane-prompt" }, c("summary", {}, b.composed ? "Composed prompt" : "Prompt"), c("pre", {}, b.prompt || "(no prompt)"))
       )
     );
   }
-  i.length || l.append(c("p", { class: "note" }, "This record has no outputs yet."));
-  const f = c("button", { type: "button", class: "small", "aria-pressed": "false", "data-action": "clip-sound" }, "Clip sound: off"), g = (b) => {
-    for (const y of w) y.muted = !b;
-    h && (h.muted = b), f.setAttribute("aria-pressed", String(b)), f.textContent = `Clip sound: ${b ? "on" : "off"}`;
+  o.length || l.append(c("p", { class: "note" }, "This record has no outputs yet."));
+  const h = c("button", { type: "button", class: "small", "aria-pressed": "false", "data-action": "clip-sound" }, "Clip sound: off"), g = (b) => {
+    for (const x of w) x.muted = !b;
+    f && (f.muted = b), h.setAttribute("aria-pressed", String(b)), h.textContent = `Clip sound: ${b ? "on" : "off"}`;
   };
-  return f.addEventListener("click", () => g(f.getAttribute("aria-pressed") !== "true")), g(!1), {
-    controls: [f],
-    nodes: [...a ? [a] : [], l, n.node, ...h ? [h] : []],
+  return h.addEventListener("click", () => g(h.getAttribute("aria-pressed") !== "true")), g(!1), {
+    controls: [h],
+    nodes: [...d ? [d] : [], l, i.node, ...f ? [f] : []],
     update(b) {
-      n.update(b);
-      const y = Ze(b);
-      r.forEach((U) => U.style.width = y);
+      i.update(b);
+      const x = at(b);
+      s.forEach((U) => U.style.width = x);
     }
   };
 }
-function ur(e, t) {
-  const { record: o, base: s } = e, n = Ye(e.clock), r = [], i = /* @__PURE__ */ new Map(), d = c("div", { class: "lanes" });
-  d.style.setProperty("--ma-columns", String(t === "three-up" ? Math.min(3, o.lanes.length) : 3));
-  for (const l of o.lanes) {
-    const m = l.output ? z(l.output.src, s) : null, u = ge(m, l.label ?? l.model, e.error, l.status === "placeholder" ? "Placeholder clip" : l.status === "pending" ? "Not run yet" : void 0);
-    u.video && (u.video.addEventListener("loadedmetadata", () => e.clock().loaded()), e.clock().add(l.id, u.video)), r.push(u.bar);
-    const { node: p, solo: h } = Tn(l, s, () => {
+function Ss(e, t) {
+  const { record: a, base: n } = e, i = tt(e.clock), s = [], o = /* @__PURE__ */ new Map(), r = c("div", { class: "lanes" });
+  r.style.setProperty("--ma-columns", String(t === "three-up" ? Math.min(3, a.lanes.length) : 3));
+  for (const l of a.lanes) {
+    const m = l.output ? X(l.output.src, n) : null, u = xe(m, l.label ?? l.model, e.error, l.status === "placeholder" ? "Placeholder clip" : l.status === "pending" ? "Not run yet" : void 0);
+    u.video && (u.video.addEventListener("loadedmetadata", () => e.clock().loaded()), e.clock().add(l.id, u.video)), s.push(u.bar);
+    const { node: p, solo: f } = zi(l, n, () => {
       e.clock().solo(l.id);
     });
-    u.video || (h.disabled = !0), i.set(l.id, h), d.append(c("article", { class: `lane${o.preferredLane === l.id ? " preferred" : ""}`, "data-lane": l.id }, u.node, p));
+    u.video || (f.disabled = !0), o.set(l.id, f), r.append(c("article", { class: `lane${a.preferredLane === l.id ? " preferred" : ""}`, "data-lane": l.id }, u.node, p));
   }
-  const a = o.observations?.length ? c("ul", { class: "note" }, ...o.observations.map((l) => c("li", {}, l))) : null;
+  const d = a.observations?.length ? c("ul", { class: "note" }, ...a.observations.map((l) => c("li", {}, l))) : null;
   return {
-    nodes: [n.node, d, ...a ? [a] : []],
+    nodes: [i.node, r, ...d ? [d] : []],
     update(l) {
-      n.update(l);
-      const m = Ze(l);
-      r.forEach((u) => u.style.width = m);
-      for (const [u, p] of i)
+      i.update(l);
+      const m = at(l);
+      s.forEach((u) => u.style.width = m);
+      for (const [u, p] of o)
         p.textContent = l.soloing === u ? "Stop" : "Play alone", p.setAttribute("aria-pressed", String(l.soloing === u));
     }
   };
 }
-const dt = () => typeof location > "u" ? "http://localhost/" : location.href;
-class mr extends HTMLElement {
+const pt = () => typeof location > "u" ? "http://localhost/" : location.href;
+class Is extends HTMLElement {
   static observedAttributes = ["src", "layout", "tab"];
   root;
-  clock = new to();
+  clock = new la();
   unsubscribe;
   current;
   set;
   tabId;
   arenaState;
-  base = dt();
+  base = pt();
   load = 0;
   onHide = () => document.hidden && this.clock.hide();
   constructor() {
@@ -3322,8 +3322,8 @@ class mr extends HTMLElement {
   disconnectedCallback() {
     document.removeEventListener("visibilitychange", this.onHide), this.clock.hide();
   }
-  attributeChangedCallback(t, o, s) {
-    t === "src" && s && s !== o && this.fetchSource(s), t === "layout" && this.current && this.render(this.current), t === "tab" && s && this.set && s !== this.tabId && this.showTab(s);
+  attributeChangedCallback(t, a, n) {
+    t === "src" && n && n !== a && this.fetchSource(n), t === "layout" && this.current && this.render(this.current), t === "tab" && n && this.set && n !== this.tabId && this.showTab(n);
   }
   get record() {
     return this.current;
@@ -3332,110 +3332,110 @@ class mr extends HTMLElement {
     this.setRecord(t);
   }
   /** Hands in a record or a record set; media and tab paths resolve against `baseUrl` (default: the page). */
-  setRecord(t, o = dt()) {
-    const s = ++this.load, n = (r) => this.message(`This record cannot be shown: ${r.message}`);
+  setRecord(t, a = pt()) {
+    const n = ++this.load, i = (s) => this.message(`This record cannot be shown: ${s.message}`);
     try {
-      this.accept(t, o, s).catch(n);
-    } catch (r) {
-      n(r);
+      this.accept(t, a, n).catch(i);
+    } catch (s) {
+      i(s);
     }
   }
   /** Not async on purpose: a bad record throws synchronously, so the message shows at once. */
-  accept(t, o, s) {
-    if (Yn(t))
-      return this.set = { data: Zn(t), base: o, cache: /* @__PURE__ */ new Map() }, this.showTab(this.getAttribute("tab") ?? this.set.data.tabs[0].id, s);
-    const n = ue(t);
-    return this.set = void 0, this.tabId = void 0, this.base = o, this.render(n), Promise.resolve();
+  accept(t, a, n) {
+    if (cs(t))
+      return this.set = { data: ls(t), base: a, cache: /* @__PURE__ */ new Map() }, this.showTab(this.getAttribute("tab") ?? this.set.data.tabs[0].id, n);
+    const i = ge(t);
+    return this.set = void 0, this.tabId = void 0, this.base = a, this.render(i), Promise.resolve();
   }
   async fetchJson(t) {
-    const o = await fetch(t);
-    if (!o.ok) throw new Error(`HTTP ${o.status}`);
-    return o.json();
+    const a = await fetch(t);
+    if (!a.ok) throw new Error(`HTTP ${a.status}`);
+    return a.json();
   }
   async fetchSource(t) {
-    const o = ++this.load;
+    const a = ++this.load;
     this.message("Loading…");
     try {
-      const s = new URL(t, dt()).href, n = await this.fetchJson(s);
-      if (o !== this.load) return;
-      await this.accept(n, s, o);
-    } catch (s) {
-      o === this.load && this.message(`Could not load ${t}: ${s.message}`);
+      const n = new URL(t, pt()).href, i = await this.fetchJson(n);
+      if (a !== this.load) return;
+      await this.accept(i, n, a);
+    } catch (n) {
+      a === this.load && this.message(`Could not load ${t}: ${n.message}`);
     }
   }
-  async showTab(t, o = ++this.load) {
-    const s = this.set;
-    if (!s) return;
-    const n = s.data.tabs.find((r) => r.id === t) ?? s.data.tabs[0];
-    this.tabId = n.id;
+  async showTab(t, a = ++this.load) {
+    const n = this.set;
+    if (!n) return;
+    const i = n.data.tabs.find((s) => s.id === t) ?? n.data.tabs[0];
+    this.tabId = i.id;
     try {
-      let r = s.cache.get(n.id);
-      if (!r) {
-        if (n.record) r = { record: ue(n.record), base: s.base };
+      let s = n.cache.get(i.id);
+      if (!s) {
+        if (i.record) s = { record: ge(i.record), base: n.base };
         else {
-          const i = new URL(n.src, s.base).href;
-          r = { record: ue(await this.fetchJson(i)), base: i };
+          const o = new URL(i.src, n.base).href;
+          s = { record: ge(await this.fetchJson(o)), base: o };
         }
-        s.cache.set(n.id, r);
+        n.cache.set(i.id, s);
       }
-      if (o !== this.load) return;
-      this.base = r.base, this.render(r.record);
-    } catch (r) {
-      o === this.load && this.message(`Could not load the "${n.label}" tab: ${r.message}`);
+      if (a !== this.load) return;
+      this.base = s.base, this.render(s.record);
+    } catch (s) {
+      a === this.load && this.message(`Could not load the "${i.label}" tab: ${s.message}`);
     }
   }
   message(t) {
     this.teardown();
-    const o = this.tabs();
+    const a = this.tabs();
     this.root.replaceChildren(
-      c("style", {}, so),
-      ...o ? [c("div", { class: "head" }, c("div", { class: "controls" }, o))] : [],
+      c("style", {}, ma),
+      ...a ? [c("div", { class: "head" }, c("div", { class: "controls" }, a))] : [],
       c("div", { class: "body" }, c("p", { class: "note" }, t))
     );
   }
   teardown() {
-    this.unsubscribe?.(), this.clock.hide(), this.clock = new to();
+    this.unsubscribe?.(), this.clock.hide(), this.clock = new la();
   }
   tabs() {
     const t = this.set;
     if (!t || t.data.tabs.length < 2) return null;
-    const o = c("div", { class: "seg tabs", role: "tablist", "aria-label": "Test" }), s = t.data.tabs.map((n) => n.id);
-    for (const n of t.data.tabs) {
-      const r = n.id === this.tabId, i = c("button", { type: "button", role: "tab", "aria-selected": String(r), tabindex: r ? "0" : "-1", "data-tab": n.id }, n.label);
-      i.addEventListener("click", () => {
-        this.showTab(n.id);
-      }), i.addEventListener("keydown", (d) => {
-        const a = d.key === "ArrowRight" ? 1 : d.key === "ArrowLeft" ? -1 : 0;
-        if (!a) return;
-        d.preventDefault();
-        const l = s[(s.indexOf(n.id) + a + s.length) % s.length];
+    const a = c("div", { class: "seg tabs", role: "tablist", "aria-label": "Test" }), n = t.data.tabs.map((i) => i.id);
+    for (const i of t.data.tabs) {
+      const s = i.id === this.tabId, o = c("button", { type: "button", role: "tab", "aria-selected": String(s), tabindex: s ? "0" : "-1", "data-tab": i.id }, i.label);
+      o.addEventListener("click", () => {
+        this.showTab(i.id);
+      }), o.addEventListener("keydown", (r) => {
+        const d = r.key === "ArrowRight" ? 1 : r.key === "ArrowLeft" ? -1 : 0;
+        if (!d) return;
+        r.preventDefault();
+        const l = n[(n.indexOf(i.id) + d + n.length) % n.length];
         this.showTab(l).then(() => this.root.querySelector(`[data-tab="${l}"]`)?.focus());
-      }), o.append(i);
+      }), a.append(o);
     }
-    return o;
+    return a;
   }
   render(t) {
     this.teardown(), this.current = t;
-    const o = this.getAttribute("layout") ?? "three-up", s = c("div", { class: "error", role: "status" }), n = { record: t, base: this.base, clock: () => this.clock, error: (m) => s.textContent = m };
-    let r;
-    o === "arena" ? (this.arenaState = Wo(t, this.arenaState), r = or(n, this.arenaState, (m) => {
+    const a = this.getAttribute("layout") ?? "three-up", n = c("div", { class: "error", role: "status" }), i = { record: t, base: this.base, clock: () => this.clock, error: (m) => n.textContent = m };
+    let s;
+    a === "arena" ? (this.arenaState = an(t, this.arenaState), s = fs(i, this.arenaState, (m) => {
       this.arenaState = m, this.render(t);
-    })) : o === "inputs" ? r = lr(n) : r = o === "guidance" ? rr(n, this.getAttribute("model")) : ur(n, o);
-    const i = this.tabs(), d = [...i ? [i] : [], ...r.controls ?? []], a = c(
+    })) : a === "inputs" ? s = ks(i) : s = a === "guidance" ? ws(i, this.getAttribute("model")) : Ss(i, a);
+    const o = this.tabs(), r = [...o ? [o] : [], ...s.controls ?? []], d = c(
       "div",
       { class: "head" },
       c("div", { class: "title" }, c("h2", {}, t.title), c("span", { class: "meta" }, `${t.lanes.length} lanes`)),
-      d.length ? c("div", { class: "controls" }, ...d) : null
-    ), l = t.shot ? c("p", { class: "intent" }, c("span", { class: "id" }, "One shot description, composed per model: "), ps(t.shot)) : null;
-    this.root.replaceChildren(c("style", {}, so), a, ...l ? [l] : [], s, c("div", { class: "body" }, ...r.nodes)), this.dataset.layout = o, this.unsubscribe = this.clock.subscribe((m) => {
-      r.update(m), m.error && (s.textContent = m.error);
+      r.length ? c("div", { class: "controls" }, ...r) : null
+    ), l = t.shot ? c("p", { class: "intent" }, c("span", { class: "id" }, "One shot description, composed per model: "), Pn(t.shot)) : null;
+    this.root.replaceChildren(c("style", {}, ma), d, ...l ? [l] : [], n, c("div", { class: "body" }, ...s.nodes)), this.dataset.layout = a, this.unsubscribe = this.clock.subscribe((m) => {
+      s.update(m), m.error && (n.textContent = m.error);
     });
   }
 }
-function Et(e = "model-arena") {
-  customElements.get(e) || customElements.define(e, mr);
+function Lt(e = "model-arena") {
+  customElements.get(e) || customElements.define(e, Is);
 }
-const pr = {
+const Es = {
   referenceVideo: "reference video",
   referenceImage: "reference image",
   referenceAudio: "reference audio",
@@ -3443,24 +3443,24 @@ const pr = {
   audio: "driving audio",
   video: "video"
 };
-function fr(e, t) {
-  const o = (r) => t.get(r.replace(/^\.\//, "")) ?? r, s = JSON.parse(JSON.stringify(e)), n = s.guide;
-  if (n)
-    for (const r of ["video", "audio", "firstFrame", "firstFrameStyled", "camera"]) n[r] && (n[r].src = o(n[r].src));
-  for (const r of s.lanes) for (const i of r.inputsSent) i.src = o(i.src);
-  return s;
+function Ps(e, t) {
+  const a = (s) => t.get(s.replace(/^\.\//, "")) ?? s, n = JSON.parse(JSON.stringify(e)), i = n.guide;
+  if (i)
+    for (const s of ["video", "audio", "firstFrame", "firstFrameStyled", "camera"]) i[s] && (i[s].src = a(i[s].src));
+  for (const s of n.lanes) for (const o of s.inputsSent) o.src = a(o.src);
+  return n;
 }
-function hr(e) {
+function As(e) {
   return [
-    `Inputs sent: ${e.inputsSent.map((o) => `${pr[o.role] ?? o.role} ${o.label ?? o.src}`).join(", ") || "prompt only"}`,
-    `Cost: ${W(e.costUsd)}${e.costUsd === null ? "" : " reported"} (estimate ${W(e.estimate.usd)})`,
-    `Seconds: ${Xe(e.generationSeconds)} to generate`,
+    `Inputs sent: ${e.inputsSent.map((a) => `${Es[a.role] ?? a.role} ${a.label ?? a.src}`).join(", ") || "prompt only"}`,
+    `Cost: ${J(e.costUsd)}${e.costUsd === null ? "" : " reported"} (estimate ${J(e.estimate.usd)})`,
+    `Seconds: ${qe(e.generationSeconds)} to generate`,
     `Model ran: ${e.modelRan ?? "not reported by the provider"}`,
     // An input the model was not sent belongs in the caption itself, not only in the notes.
-    ...e.notes.filter((o) => o.startsWith("Music not sent"))
+    ...e.notes.filter((a) => a.startsWith("Music not sent"))
   ].join(" · ");
 }
-function gr(e) {
+function Us(e) {
   const t = c("a", { class: "btn", download: `${e.id}.json`, "data-action": "record-json" }, "Download record JSON");
   try {
     t.href = URL.createObjectURL(new Blob([JSON.stringify(e, null, 2)], { type: "application/json" }));
@@ -3469,29 +3469,29 @@ function gr(e) {
   }
   return t;
 }
-function br(e, t, o, s) {
-  Et();
-  const n = document.createElement("model-arena");
-  n.setAttribute("layout", "guidance"), n.setRecord(fr(e.record, t), o);
-  const r = c("a", { class: "btn", href: z(e.videoURL, o) ?? "#", download: "", target: "_blank", rel: "noopener noreferrer", "data-action": "download" }, "Download"), i = c("button", { type: "button", "data-action": "add" }, "Add to gallery"), d = c("span");
-  i.addEventListener("click", () => {
-    s(e.record), i.textContent = "Added", i.disabled = !0, d.replaceChildren(gr(e.record));
+function Ts(e, t, a, n) {
+  Lt();
+  const i = document.createElement("model-arena");
+  i.setAttribute("layout", "guidance"), i.setRecord(Ps(e.record, t), a);
+  const s = c("a", { class: "btn", href: X(e.videoURL, a) ?? "#", download: "", target: "_blank", rel: "noopener noreferrer", "data-action": "download" }, "Download"), o = c("button", { type: "button", "data-action": "add" }, "Add to gallery"), r = c("span");
+  o.addEventListener("click", () => {
+    n(e.record), o.textContent = "Added", o.disabled = !0, r.replaceChildren(Us(e.record));
   });
-  const a = c("details", { class: "cost-row" }, c("summary", {}, "Cost row for docs/costs.md"), c("pre", {}, e.costRowText.trim()));
+  const d = c("details", { class: "cost-row" }, c("summary", {}, "Cost row for docs/costs.md"), c("pre", {}, e.costRowText.trim()));
   return c(
     "section",
     { class: "result", "aria-label": "Result" },
-    n,
-    c("p", { class: "caption", "data-caption": "" }, hr(e)),
+    i,
+    c("p", { class: "caption", "data-caption": "" }, As(e)),
     e.notes.length ? c("ul", { class: "notes" }, ...e.notes.map((l) => c("li", {}, l))) : null,
-    c("div", { class: "row" }, r, i, d),
-    a
+    c("div", { class: "row" }, s, o, r),
+    d
   );
 }
-const wr = Cn.map((e) => `${e}: inherit;`).join(" "), Ho = (
+const Rs = Yi.map((e) => `${e}: inherit;`).join(" "), nn = (
   /* css */
   `
-${Je}
+${et}
 :host { display: block; width: 100%; max-width: 100%; color: var(--ma-fg); background: var(--ma-card); border: 1px solid var(--ma-line); border-radius: var(--ma-radius-lg); font: 400 14px/1.5 var(--ma-font); container-type: inline-size; overflow: hidden; }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
@@ -3541,10 +3541,10 @@ pre { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font: 12px/1.5 
 .switch button[aria-pressed="true"] { background: var(--ma-accent); color: var(--ma-accent-fg); }
 .empty { padding: 32px 16px; text-align: center; color: var(--ma-muted); }
 .empty strong { display: block; color: var(--ma-fg); font-size: 15px; margin-bottom: 4px; }
-model-arena, arena-key { ${wr} }
+model-arena, arena-key { ${Rs} }
 `
-), de = () => typeof location > "u" ? "http://localhost/" : location.href;
-class vr extends HTMLElement {
+), me = () => typeof location > "u" ? "http://localhost/" : location.href;
+class Ms extends HTMLElement {
   static observedAttributes = ["guide-src", "preset"];
   /** A fake or wrapped fetch for the provider; the page's fetch otherwise. */
   fetch;
@@ -3553,7 +3553,7 @@ class vr extends HTMLElement {
   confirm;
   root;
   urls = /* @__PURE__ */ new Map();
-  base = de();
+  base = me();
   loaded;
   refs = {};
   slots;
@@ -3566,15 +3566,15 @@ class vr extends HTMLElement {
   }
   connectedCallback() {
     this.ui || this.build();
-    const t = this.getAttribute("preset"), o = this.getAttribute("guide-src");
-    t && !this.loaded ? this.fetchPreset(t) : o && !this.loaded && this.loadFrom(o);
+    const t = this.getAttribute("preset"), a = this.getAttribute("guide-src");
+    t && !this.loaded ? this.fetchPreset(t) : a && !this.loaded && this.loadFrom(a);
   }
-  attributeChangedCallback(t, o, s) {
-    !this.ui || !s || s === o || (t === "preset" ? this.fetchPreset(s) : this.loadFrom(s));
+  attributeChangedCallback(t, a, n) {
+    !this.ui || !n || n === a || (t === "preset" ? this.fetchPreset(n) : this.loadFrom(n));
   }
   /** A bundle: FileList, File[] or name → Blob. */
   set guide(t) {
-    this.pending = this.setGuide(t, de());
+    this.pending = this.setGuide(t, me());
   }
   /** The loaded guide, or undefined. */
   get guide() {
@@ -3596,91 +3596,91 @@ class vr extends HTMLElement {
     return this.pending ?? Promise.resolve();
   }
   /** Loads a bundle, its references, shot and model; URLs resolve against `baseUrl`. */
-  async loadPreset(t, o = de()) {
+  async loadPreset(t, a = me()) {
     this.ui || this.build();
-    const s = this.ui;
+    const n = this.ui;
     try {
-      const n = _n(t), r = (a) => new URL(a, o).href, { files: i, dir: d } = await qt(r(n.bundle));
-      await this.setGuide(i, d, !0);
-      for (const a of ["character", "environment"]) {
-        const l = n.references?.[a];
-        await this.setRef(a, l ? await Kn(r(l)) : void 0);
+      const i = as(t), s = (d) => new URL(d, a).href, { files: o, dir: r } = await da(s(i.bundle));
+      await this.setGuide(o, r, !0);
+      for (const d of ["character", "environment"]) {
+        const l = i.references?.[d];
+        await this.setRef(d, l ? await ns(s(l)) : void 0);
       }
-      if (n.shot) for (const [a] of pt) s.fields[a].value = n.shot[a] ?? "";
-      n.model && s.setModel(n.model), s.override.value = n.prompt ?? "", s.own.open = !!s.override.value, this.refresh();
-    } catch (n) {
-      this.fail(`Could not load the preset: ${n.message}`);
+      if (i.shot) for (const [d] of yt) n.fields[d].value = i.shot[d] ?? "";
+      i.model && n.setModel(i.model), n.override.value = i.prompt ?? "", n.own.open = !!n.override.value, this.refresh();
+    } catch (i) {
+      this.fail(`Could not load the preset: ${i.message}`);
     }
   }
   async fetchPreset(t) {
     try {
-      const o = new URL(t, de()).href, s = await fetch(o);
-      if (!s.ok) throw new Error(`HTTP ${s.status}`);
-      this.pending = this.loadPreset(await s.json(), o), await this.pending;
-    } catch (o) {
-      this.fail(`Could not load the preset: ${o.message}`);
+      const a = new URL(t, me()).href, n = await fetch(a);
+      if (!n.ok) throw new Error(`HTTP ${n.status}`);
+      this.pending = this.loadPreset(await n.json(), a), await this.pending;
+    } catch (a) {
+      this.fail(`Could not load the preset: ${a.message}`);
     }
   }
   async loadFrom(t) {
     try {
-      const { files: o, dir: s } = await qt(new URL(t, de()).href);
-      this.pending = this.setGuide(o, s, !0), await this.pending;
-    } catch (o) {
-      this.fail(`Could not load the guide bundle: ${o.message}`);
+      const { files: a, dir: n } = await da(new URL(t, me()).href);
+      this.pending = this.setGuide(a, n, !0), await this.pending;
+    } catch (a) {
+      this.fail(`Could not load the guide bundle: ${a.message}`);
     }
   }
   keySource() {
-    const t = this.getAttribute("key-panel"), o = t ? document.getElementById(t) : null;
-    if (o && typeof o.getKey == "function") return o;
-    const s = document.querySelector("arena-key");
-    return s && typeof s.getKey == "function" ? s : this.ownKey;
+    const t = this.getAttribute("key-panel"), a = t ? document.getElementById(t) : null;
+    if (a && typeof a.getKey == "function") return a;
+    const n = document.querySelector("arena-key");
+    return n && typeof n.getKey == "function" ? n : this.ownKey;
   }
   shot() {
-    const t = this.ui.fields, o = (s) => t[s].value.trim();
-    return o("subject") ? { subject: o("subject"), action: o("action"), ...o("environment") ? { environment: o("environment") } : {}, ...o("legend") ? { legend: o("legend") } : {} } : null;
+    const t = this.ui.fields, a = (n) => t[n].value.trim();
+    return a("subject") ? { subject: a("subject"), action: a("action"), ...a("environment") ? { environment: a("environment") } : {}, ...a("legend") ? { legend: a("legend") } : {} } : null;
   }
-  async setGuide(t, o, s = !1) {
-    const n = this.ui ?? (this.build(), this.ui);
+  async setGuide(t, a, n = !1) {
+    const i = this.ui ?? (this.build(), this.ui);
     try {
-      const r = /* @__PURE__ */ new Map(), i = Array.isArray(t) || t.length !== void 0 ? Array.from(t) : null;
-      if (i) for (const l of i) r.set(l.name.split(/[\\/]/).pop(), l);
-      else for (const [l, m] of Object.entries(t)) r.set(l, m);
-      const d = await Io(Do(t), s ? { base: o } : {});
+      const s = /* @__PURE__ */ new Map(), o = Array.isArray(t) || t.length !== void 0 ? Array.from(t) : null;
+      if (o) for (const l of o) s.set(l.name.split(/[\\/]/).pop(), l);
+      else for (const [l, m] of Object.entries(t)) s.set(l, m);
+      const r = await ja(Ya(t), n ? { base: a } : {});
       for (const [l, m] of this.urls) Object.values(this.refs).some((u) => u?.media.displaySrc === l) || URL.revokeObjectURL(m);
-      this.urls = new Map([...r].filter(([l]) => !l.endsWith(".json")).map(([l, m]) => [l, URL.createObjectURL(m)]));
+      this.urls = new Map([...s].filter(([l]) => !l.endsWith(".json")).map(([l, m]) => [l, URL.createObjectURL(m)]));
       for (const l of Object.values(this.refs)) l && this.urls.set(l.media.displaySrc ?? l.media.name, l.url);
-      this.base = o, this.loaded = d;
-      for (const [l] of pt) {
-        const m = d.shot?.[l];
-        m && !n.fields[l].value && !this.getAttribute(l) && (n.fields[l].value = m);
+      this.base = a, this.loaded = r;
+      for (const [l] of yt) {
+        const m = r.shot?.[l];
+        m && !i.fields[l].value && !this.getAttribute(l) && (i.fields[l].value = m);
       }
-      const a = d.meta;
-      n.guideInfo.textContent = `Guide: ${d.video.name} · ${a.width}×${a.height} · ${a.fps} fps · ${d.seconds} s${d.audio ? ` · audio ${d.audio.name}` : " · no audio"}`, n.error.textContent = "", this.refresh();
-    } catch (r) {
-      this.fail(r.message);
+      const d = r.meta;
+      i.guideInfo.textContent = `Guide: ${r.video.name} · ${d.width}×${d.height} · ${d.fps} fps · ${r.seconds} s${r.audio ? ` · audio ${r.audio.name}` : " · no audio"}`, i.error.textContent = "", this.refresh();
+    } catch (s) {
+      this.fail(s.message);
     }
   }
-  async setRef(t, o) {
+  async setRef(t, a) {
     this.ui || this.build();
-    const s = this.slots[t], n = this.refs[t];
-    if (n && URL.revokeObjectURL(n.url), delete this.refs[t], s.shown.replaceChildren(), o)
+    const n = this.slots[t], i = this.refs[t];
+    if (i && URL.revokeObjectURL(i.url), delete this.refs[t], n.shown.replaceChildren(), a)
       try {
-        const r = await mt(o, t), i = o instanceof Blob ? o : o.blob, d = URL.createObjectURL(i);
-        this.refs[t] = { input: o, media: r, url: d }, this.urls.set(r.displaySrc ?? r.name, d);
-        const a = c("button", { type: "button", "data-action": `clear-${t}` }, "Remove");
-        a.addEventListener("click", () => {
+        const s = await wt(a, t), o = a instanceof Blob ? a : a.blob, r = URL.createObjectURL(o);
+        this.refs[t] = { input: a, media: s, url: r }, this.urls.set(s.displaySrc ?? s.name, r);
+        const d = c("button", { type: "button", "data-action": `clear-${t}` }, "Remove");
+        d.addEventListener("click", () => {
           this.setRef(t, void 0).then(() => this.refresh());
-        }), s.shown.append(c("img", { src: d, alt: t === "character" ? "Character sheet" : "Environment" }), c("span", { class: "note" }, `${r.name}${r.info?.width ? ` · ${r.info.width}×${r.info.height}` : ""}`), a);
-      } catch (r) {
-        this.fail(r.message, "refused");
+        }), n.shown.append(c("img", { src: r, alt: t === "character" ? "Character sheet" : "Environment" }), c("span", { class: "note" }, `${s.name}${s.info?.width ? ` · ${s.info.width}×${s.info.height}` : ""}`), d);
+      } catch (s) {
+        this.fail(s.message, "refused");
       }
     this.refresh();
   }
-  fail(t, o = "bad-bundle") {
-    this.ui && (this.ui.error.textContent = t), this.dispatchEvent(new CustomEvent("arena-generate-error", { bubbles: !0, composed: !0, detail: { code: o, message: t } }));
+  fail(t, a = "bad-bundle") {
+    this.ui && (this.ui.error.textContent = t), this.dispatchEvent(new CustomEvent("arena-generate-error", { bubbles: !0, composed: !0, detail: { code: a, message: t } }));
   }
   refresh() {
-    const t = this.ui, o = {
+    const t = this.ui, a = {
       seconds: this.loaded?.seconds ?? 5,
       hasAudio: this.loaded ? !!this.loaded.audio : !0,
       hasCharacter: !!this.refs.character,
@@ -3688,88 +3688,88 @@ class vr extends HTMLElement {
       audioInVideo: this.loaded?.meta.audioInVideo === !0,
       audioSeconds: this.loaded?.audio?.info?.seconds
     };
-    t.preview.replaceChildren(Xn({ shot: this.shot(), override: t.override.value, model: t.model(), facts: o }));
-    let s = "Load a guide bundle to see the estimate.";
+    t.preview.replaceChildren(rs({ shot: this.shot(), override: t.override.value, model: t.model(), facts: a }));
+    let n = "Load a guide bundle to see the estimate.";
     if (this.loaded)
       try {
-        const n = No({ guide: this.loaded, model: t.model(), shot: this.shot() ?? void 0, prompt: t.override.value, character: this.refs.character?.media, environment: this.refs.environment?.media });
-        s = `Estimated ${W(n.plan.estimate.usd)} (${n.plan.estimate.basis}). Sends: ${n.plan.inputsSent.map((r) => `${r.role} ${r.label}`).join(", ")}.`;
-      } catch (n) {
-        s = n.message;
+        const i = Xa({ guide: this.loaded, model: t.model(), shot: this.shot() ?? void 0, prompt: t.override.value, character: this.refs.character?.media, environment: this.refs.environment?.media });
+        n = `Estimated ${J(i.plan.estimate.usd)} (${i.plan.estimate.basis}). Sends: ${i.plan.inputsSent.map((s) => `${s.role} ${s.label}`).join(", ")}.`;
+      } catch (i) {
+        n = i.message;
       }
-    t.estimate.textContent = s, t.run.disabled = !this.loaded || !!this.abort;
+    t.estimate.textContent = n, t.run.disabled = !this.loaded || !!this.abort;
   }
   askInline(t) {
-    const o = this.ui.confirmSlot;
-    return new Promise((s) => {
-      const n = c("button", { type: "button", class: "primary", "data-action": "confirm" }, `Spend up to ${W(t.usd)}`), r = c("button", { type: "button", "data-action": "cancel" }, "Cancel"), i = (d) => (o.replaceChildren(), s(d));
-      n.addEventListener("click", () => i(!0)), r.addEventListener("click", () => i(!1)), o.replaceChildren(
-        c("div", { class: "confirm", role: "group", "aria-label": "Confirm cost" }, c("p", { class: "caption" }, `${t.modelName}: estimated ${W(t.usd)} (${t.basis}); your cap is ${W(t.maxPrice)}.`), c("div", { class: "row" }, n, r))
-      ), n.focus();
+    const a = this.ui.confirmSlot;
+    return new Promise((n) => {
+      const i = c("button", { type: "button", class: "primary", "data-action": "confirm" }, `Spend up to ${J(t.usd)}`), s = c("button", { type: "button", "data-action": "cancel" }, "Cancel"), o = (r) => (a.replaceChildren(), n(r));
+      i.addEventListener("click", () => o(!0)), s.addEventListener("click", () => o(!1)), a.replaceChildren(
+        c("div", { class: "confirm", role: "group", "aria-label": "Confirm cost" }, c("p", { class: "caption" }, `${t.modelName}: estimated ${J(t.usd)} (${t.basis}); your cap is ${J(t.maxPrice)}.`), c("div", { class: "row" }, i, s))
+      ), i.focus();
     });
   }
   async run() {
     const t = this.ui;
     if (!this.loaded) return;
-    const o = this.keySource();
-    if (!o?.connected) return this.fail("Connect your Runware key first.", "invalid-key");
+    const a = this.keySource();
+    if (!a?.connected) return this.fail("Connect your Runware key first.", "invalid-key");
     this.abort = new AbortController(), t.run.disabled = !0, t.stop.hidden = !1, t.error.textContent = "", t.result.replaceChildren();
     try {
-      const s = await Pn({
+      const n = await Di({
         guide: this.loaded,
         model: t.model(),
         shot: this.shot() ?? void 0,
         prompt: t.override.value,
         references: this.references,
         maxPrice: Number(t.maxPrice.value),
-        key: o.getKey,
-        confirm: this.confirm ?? ((i) => this.askInline(i)),
+        key: a.getKey,
+        confirm: this.confirm ?? ((o) => this.askInline(o)),
         signal: this.abort.signal,
         fetch: this.fetch,
         poll: this.pollOptions,
-        onProgress: (i) => {
-          t.status.textContent = `${i.stage}: ${i.message}${i.progress !== void 0 ? ` ${i.progress}%` : ""}`, this.dispatchEvent(new CustomEvent("arena-generate-progress", { bubbles: !0, composed: !0, detail: { ...i } }));
+        onProgress: (o) => {
+          t.status.textContent = `${o.stage}: ${o.message}${o.progress !== void 0 ? ` ${o.progress}%` : ""}`, this.dispatchEvent(new CustomEvent("arena-generate-progress", { bubbles: !0, composed: !0, detail: { ...o } }));
         }
       });
       t.result.replaceChildren(
-        br(
-          s,
+        Ts(
+          n,
           this.urls,
           this.base,
-          (i) => this.dispatchEvent(new CustomEvent("arena-gallery-add", { bubbles: !0, composed: !0, detail: { record: i, base: this.base } }))
+          (o) => this.dispatchEvent(new CustomEvent("arena-gallery-add", { bubbles: !0, composed: !0, detail: { record: o, base: this.base } }))
         )
       );
-      const { task: n, ...r } = s;
-      this.dispatchEvent(new CustomEvent("arena-generate-result", { bubbles: !0, composed: !0, detail: r }));
-    } catch (s) {
-      const n = s instanceof P ? s : new P("provider", s.message);
-      this.fail(n.message, n.code);
+      const { task: i, ...s } = n;
+      this.dispatchEvent(new CustomEvent("arena-generate-result", { bubbles: !0, composed: !0, detail: s }));
+    } catch (n) {
+      const i = n instanceof P ? n : new P("provider", n.message);
+      this.fail(i.message, i.code);
     } finally {
       this.abort = void 0, t.stop.hidden = !0, t.confirmSlot.replaceChildren(), this.refresh();
     }
   }
   build() {
-    const t = Bn((s) => this.getAttribute(s));
+    const t = es((n) => this.getAttribute(n));
     this.ui = t, this.slots = {
-      character: Yt("character", (s) => {
-        this.setRef("character", s);
+      character: sa("character", (n) => {
+        this.setRef("character", n);
       }),
-      environment: Yt("environment", (s) => {
-        this.setRef("environment", s);
+      environment: sa("environment", (n) => {
+        this.setRef("environment", n);
       })
-    }, t.bundleInput.addEventListener("change", () => t.bundleInput.files?.length && void (this.pending = this.setGuide(t.bundleInput.files, de()))), t.run.addEventListener("click", () => {
+    }, t.bundleInput.addEventListener("change", () => t.bundleInput.files?.length && void (this.pending = this.setGuide(t.bundleInput.files, me()))), t.run.addEventListener("click", () => {
       this.run();
     }), t.stop.addEventListener("click", () => this.abort?.abort());
-    for (const s of [...Object.values(t.fields), t.override]) s.addEventListener("input", () => this.refresh());
-    for (const { r: s } of t.radios) s.addEventListener("change", () => this.refresh());
-    const o = c("div");
-    this.keySource() || (Go(), this.ownKey = document.createElement("arena-key"), o.append(this.ownKey)), this.root.replaceChildren(
-      c("style", {}, Ho),
+    for (const n of [...Object.values(t.fields), t.override]) n.addEventListener("input", () => this.refresh());
+    for (const { r: n } of t.radios) n.addEventListener("change", () => this.refresh());
+    const a = c("div");
+    this.keySource() || (Qa(), this.ownKey = document.createElement("arena-key"), a.append(this.ownKey)), this.root.replaceChildren(
+      c("style", {}, nn),
       c(
         "div",
         { class: "wrap" },
         c("h3", {}, "Generate from this guide"),
-        o,
+        a,
         c("div", { class: "row" }, t.bundleInput, t.guideInfo),
         t.modelSet,
         t.shotSet,
@@ -3785,14 +3785,14 @@ class vr extends HTMLElement {
     ), this.refresh();
   }
 }
-function yr(e = "arena-generate") {
-  customElements.get(e) || customElements.define(e, vr);
+function Fs(e = "arena-generate") {
+  customElements.get(e) || customElements.define(e, Ms);
 }
-const ct = () => typeof location > "u" ? "http://localhost/" : location.href, ao = 50;
-function xr(e) {
+const ht = () => typeof location > "u" ? "http://localhost/" : location.href, ga = 50;
+function Ls(e) {
   return e ? [`${e.subject} ${e.action}`.trim(), e.environment, e.legend].filter(Boolean).join(" · ") : null;
 }
-class $r extends HTMLElement {
+class js extends HTMLElement {
   static observedAttributes = ["src"];
   root;
   entries = [];
@@ -3804,121 +3804,121 @@ class $r extends HTMLElement {
     super(), this.root = this.attachShadow({ mode: "open" });
   }
   connectedCallback() {
-    Et(), this.getAttribute("src") || this.render();
+    Lt(), this.getAttribute("src") || this.render();
   }
-  attributeChangedCallback(t, o, s) {
-    s && s !== o && this.fetchList(s);
+  attributeChangedCallback(t, a, n) {
+    n && n !== a && this.fetchList(n);
   }
   get records() {
     return this.entries.map((t) => t.record);
   }
   set records(t) {
     this.entries = [], this.skipped = [];
-    for (const o of Array.isArray(t) ? t.slice(0, ao) : []) this.accept(o, ct());
+    for (const a of Array.isArray(t) ? t.slice(0, ga) : []) this.accept(a, ht());
     this.index = 0, this.render();
   }
   /** Adds a record and shows it. Returns false when it does not validate. */
-  add(t, o = ct()) {
-    const s = this.accept(t, o);
-    return s && (this.index = this.entries.length - 1), this.render(), s;
+  add(t, a = ht()) {
+    const n = this.accept(t, a);
+    return n && (this.index = this.entries.length - 1), this.render(), n;
   }
-  accept(t, o) {
+  accept(t, a) {
     try {
-      const s = ue(t), n = this.entries.findIndex((r) => r.record.id === s.id);
-      return n >= 0 ? this.entries[n] = { record: s, base: o } : this.entries.push({ record: s, base: o }), !0;
-    } catch (s) {
-      return this.skipped.push(s.message), !1;
+      const n = ge(t), i = this.entries.findIndex((s) => s.record.id === n.id);
+      return i >= 0 ? this.entries[i] = { record: n, base: a } : this.entries.push({ record: n, base: a }), !0;
+    } catch (n) {
+      return this.skipped.push(n.message), !1;
     }
   }
   async fetchList(t) {
-    const o = ++this.load;
+    const a = ++this.load;
     try {
-      const s = new URL(t, ct()).href, n = await fetch(s);
-      if (!n.ok) throw new Error(`HTTP ${n.status}`);
-      const r = await n.json(), i = Array.isArray(r) ? r : Array.isArray(r.records) ? r.records : null;
-      if (!i) throw new Error("expected an array of records");
-      const d = [];
+      const n = new URL(t, ht()).href, i = await fetch(n);
+      if (!i.ok) throw new Error(`HTTP ${i.status}`);
+      const s = await i.json(), o = Array.isArray(s) ? s : Array.isArray(s.records) ? s.records : null;
+      if (!o) throw new Error("expected an array of records");
+      const r = [];
       this.skipped = [];
-      for (const a of i.slice(0, ao))
-        if (typeof a == "string") {
-          const l = new URL(a, s).href, m = await fetch(l);
+      for (const d of o.slice(0, ga))
+        if (typeof d == "string") {
+          const l = new URL(d, n).href, m = await fetch(l);
           if (!m.ok) {
-            this.skipped.push(`${a}: HTTP ${m.status}`);
+            this.skipped.push(`${d}: HTTP ${m.status}`);
             continue;
           }
-          d.push(...this.tryParse(await m.json(), l));
-        } else d.push(...this.tryParse(a, s));
-      if (o !== this.load) return;
-      this.entries = d, this.index = 0, this.render();
-    } catch (s) {
-      o === this.load && this.render(`Could not load ${t}: ${s.message}`);
+          r.push(...this.tryParse(await m.json(), l));
+        } else r.push(...this.tryParse(d, n));
+      if (a !== this.load) return;
+      this.entries = r, this.index = 0, this.render();
+    } catch (n) {
+      a === this.load && this.render(`Could not load ${t}: ${n.message}`);
     }
   }
-  tryParse(t, o) {
+  tryParse(t, a) {
     try {
-      return [{ record: ue(t), base: o }];
-    } catch (s) {
-      return this.skipped.push(s.message), [];
+      return [{ record: ge(t), base: a }];
+    } catch (n) {
+      return this.skipped.push(n.message), [];
     }
   }
   render(t) {
-    const o = c("style", {}, Ho);
+    const a = c("style", {}, nn);
     if (!this.entries.length) {
       this.root.replaceChildren(
-        o,
+        a,
         c("div", { class: "empty", "data-empty": "" }, c("strong", {}, "No published runs yet"), t ?? "Runs added to the gallery show up here, playable without a key.")
       );
       return;
     }
-    const s = this.entries[Math.min(this.index, this.entries.length - 1)], n = !!s.record.guide, r = n ? this.view : "arena", i = c("div", { class: "switch", role: "group", "aria-label": "Run" });
-    this.entries.forEach((h, w) => {
-      const f = c("button", { type: "button", "aria-pressed": String(h === s), "data-record": h.record.id }, h.record.title.slice(0, 48));
-      f.addEventListener("click", () => (this.index = w, this.render())), i.append(f);
+    const n = this.entries[Math.min(this.index, this.entries.length - 1)], i = !!n.record.guide, s = i ? this.view : "arena", o = c("div", { class: "switch", role: "group", "aria-label": "Run" });
+    this.entries.forEach((f, w) => {
+      const h = c("button", { type: "button", "aria-pressed": String(f === n), "data-record": f.record.id }, f.record.title.slice(0, 48));
+      h.addEventListener("click", () => (this.index = w, this.render())), o.append(h);
     });
-    const d = c("div", { class: "switch", role: "group", "aria-label": "View" });
-    for (const [h, w] of [["inputs", "Inputs and outputs"], ["guidance", "Guide beside output"], ["arena", "All outputs"]]) {
-      const f = c("button", { type: "button", "aria-pressed": String(r === h), "data-view": h }, w);
-      f.disabled = h !== "arena" && !n, f.addEventListener("click", () => (this.view = h, this.render())), d.append(f);
+    const r = c("div", { class: "switch", role: "group", "aria-label": "View" });
+    for (const [f, w] of [["inputs", "Inputs and outputs"], ["guidance", "Guide beside output"], ["arena", "All outputs"]]) {
+      const h = c("button", { type: "button", "aria-pressed": String(s === f), "data-view": f }, w);
+      h.disabled = f !== "arena" && !i, h.addEventListener("click", () => (this.view = f, this.render())), r.append(h);
     }
-    const a = document.createElement("model-arena");
-    a.setAttribute("layout", r), a.setRecord(s.record, s.base);
-    const l = s.record.lanes.find((h) => h.shot) ?? s.record.lanes[0], m = xr(l?.shot ?? s.record.shot), u = zn(s.record, s.base);
+    const d = document.createElement("model-arena");
+    d.setAttribute("layout", s), d.setRecord(n.record, n.base);
+    const l = n.record.lanes.find((f) => f.shot) ?? n.record.lanes[0], m = Ls(l?.shot ?? n.record.shot), u = is(n.record, n.base);
     let p = null;
     u && (p = c("button", { type: "button", "data-action": "run-yourself" }, "Run this yourself"), p.addEventListener("click", () => {
-      this.dispatchEvent(new CustomEvent("arena-run-yourself", { bubbles: !0, composed: !0, detail: { preset: u, record: s.record } }));
-      const h = this.getAttribute("generate"), w = h ? document.getElementById(h) : null;
+      this.dispatchEvent(new CustomEvent("arena-run-yourself", { bubbles: !0, composed: !0, detail: { preset: u, record: n.record } }));
+      const f = this.getAttribute("generate"), w = f ? document.getElementById(f) : null;
       w?.loadPreset && (w.loadPreset(u), w.scrollIntoView?.({ behavior: "smooth", block: "start" }));
     })), this.root.replaceChildren(
-      o,
+      a,
       c(
         "div",
         { class: "wrap" },
-        c("div", { class: "row spread" }, i, d),
-        a,
+        c("div", { class: "row spread" }, o, r),
+        d,
         c("div", { class: "row spread" }, m ? c("p", { class: "caption", "data-shot": "" }, c("strong", {}, "Shot: "), m) : c("span"), p),
         this.skipped.length ? c("p", { class: "note" }, `${this.skipped.length} record(s) skipped: ${this.skipped[0]}`) : null
       )
     );
   }
 }
-function kr(e = "arena-gallery") {
-  customElements.get(e) || customElements.define(e, $r);
+function Cs(e = "arena-gallery") {
+  customElements.get(e) || customElements.define(e, js);
 }
-const Sr = () => typeof location > "u" ? "http://localhost/" : location.href;
-function Ir(e, t, o, s = 24) {
-  return Number.isFinite(t) ? o ? Math.abs(e - t) > 1e-3 : Math.abs(e - t) > 1 / s : !1;
+const Vs = () => typeof location > "u" ? "http://localhost/" : location.href;
+function Os(e, t, a, n = 24) {
+  return Number.isFinite(t) ? a ? Math.abs(e - t) > 1e-3 : Math.abs(e - t) > 1 / n : !1;
 }
-const Er = (
+const Ns = (
   /* css */
   `
-${Je}
+${et}
 :host { display: block; position: relative; background: #000; border-radius: var(--ma-radius); overflow: hidden; aspect-ratio: 16 / 9; }
 video { width: 100%; height: 100%; display: block; object-fit: contain; }
 .err { position: absolute; inset: auto 8px 8px 8px; margin: 0; font: 12px var(--ma-font); color: var(--ma-warn); }
 .err:empty { display: none; }
 `
 );
-class Pr extends HTMLElement {
+class Ds extends HTMLElement {
   static observedAttributes = ["src", "controls", "muted", "label"];
   video;
   root;
@@ -3929,12 +3929,12 @@ class Pr extends HTMLElement {
       this.dispatchEvent(new CustomEvent("arena-player-ready", { bubbles: !0, composed: !0, detail: { duration: this.video.duration } })), this.target && (this.video.currentTime = Math.min(this.target, this.video.duration || this.target));
     }), this.video.addEventListener("error", () => {
       this.err.textContent = "The clip did not load.", this.dispatchEvent(new CustomEvent("arena-player-error", { bubbles: !0, composed: !0, detail: { message: this.err.textContent } }));
-    }), this.root.replaceChildren(c("style", {}, Er), this.video, this.err);
+    }), this.root.replaceChildren(c("style", {}, Ns), this.video, this.err);
   }
   attributeChangedCallback(t) {
     if (t === "src") {
-      const o = z(this.getAttribute("src") ?? "", Sr());
-      this.err.textContent = "", o ? this.video.src = o : this.video.removeAttribute("src");
+      const a = X(this.getAttribute("src") ?? "", Vs());
+      this.err.textContent = "", a ? this.video.src = a : this.video.removeAttribute("src");
     }
     t === "controls" && (this.video.controls = this.getAttribute("controls") !== "none"), t === "muted" && (this.video.muted = this.getAttribute("muted") !== "false"), t === "label" && this.video.setAttribute("aria-label", this.getAttribute("label") ?? "Generated clip");
   }
@@ -3962,8 +3962,8 @@ class Pr extends HTMLElement {
     this.follow(t);
   }
   follow(t) {
-    const o = this.video.duration, s = Math.max(0, Number.isFinite(o) && o > 0 ? Math.min(t, o) : t);
-    this.target = s, Ir(this.video.currentTime, s, this.video.paused, this.fps) && (this.video.currentTime = s);
+    const a = this.video.duration, n = Math.max(0, Number.isFinite(a) && a > 0 ? Math.min(t, a) : t);
+    this.target = n, Os(this.video.currentTime, n, this.video.paused, this.fps) && (this.video.currentTime = n);
   }
   seek(t) {
     this.target = Math.max(0, t), this.video.currentTime = this.target;
@@ -3979,29 +3979,49 @@ class Pr extends HTMLElement {
     this.video.pause();
   }
 }
-function Ar(e = "arena-player") {
-  customElements.get(e) || customElements.define(e, Pr);
+function Gs(e = "arena-player") {
+  customElements.get(e) || customElements.define(e, Ds);
 }
-const Ur = (e) => Math.round(e * 1e6) / 1e6;
-function Rr(e, t) {
-  if (e.outputTokensPerImage === void 0 || t.references > 0 && e.inputTokensPerImage === void 0) return null;
-  const o = new TextEncoder().encode(t.prompt ?? "").length;
-  return Ur(
-    e.outputTokensPerImage * e.rates.imageOutput + o * e.rates.textInput + t.references * (e.inputTokensPerImage ?? 0) * e.rates.imageInput
-  );
+const sn = (e) => Math.round(e * 1e6) / 1e6, on = (e = "") => new TextEncoder().encode(e).length;
+function Bs(e, t) {
+  return e.outputTokensPerImage === void 0 || t.references > 0 && e.inputTokensPerImage === void 0 ? null : sn(e.outputTokensPerImage * e.rates.imageOutput + on(t.prompt) * e.rates.textInput + t.references * (e.inputTokensPerImage ?? 0) * e.rates.imageInput);
 }
-const Mr = (e) => Math.max(...e.examples.map((t) => t.usd)), Xo = (e) => e.examples.map((t) => `${t.mode} $${t.usd}`).join(", ");
-function Jo(e, t) {
-  const o = Rr(e, t);
-  return o !== null ? { usd: o, basis: `up to $${o} (priced per token: ${e.ratesText})` } : {
-    usd: null,
-    basis: `priced per token (${e.ratesText}); Runware publishes no token count for this size and quality, so there is no upper bound. Published examples: ${Xo(e)}`
+function Ks(e, t) {
+  if (t.resolution) return e.output.find((n) => n.presets?.includes(t.resolution));
+  if (!t.width || !t.height) return;
+  const a = t.width * t.height;
+  return e.output.find((n) => a <= n.upToPixels);
+}
+function _s(e, t) {
+  const a = e.approx, n = t > 0 ? "reference-to-image" : "text-to-image", i = e.examples.filter((s) => s.mode === n && s.outputTokens !== void 0).map((s) => (s.usd - s.outputTokens * e.rates.imageOutput - (s.references ?? 0) * a.perReference * e.rates.imageInput) / e.rates.textInput);
+  return Math.max(0, Math.ceil(Math.max(0, ...i)));
+}
+function zs(e, t) {
+  const a = e.approx;
+  if (!a) return null;
+  const n = Ks(a, t);
+  if (!n) return null;
+  const i = _s(e, t.references), s = i + on(t.prompt), o = n.tokens * e.rates.imageOutput + t.references * a.perReference * e.rates.imageInput + s * e.rates.textInput, r = sn(o * (1 + a.margin)), d = t.references ? ` + ${t.references} × about ${a.perReference.toLocaleString("en-GB")} reference tokens` : "";
+  return {
+    usd: r,
+    approximate: !0,
+    basis: `about $${r}: an estimate, not a strict bound. Priced per token (${e.ratesText}); output ${n.label} about ${n.tokens.toLocaleString("en-GB")} image tokens${d}; text about ${s.toLocaleString("en-GB")} tokens (the prompt plus a rewrite allowance of ${i.toLocaleString("en-GB")}, the most the published examples imply); plus a ${Math.round(a.margin * 100)}% margin. Source: ${a.source}`
   };
 }
-const ee = "https://runware.ai/docs/models", Te = "13 Nov 2026", gt = ["FLUX", "OpenAI GPT Image", "MiniMax H3", "ByteDance Seedream", "Kling IMAGE"], ae = (e) => ({ slug: e, schemaUrl: `${ee}/${e}/schema.json`, pageUrl: `${ee}/${e}` }), Yo = (e, t) => () => ({ usd: e, basis: t }), Zo = (e) => Object.values(e.pairs).flat(), Qo = (e, t, o) => Object.entries(e.pairs).find(([, s]) => s.some(([n, r]) => n === t && r === o))?.[0], Tr = {
+const Ws = (e) => Math.max(...e.examples.map((t) => t.usd)), $t = (e) => e.examples.map((t) => `${t.mode} $${t.usd}`).join(", ");
+function rn(e, t) {
+  const a = Bs(e, t);
+  if (a !== null) return { usd: a, basis: `up to $${a} (priced per token: ${e.ratesText})` };
+  const n = zs(e, t);
+  return n || {
+    usd: null,
+    basis: e.approx ? `priced per token (${e.ratesText}); Runware publishes no token count for an output of this size (the approximate figures stop at 4K), so there is no estimate. Published examples: ${$t(e)}` : `priced per token (${e.ratesText}); Runware publishes no token count for this size and quality, so there is no upper bound. Published examples: ${$t(e)}`
+  };
+}
+const q = "https://runware.ai/docs/models", Ee = "13 Nov 2026", kt = ["FLUX", "OpenAI GPT Image", "MiniMax H3", "ByteDance Seedream", "Kling IMAGE"], ue = (e) => ({ slug: e, schemaUrl: `${q}/${e}/schema.json`, pageUrl: `${q}/${e}` }), dn = (e, t) => () => ({ usd: e, basis: t }), cn = (e) => Object.values(e.pairs).flat(), ln = (e, t, a) => Object.entries(e.pairs).find(([, n]) => n.some(([i, s]) => i === t && s === a))?.[0], Hs = {
   key: "klein-9b",
   air: "runware:400@2",
-  ...ae("bfl-flux-2-klein-9b"),
+  ...ue("bfl-flux-2-klein-9b"),
   name: "FLUX.2 [klein] 9B",
   family: "FLUX",
   provider: "runware-api",
@@ -4015,15 +4035,15 @@ const ee = "https://runware.ai/docs/models", Te = "13 Nov 2026", gt = ["FLUX", "
   pricing: {
     kind: "compute-time",
     summary: "Billed by compute time; no rate. Measured 1024×1024 at 4 steps $0.00078; examples $0.00078-$0.00338",
-    source: `${ee}/bfl-flux-2-klein-9b/schema.json x-pricing`,
+    source: `${q}/bfl-flux-2-klein-9b/schema.json x-pricing`,
     read: "10 Nov 2026"
   },
   // No per-unit rate: "billed by compute time". The bound is the highest published example price.
-  estimate: Yo(338e-5, "no published rate (compute-time billing); bounded by the highest published example, $0.00338")
-}, co = [[512 * 512, 3e-3], [1024 * 1024, 6e-3], [2048 * 2048, 0.0179], [4096 * 4096, 0.1013]], lo = [[768 * 1344, 0.0149], [1024 * 1536, 0.0149]], Fr = {
+  estimate: dn(338e-5, "no published rate (compute-time billing); bounded by the highest published example, $0.00338")
+}, ba = [[512 * 512, 3e-3], [1024 * 1024, 6e-3], [2048 * 2048, 0.0179], [4096 * 4096, 0.1013]], wa = [[768 * 1344, 0.0149], [1024 * 1536, 0.0149]], Xs = {
   key: "flux-3-image-klein",
   air: "bfl:flux@3-image-klein",
-  ...ae("bfl-flux-3-image-klein"),
+  ...ue("bfl-flux-3-image-klein"),
   name: "FLUX 3 Image Klein",
   family: "FLUX",
   provider: "runware-api",
@@ -4038,26 +4058,26 @@ const ee = "https://runware.ai/docs/models", Te = "13 Nov 2026", gt = ["FLUX", "
   pricing: {
     kind: "compute-time",
     summary: "Billed by compute time; no rate. Measured at 16 steps: 512² $0.003, 1024² $0.006, 2048² $0.0179, 4096² $0.1013; reference examples $0.0149",
-    source: `${ee}/bfl-flux-3-image-klein/schema.json x-pricing`,
-    read: Te
+    source: `${q}/bfl-flux-3-image-klein/schema.json x-pricing`,
+    read: Ee
   },
   estimate(e) {
-    const t = (e.width ?? 1280) * (e.height ?? 720), o = co.find(([i]) => i >= t) ?? co.at(-1), s = Math.round(Math.sqrt(o[0]));
-    let n = o[1], r = `compute-time billing, no rate; bounded by the measured run at ${s}×${s} (16 steps), $${o[1]}`;
+    const t = (e.width ?? 1280) * (e.height ?? 720), a = ba.find(([o]) => o >= t) ?? ba.at(-1), n = Math.round(Math.sqrt(a[0]));
+    let i = a[1], s = `compute-time billing, no rate; bounded by the measured run at ${n}×${n} (16 steps), $${a[1]}`;
     if (e.references > 0) {
-      const i = Math.max(...lo.map(([a]) => a));
-      if (t > i)
-        return { usd: null, basis: `compute-time billing; no published run with reference images above ${(i / 1e6).toFixed(2)} MP, so no bound` };
-      const d = Math.max(...lo.map(([, a]) => a));
-      d > n && (n = d, r = `compute-time billing, no rate; bounded by the highest published reference example, $${d}`);
+      const o = Math.max(...wa.map(([d]) => d));
+      if (t > o)
+        return { usd: null, basis: `compute-time billing; no published run with reference images above ${(o / 1e6).toFixed(2)} MP, so no bound` };
+      const r = Math.max(...wa.map(([, d]) => d));
+      r > i && (i = r, s = `compute-time billing, no rate; bounded by the highest published reference example, $${r}`);
     }
-    return { usd: n, basis: r };
+    return { usd: i, basis: s };
   },
   notOffered: ["settings.boundingBoxes", "steps", "seed"]
-}, uo = { "0.75K": 0.041, "1K": 0.048, "2K": 0.1, "4K": 0.607 }, qo = {
+}, ya = { "0.75K": 0.041, "1K": 0.048, "2K": 0.1, "4K": 0.607 }, un = {
   key: "flux-3-image",
   air: "bfl:flux@3-image",
-  ...ae("bfl-flux-3-image"),
+  ...ue("bfl-flux-3-image"),
   name: "FLUX 3 Image",
   family: "FLUX",
   provider: "runware-api",
@@ -4084,20 +4104,20 @@ const ee = "https://runware.ai/docs/models", Te = "13 Nov 2026", gt = ["FLUX", "
   pricing: {
     kind: "per-image",
     summary: "Per image: 0.75K $0.041, 1K $0.048, 2K $0.10, 4K $0.607",
-    source: `${ee}/bfl-flux-3-image/schema.json x-pricing`,
-    read: Te
+    source: `${q}/bfl-flux-3-image/schema.json x-pricing`,
+    read: Ee
   },
   estimate(e) {
-    const t = e.resolution ?? (e.width && e.height ? Qo(qo.size, e.width, e.height) : "1K") ?? "4K";
-    return { usd: uo[t], basis: `x-pricing: ${t} at $${uo[t]} per image` };
+    const t = e.resolution ?? (e.width && e.height ? ln(un.size, e.width, e.height) : "1K") ?? "4K";
+    return { usd: ya[t], basis: `x-pricing: ${t} at $${ya[t]} per image` };
   },
   notOffered: ["settings.boundingBoxes", "settings.grounding", "settings.safetyTolerance"]
-}, Lr = { textInput: 5e-6, imageInput: 8e-6, imageOutput: 3e-5 }, mo = "text input $5.00, image input $8.00, image output $30.00 per 1M tokens", es = (e, t) => {
-  const o = `openai-gpt-image-2-6-${e.toLowerCase()}`, s = { rates: Lr, ratesText: mo, examples: t };
+}, Js = { textInput: 5e-6, imageInput: 8e-6, imageOutput: 3e-5 }, va = "text input $5.00, image input $8.00, image output $30.00 per 1M tokens", mn = (e, t) => {
+  const a = `openai-gpt-image-2-6-${e.toLowerCase()}`, n = { rates: Js, ratesText: va, examples: t };
   return {
     key: `gpt-image-2.6-${e.toLowerCase()}`,
     air: `openai:gpt-image@2.6-${e.toLowerCase()}`,
-    ...ae(o),
+    ...ue(a),
     name: `GPT-Image-2.6 ${e}`,
     family: "OpenAI GPT Image",
     provider: "runware-api",
@@ -4109,39 +4129,51 @@ const ee = "https://runware.ai/docs/models", Te = "13 Nov 2026", gt = ["FLUX", "
     size: { kind: "grid", min: 16, max: 3840, multipleOf: 16, default: [1280, 720], area: { min: 655360, max: 8294400 }, ratio: { min: 1 / 3, max: 3 } },
     outputFormats: ["JPG", "PNG", "WEBP", "SVG", "GIF"],
     transparency: !0,
-    pricing: { kind: "token", summary: `Per token: ${mo}`, source: `${ee}/${o}/schema.json x-pricing`, read: Te },
-    tokens: s,
-    estimate: (n) => Jo(s, n),
+    // settings.quality enum and default from the schema; the quality guide: quality and size set the output tokens.
+    quality: { values: ["auto", "max", "xhigh", "high", "medium", "low"], default: "auto" },
+    pricing: { kind: "token", summary: `Per token: ${va}`, source: `${q}/${a}/schema.json x-pricing`, read: Ee },
+    tokens: n,
+    estimate: (i) => rn(n, i),
     notOffered: ["inputs.maskImage", "inputs.markupImage", "outputFormat SVG and GIF (no references allowed beside them)", "settings.quality", "settings.thinkingLevel"]
   };
-}, jr = es("Flare", [
+}, Ys = mn("Flare", [
   { mode: "inpaint", usd: 0.0587 },
   { mode: "text-to-gif", usd: 0.118 },
   { mode: "text-to-image", usd: 0.167 },
   { mode: "text-to-vector", usd: 0.174 },
   { mode: "transparent-background", usd: 0.175 },
   { mode: "reference-to-image", usd: 0.193 }
-]), Vr = es("Sunburst", [
+]), Zs = mn("Sunburst", [
   { mode: "text-to-gif", usd: 0.0374 },
   { mode: "text-to-image", usd: 0.0431 },
   { mode: "text-to-vector", usd: 0.0634 },
   { mode: "inpaint", usd: 0.0771 },
   { mode: "transparent-background", usd: 0.0788 },
   { mode: "reference-to-image", usd: 0.192 }
-]), ts = (e) => {
-  const t = e ? "minimax-h3-image-highspeed" : "minimax-h3-image", o = e ? {
+]), xa = (e) => ({
+  output: [
+    { upToPixels: 42e5, tokens: 4100, label: "up to about 4 MP", presets: ["1K", "2K"] },
+    { upToPixels: 5472 * 3072, tokens: 16400, label: "4K", presets: ["4K"] }
+  ],
+  perReference: 2050,
+  margin: 0.25,
+  source: `${q}/${e} (Pricing), read ${Ee}`
+}), pn = (e) => {
+  const t = e ? "minimax-h3-image-highspeed" : "minimax-h3-image", a = (s) => ({ mode: "text-to-image", usd: s, references: 0, outputTokens: 4100 }), n = (s) => ({ mode: "reference-to-image", usd: s, references: 2, outputTokens: 4100 }), i = e ? {
     rates: { textInput: 23e-7, imageInput: 3e-6, imageOutput: 76e-7 },
     ratesText: "text input $2.30, image input $3.00, image output $7.60 per 1M tokens",
-    examples: [{ mode: "text-to-image", usd: 0.0418 }, { mode: "text-to-image", usd: 0.0422 }, { mode: "reference-to-image", usd: 0.0725 }, { mode: "reference-to-image", usd: 0.0743 }]
+    examples: [a(0.0418), a(0.0422), n(0.0725), n(0.0743)],
+    approx: xa(t)
   } : {
     rates: { textInput: 23e-7, imageInput: 15e-7, imageOutput: 38e-7 },
     ratesText: "text input $2.30, image input $1.50, image output $3.80 per 1M tokens",
-    examples: [{ mode: "text-to-image", usd: 0.0176 }, { mode: "text-to-image", usd: 0.0189 }, { mode: "reference-to-image", usd: 0.0432 }, { mode: "reference-to-image", usd: 0.0432 }]
+    examples: [a(0.0176), a(0.0189), n(0.0432), n(0.0432)],
+    approx: xa(t)
   };
   return {
     key: e ? "h3-image-highspeed" : "h3-image",
     air: e ? "minimax:h3@image-highspeed" : "minimax:h3@image",
-    ...ae(t),
+    ...ue(t),
     name: e ? "MiniMax H3 Image Highspeed" : "MiniMax H3 Image",
     family: "MiniMax H3",
     provider: "runware-api",
@@ -4153,15 +4185,20 @@ const ee = "https://runware.ai/docs/models", Te = "13 Nov 2026", gt = ["FLUX", "
     size: { kind: "grid", min: 468, max: 7745, multipleOf: 1, default: [1280, 720], area: { min: 655360, max: 2e7 }, ratio: { min: 1 / 3, max: 3 }, resolution: { values: ["1K", "2K", "4K"] } },
     outputFormats: ["JPG", "PNG", "WEBP"],
     transparency: !1,
-    pricing: { kind: "token", summary: `Per token: ${o.ratesText}`, source: `${ee}/${t}/schema.json x-pricing`, read: Te },
-    tokens: o,
-    estimate: (s) => Jo(o, s),
+    pricing: {
+      kind: "token",
+      summary: `Per token: ${i.ratesText}; about 4,100 image tokens up to about 4 MP, about 16,400 at 4K, about 2,050 per reference (estimate with a 25% margin)`,
+      source: `${q}/${t}/schema.json x-pricing and the model page's Pricing paragraph`,
+      read: Ee
+    },
+    tokens: i,
+    estimate: (s) => rn(i, s),
     notOffered: ["settings.promptOptimizer (must stay on without width/height or with references)"]
   };
-}, Cr = ts(!1), Nr = ts(!0), Or = 261e4, Dr = {
+}, Qs = pn(!1), qs = pn(!0), eo = 261e4, to = {
   key: "seedream-5.5",
   air: "bytedance:seedream@5.5",
-  ...ae("bytedance-seedream-5-5"),
+  ...ue("bytedance-seedream-5-5"),
   name: "Seedream 5.5",
   family: "ByteDance Seedream",
   provider: "runware-api",
@@ -4176,18 +4213,18 @@ const ee = "https://runware.ai/docs/models", Te = "13 Nov 2026", gt = ["FLUX", "
   pricing: {
     kind: "per-image",
     summary: "Per image: up to 1.5K (2.61 MP) $0.02, 2K (above 2.61 MP) $0.035; plus $0.008 per input image",
-    source: `${ee}/bytedance-seedream-5-5/schema.json x-pricing`,
-    read: Te
+    source: `${q}/bytedance-seedream-5-5/schema.json x-pricing`,
+    read: Ee
   },
   estimate(e) {
-    const t = e.resolution ? e.resolution !== "2K" : e.width && e.height ? e.width * e.height <= Or : !1, o = t ? 0.02 : 0.035, s = 8e-3 * e.references, n = Math.round((o + s) * 1e4) / 1e4, r = t ? "up to 1.5K (2.61 MP)" : `2K (above 2.61 MP)${e.resolution || e.width ? "" : ", the schema default"}`;
-    return { usd: n, basis: `x-pricing: ${r} at $${o} per image${e.references ? ` + $0.008 × ${e.references} input image${e.references > 1 ? "s" : ""}` : ""}` };
+    const t = e.resolution ? e.resolution !== "2K" : e.width && e.height ? e.width * e.height <= eo : !1, a = t ? 0.02 : 0.035, n = 8e-3 * e.references, i = Math.round((a + n) * 1e4) / 1e4, s = t ? "up to 1.5K (2.61 MP)" : `2K (above 2.61 MP)${e.resolution || e.width ? "" : ", the schema default"}`;
+    return { usd: i, basis: `x-pricing: ${s} at $${a} per image${e.references ? ` + $0.008 × ${e.references} input image${e.references > 1 ? "s" : ""}` : ""}` };
   },
   notOffered: ["settings.layerDecomposition", "settings.safetyIdentifier"]
-}, Br = {
+}, ao = {
   key: "kling-image-3",
   air: "klingai:kling-image@3",
-  ...ae("klingai-image-3-0"),
+  ...ue("klingai-image-3-0"),
   name: "Kling IMAGE 3.0",
   family: "Kling IMAGE",
   provider: "runware-api",
@@ -4207,204 +4244,213 @@ const ee = "https://runware.ai/docs/models", Te = "13 Nov 2026", gt = ["FLUX", "
   },
   outputFormats: ["JPG", "PNG", "WEBP"],
   transparency: !1,
-  pricing: { kind: "per-image", summary: "$0.028 per image", source: `${ee}/klingai-image-3-0/schema.json x-pricing`, read: "10 Nov 2026" },
-  estimate: Yo(0.028, "x-pricing: $0.028 per image")
-}, me = [
-  Tr,
-  qo,
-  Fr,
-  jr,
-  Vr,
-  Cr,
-  Nr,
-  Dr,
-  Br
+  pricing: { kind: "per-image", summary: "$0.028 per image", source: `${q}/klingai-image-3-0/schema.json x-pricing`, read: "10 Nov 2026" },
+  estimate: dn(0.028, "x-pricing: $0.028 per image")
+}, be = [
+  Hs,
+  un,
+  Xs,
+  Ys,
+  Zs,
+  Qs,
+  qs,
+  to,
+  ao
 ];
-function Gr(e) {
-  const t = me.find((o) => o.key === e || o.air === e || o.slug === e);
-  if (!t) throw new x(`Unknown image model "${e}". Use one of: ${me.map((o) => o.key).join(", ")}.`);
+function jt(e) {
+  const t = be.find((a) => a.key === e || a.air === e || a.slug === e);
+  if (!t) throw new v(`Unknown image model "${e}". Use one of: ${be.map((a) => a.key).join(", ")}.`);
   return t;
 }
-const bt = ["PNG", "JPG", "WEBP"], be = (e) => Number.isInteger(e) ? String(e) : e.toFixed(2);
-function wt(e) {
+const St = ["PNG", "JPG", "WEBP"], $e = (e) => Number.isInteger(e) ? String(e) : e.toFixed(2);
+function It(e) {
   if (e.kind === "list") {
-    const o = Object.entries(e.pairs).map(([s, n]) => `${n.length} at ${s}`);
-    return `${Zo(e).length} fixed width×height pairs (${o.join(", ")}; default ${e.default.join("×")}); with a reference, resolution ${e.withReference.values.join("/")}${e.pairsWithReference ? " or a listed pair" : ""}`;
+    const a = Object.entries(e.pairs).map(([n, i]) => `${i.length} at ${n}`);
+    return `${cn(e).length} fixed width×height pairs (${a.join(", ")}; default ${e.default.join("×")}); with a reference, resolution ${e.withReference.values.join("/")}${e.pairsWithReference ? " or a listed pair" : ""}`;
   }
   const t = [`${e.min}-${e.max} px a side${e.multipleOf > 1 ? ` in multiples of ${e.multipleOf}` : ""}`];
-  return e.area && t.push(`${(e.area.min / 1e6).toFixed(2)}-${(e.area.max / 1e6).toFixed(2)} MP`), e.ratio && t.push(`aspect ${be(e.ratio.min)}-${be(e.ratio.max)}`), e.resolution && t.push(`or resolution ${e.resolution.values.join("/")}`), t.join(", ");
+  return e.area && t.push(`${(e.area.min / 1e6).toFixed(2)}-${(e.area.max / 1e6).toFixed(2)} MP`), e.ratio && t.push(`aspect ${$e(e.ratio.min)}-${$e(e.ratio.max)}`), e.resolution && t.push(`or resolution ${e.resolution.values.join("/")}`), t.join(", ");
 }
-function po(e, t, o) {
-  if (t < e.min || t > e.max || o < e.min || o > e.max || t % e.multipleOf || o % e.multipleOf)
+function $a(e, t, a) {
+  if (t < e.min || t > e.max || a < e.min || a > e.max || t % e.multipleOf || a % e.multipleOf)
     return `sizes are ${e.min}-${e.max} px${e.multipleOf > 1 ? ` in multiples of ${e.multipleOf}` : ""}`;
-  if (e.area && (t * o < e.area.min || t * o > e.area.max)) return `width × height must be ${e.area.min}-${e.area.max} px`;
-  if (e.ratio && (t / o < e.ratio.min - 1e-9 || t / o > e.ratio.max + 1e-9)) return `the aspect must be ${be(e.ratio.min)}-${be(e.ratio.max)}`;
+  if (e.area && (t * a < e.area.min || t * a > e.area.max)) return `width × height must be ${e.area.min}-${e.area.max} px`;
+  if (e.ratio && (t / a < e.ratio.min - 1e-9 || t / a > e.ratio.max + 1e-9)) return `the aspect must be ${$e(e.ratio.min)}-${$e(e.ratio.max)}`;
 }
-function _r(e, t, o) {
-  let s = 1;
-  e.area && t * o < e.area.min && (s = Math.sqrt(e.area.min / (t * o))), e.area && t * o > e.area.max && (s = Math.sqrt(e.area.max / (t * o)));
-  const n = s > 1 ? Math.ceil : s < 1 ? Math.floor : Math.round, r = (i) => Math.min(e.max, Math.max(e.min, n(i * s / e.multipleOf) * e.multipleOf));
-  return [r(t), r(o)];
+function no(e, t, a) {
+  let n = 1;
+  e.area && t * a < e.area.min && (n = Math.sqrt(e.area.min / (t * a))), e.area && t * a > e.area.max && (n = Math.sqrt(e.area.max / (t * a)));
+  const i = n > 1 ? Math.ceil : n < 1 ? Math.floor : Math.round, s = (o) => Math.min(e.max, Math.max(e.min, i(o * n / e.multipleOf) * e.multipleOf));
+  return [s(t), s(a)];
 }
-function Kr(e, t, o) {
-  const s = e.references, { width: n, height: r, bytes: i } = t.info ?? {};
-  if (s.maxBytes && i && i > s.maxBytes)
-    throw new x(`${e.name} takes reference images up to ${Math.round(s.maxBytes / 1048576)} MB; ${t.name} is ${(i / 1048576).toFixed(1)} MB. Re-save it smaller.`);
-  if (!n || !r) {
-    (s.minSide || s.maxSide || s.minRatio || s.maxPixels) && o.push(`${t.name}: its size is not known here, so ${e.name}'s reference limits were not checked; Runware checks them.`);
+function io(e, t, a) {
+  const n = e.references, { width: i, height: s, bytes: o } = t.info ?? {};
+  if (n.maxBytes && o && o > n.maxBytes)
+    throw new v(`${e.name} takes reference images up to ${Math.round(n.maxBytes / 1048576)} MB; ${t.name} is ${(o / 1048576).toFixed(1)} MB. Re-save it smaller.`);
+  if (!i || !s) {
+    (n.minSide || n.maxSide || n.minRatio || n.maxPixels) && a.push(`${t.name}: its size is not known here, so ${e.name}'s reference limits were not checked; Runware checks them.`);
     return;
   }
-  if (s.minSide && Math.min(n, r) < s.minSide)
-    throw new x(`${e.name} takes reference images at least ${s.minSide} px a side; ${t.name} is ${n}×${r}. Use a larger image.`);
-  if (s.maxSide && Math.max(n, r) > s.maxSide)
-    throw new x(`${e.name} takes reference images up to ${s.maxSide} px a side; ${t.name} is ${n}×${r}. Resize it.`);
-  if (s.maxPixels && n * r > s.maxPixels)
-    throw new x(`${e.name} takes reference images up to ${s.maxPixels / 1e6} MP; ${t.name} is ${(n * r / 1e6).toFixed(1)} MP. Resize it.`);
-  if (s.minRatio && n / r < s.minRatio || s.maxRatio && n / r > s.maxRatio)
-    throw new x(`${e.name} takes reference images with aspect ${be(s.minRatio ?? 0)}-${be(s.maxRatio ?? 1 / 0)}; ${t.name} is ${(n / r).toFixed(2)}. Crop it.`);
+  if (n.minSide && Math.min(i, s) < n.minSide)
+    throw new v(`${e.name} takes reference images at least ${n.minSide} px a side; ${t.name} is ${i}×${s}. Use a larger image.`);
+  if (n.maxSide && Math.max(i, s) > n.maxSide)
+    throw new v(`${e.name} takes reference images up to ${n.maxSide} px a side; ${t.name} is ${i}×${s}. Resize it.`);
+  if (n.maxPixels && i * s > n.maxPixels)
+    throw new v(`${e.name} takes reference images up to ${n.maxPixels / 1e6} MP; ${t.name} is ${(i * s / 1e6).toFixed(1)} MP. Resize it.`);
+  if (n.minRatio && i / s < n.minRatio || n.maxRatio && i / s > n.maxRatio)
+    throw new v(`${e.name} takes reference images with aspect ${$e(n.minRatio ?? 0)}-${$e(n.maxRatio ?? 1 / 0)}; ${t.name} is ${(i / s).toFixed(2)}. Crop it.`);
 }
-function zr(e, t = globalThis.crypto.randomUUID()) {
-  const o = Gr(e.model), s = e.prompt.trim();
-  if (s.length < o.prompt.min || s.length > o.prompt.max)
-    throw new x(`${o.name} takes a prompt of ${o.prompt.min}-${o.prompt.max} characters.`);
-  const n = { taskType: "imageInference", taskUUID: t, model: o.air, positivePrompt: s }, r = [], i = [], d = [], a = [...e.reference ? [e.reference] : [], ...e.references ?? []];
-  if (a.length > o.references.max)
-    throw new x(`${o.name} takes ${o.references.max === 1 ? "one reference image" : `up to ${o.references.max} reference images`}; got ${a.length}.`);
-  if (a.length) {
-    const w = a.map((f) => {
-      if (Kr(o, f, d), i.push({ role: "referenceImage", src: f.displaySrc ?? f.name, label: f.name }), /^https:\/\//.test(f.ref)) return f.ref;
-      if (!/^data:image\/[a-z0-9.+-]+;base64,/i.test(f.ref)) throw new x(`${f.name}: the reference must be an https URL or an image file.`);
-      const g = Lo(r.length + 1, f.name);
-      return r.push({ placeholder: g, media: f }), g;
+function so(e, t = globalThis.crypto.randomUUID()) {
+  const a = jt(e.model), n = e.prompt.trim();
+  if (n.length < a.prompt.min || n.length > a.prompt.max)
+    throw new v(`${a.name} takes a prompt of ${a.prompt.min}-${a.prompt.max} characters.`);
+  const i = { taskType: "imageInference", taskUUID: t, model: a.air, positivePrompt: n }, s = [], o = [], r = [], d = [...e.reference ? [e.reference] : [], ...e.references ?? []];
+  if (d.length > a.references.max)
+    throw new v(`${a.name} takes ${a.references.max === 1 ? "one reference image" : `up to ${a.references.max} reference images`}; got ${d.length}.`);
+  if (d.length) {
+    const w = d.map((h) => {
+      if (io(a, h, r), o.push({ role: "referenceImage", src: h.displaySrc ?? h.name, label: h.name }), /^https:\/\//.test(h.ref)) return h.ref;
+      if (!/^data:image\/[a-z0-9.+-]+;base64,/i.test(h.ref)) throw new v(`${h.name}: the reference must be an https URL or an image file.`);
+      const g = _a(s.length + 1, h.name);
+      return s.push({ placeholder: g, media: h }), g;
     });
-    n.inputs = { referenceImages: w };
+    i.inputs = { referenceImages: w };
   }
-  const l = a.find((w) => w.info?.width && w.info?.height), m = o.size;
-  if (e.width !== void 0 && e.resolution) throw new x(`${o.name} takes a resolution or a width and height, not both.`);
-  m.kind === "grid" ? Wr(o, m, e, l, n, d) : Hr(o, m, e, a.length > 0, n, d);
+  const l = d.find((w) => w.info?.width && w.info?.height), m = a.size;
+  if (e.width !== void 0 && e.resolution) throw new v(`${a.name} takes a resolution or a width and height, not both.`);
+  m.kind === "grid" ? oo(a, m, e, l, i, r) : ro(a, m, e, d.length > 0, i, r);
   const u = e.outputFormat ?? "PNG";
-  if (!bt.includes(u) || !o.outputFormats.includes(u))
-    throw new x(`${o.name} still formats: ${o.outputFormats.filter((w) => bt.includes(w)).join(", ")}.`);
+  if (!St.includes(u) || !a.outputFormats.includes(u))
+    throw new v(`${a.name} still formats: ${a.outputFormats.filter((w) => St.includes(w)).join(", ")}.`);
   if (e.transparent) {
-    if (!o.transparency) throw new x(`${o.name} has no transparent background in its schema; pick one that has (${me.filter((w) => w.transparency).map((w) => w.key).join(", ")}).`);
-    if (u === "JPG") throw new x(`${o.name} makes a transparent background only as PNG or WEBP.`);
-    n.settings = { background: "transparent" };
+    if (!a.transparency) throw new v(`${a.name} has no transparent background in its schema; pick one that has (${be.filter((w) => w.transparency).map((w) => w.key).join(", ")}).`);
+    if (u === "JPG") throw new v(`${a.name} makes a transparent background only as PNG or WEBP.`);
+    i.settings = { background: "transparent" };
   }
-  Object.assign(n, { outputType: "URL", outputFormat: u, numberResults: 1, deliveryMethod: "async", includeCost: !0 });
-  const p = o.estimate({
-    width: n.width,
-    height: n.height,
-    resolution: n.resolution,
-    references: a.length,
-    prompt: s
+  if (e.quality !== void 0) {
+    if (!a.quality) throw new v(`${a.name} has no quality setting in its schema.`);
+    if (!a.quality.values.includes(e.quality)) throw new v(`${a.name} quality: ${a.quality.values.join(", ")} (default ${a.quality.default}).`);
+    i.settings = { ...i.settings, quality: e.quality };
+  }
+  Object.assign(i, { outputType: "URL", outputFormat: u, numberResults: 1, deliveryMethod: "async", includeCost: !0 });
+  const p = a.estimate({
+    width: i.width,
+    height: i.height,
+    resolution: i.resolution,
+    references: d.length,
+    prompt: n
   });
-  let h;
-  return p.usd === null && o.tokens ? (h = { highestExampleUsd: Mr(o.tokens), rates: o.tokens.ratesText, examples: Xo(o.tokens) }, d.push(`${o.name}: no published upper bound (${p.basis}). A run needs allowUnpriced (CLI --allow-unpriced); the cap is then compared with the highest published example, $${h.highestExampleUsd}.`)) : p.usd === null && d.push(`${o.name}: no price estimate (${p.basis}). A run with a price cap is refused.`), { modelId: o.air, modelName: o.name, uploads: r, task: n, inputsSent: i, estimate: p, ...h ? { unpriced: h } : {}, notes: d };
+  let f;
+  return p.usd === null && a.tokens ? (f = { highestExampleUsd: Ws(a.tokens), rates: a.tokens.ratesText, examples: $t(a.tokens) }, r.push(`${a.name}: no published upper bound (${p.basis}). A run needs allowUnpriced (CLI --allow-unpriced); the cap is then compared with the highest published example, $${f.highestExampleUsd}.`)) : p.usd === null && r.push(`${a.name}: no price estimate (${p.basis}). A run with a price cap is refused.`), { modelId: a.air, modelName: a.name, uploads: s, task: i, inputsSent: o, estimate: p, ...f ? { unpriced: f } : {}, notes: r };
 }
-function Wr(e, t, o, s, n, r) {
-  if (o.resolution) {
-    if (!t.resolution) throw new x(`${e.name} has no resolution preset; give --width and --height (${wt(t)}).`);
-    if (!t.resolution.values.includes(o.resolution)) throw new x(`${e.name} resolutions: ${t.resolution.values.join(", ")}.`);
-    n.resolution = o.resolution;
+function oo(e, t, a, n, i, s) {
+  if (a.resolution) {
+    if (!t.resolution) throw new v(`${e.name} has no resolution preset; give --width and --height (${It(t)}).`);
+    if (!t.resolution.values.includes(a.resolution)) throw new v(`${e.name} resolutions: ${t.resolution.values.join(", ")}.`);
+    i.resolution = a.resolution;
     return;
   }
-  if (o.width !== void 0 || o.height !== void 0) {
-    const [a, l] = [o.width ?? 0, o.height ?? 0], m = po(t, a, l);
-    if (m) throw new x(`${e.name} ${m}; got ${a}×${l}. Rule: ${wt(t)}.`);
-    n.width = a, n.height = l;
+  if (a.width !== void 0 || a.height !== void 0) {
+    const [d, l] = [a.width ?? 0, a.height ?? 0], m = $a(t, d, l);
+    if (m) throw new v(`${e.name} ${m}; got ${d}×${l}. Rule: ${It(t)}.`);
+    i.width = d, i.height = l;
     return;
   }
-  let [i, d] = t.default;
-  if (s) {
-    const [a, l] = [s.info.width, s.info.height], [m, u] = _r(t, a, l);
-    po(t, m, u) ? r.push(`${s.name} (${a}×${l}) does not fit ${e.name}'s output sizes, so the still is ${i}×${d}; the reference is sent as it is.`) : ([i, d] = [m, u], (m !== a || u !== l) && r.push(`Output size ${m}×${u}, ${t.multipleOf > 1 && !t.area ? `snapped (multiples of ${t.multipleOf})` : "fitted to the model's size rule"} from ${s.name}'s ${a}×${l}; the reference is sent as it is.`));
+  let [o, r] = t.default;
+  if (n) {
+    const [d, l] = [n.info.width, n.info.height], [m, u] = no(t, d, l);
+    $a(t, m, u) ? s.push(`${n.name} (${d}×${l}) does not fit ${e.name}'s output sizes, so the still is ${o}×${r}; the reference is sent as it is.`) : ([o, r] = [m, u], (m !== d || u !== l) && s.push(`Output size ${m}×${u}, ${t.multipleOf > 1 && !t.area ? `snapped (multiples of ${t.multipleOf})` : "fitted to the model's size rule"} from ${n.name}'s ${d}×${l}; the reference is sent as it is.`));
   }
-  n.width = i, n.height = d;
+  i.width = o, i.height = r;
 }
-function Hr(e, t, o, s, n, r) {
-  const i = Zo(t), d = (u, p) => i.some(([h, w]) => h === u && w === p);
-  if (s && (o.width === void 0 || !t.pairsWithReference)) {
-    if (o.width !== void 0)
-      throw new x(`${e.name} with a reference takes --resolution (${t.withReference.values.join(" or ")}), not a width and height; the output follows the reference's aspect.`);
-    const u = o.resolution ?? t.withReference.default;
-    if (!t.withReference.values.includes(u)) throw new x(`${e.name} resolutions: ${t.withReference.values.join(", ")}.`);
-    n.resolution = u, r.push(`${e.name} matches the reference's aspect ratio at ${u}.`);
+function ro(e, t, a, n, i, s) {
+  const o = cn(t), r = (u, p) => o.some(([f, w]) => f === u && w === p);
+  if (n && (a.width === void 0 || !t.pairsWithReference)) {
+    if (a.width !== void 0)
+      throw new v(`${e.name} with a reference takes --resolution (${t.withReference.values.join(" or ")}), not a width and height; the output follows the reference's aspect.`);
+    const u = a.resolution ?? t.withReference.default;
+    if (!t.withReference.values.includes(u)) throw new v(`${e.name} resolutions: ${t.withReference.values.join(", ")}.`);
+    i.resolution = u, s.push(`${e.name} matches the reference's aspect ratio at ${u}.`);
     return;
   }
-  if (o.resolution) throw new x(`${e.name} takes --resolution only beside a reference image.`);
-  const [a, l] = [o.width ?? t.default[0], o.height ?? t.default[1]];
-  if (!d(a, l)) throw new x(`${e.name} sizes: ${i.map(([u, p]) => `${u}×${p}`).join(", ")}.`);
-  n.width = a, n.height = l;
-  const m = Qo(t, a, l);
-  m && Object.keys(t.pairs).length > 1 && r.push(`${a}×${l} is a ${m} size.`);
+  if (a.resolution) throw new v(`${e.name} takes --resolution only beside a reference image.`);
+  const [d, l] = [a.width ?? t.default[0], a.height ?? t.default[1]];
+  if (!r(d, l)) throw new v(`${e.name} sizes: ${o.map(([u, p]) => `${u}×${p}`).join(", ")}.`);
+  i.width = d, i.height = l;
+  const m = ln(t, d, l);
+  m && Object.keys(t.pairs).length > 1 && s.push(`${d}×${l} is a ${m} size.`);
 }
-function Xr(e, t, o = !1) {
-  const s = e.estimate;
-  if (s.usd !== null)
-    return s.usd > t ? { ok: !1, code: "over-price", message: `Estimated $${s.usd.toFixed(4)} (${s.basis}) is over your cap of $${t.toFixed(2)}.` } : { ok: !0, usd: s.usd, basis: s.basis, priced: "bound" };
-  const n = e.unpriced;
-  return n ? o ? n.highestExampleUsd > t ? { ok: !1, code: "over-price", message: `${e.modelName} has no published bound, and its highest published example, $${n.highestExampleUsd}, is over your cap of $${t.toFixed(2)}.` } : {
+function co(e, t, a = !1) {
+  const n = e.estimate;
+  if (n.usd !== null)
+    return n.usd > t ? { ok: !1, code: "over-price", message: `Estimated $${n.usd.toFixed(4)} (${n.basis}) is over your cap of $${t.toFixed(2)}.` } : { ok: !0, usd: n.usd, basis: n.basis, priced: n.approximate ? "estimate" : "bound" };
+  const i = e.unpriced;
+  return i ? a ? i.highestExampleUsd > t ? { ok: !1, code: "over-price", message: `${e.modelName} has no published bound, and its highest published example, $${i.highestExampleUsd}, is over your cap of $${t.toFixed(2)}.` } : {
     ok: !0,
-    usd: n.highestExampleUsd,
-    basis: `no published upper bound: priced per token (${n.rates}); highest published example $${n.highestExampleUsd} (examples: ${n.examples}). The real cost may be higher.`,
+    usd: i.highestExampleUsd,
+    basis: `no published upper bound: priced per token (${i.rates}); highest published example $${i.highestExampleUsd} (examples: ${i.examples}). The real cost may be higher.`,
     priced: "unpriced",
-    rates: n.rates,
-    examples: n.examples
-  } : { ok: !1, code: "no-estimate", message: `${e.modelName} is priced per token (${n.rates}) and Runware publishes no upper bound for it. Pass allowUnpriced: true to run it with the cap compared to the highest published example ($${n.highestExampleUsd}).` } : { ok: !1, code: "no-estimate", message: `No price estimate for ${e.modelName} (${s.basis}); it cannot be checked against maxPrice.` };
+    rates: i.rates,
+    examples: i.examples
+  } : { ok: !1, code: "no-estimate", message: `${e.modelName} is priced per token (${i.rates}) and Runware publishes no upper bound for it. Pass allowUnpriced: true to run it with the cap compared to the highest published example ($${i.highestExampleUsd}).` } : { ok: !1, code: "no-estimate", message: `No price estimate for ${e.modelName} (${n.basis}); it cannot be checked against maxPrice.` };
 }
-async function Jr(e, t, o = {}) {
-  const s = /* @__PURE__ */ new Map();
-  for (const d of t.uploads)
-    o.onUpload?.(d.media.name), s.set(d.placeholder, (await e.upload(d.media.ref, o.signal)).mediaUUID);
-  const n = Vo(t.task, s);
-  o.onSubmit?.();
-  const { errors: r } = await e.post([n], o.signal), i = r.filter((d) => !d.taskUUID || d.taskUUID === n.taskUUID);
-  if (i.length) throw new Q(400, i);
-  return { task: n, result: await vn(e, String(n.taskUUID), o) };
+async function lo(e, t, a = {}) {
+  const n = /* @__PURE__ */ new Map();
+  for (const r of t.uploads)
+    a.onUpload?.(r.media.name), n.set(r.placeholder, (await e.upload(r.media.ref, a.signal)).mediaUUID);
+  const i = Wa(t.task, n);
+  a.onSubmit?.();
+  const { errors: s } = await e.post([i], a.signal), o = s.filter((r) => !r.taskUUID || r.taskUUID === i.taskUUID);
+  if (o.length) throw new ne(400, o);
+  return { task: i, result: await Mi(e, String(i.taskUUID), a) };
 }
-const Yr = /^[\x21-\x7e]{16,512}$/, fo = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp" };
-async function Zr(e, t) {
-  const o = `reference ${t + 1}`;
+const uo = /^[\x21-\x7e]{16,512}$/, ka = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp" };
+async function mo(e, t) {
+  const a = `reference ${t + 1}`;
   if (typeof e == "string") {
-    if (!/^https:\/\//.test(e)) throw new P("refused", `The ${o} URL must start with https://.`);
-    const d = decodeURIComponent(new URL(e).pathname.split("/").pop() || o);
-    return { name: d, contentType: Ue(d) ?? "image/*", ref: e, displaySrc: e };
+    if (!/^https:\/\//.test(e)) throw new P("refused", `The ${a} URL must start with https://.`);
+    const r = decodeURIComponent(new URL(e).pathname.split("/").pop() || a);
+    return { name: r, contentType: je(r) ?? "image/*", ref: e, displaySrc: e };
   }
-  const s = e instanceof Blob ? e : e.blob;
-  if (!(s instanceof Blob)) throw new P("refused", `The ${o} must be an image Blob or an https URL.`);
-  if (!fo[s.type]) throw new P("refused", `The ${o} must be PNG, JPEG or WebP; got ${s.type || "an unknown type"}.`);
-  let r = ((e instanceof Blob ? e.name : e.name ?? e.blob.name) || `reference-${t + 1}`).split(/[\\/]/).pop();
-  Ue(r) !== s.type && (r = `${r.replace(/\.[A-Za-z0-9]{1,5}$/, "")}.${fo[s.type]}`);
-  const i = e instanceof Blob ? void 0 : e.src;
+  const n = e instanceof Blob ? e : e.blob;
+  if (!(n instanceof Blob)) throw new P("refused", `The ${a} must be an image Blob or an https URL.`);
+  if (!ka[n.type]) throw new P("refused", `The ${a} must be PNG, JPEG or WebP; got ${n.type || "an unknown type"}.`);
+  let s = ((e instanceof Blob ? e.name : e.name ?? e.blob.name) || `reference-${t + 1}`).split(/[\\/]/).pop();
+  je(s) !== n.type && (s = `${s.replace(/\.[A-Za-z0-9]{1,5}$/, "")}.${ka[n.type]}`);
+  const o = e instanceof Blob ? void 0 : e.src;
   try {
-    return await ko(De(s, r), i && /^https?:\/\//.test(i) ? i : void 0);
-  } catch (d) {
-    throw new P("refused", `The ${o}: ${d.message}`);
+    return await Fa(ze(n, s), o && /^https?:\/\//.test(o) ? o : void 0);
+  } catch (r) {
+    throw new P("refused", `The ${a}: ${r.message}`);
   }
 }
-async function si(e) {
-  const t = e.key, o = typeof t == "function" ? t : typeof t == "string" ? () => t : () => t.getKey(), s = new Ne({ getKey: o, fetch: e.fetch }), n = (d) => s.redact(d), r = (d) => e.onProgress?.(d);
-  let i;
+async function ko(e) {
+  const t = e.key, a = typeof t == "function" ? t : typeof t == "string" ? () => t : () => t.getKey(), n = new Ke({ getKey: a, fetch: e.fetch }), i = (r) => n.redact(r), s = (r) => e.onProgress?.(r);
+  let o;
   try {
     if (!(typeof e.maxPrice == "number" && Number.isFinite(e.maxPrice) && e.maxPrice > 0 && e.maxPrice <= 100))
       throw new P("refused", "maxPrice must be a positive number of USD up to 100.");
-    const d = o();
-    if (!d || !Yr.test(d)) throw new P("invalid-key", "Connect a Runware API key first (16-512 characters, no spaces).");
-    r({ stage: "plan", message: "checking the references" });
-    const a = await Promise.all((e.references ?? []).map(Zr)), l = e.size ?? {}, m = zr(
+    const r = a();
+    if (!r || !uo.test(r)) throw new P("invalid-key", "Connect a Runware API key first (16-512 characters, no spaces).");
+    s({ stage: "plan", message: "checking the references" });
+    const d = await Promise.all((e.references ?? []).map(mo)), l = e.size ?? {}, m = so(
       {
         model: e.model,
         prompt: e.prompt,
-        references: a,
+        references: d,
         ...l.resolution !== void 0 ? { resolution: l.resolution } : {},
         ...l.width !== void 0 || l.height !== void 0 ? { width: l.width, height: l.height } : {},
         ...e.transparent ? { transparent: !0 } : {},
-        ...e.outputFormat ? { outputFormat: e.outputFormat } : {}
+        ...e.outputFormat ? { outputFormat: e.outputFormat } : {},
+        ...e.quality !== void 0 ? { quality: e.quality } : {}
       },
       e.taskUUID
-    ), u = Xr(m, e.maxPrice, e.allowUnpriced === !0);
+    ), u = co(m, e.maxPrice, e.allowUnpriced === !0);
     if (!u.ok) throw new P(u.code, u.message);
-    if (r({ stage: "confirm", message: u.priced === "bound" ? `up to $${u.usd.toFixed(4)}` : `no published bound; highest example $${u.usd}` }), !await e.confirm({
+    if (s({
+      stage: "confirm",
+      message: u.priced === "bound" ? `up to $${u.usd.toFixed(4)}` : u.priced === "estimate" ? `about $${u.usd.toFixed(4)} (estimate)` : `no published bound; highest example $${u.usd}`
+    }), !await e.confirm({
       model: m.modelId,
       modelName: m.modelName,
       usd: u.usd,
@@ -4416,49 +4462,162 @@ async function si(e) {
       ...u.rates ? { rates: u.rates, examples: u.examples } : {}
     })) throw new P("not-confirmed", "Not confirmed; nothing was sent.");
     if (e.signal?.aborted) throw new P("aborted", "Stopped. Nothing was submitted.");
-    const h = Date.now(), { task: w, result: f } = await Jr(s, m, {
+    const f = Date.now(), { task: w, result: h } = await lo(n, m, {
       timeoutMs: 10 * 6e4,
       ...e.poll,
       signal: e.signal,
-      onUpload: (U) => r({ stage: "upload", message: `uploading ${U}` }),
+      onUpload: (U) => s({ stage: "upload", message: `uploading ${U}` }),
       onSubmit: () => {
-        i = String(m.task.taskUUID), r({ stage: "submit", message: "submitting" });
+        o = String(m.task.taskUUID), s({ stage: "submit", message: "submitting" });
       },
-      onProgress: (U, F) => r({ stage: "poll", message: U, progress: F })
-    }), g = (Date.now() - h) / 1e3, b = {
+      onProgress: (U, F) => s({ stage: "poll", message: U, progress: F })
+    }), g = (Date.now() - f) / 1e3, b = {
       date: (/* @__PURE__ */ new Date()).toISOString().slice(0, 10),
       model: m.modelId,
       modelRan: m.modelId,
-      taskUUID: f.taskUUID,
+      taskUUID: h.taskUUID,
       duration: "-",
-      resolution: go(w),
+      resolution: Ea(w),
       inputs: m.inputsSent.length ? m.inputsSent.map((U) => U.role).join("+") : "prompt",
       estimateUsd: m.estimate.usd,
-      costUsd: f.cost,
+      costUsd: h.cost,
       seconds: g,
-      output: f.imageURL,
+      output: h.imageURL,
       status: "ok (browser)"
-    }, y = [...m.notes];
-    return a.length && y.push(`${a.length === 1 ? "The reference was" : `All ${a.length} references were`} sent as given: none resized or dropped.`), u.priced === "unpriced" && y.push(`Ran without a published bound (allowUnpriced): the cap was compared with the highest published example, $${u.usd}; the cost Runware reported is ${f.cost === null ? "missing" : `$${f.cost}`}.`), f.cost !== null && f.cost > e.maxPrice && y.push(`Reported cost $${f.cost} is over the cap of $${e.maxPrice}.`), r({ stage: "done", message: "done" }), {
-      imageURL: f.imageURL,
-      costUsd: f.cost,
-      taskUUID: f.taskUUID,
+    }, x = [...m.notes];
+    return d.length && x.push(`${d.length === 1 ? "The reference was" : `All ${d.length} references were`} sent as given: none resized or dropped.`), u.priced === "unpriced" && x.push(`Ran without a published bound (allowUnpriced): the cap was compared with the highest published example, $${u.usd}; the cost Runware reported is ${h.cost === null ? "missing" : `$${h.cost}`}.`), h.cost !== null && h.cost > e.maxPrice && x.push(`Reported cost $${h.cost} is over the cap of $${e.maxPrice}.`), s({ stage: "done", message: "done" }), {
+      imageURL: h.imageURL,
+      costUsd: h.cost,
+      taskUUID: h.taskUUID,
       // A named model runs as asked; there is no router on this path.
       modelRan: m.modelId,
       estimate: m.estimate,
       inputsSent: m.inputsSent,
-      notes: y,
+      notes: x,
       generationSeconds: g,
       costRow: b,
-      costRowText: ho(b),
+      costRowText: Ia(b),
       task: w
     };
-  } catch (d) {
-    throw Bo(d, e.signal, i, n);
+  } catch (r) {
+    throw Za(r, e.signal, o, i);
   }
 }
-function Qr(e) {
-  const t = e.size.default;
+const po = "https://runware.ai/docs/models", te = "13 Nov 2026", L = (e, t) => `${po}/${e}/guides/${t}`, ft = [
+  "Say first what the image is for, then describe it one area of the frame at a time.",
+  "Give every count as a number and every position against the frame.",
+  "Put any words to render in double quotes, and finish with no text or no other text.",
+  "With references, say what each image is before anything else, then list what must stay the same."
+], Sa = [
+  "Open with the task and where the image will be used, then the arrangement, then details and light.",
+  "Write counts as numbers and place things against the frame, not against each other.",
+  "Call references image 1, image 2 in the order sent, one job each, and say what may change.",
+  "Always send a size or 1K/2K: with no size the model returns 4K at about four times the cost."
+], hn = [
+  {
+    key: "klein-9b",
+    guide: { url: null, read: te, related: [], note: "no model guide published" },
+    tips: [
+      "Describe the subject, the setting, the framing and the light in plain sentences.",
+      "Name what each reference image is for.",
+      "Keep sizes on its grid of 16 px; the reference sets the default size."
+    ],
+    dialect: "neutral"
+  },
+  {
+    key: "flux-3-image",
+    guide: { url: L("bfl-flux-3-image", "prompting"), read: te, related: [L("bfl-flux-3-image", "multi-reference-composition")] },
+    tips: [
+      "Write the subject, the action, the place, the composition and the style, in that order.",
+      "There is no negative prompt: describe what is there instead of what is missing.",
+      "Give the light a direction and a hardness.",
+      "Refer to references as image 1, image 2, give each a job and say whose light wins."
+    ],
+    dialect: "flux3"
+  },
+  {
+    key: "flux-3-image-klein",
+    guide: { url: L("bfl-flux-3-image-klein", "prompting"), read: te, related: [L("bfl-flux-3-image-klein", "multi-reference-composition")] },
+    tips: [
+      "Write a full caption: framing, subject, background and light, then a style line.",
+      "Nothing rewrites the prompt here, so every clause you leave out is the model's choice.",
+      "State absences as what is there, such as a plain blank wall.",
+      "Up to four references; name each by number and restate its key details."
+    ],
+    dialect: "klein3"
+  },
+  {
+    key: "gpt-image-2.6-flare",
+    guide: {
+      url: L("openai-gpt-image-2-6-flare", "prompting"),
+      read: te,
+      related: [L("openai-gpt-image-2-6-flare", "editing-images"), L("openai-gpt-image-2-6-flare", "quality-and-thinking-level")]
+    },
+    tips: [...ft.slice(0, 3), "Try quality low for drafts; quality and size decide how many output tokens you pay for."],
+    dialect: "gpt"
+  },
+  {
+    key: "gpt-image-2.6-sunburst",
+    guide: {
+      url: L("openai-gpt-image-2-6-sunburst", "detailed-editing"),
+      read: te,
+      related: [L("openai-gpt-image-2-6-flare", "prompting"), L("openai-gpt-image-2-6-flare", "editing-images")],
+      note: "Sunburst takes the same request as Flare; its own guide covers detailed edits, and the Flare guides cover prompting"
+    },
+    tips: [ft[0], ft[3], "Change one thing per edit and list everything else to keep.", "Check every quoted string in the result; one wrong character is the usual miss."],
+    dialect: "gpt"
+  },
+  {
+    key: "h3-image",
+    guide: {
+      url: L("minimax-h3-image", "prompting"),
+      read: te,
+      related: [L("minimax-h3-image", "multi-reference-composition"), L("minimax-h3-image", "prompt-optimizer")]
+    },
+    tips: Sa,
+    dialect: "h3"
+  },
+  {
+    key: "h3-image-highspeed",
+    guide: {
+      url: L("minimax-h3-image", "prompting"),
+      read: te,
+      related: [L("minimax-h3-image", "multi-reference-composition"), L("minimax-h3-image", "prompt-optimizer")],
+      note: "no separate guide; the MiniMax H3 Image guide says Highspeed takes the same requests"
+    },
+    tips: Sa,
+    dialect: "h3"
+  },
+  {
+    key: "seedream-5.5",
+    guide: { url: L("bytedance-seedream-5-5", "prompting"), read: te, related: [L("bytedance-seedream-5-5", "multi-reference-composition")] },
+    tips: [
+      "Write it as a brief: what it is for, then subject, setting, light, lens and framing, one clause each.",
+      "Describe materials and parts, not only colours, and finish with what to leave out.",
+      "Keep it under about 600 words.",
+      "Call references image 1, image 2 in the order sent; keep the character as image 1 across a set."
+    ],
+    dialect: "seedream"
+  },
+  {
+    key: "kling-image-3",
+    guide: { url: null, read: te, related: [], note: "no model guide published" },
+    tips: [
+      "Describe the subject, the setting, the framing and the light in plain sentences.",
+      "It takes one reference; say what it is for.",
+      "Prompts are limited to 2,500 characters."
+    ],
+    dialect: "neutral"
+  }
+];
+function fn(e) {
+  return hn.find((t) => t.key === e);
+}
+function So() {
+  return hn.map(({ key: e, guide: t, tips: a }) => ({ key: e, guide: { ...t, related: [...t.related] }, tips: [...a] }));
+}
+function ho(e) {
+  const t = e.size.default, a = fn(e.key);
   return {
     key: e.key,
     name: e.name,
@@ -4470,63 +4629,179 @@ function Qr(e) {
       text: !0,
       referenceImages: { ...e.references },
       transparent: e.transparency,
-      outputFormats: e.outputFormats.filter((o) => bt.includes(o)),
+      quality: e.quality ? { values: [...e.quality.values], default: e.quality.default } : null,
+      outputFormats: e.outputFormats.filter((n) => St.includes(n)),
       notOffered: [...e.notOffered ?? []]
     },
     prompt: { ...e.prompt },
-    size: { rule: structuredClone(e.size), summary: wt(e.size), default: [t[0], t[1]] },
+    size: { rule: structuredClone(e.size), summary: It(e.size), default: [t[0], t[1]] },
     estimate: e.estimate({ width: t[0], height: t[1], references: 0 }),
     pricing: { ...e.pricing },
+    guide: { ...a.guide, related: [...a.guide.related] },
+    tips: [...a.tips],
     schemaUrl: e.schemaUrl,
     pageUrl: e.pageUrl
   };
 }
-const qr = () => [...me].sort((e, t) => gt.indexOf(e.family) - gt.indexOf(t.family) || me.indexOf(e) - me.indexOf(t));
-function ei() {
-  return qr().map(Qr);
+const fo = () => [...be].sort((e, t) => kt.indexOf(e.family) - kt.indexOf(t.family) || be.indexOf(e) - be.indexOf(t));
+function go() {
+  return fo().map(ho);
 }
-function ni() {
-  const e = ei();
-  return gt.map((t) => ({ family: t, models: e.filter((o) => o.family === t) })).filter((t) => t.models.length);
+function Io() {
+  const e = go();
+  return kt.map((t) => ({ family: t, models: e.filter((a) => a.family === t) })).filter((t) => t.models.length);
 }
-Et();
-Go();
-Ar();
-yr();
-kr();
+const bo = { landscape: "a wide landscape frame", portrait: "a tall portrait frame", square: "a square frame" }, H = (e) => e.trim().replace(/\s+/g, " ").replace(/[.\s]+$/, ""), z = (e) => e.length < 2 ? e.join("") : `${e.slice(0, -1).join(", ")} and ${e.at(-1)}`, Et = (e) => e ? e[0].toUpperCase() + e.slice(1) + "." : "";
+function wo(e) {
+  const t = e.kind === "free" ? void 0 : e.kind;
+  return (e.references ?? []).map((a, n) => {
+    const i = n + 1, s = a.note ? H(a.note) : void 0;
+    return a.role === "character" && t !== "environment" ? { n: i, noun: "character", role: "the character to show", keep: "face, hair, build and clothing", mayChange: t === "character" ? "pose and framing" : void 0, styleOnly: !1, note: s } : a.role === "character" ? { n: i, noun: "character", role: "a style reference, used only for its art style and colour palette", keep: "art style and colour palette", styleOnly: !0, note: s } : a.role === "environment" && t !== "character" ? { n: i, noun: "place", role: "the place to show", keep: "layout, architecture and materials", mayChange: e.camera ? "camera position" : void 0, styleOnly: !1, note: s } : a.role === "environment" ? { n: i, noun: "setting", role: "a style reference, used only for its colour palette and the colour of its light", keep: "colour palette", styleOnly: !0, note: s } : { n: i, noun: s ?? "reference", role: s ? `a reference for ${s}` : "a style reference", styleOnly: !0 };
+  });
+}
+function yo(e) {
+  const t = H(e.subject), a = e.style ? H(e.style) : void 0, n = bo[e.orientation ?? (e.kind === "character", "landscape")];
+  return e.kind === "character" ? {
+    deliverable: `a character reference sheet${a ? ` in ${a}` : ""}, for use as a reference image`,
+    subject: t,
+    layout: "three full-body views of the same character side by side: the front view on the left, the side profile in the middle and the back view on the right",
+    action: "standing in a neutral pose with the arms relaxed at the sides",
+    setting: "a plain light grey studio background",
+    settingAsState: "the background is plain, even light grey and unmarked",
+    light: "soft, even studio light from the front, the shadows faint and diffuse",
+    camera: "straight-on at mid-body height, the whole figure in each view with space above the head and below the feet",
+    frame: n,
+    exclusions: ["no text", "no labels", "no logos"]
+  } : e.kind === "environment" ? {
+    deliverable: `an environment view for a film shot${a ? ` in ${a}` : ""}`,
+    subject: t,
+    layout: "the place on its own",
+    action: "empty and still",
+    setting: t,
+    settingAsState: "the place is empty of people and every surface is unlettered",
+    light: e.light ? H(e.light) : "",
+    camera: e.camera ? H(e.camera) : "",
+    frame: n,
+    exclusions: ["no people", "no text"]
+  } : { deliverable: "", subject: t, layout: "", action: "", setting: "", settingAsState: "", light: e.light ? H(e.light) : "", camera: e.camera ? H(e.camera) : "", frame: n, exclusions: [], style: a };
+}
+function pe(e, t) {
+  const a = e.filter((n) => n.keep && !n.styleOnly).map((n) => `the ${n.keep} ${t(n)}`);
+  return a.length ? `Keep ${z(a)}` : "";
+}
+const vo = {
+  gpt(e, t, a) {
+    const n = [];
+    t.length && n.push(z(t.map((s) => `${s.n === 1 ? "Image" : "image"} ${s.n} is ${s.role}${s.note ? ` (${s.note})` : ""}`))), a.kind === "free" ? n.push(e.subject) : (n.push(`${e.deliverable}, in ${e.frame}: ${e.subject}`), n.push(`${e.layout}, ${e.action}`), n.push(`${e.setting === e.subject ? "" : `On ${e.setting}, `}${e.light}${e.camera ? `, camera ${e.camera}` : ""}`.replace(/^, /, "")));
+    for (const s of t.filter((o) => o.styleOnly)) n.push(`Take only the ${s.keep ?? "style"} from image ${s.n}, not its content`);
+    const i = pe(t, (s) => `of the ${s.noun} from image ${s.n}`);
+    return i && n.push(`${i} exactly as ${t.filter((s) => s.keep && !s.styleOnly).length > 1 ? "they are" : "it is"}`), e.exclusions.length && n.push(z(e.exclusions)), n;
+  },
+  h3(e, t, a) {
+    const n = [];
+    t.length && n.push(`Use ${z(t.map((r) => `image ${r.n} as ${r.role}`))}`), a.kind === "free" ? n.push(e.subject) : (n.push(`${e.deliverable}, in ${e.frame}`), n.push(a.kind === "character" ? `${e.subject}, shown in ${e.layout}, ${e.action}` : `${e.subject}, ${e.action}`), e.camera && n.push(`The camera is ${e.camera}`), n.push(a.kind === "character" ? "Plain empty space around each view" : "The frame holds only the place"), a.kind === "character" && n.push(`${e.setting}, ${e.light}`));
+    const i = t.find((r) => r.noun === "place" || r.noun === "setting" && !r.styleOnly);
+    a.kind === "environment" && e.light && n.push(i ? `Relight the place from image ${i.n} with ${e.light}` : e.light);
+    const s = pe(t, (r) => `from image ${r.n}`);
+    s && n.push(s);
+    for (const r of t.filter((d) => d.styleOnly)) n.push(`Take only the ${r.keep ?? "style"} from image ${r.n}`);
+    const o = t.filter((r) => r.mayChange).map((r) => r.mayChange);
+    return o.length && n.push(`The ${z([...new Set(o)])} can change`), e.exclusions.length && n.push(z(e.exclusions)), n;
+  },
+  seedream(e, t, a) {
+    const n = [];
+    t.length && n.push(z(t.map((s) => `${s.n === 1 ? "Image" : "image"} ${s.n} is ${s.role}${s.note ? ` (${s.note})` : ""}`))), a.kind === "free" ? n.push(e.subject) : (n.push(e.deliverable), n.push(a.kind === "character" ? `The subject is ${e.subject}, ${e.action}` : `The setting is ${e.subject}, ${e.action}`), a.kind === "character" && n.push(`The setting is ${e.setting}`), e.light && n.push(`The light is ${e.light}`), n.push(a.kind === "character" ? "50mm lens, straight-on" : e.camera ? `The camera is ${e.camera}` : ""), n.push(`Framing: ${a.kind === "character" ? e.layout : "the place fills the frame"}, in ${e.frame}`));
+    const i = pe(t, (s) => `of the ${s.noun} from image ${s.n}`);
+    i && n.push(i);
+    for (const s of t.filter((o) => o.styleOnly)) n.push(`Take only the ${s.keep ?? "style"} from image ${s.n}`);
+    return e.exclusions.length && n.push(z(e.exclusions)), n.filter(Boolean);
+  },
+  flux3(e, t, a) {
+    const n = [];
+    t.length && n.push(z(t.map((o) => `${o.n === 1 ? "Image" : "image"} ${o.n} supplies ${o.role}`))), a.kind === "free" ? n.push(e.subject) : a.kind === "character" ? (n.push(`${e.subject}, shown in ${e.layout}`), n.push(e.action), n.push(`${e.frame}, the camera ${e.camera}, a soft contact shadow under each view`)) : (n.push(e.subject), n.push(e.settingAsState), e.camera ? n.push(`${e.frame}, the camera ${e.camera}`) : n.push(`In ${e.frame}`));
+    const i = t.find((o) => o.noun === "place");
+    e.light && n.push(i ? `The light of the scene wins: ${e.light}` : e.light), a.kind === "character" && n.push(e.settingAsState), a.style && n.push(H(a.style));
+    const s = pe(t, (o) => `of the ${o.noun} from image ${o.n}`);
+    s && n.push(s);
+    for (const o of t.filter((r) => r.styleOnly)) n.push(`Take only the ${o.keep ?? "style"} from image ${o.n}`);
+    return n;
+  },
+  klein3(e, t, a) {
+    const n = [], i = (o) => `the ${o.noun} from image ${o.n}${o.note ? `, ${o.note}` : ""}`;
+    if (a.kind === "free") n.push(e.subject);
+    else if (a.kind === "character")
+      n.push(`${Et(e.frame).slice(0, -1)} showing ${e.layout}, ${e.camera}`), n.push(`The subject is ${t.find((o) => o.noun === "character" && !o.styleOnly) ? i(t.find((o) => o.noun === "character" && !o.styleOnly)) + ", " : ""}${e.subject}, ${e.action}`), n.push(`The background is ${e.setting}, plain and blank`), n.push(`The lighting is ${e.light}`);
+    else {
+      const o = t.find((r) => r.noun === "place");
+      n.push(`${Et(e.frame).slice(0, -1)}${e.camera ? `, the camera ${e.camera}` : ""}`), n.push(o ? `Use image ${o.n} as the scene: ${e.subject}` : `The scene is ${e.subject}`), n.push(e.settingAsState), e.light && n.push(`The lighting is ${e.light}`);
+    }
+    for (const o of t.filter((r) => r.styleOnly)) n.push(`Take only the ${o.keep ?? "style"} of image ${o.n}${o.note ? `, ${o.note}` : ""}`);
+    const s = pe(t, (o) => `of the ${o.noun} from image ${o.n}`);
+    return s && n.push(s), n.push(a.style ? `Style: ${H(a.style)}` : a.kind === "free" ? "" : "Style: clean reference illustration"), n.filter(Boolean);
+  },
+  neutral(e, t, a) {
+    const n = [], i = (o) => jt(a.model).references.max === 1 ? "the reference image" : `image ${o.n}`;
+    t.length && n.push(z(t.map((o) => `${i(o)} is ${o.role}`))), a.kind === "free" ? n.push(e.subject) : (n.push(`${e.deliverable}: ${e.subject}`), a.kind === "character" && n.push(`${e.layout}, ${e.action}`), n.push(a.kind === "character" ? `${e.setting}, ${e.light}` : [e.light, e.camera && `camera ${e.camera}`].filter(Boolean).join(", ")), n.push(e.frame));
+    const s = pe(t, (o) => `from ${i(o)}`);
+    s && n.push(s);
+    for (const o of t.filter((r) => r.styleOnly)) n.push(`Take only the ${o.keep ?? "style"} from ${i(o)}`);
+    return e.exclusions.length && n.push(z(e.exclusions)), n;
+  }
+};
+function Eo(e) {
+  const t = jt(e.model), a = fn(t.key);
+  if (!a) throw new v(`No prompt guide entry for ${t.name}.`);
+  if (!H(e.subject)) throw new v("Describe the subject.");
+  const n = e.references ?? [];
+  if (n.length > t.references.max)
+    throw new v(`${t.name} takes ${t.references.max === 1 ? "one reference image" : `up to ${t.references.max} reference images`}; got ${n.length}.`);
+  const i = [], s = wo(e), o = yo(e), r = vo[a.dialect](o, s, e).map((l) => Et(H(l))).filter((l) => l.length > 1).join(" ");
+  if (r.length > t.prompt.max) throw new v(`The composed prompt is ${r.length} characters; ${t.name} takes up to ${t.prompt.max}. Shorten the subject.`);
+  a.dialect === "seedream" && r.split(/\s+/).length > 600 && i.push(`${t.name}: the guide recommends under about 600 words; this prompt has ${r.split(/\s+/).length}.`);
+  const d = n.findIndex((l) => l.role === "character");
+  return e.kind === "character" && d > 0 && (a.dialect === "gpt" || a.dialect === "seedream") && i.push(`${t.name}: send the character reference first; its guide treats image 1 as the base to keep.`), e.kind === "environment" && !e.light && i.push("No light or time of day given; the model will choose one."), e.kind === "environment" && !e.camera && i.push("No camera height given; say the one the shot uses."), a.dialect === "h3" && i.push(`${t.name}: send a size or 1K/2K; with none it returns 4K at about four times the image tokens.`), a.dialect === "seedream" && n.length > 1 && i.push(`${t.name}: references of different shapes leave the output ratio open; send width and height.`), a.guide.url || i.push(`${t.name}: no model guide published; the prompt uses plain clauses.`), { prompt: r, notes: i };
+}
+Lt();
+Qa();
+Gs();
+Fs();
+Cs();
 export {
-  $r as ArenaGallery,
-  vr as ArenaGenerate,
-  On as ArenaKey,
-  Pr as ArenaPlayer,
-  un as COMPARE_MODEL_KEYS,
-  he as GUIDE_MODEL_KEYS,
+  js as ArenaGallery,
+  Ms as ArenaGenerate,
+  Qi as ArenaKey,
+  Ds as ArenaPlayer,
+  Si as COMPARE_MODEL_KEYS,
+  ve as GUIDE_MODEL_KEYS,
   P as GenerateError,
-  mr as ModelArena,
-  Ne as RunwareClient,
-  bt as STILL_FORMATS,
-  Cn as TOKEN_NAMES,
-  Xr as checkImagePrice,
-  hn as comparePrompts,
-  ti as composePrompt,
-  wt as describeSize,
-  Do as entriesOf,
-  Pn as generateFromGuide,
-  si as generateImage,
-  Co as guideModels,
-  ni as imageFamilies,
-  ei as imageModels,
-  Xt as keyProblem,
-  Io as loadGuideBundle,
-  Ir as needsSeek,
-  oi as offeredModels,
-  So as parseGuideShot,
-  _n as parsePreset,
-  ue as parseRecord,
-  No as planGuideLane,
-  zr as planImage,
-  zn as presetFromRecord,
-  He as previewPrompt,
-  Jr as runImage,
-  Rr as tokenBound
+  Is as ModelArena,
+  Ke as RunwareClient,
+  St as STILL_FORMATS,
+  Yi as TOKEN_NAMES,
+  co as checkImagePrice,
+  Ai as comparePrompts,
+  Eo as composeImagePrompt,
+  xo as composePrompt,
+  It as describeSize,
+  Ya as entriesOf,
+  Di as generateFromGuide,
+  ko as generateImage,
+  Ha as guideModels,
+  Io as imageFamilies,
+  fn as imageGuide,
+  So as imageGuides,
+  go as imageModels,
+  na as keyProblem,
+  ja as loadGuideBundle,
+  Os as needsSeek,
+  $o as offeredModels,
+  La as parseGuideShot,
+  as as parsePreset,
+  ge as parseRecord,
+  Xa as planGuideLane,
+  so as planImage,
+  is as presetFromRecord,
+  Qe as previewPrompt,
+  lo as runImage,
+  Bs as tokenBound
 };

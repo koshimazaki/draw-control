@@ -12,20 +12,29 @@ export type ArenaResult = { videoURL: string; costUsd: number | null; modelRan: 
 /** An image model from the embed's catalogue (imageFamilies()): plain data for a picker. */
 export type ImageModelInfo = {
   key: string; name: string; family: string;
-  accepts: { referenceImages: { max: number } };
+  accepts: { referenceImages: { max: number }; quality?: { values: string[]; default: string } | null };
   prompt: { min: number; max: number };
   size: { summary: string; default: [number, number] };
   estimate: { usd: number | null };
   pricing: { kind: "per-image" | "token" | "compute-time"; summary: string };
+  /** The Runware prompting guide this model's prompts follow (url null: none published, `note` says so), and short tips. */
+  guide?: { url: string | null; note?: string };
+  tips?: string[];
+};
+/** composeImagePrompt's input (the embed's image-compose.ts). */
+export type ComposeImageInput = {
+  model: string; kind: "character" | "environment" | "free"; subject: string; style?: string; light?: string; camera?: string;
+  references?: { role: "character" | "environment" | "other"; note?: string }[]; orientation?: "landscape" | "portrait" | "square";
 };
 export type ImageFamilyInfo = { family: string; models: ImageModelInfo[] };
 /** What the embed asks before a run (generateFromGuide and generateImage): images may be "unpriced" (no published bound). */
-export type CostQuestion = { model: string; modelName: string; usd: number; maxPrice: number; inputs: unknown[]; prompt: string; priced?: "bound" | "unpriced"; rates?: string; examples?: string };
+export type CostQuestion = { model: string; modelName: string; usd: number; basis?: string; maxPrice: number; inputs: unknown[]; prompt: string; priced?: "bound" | "estimate" | "unpriced"; rates?: string; examples?: string };
 export type ImageResult = { imageURL: string; costUsd: number | null; modelRan: string; notes: string[]; taskUUID: string };
 export type ArenaModule = {
   generateFromGuide(o: Record<string, unknown>): Promise<ArenaResult>;
   imageFamilies?(): ImageFamilyInfo[];
   generateImage?(o: Record<string, unknown>): Promise<ImageResult>;
+  composeImagePrompt?(o: ComposeImageInput): { prompt: string; notes: string[] };
   offeredModels(): ArenaModel[];
   composePrompt(shot: Record<string, string>, model: string, references?: { character?: unknown; environment?: unknown }, guide?: { seconds?: number; hasAudio?: boolean }): { prompt: string; notes: string[] };
 };
@@ -46,6 +55,8 @@ export function fakeFetch(result: () => string, image: () => string = result) {
   return async (url: string, init: { body: string }) => {
     if (new URL(url).host !== "api.runware.ai") throw new Error("the fake provider only answers api.runware.ai");
     const tasks = JSON.parse(init.body) as { taskType: string; taskUUID: string }[];
+    // What the page would have sent, kept for the smoke checks (local only; nothing leaves the page).
+    ((globalThis as { __fakeTasks?: unknown[] }).__fakeTasks ??= []).push(...tasks.filter(t => t.taskType !== "getResponse"));
     const data = tasks.map(t => {
       if (t.taskType === "mediaStorage") return { taskType: "mediaStorage", taskUUID: t.taskUUID, mediaUUID: `00000000-0000-4000-8000-${String(++n).padStart(12, "0")}` };
       if (t.taskType === "videoInference" || t.taskType === "imageInference") { kinds.set(t.taskUUID, t.taskType); return { taskType: t.taskType, taskUUID: t.taskUUID }; }

@@ -62,3 +62,27 @@ describe("reference store: an image the browser could not fetch", () => {
     expect(revoked).toEqual(["blob:x"]);
   });
 });
+
+describe("round 11: size, estimate and the compose request", () => {
+  const h3 = { ...model("h3-image", "MiniMax H3", "token", 16), estimate: { usd: 0.03 } };
+  it("always sends MiniMax H3 a size; the prompt's orientation follows the size sent", async () => {
+    const { sizeFor } = await import("../src/beat-path/image-panel");
+    expect(sizeFor(h3)).toEqual({ size: { width: 1280, height: 720 }, orientation: "landscape" });
+    expect(sizeFor(model("flux-3", "FLUX", "per-image"))).toEqual({ orientation: "square" });
+    expect(sizeFor({ ...model("tall", "X", "per-image"), size: { summary: "", default: [768, 1344] } }).orientation).toBe("portrait");
+  });
+  it("H3 with an estimate runs under the cap; GPT without one needs the no-bound notice", () => {
+    expect(needsUnpriced(h3)).toBe(false);
+    expect(needsUnpriced(modelOf(FAMILIES, "flare"))).toBe(true);
+  });
+  it("shows the embed's estimate words as they are", () => {
+    expect(imageCostText({ usd: 0.031, modelName: "H3", basis: "about $0.031: an estimate, not a strict bound", inputs: [], priced: "estimate" }, ""))
+      .toBe("H3: about $0.031: an estimate, not a strict bound. Limit 0.50 USD. It sends the prompt.");
+  });
+  it("asks composeImagePrompt for the drop's kind, the shot's words and the references' roles", async () => {
+    const { composeInput } = await import("../src/beat-path/image-panel");
+    const s = initialState("environment", SHOT, FAMILIES);
+    expect(composeInput(s, SHOT, [{ role: "character" }], modelOf(FAMILIES, s.model)))
+      .toEqual({ model: "flux-3", kind: "environment", subject: "a rainy market street at dusk", references: [{ role: "character" }], orientation: "square" });
+  });
+});

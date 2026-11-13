@@ -34,6 +34,8 @@ export interface GenerateImageOptions {
     };
     transparent?: boolean;
     outputFormat?: StillFormat;
+    /** GPT-Image-2.6 `settings.quality`: auto (the default), low, medium, high, xhigh or max. `low` suits cheap drafts. */
+    quality?: string;
     maxPrice: number;
     /**
      * Run a token-priced model that has no published upper bound. The cost
