@@ -21,9 +21,10 @@ import { LaneView, Menu } from "./lanes";
 import { LAYOUT } from "./layout";
 import { MapView, type Tool, type View } from "./map";
 import { BlockTool } from "./map-blocks";
+import { FollowTool, type FollowSeg } from "./map-follow";
 import { bindActions } from "./page-actions";
 import { beatPathRecipe, type TrackInfo } from "./recipe-map";
-import { LABELS, fitLanes, type BeatPathState, type CameraWord, type CharacterWord } from "./script";
+import { LABELS, fitLanes, isFollowWord, type BeatPathState, type CameraWord, type CharacterWord } from "./script";
 import { AudioStrip } from "./strip";
 
 export type Page = ReturnType<typeof startBeatPath>;
@@ -102,6 +103,7 @@ export function startBeatPath(root: HTMLElement) {
       update(next, final);
     },
     blocksDown: (e, w, toScreen, fromScreen) => blocks.down(e, w, toScreen, fromScreen),
+    followDown: (e, toScreen, fromScreen) => follow.down(e, toScreen, fromScreen),
     selectedBox: () => blocks.selected,
     pen: () => pen,
     // Draw new stays armed after a stroke (Escape or Edit disarms it), so a second stroke draws too.
@@ -116,6 +118,14 @@ export function startBeatPath(root: HTMLElement) {
     boxes: () => state.boxes ?? lastLandmarks.map(b => ({ x: b.x, z: b.z, w: b.w, d: b.d, h: b.h, ...(b.yaw ? { yaw: b.yaw } : {}) })),
     setBoxes: (boxes, final) => update({ ...state, boxes, scenery: state.scenery === "none" ? "street" : state.scenery, landmarks: { ...state.landmarks, on: true } }, final),
     pen: () => pen, subject: () => lastFloor, say: text => say(text), changed: () => { map.refresh(); actions.sync(); },
+  });
+  /** Follow blocks on the map: dragging a follow line sets the block's offset (map-follow.ts); one undo step per drag. */
+  let followSegs: FollowSeg[] = [];
+  const follow = new FollowTool($<HTMLCanvasElement>("map"), {
+    segments: () => followSegs,
+    current: k => state.cameraLane[k]?.follow,
+    set: (k, f, final) => update({ ...state, cameraLane: state.cameraLane.map((b, i) => (i === k ? { ...b, follow: f } : b)) }, final),
+    say: text => say(text),
   });
   /** One clock for the page: the transport bar, the music strip and the play buttons all move it. */
   function seek(seconds: number) { head = Math.max(window0(), Math.min(window1(), seconds)); if (player.playing) player.play(track, head); dirty = true; }
@@ -196,12 +206,18 @@ export function startBeatPath(root: HTMLElement) {
     const smooth = (n: number) => { let x = 0, z = 0, c = 0; for (let k = -6; k <= 6; k += 2) { const q = pos(n + k); x += q.x; z += q.z; c++; } return { x: x / c, z: z / c }; };
     const sel = selection?.kind === "block" && selection.lane === "cameraLane" ? state.cameraLane[selection.index] : null;
     const NAME: Record<string, string> = { chase: "Follow behind", side: "Follow side", orbit: "Orbit", top: "Top", path: "My path", pushIn: "Push in", pullOut: "Pull out", rise: "Crane", static: "Hold", fixed: "Tripod", lead: "Follow front", threeQuarter: "Three-quarter", truck: "Truck" };
+    followSegs = [];
     const cameraSegments = (recipe.camera?.segments ?? []).map(sg => {
-      const points: { x: number; z: number }[] = [];
-      for (let n = fr(sg.fromBeat); n <= fr(sg.toBeat); n += 2) points.push(smooth(n));
-      const label = sg.shoulder ? "Over shoulder" : sg.modes.map(m => NAME[m] ?? m).join(" + ");
+      const points: { x: number; z: number }[] = [], frames: number[] = [];
+      for (let n = fr(sg.fromBeat); n <= fr(sg.toBeat); n += 2) { points.push(smooth(n)); frames.push(n); }
+      const side = sg.modes.includes("side") && Math.abs(sg.follow?.angle ?? 0) > 90 ? " right" : "";
+      const label = sg.shoulder ? "Over shoulder" : sg.modes.map(m => NAME[m] ?? m).join(" + ") + side;
       const emphasis = !sel ? "normal" as const : sg.fromBeat >= sel.from - 1e-6 && sg.toBeat <= sel.to + 1e-6 ? "selected" as const : "dim" as const;
-      return { label, points, emphasis };
+      // A plain follow block's line can be dragged: its frames carry where the subject is and which way it faces.
+      const block = state.cameraLane.findIndex(b => sg.fromBeat >= b.from - 1e-6 && sg.toBeat <= b.to + 1e-6);
+      const b = state.cameraLane[block], editable = !!b && isFollowWord(b.word) && !b.phrase;
+      if (editable) followSegs.push({ block, word: b.word as "behind" | "side", points, anchors: frames.map(n => { const r = frameAt(recipe, n, live()).root; return { x: r.x, z: r.z, heading: r.yawRadians }; }) });
+      return { label, points, emphasis, editable };
     });
     const subjectBeats: { x: number; z: number }[] = [], cameraBeats: { x: number; z: number }[] = [];
     for (let b = 0; b <= recipe.durationBeats; b++) { const r = frameAt(recipe, fr(b), live()).root; subjectBeats.push({ x: r.x, z: r.z }); cameraBeats.push(smooth(fr(b))); }
@@ -320,7 +336,7 @@ export function startBeatPath(root: HTMLElement) {
     $, map, menu, viewport, strip, player,
     get state() { return state; }, get recipe() { return recipe; }, get tool() { return tool; }, get view() { return view; },
     get track() { return track; }, get drive() { return live(); }, get info() { return info; }, get busy() { return busy; }, set busy(v: boolean) { busy = v; dirty = true; },
-    get head() { return head; }, get shown() { return shown; }, get slot() { return slot; }, blocks, seek, removeTrack, totalBeats, window0, window1, update, undo, rebuild, setPlaying, switchSlot, useFile, say,
+    get head() { return head; }, get shown() { return shown; }, get slot() { return slot; }, get followSegs() { return followSegs; }, blocks, seek, removeTrack, totalBeats, window0, window1, update, undo, rebuild, setPlaying, switchSlot, useFile, say,
     setTool(t: Tool) { tool = t; map.refresh(); actions.sync(); },
     setView(v: View) { view = v; map.refresh(); actions.sync(); },
     get pen() { return pen; },

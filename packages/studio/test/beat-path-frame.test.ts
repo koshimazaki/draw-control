@@ -67,6 +67,15 @@ describe("the subject stays in frame", () => {
     const w = worst(r, f.drive);
     expect(w.v, `worst at frame ${w.n}`).toBeLessThan(MARGIN);
   });
+  // Follow offsets (round 6): near, far, high, low, turned, either side; the framing guard holds them all.
+  for (const cam of ["follow behind distance 1m height 0.2m", "follow behind distance 25m height 6m", "follow behind distance 10m angle 70", "follow side right distance 20m height 2m",
+    "follow side distance 1m height 0.5m", "follow side right distance 30m height 8m angle -40"]) it(`offsets: ${cam}`, () => {
+    const base = beatPathBase({ seconds: 8, bpm: demo.f.estimatedBpm ?? 120, offsetSeconds: demo.f.estimatedBpm ? demo.f.estimatedOffsetSeconds : 0 });
+    const script = `beats 0-${base.durationBeats} | action: walk on path (-12,4) (-4,-3) (4,3) (12,-4) corners 0.7 lock beat 1 | camera: ${cam} lock beat 1 hold | shot: wide`;
+    const r = applyScript(base, { script }, { drive: demo.drive, bands: demo.drive.bands });
+    const w = worst(r, demo.drive);
+    expect(w.v, `worst at frame ${w.n}`).toBeLessThan(MARGIN);
+  });
   // No track, lock off: every camera word, a fast subject, a camera path that wanders away, and block blends.
   const WANDER = [{ x: -14, z: 12, y: 2 }, { x: 0, z: 18, y: 3 }, { x: 16, z: 6, y: 2.5 }, { x: 10, z: -14, y: 2 }];
   const FAST = [{ x: -13, z: 5 }, { x: -4, z: -4 }, { x: 5, z: 4 }, { x: 13, z: -5 }];

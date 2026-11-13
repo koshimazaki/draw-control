@@ -70,7 +70,16 @@ export type CameraSegment = {
   shoulder?: boolean;
   /** How quickly the block reaches its target: `fast` early (on the first locked hit when locked), `slow` late. Absent: even. */
   pace?: Pace;
+  /**
+   * A follow rig's offset (chase, lead, side, threeQuarter), eased in like a shot: `distance` from the subject (metres,
+   * FOLLOW_LIMITS), `height` (metres, up to CAMERA_MAX_HEIGHT), `angle` turned around the subject from the rig's own
+   * angle (degrees; 180 puts follow side on the subject's right). It stays a follow: the line is the subject's path offset.
+   */
+  follow?: FollowOffset;
 };
+export type FollowOffset = { distance?: number; height?: number; angle?: number };
+/** The range a follow offset may take: far enough to film past a row of street or city blocks (BUILDINGS.block is 14 m). */
+export const FOLLOW_LIMITS = { distance: [1, 30], height: [0.2, 8], angle: [-180, 180] } as const;
 export const PACES = ["slow", "fast"] as const;
 export type Pace = (typeof PACES)[number];
 export type CameraConfig = {
@@ -113,7 +122,7 @@ export function validateCamera(input: unknown, durationBeats: number): CameraCon
   const segments = (input.segments as unknown[]).map((s, i): CameraSegment => {
     const where = `camera.segments[${i}]`;
     if (!isObject(s)) return fail(`${where} must be an object`);
-    only(s, ["fromBeat", "toBeat", "modes", "shot", "cut", "amount", "from", "to", "lock", "strength", "onHit", "punch", "shoulder", "pace"], where);
+    only(s, ["fromBeat", "toBeat", "modes", "shot", "cut", "amount", "from", "to", "lock", "strength", "onHit", "punch", "shoulder", "pace", "follow"], where);
     const fromBeat = num(s.fromBeat, 0, durationBeats, `${where}.fromBeat`);
     const toBeat = num(s.toBeat, 0, durationBeats, `${where}.toBeat`);
     if (toBeat <= fromBeat) fail(`${where}.toBeat must be after fromBeat`);
@@ -189,6 +198,17 @@ function validateSegmentExtras(s: Record<string, unknown>, where: string, seg: C
     if (typeof s.shoulder !== "boolean") fail(`${where}.shoulder must be true or false`);
     if (s.shoulder && !seg.modes.includes("chase")) fail(`${where}.shoulder goes with chase (over the shoulder is a follow-behind rig)`);
     if (s.shoulder) seg.shoulder = true;
+  }
+  if (s.follow !== undefined) {
+    if (!isObject(s.follow)) fail(`${where}.follow must be an object`);
+    const fo = s.follow as Record<string, unknown>;
+    only(fo, ["distance", "height", "angle"], `${where}.follow`);
+    if (!seg.modes.some(m => FOLLOW_MODES.includes(m))) fail(`${where}.follow goes with a follow rig (chase, lead, side, threeQuarter)`);
+    const out: FollowOffset = {};
+    if (fo.distance !== undefined) out.distance = num(fo.distance, FOLLOW_LIMITS.distance[0], FOLLOW_LIMITS.distance[1], `${where}.follow.distance`);
+    if (fo.height !== undefined) out.height = num(fo.height, FOLLOW_LIMITS.height[0], Math.min(FOLLOW_LIMITS.height[1], CAMERA_MAX_HEIGHT), `${where}.follow.height`);
+    if (fo.angle !== undefined) out.angle = num(fo.angle, FOLLOW_LIMITS.angle[0], FOLLOW_LIMITS.angle[1], `${where}.follow.angle`);
+    if (Object.keys(out).length) seg.follow = out;
   }
   if (s.pace !== undefined && s.pace !== "even") {
     if (!PACES.includes(s.pace as Pace)) fail(`${where}.pace must be slow, even or fast`);

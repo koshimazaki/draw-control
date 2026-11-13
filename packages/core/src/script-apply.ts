@@ -11,7 +11,8 @@ import { isAccentKey, type AccentKey } from "./accents";
 import type { BandAnalysis } from "./audio-bands";
 import type { AudioDrive } from "./audio-drive";
 import { secondsAtBeat } from "./beats";
-import { DEFAULT_CAMERA, SHOTS, type CameraMode, type Shot } from "./camera";
+import { DEFAULT_CAMERA, FOLLOW_MODES, SHOTS, type CameraMode, type FollowOffset, type Shot } from "./camera";
+import { parseFollowArgs } from "./follow-words";
 import { gaitSpeedFor, setCameraModes, setCameraPath, setRootPath, startCameraMove } from "./camera-edits";
 import { insertMove } from "./commands";
 import { LOCK_TARGETS, lockHits, unmutedBands, type LockTarget } from "./lock";
@@ -26,7 +27,7 @@ type Lock = { lock: LockTarget; strength?: number };
 type Hit = { accent: AccentKey; band: string; index: number };
 type Row = { from: number; to: number; line: number; action?: string; camera?: string; shot?: string };
 type Point = { x: number; z: number; y?: number };
-type Cam = { path?: Point[]; corners?: number; startSeconds?: number; shoulder?: boolean; pace?: "slow" | "fast"; then?: Cam[]; modes: CameraMode[]; amount?: number; from?: number; to?: number; lock?: LockTarget; strength?: number; onHit?: "hold" | "punch"; punch?: number; at?: { band: string; index: number } };
+type Cam = { path?: Point[]; corners?: number; startSeconds?: number; shoulder?: boolean; follow?: FollowOffset; pace?: "slow" | "fast"; then?: Cam[]; modes: CameraMode[]; amount?: number; from?: number; to?: number; lock?: LockTarget; strength?: number; onHit?: "hold" | "punch"; punch?: number; at?: { band: string; index: number } };
 
 const bad = (row: Row, msg: string): never => { throw new RecipeError(`script line ${row.line}: ${msg}`); };
 const number = (row: Row, t: string, what: string) => {
@@ -242,6 +243,8 @@ function parseCameraWords(row: Row, text: string, points: Point[] | undefined, c
     cam.modes.push(mode);
     if (key === "over shoulder" || key === "shoulder") cam.shoulder = true;
     if (!args.length) continue;
+    // A follow rig's offset: "follow side right distance 14m height 2.5m angle 10".
+    if (FOLLOW_MODES.includes(mode)) { const f = parseFollowArgs(mode, args, msg => bad(row, msg)); if (f) cam.follow = f; continue; }
     const toAt = args.indexOf("to");
     if (mode === "orbit" || mode === "truck") cam.amount = number(row, args[0], `${key} amount`) * (key === "truck left" ? -1 : 1);
     else if (mode === "pushIn" || mode === "pullOut") { if (toAt === 0) cam.to = number(row, args[1], "end distance"); else cam.amount = number(row, args[0], "dolly amount"); }

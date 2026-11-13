@@ -21,7 +21,7 @@ export type MapScene = {
   trail: { x: number; z: number }[] | null;
   landmarks: Landmark[];
   /** The camera's track block by block (smoothed), labelled; the selected block bright, the others dim when one is selected. */
-  cameraSegments: { label: string; points: { x: number; z: number }[]; emphasis: "selected" | "dim" | "normal" }[];
+  cameraSegments: { label: string; points: { x: number; z: number }[]; emphasis: "selected" | "dim" | "normal"; /** a follow block: its line drags (map-follow.ts) */ editable?: boolean }[];
   /** Where the subject and the camera are on each beat, and the camera on each of its hits. */
   subjectBeats: { x: number; z: number }[]; cameraBeats: { x: number; z: number }[]; cameraHits: { x: number; z: number }[];
 };
@@ -44,6 +44,8 @@ export type MapHost = {
   selectedBox?(): number;
   /** A word for the status line (a click that did nothing says why). */
   hint?(text: string): void;
+  /** The camera tool in Edit: pointer down on a follow block's line (true when it took the drag). */
+  followDown?(e: PointerEvent, toScreen: (p: PathPt) => [number, number], fromScreen: (x: number, y: number) => PathPt): boolean;
 };
 type Live = { subject?: { x: number; z: number; yaw: number }; camera?: { x: number; z: number; tx: number; tz: number; fov: number } };
 
@@ -237,6 +239,8 @@ export class MapView {
       up = () => this.host.change(tool, pts, true);
       revert = () => this.host.change(tool, original, true);
     } else {
+      // A follow block's line drags its offset (it stays a follow); Draw new still draws over it.
+      if (tool === "camera" && view === "top" && this.host.pen() === "edit" && this.host.followDown?.(e, p => this.top(p), (x, y) => this.fromTop(x, y))) return;
       // Only an armed pen draws; otherwise a click on empty ground just clears the selection.
       if (view !== "top" || this.host.pen() !== "draw") { this.host.select(null); this.host.hint?.(view === "top" ? "Press Draw new to draw a path (Edit only moves points)" : ""); this.refresh(); return; }
       const y = original.at(-1)?.y ?? (DEFAULT_Y[pathOf(tool)] || undefined);
@@ -340,6 +344,8 @@ export class MapView {
       g.globalAlpha = Math.max(0.45, alpha);
       g.strokeStyle = C.camera; g.lineWidth = 1; g.beginPath(); g.moveTo(x + nx * 5, y + ny * 5); g.lineTo(lx - nx * 3, ly - ny * 3); g.stroke();
       this.label(g, seg.label, lx + (nx < 0 ? -2 : 2), ly + 4, C.camera, nx < 0 ? "right" : "left"); g.globalAlpha = 1;
+      // A follow line you can drag: a small diamond grip at its middle (Camera tool).
+      if (seg.editable && tool === "camera") { g.save(); g.translate(x, y); g.rotate(Math.PI / 4); g.fillStyle = C["map-bg"]; g.strokeStyle = C.camera; g.lineWidth = 1.6; g.fillRect(-4, -4, 8, 8); g.strokeRect(-4, -4, 8, 8); g.restore(); }
     });
     this.line(g, s.floor.map(p => this.top(p)), C.subject, 3.2);
     // Beat ticks: a small dot on each beat along both tracks; the camera on each of its hits, a ring.

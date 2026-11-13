@@ -73,8 +73,10 @@ function valuesIn(s: CameraSegment, v: Values, hits: number[], beat: number): Va
   const w = s.cut ? 1 : ease((beat - s.fromBeat) / t);
   const preset = s.shot ? SHOT_PRESETS[s.shot] : null;
   const p = progressOf(s, hits, beat);
-  let d = preset ? v.d + (preset.distance - v.d) * w : v.d;
-  let h = preset ? v.h + (preset.height - v.h) * w : v.h;
+  // A follow offset sets the distance and height the way a shot does (and wins over the shot's).
+  const td = s.follow?.distance ?? preset?.distance, th = s.follow?.height ?? preset?.height;
+  let d = td !== undefined ? v.d + (td - v.d) * w : v.d;
+  let h = th !== undefined ? v.h + (th - v.h) * w : v.h;
   const f = preset ? v.f + (preset.fov - v.f) * w : v.f;
   const a = preset ? v.a + (preset.aim - v.a) * w : v.a;
   if (isDolly(s)) {

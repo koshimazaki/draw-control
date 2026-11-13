@@ -14,6 +14,7 @@ import type { Page } from "./page";
 import { beatPathRecipe, exportRange } from "./recipe-map";
 import { HIT_CHOICES, LABELS, LOCK_CHOICES, fitLanes, setWord, toScript, type BeatPathState, type Block, type CameraWord, type ClipChoice } from "./script";
 import { isTyping } from "./drag";
+import { bindFollowFields, followProbe } from "./page-follow";
 
 /** What each block's shape on the map is, said in its popover. */
 const CAMERA_NOTES: Record<CameraWord, string> = {
@@ -49,6 +50,7 @@ export function bindActions(p: Page) {
   const { $ } = p;
   const input = (id: string) => $<HTMLInputElement>(id);
 
+  const followFields = bindFollowFields(p);
   function sync() {
     const s = p.state;
     const pick = (name: string, value: string | number) => document.querySelectorAll<HTMLButtonElement>(`[data-control="${name}"] button`).forEach(b => {
@@ -57,6 +59,7 @@ export function bindActions(p: Page) {
     });
     pick("tool", p.tool); pick("view", p.view); pick("clip", s.clip); pick("pen", p.pen); pick("example", p.slot);
     $<HTMLSelectElement>("scenery").value = s.scenery;
+    input("sightPasses").checked = s.sight === "passes";
     $<HTMLSelectElement>("figureShape").value = s.figure.shape;
     input("figureBody").value = s.figure.body; input("figureHead").value = s.figure.head;
     const chip = (id: string, l: { lock: string; strength: number }, extra = "") => {
@@ -68,6 +71,7 @@ export function bindActions(p: Page) {
     const corners = p.tool === "camera" ? s.cameraCorners : s.subjectCorners;
     const box = p.tool === "blocks" ? p.blocks.selected : -1, boxes = p.tool === "blocks" ? (s.boxes ?? null) : null;
     $("boxHeightRow").hidden = box < 0; $("cornersRow").hidden = p.tool === "blocks";
+    followFields.sync();
     if (box >= 0 && document.activeElement !== input("boxHeight")) input("boxHeight").value = String((boxes ?? [])[box]?.h ?? 8);
     input("corners").value = String(corners);
     $("cornersOut").textContent = corners.toFixed(2);
@@ -82,10 +86,10 @@ export function bindActions(p: Page) {
     const rigs = p.tool === "camera" && pts.length < 2 && !s.cameraLane.some(b => b.word === "path");
     empty.hidden = pts.length >= 2 || p.tool === "blocks" || rigs;
     empty.textContent = p.view === "side" ? `Draw the ${p.tool} path in the top view first.` : `No ${p.tool} path yet: press Draw new, then drag on the map or click to place points.`;
-    $("mapHint").textContent = rigs ? "The camera follows the Camera lane · Draw new flies your own path"
+    $("mapHint").textContent = rigs ? "The camera follows the Camera lane · drag a follow line to adjust it · Draw new replaces it with your path"
       : p.tool === "blocks" ? (p.pen === "draw" ? "Drag a rectangle to add a block · Esc stops" : "Click to select · drag to move · corners resize · ⌘D duplicates · Delete removes")
       : p.view !== "top" ? `Drag a point up or down to set the ${p.tool}’s height`
-      : p.pen === "draw" ? "Drag a stroke or click points · Esc stops"
+      : p.pen === "draw" ? (p.tool === "camera" ? "Drawing replaces the block's camera with your path · Esc stops" : "Drag a stroke or click points · Esc stops")
       : "Drag points to move · Delete removes · Draw new starts a path";
     $("mapHint").title = $("mapHint").textContent ?? "";   // the full hint when two lines cut it
     $("map").classList.toggle("pen", p.pen === "draw");
@@ -136,6 +140,7 @@ export function bindActions(p: Page) {
   // A preset fills the scene again with its own (editable) boxes.
   $<HTMLSelectElement>("scenery").onchange = () => { const v = $<HTMLSelectElement>("scenery").value as BeatPathState["scenery"]; p.update({ ...p.state, scenery: v, boxes: undefined, landmarks: { ...p.state.landmarks, on: v !== "none" } }); };
   $<HTMLSelectElement>("figureShape").onchange = () => p.update({ ...p.state, figure: { ...p.state.figure, shape: $<HTMLSelectElement>("figureShape").value as BeatPathState["figure"]["shape"] } });
+  input("sightPasses").onchange = () => p.update({ ...p.state, sight: input("sightPasses").checked ? "passes" : "clear" });
   input("gridExport").onchange = () => { p.viewport.setExportGrid(input("gridExport").checked); p.viewport.setGrid(input("gridExport").checked); p.rebuild(); };
   $("clearPath").onclick = () => {
     const s = p.state;
@@ -280,6 +285,8 @@ export function bindActions(p: Page) {
       recipe: () => p.recipe, state: () => structuredClone(p.state), script, mapPoint: (q: { x: number; z: number }) => p.map.clientAt(q),
       playing: () => p.player.playing, head: () => p.head, selection: () => p.selection, mapInside: () => p.map.allInside(), shown: () => p.shown,
       boxes: () => p.blocks.host.boxes(), boxSelected: () => p.blocks.selected, slot: () => p.slot, trackName: () => p.info?.name ?? null,
+      followSegs: () => p.followSegs.map(s => ({ block: s.block, word: s.word, points: s.points, anchors: s.anchors })),
+      followProbe: (k: number) => followProbe(p.recipe, p.drive, p.state.cameraLane[k]),
     };
   }
   return { sync, openBlock };

@@ -12,6 +12,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { unzipSync, strFromU8 } from "fflate";
 import { smokeBeatPathMap } from "./smoke-beat-path-map.mjs";
 import { smokeBeatPathHunt } from "./smoke-beat-path-hunt.mjs";
+import { smokeBeatPathFollow } from "./smoke-beat-path-follow.mjs";
 
 
 export async function smokeBeatPath(browser, base, { fail, OUT, SHOTS }) {
@@ -254,6 +255,7 @@ export async function smokeBeatPath(browser, base, { fail, OUT, SHOTS }) {
   await page.close();
   await smokeBeatPathMap(browser, base, { fail, SHOTS });
   await smokeBeatPathHunt(browser, base, { fail });
+  await smokeBeatPathFollow(browser, base, { fail, SHOTS });
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

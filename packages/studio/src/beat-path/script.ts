@@ -5,15 +5,23 @@
  * the global lock and "on each hit" are its `lock …` words. A script with words outside the
  * page's vocabulary is read to the nearest page word, and `notes` says what changed.
  */
-import { parseRows, parseSettings } from "@motion-studio/core";
+import { parseRows, parseSettings, type FollowOffset } from "@motion-studio/core";
+import { followWords, parseFollowArgs } from "@motion-studio/core/internal";
 
 export type PathPt = { x: number; z: number; y?: number };
 export const CHARACTER_WORDS = ["glide", "hover", "spin", "jump", "freeze"] as const;
 export type CharacterWord = (typeof CHARACTER_WORDS)[number];
 export const CAMERA_WORDS = ["behind", "side", "orbit", "top", "path", "push"] as const;
 export type CameraWord = (typeof CAMERA_WORDS)[number];
-/** A lane block; a camera block may carry a typed phrase (the script's camera words, e.g. "go above then dolly in 2m fast"). */
-export type Block<W extends string> = { from: number; to: number; word: W; phrase?: string };
+/**
+ * A lane block; a camera block may carry a typed phrase (the script's camera words, e.g. "go above then dolly in 2m fast"),
+ * and a follow block (behind, side) its offset: distance, height, angle (180 on side = the subject's right).
+ */
+export type Block<W extends string> = { from: number; to: number; word: W; phrase?: string; follow?: FollowOffset };
+/** The page's follow words and the rig mode each prints as. */
+export const FOLLOW_WORDS = { behind: "chase", side: "side" } as const;
+export const isFollowWord = (w: string): w is keyof typeof FOLLOW_WORDS => w in FOLLOW_WORDS;
+const followTail = (word: keyof typeof FOLLOW_WORDS, f?: FollowOffset) => { const t = followWords(FOLLOW_WORDS[word], f); return t ? ` ${t}` : ""; };
 export const LOCK_CHOICES = ["off", "beat", "kick", "snare"] as const;
 export type LockChoice = (typeof LOCK_CHOICES)[number];
 export const HIT_CHOICES = ["move", "hold", "punch"] as const;
@@ -138,7 +146,7 @@ export function toScript(state: BeatPathState): string {
         shot = /\bpath\b/.test(k.phrase) ? "-" : /^(go )?(top|above)\b/.test(k.phrase) ? "top" : "wide";
       } else {
         camera = {
-          behind: "follow behind", side: "follow side", orbit: `orbit ${f(CAMERA_AMOUNTS.orbitPerBeat * len)}`, top: "top",
+          behind: `follow behind${followTail("behind", k.follow)}`, side: `follow side${followTail("side", k.follow)}`, orbit: `orbit ${f(CAMERA_AMOUNTS.orbitPerBeat * len)}`, top: "top",
           path: pathPrinted ? "path" : `path ${pts(state.camera)} corners ${f(state.cameraCorners)}`, push: `push in to ${f(CAMERA_AMOUNTS.pushTo)}m`,
         }[word] + camLock + (k.from > 0 ? advance : "");
         if (word === "path") pathPrinted = true;
@@ -225,8 +233,14 @@ export function fromScript(text: string, base: BeatPathState, grid: { bpm: numbe
     if (anchor) { advanceSeen = true; if (!camSeen) state.camLock.lock = anchor[1] as LockChoice; }
     // Anything richer than a lane word stays as the block's phrase (lock words stripped: the lock is global).
     const bare = c.replace(/\s*@(kick|snare)\s+1\b/, "").replace(/\s*\block\s+(beat|kick|snare|hat)(\s+[\d.]+)?(\s+(hold|punch(\s+[\d.]+m?)?))?\s*$/, "").trim();
-    const plain = /^(follow behind|follow side|top|push in to 2\.6m|orbit\s+-?[\d.]+)$/.test(bare) || /^path\b/.test(bare) && !/\bthen\b/.test(bare);
-    const block: Block<CameraWord> = { from: row.from, to: row.to, word };
+    // A follow word with its offset words stays a plain follow block (the offset rides on it).
+    const followed = /^follow (behind|side)\s+(.+)$/.exec(bare);
+    let follow: FollowOffset | undefined, followOk = false;
+    if (followed && !/\b(then|over|shoulder)\b/.test(followed[2])) {
+      try { follow = parseFollowArgs(followed[1] === "side" ? "side" : "chase", followed[2].split(/\s+/), msg => { throw new Error(msg); }); followOk = true; } catch { followOk = false; }
+    }
+    const plain = followOk || /^(follow behind|follow side|top|push in to 2\.6m|orbit\s+-?[\d.]+)$/.test(bare) || /^path\b/.test(bare) && !/\bthen\b/.test(bare);
+    const block: Block<CameraWord> = { from: row.from, to: row.to, word, ...(follow ? { follow } : {}) };
     if (!plain) block.phrase = bare.replace(/\(([^)]*)\)\s*/g, "").replace(/\s*corners\s+[\d.]+/, "").trim();
     state.cameraLane.push(block);
   }
@@ -265,7 +279,9 @@ export function fitLanes(state: BeatPathState, beats: number): BeatPathState {
 
 /** Only one glide block (the script has one walk path): making one glide turns the others to hover. */
 export function setWord<W extends string>(lane: Block<W>[], index: number, word: W, single?: W): Block<W>[] {
-  return lane.map((b, i) => (i === index ? { ...b, word } : single && word === single && b.word === single ? { ...b, word: "hover" as W } : b));
+  // A follow offset stays only on a follow word (a block turned into Orbit or Top drops it).
+  const next = (b: Block<W>): Block<W> => { const { follow, ...rest } = b; return isFollowWord(word) && follow ? { ...rest, word, follow } : { ...rest, word }; };
+  return lane.map((b, i) => (i === index ? next(b) : single && word === single && b.word === single ? { ...b, word: "hover" as W } : b));
 }
 
 /** What a script leaves out, before any example is read. */

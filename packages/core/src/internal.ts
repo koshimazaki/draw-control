@@ -49,3 +49,4 @@ export * from "./freeze";
 export { applyScript, parseRows, parseSettings } from "./script-apply";
 export { CAMERA_LANES, LANE_SPECS, inLane, isCameraLane, laneAt, type CameraLane, type LaneSpec } from "./automation";
 export * from "./drum-synth";
+export * from "./follow-words";

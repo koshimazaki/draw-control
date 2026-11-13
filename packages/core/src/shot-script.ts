@@ -15,7 +15,8 @@
 import { ACCENT_KEYS } from "./accents";
 import type { BandAnalysis } from "./audio-bands";
 import { beatAtSeconds } from "./beats";
-import { CAMERA_MODES, SHOTS, type CameraMode, type CameraSegment } from "./camera";
+import { CAMERA_MODES, FOLLOW_MODES, SHOTS, type CameraMode, type CameraSegment } from "./camera";
+import { followWords } from "./follow-words";
 import { LOOP_CLIPS } from "./clip-library";
 import { moveEndBeat } from "./engine";
 import { LOCK_TARGETS } from "./lock";
@@ -116,7 +117,8 @@ export function cameraWords(s: CameraSegment, path?: readonly { x: number; y: nu
       default: return m;
     }
   };
-  let out = s.modes.map(part).join(" + ") + (s.pace ? ` ${s.pace}` : "");
+  const withFollow = (m: CameraMode) => { const w = FOLLOW_MODES.includes(m) ? followWords(m, s.follow) : ""; return part(m) + (w ? ` ${w}` : ""); };
+  let out = s.modes.map(withFollow).join(" + ") + (s.pace ? ` ${s.pace}` : "");
   if (s.lock) {
     out += ` lock ${s.lock}${s.strength !== undefined ? ` ${fmt(s.strength)}` : ""}`;
     if (s.onHit === "punch") out += ` punch${s.punch !== undefined ? ` ${metres(s.punch)}` : ""}`;

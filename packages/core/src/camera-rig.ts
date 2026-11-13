@@ -109,7 +109,9 @@ export function planCamera(recipe: Recipe, drive?: AudioDrive, frames = 0): Came
   let shoulderW = segAt(0)?.shoulder ? 1 : 0;
   const shoulderAt = new Float64Array(total);
   const yaw0 = config.startYaw * Math.PI / 180;
-  const off0 = followOffset(startModes);
+  // A follow block's own angle (segment.follow.angle, degrees) turns the rig around the subject.
+  const turn = (beat: number) => (segAt(beat)?.follow?.angle ?? 0) * Math.PI / 180;
+  const base0 = followOffset(startModes), off0 = base0 === null ? null : base0 + turn(0);
   if (off0 !== null) followYaw = s0.heading + off0 - SHOULDER.angle * shoulderW - yaw0;
   const rangeSeconds = (beat: number) => {
     const seg = config.segments.find(s => beat >= s.fromBeat && beat < s.toBeat);
@@ -149,7 +151,7 @@ export function planCamera(recipe: Recipe, drive?: AudioDrive, frames = 0): Came
       [cx, cvx] = followStep(cx, cvx, s.x, (s.x - sp.x) / dt, 6, CAMERA_LIMITS.centreAccel, dt);
       [cz, cvz] = followStep(cz, cvz, s.z, (s.z - sp.z) / dt, 6, CAMERA_LIMITS.centreAccel, dt);
       // Lead / chase: swing the base yaw so the camera sits in front of or behind the heading.
-      const rig = followOffset(modes), off = rig === null ? null : rig - SHOULDER.angle * shoulderW;
+      const rig = followOffset(modes), off = rig === null ? null : rig + turn(beat) - SHOULDER.angle * shoulderW;
       if (off !== null) {
         let want = s.heading + off - yaw0 - orbit;
         want += 2 * Math.PI * Math.round((followYaw - want) / (2 * Math.PI));

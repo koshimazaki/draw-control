@@ -42,6 +42,12 @@ export const LAYOUT = `
       <div class="map-zoom"><button type="button" id="zoomIn" class="btn ghost tip-start" aria-label="Zoom in" data-tip="Zoom in (ctrl/cmd + wheel)">+</button><button type="button" id="zoomOut" class="btn ghost" aria-label="Zoom out">−</button><button type="button" id="zoomFit" class="btn ghost tip-start" data-tip="Frame everything (pan: scroll, middle button, or drag with Space held)">Fit</button></div>
       <p class="map-hint muted" id="mapHint"></p>
       <div class="map-tools end">
+        <div class="follow-row" id="followRow" hidden>
+          <div class="seg" id="followSide" role="radiogroup" aria-label="Which side of the subject"><button type="button" role="radio" id="followLeft">Left</button><button type="button" role="radio" id="followRight">Right</button></div>
+          <label class="pick tip-end" data-tip="Distance from the subject (m)"><span>Dist</span><input id="followDistance" aria-label="Distance from the subject, metres" class="field num" type="number" min="1" max="30" step="0.5" /></label>
+          <label class="pick tip-end" data-tip="Camera height (m)"><span>Height</span><input id="followHeight" aria-label="Camera height, metres" class="field num" type="number" min="0.2" max="8" step="0.1" /></label>
+          <label class="pick tip-end" data-tip="Turned around the subject (°)"><span>Angle</span><input id="followAngle" aria-label="Turned around the subject, degrees" class="field num" type="number" min="-180" max="180" step="5" /></label>
+        </div>
         <label class="pick" id="boxHeightRow" hidden>Height <input id="boxHeight" class="field num" type="number" min="0.2" max="60" step="0.5" /> m</label>
         <label class="slider tip-end" id="cornersRow" data-tip="From sharp corners (hard turns) to a round curve"><span>Corners</span><input id="corners" type="range" min="0" max="1" step="0.05" /><output id="cornersOut"></output></label>
         <button type="button" id="clearPath" class="btn ghost">Clear</button>
@@ -87,6 +93,7 @@ export const LAYOUT = `
               <label class="toggle" data-tip="On: edges snap to beats and hits. Off: they move by single frames"><input id="snap" type="checkbox" checked /><span class="knob"></span>Snap</label></div>
             <div class="opt-row"><span class="lab">Locks</span><button type="button" class="btn outline" id="setCharLock">Character…</button><button type="button" class="btn outline" id="setCamLock">Camera…</button></div>
             <div class="opt-row"><span class="lab">Guide</span><label class="toggle"><input id="gridExport" type="checkbox" checked /><span class="knob"></span>Ground grid</label>
+              <label class="toggle" data-tip="On: blocks may pass between the camera and the subject (briefly, within the caps). Off: the line of sight stays clear"><input id="sightPasses" type="checkbox" /><span class="knob"></span>Pass in front</label>
               <label class="pick">Scenery <select id="scenery"><option value="none">None</option><option value="scatter">Scatter</option><option value="street">Street</option><option value="city">City</option></select></label></div>
             <div class="opt-row"><span class="lab">Figure</span><select id="figureShape" aria-label="Figure shape"><option value="glider">Pyramid</option><option value="car">Car</option><option value="flyer">Flyer</option><option value="runner">Runner</option></select>
               <span class="swatches" data-tip="Body and head colours (a prompt can name them)"><input id="figureBody" type="color" aria-label="Figure body colour" /><input id="figureHead" type="color" aria-label="Figure head colour" /></span></div>

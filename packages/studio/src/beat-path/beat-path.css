@@ -181,6 +181,12 @@ select:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
 .map-zoom .btn { height: 26px; min-width: 28px; padding: 0 8px; }
 #map.panning { cursor: grab; }
 .field.num { width: 64px; flex: none; }
+.follow-row { display: flex; align-items: center; gap: var(--s-2); }
+.follow-row[hidden], .follow-row .seg[hidden] { display: none; }
+.follow-row .field.num { width: 50px; padding: 0 var(--s-1); }
+.follow-row .pick { gap: var(--s-1); }
+/* With a follow block's numbers showing, the footer gives them the hint's room. */
+.map-foot:has(#followRow:not([hidden])) .map-hint { display: none; }
 .pick[hidden], .slider[hidden] { display: none; }
 .page-section { max-width: none; }
 .gallery-rows { display: grid; gap: var(--s-4); }
@@ -211,3 +217,5 @@ select:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
 /* A narrow map (with a result beside the preview) drops the hint and the slider's word, never a control. */
 .map-pane { container-type: inline-size; }
 @container (max-width: 480px) { .map-foot .map-hint { display: none; } .map-foot .slider > span { display: none; } .map-foot .slider input[type="range"] { width: 90px; } }
+/* A map under 600 px keeps the follow fields and drops their words (each field names itself on hover and to a screen reader). */
+@container (max-width: 600px) { .follow-row .pick > span { display: none; } }
