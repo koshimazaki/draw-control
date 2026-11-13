@@ -20,6 +20,33 @@ export function patternTimes(bpm: number, bars: number, offset = 0.1): DrumPatte
   return { kicks: sort(kicks), snares: sort(snares), hats: sort(hats) };
 }
 
+/**
+ * Three clearly different example grooves for Beat Path, each locking well:
+ * - "laidback" (100 BPM): kick on 1, the "and" of 2 and 3, snare on 2 and 4, hats on quarters;
+ * - "straight" (120 BPM): the pattern above (kick 1 and 3, snare 2 and 4);
+ * - "drive" (140 BPM): kick on every beat, snare on 2 and 4, hats on every eighth.
+ */
+export type GrooveStyle = "laidback" | "straight" | "drive";
+export const GROOVES: Record<GrooveStyle, { bpm: number }> = { laidback: { bpm: 100 }, straight: { bpm: 120 }, drive: { bpm: 140 } };
+export function grooveTimes(style: GrooveStyle, bars: number, offset = 0.1): DrumPattern {
+  if (style === "straight") return patternTimes(GROOVES.straight.bpm, bars, offset);
+  const beat = 60 / GROOVES[style].bpm, kicks: number[] = [], snares: number[] = [], hats: number[] = [];
+  for (let bar = 0; bar < bars; bar++) {
+    const t0 = offset + bar * 4 * beat;
+    if (style === "laidback") {
+      kicks.push(t0, t0 + 1.5 * beat, t0 + 2 * beat);
+      snares.push(t0 + beat, t0 + 3 * beat);
+      for (let q = 0; q < 4; q++) hats.push(t0 + q * beat);
+    } else {
+      for (let q = 0; q < 4; q++) kicks.push(t0 + q * beat);
+      snares.push(t0 + beat, t0 + 3 * beat);
+      for (let e = 0; e < 8; e++) hats.push(t0 + e * beat / 2);
+    }
+  }
+  const sort = (a: number[]) => a.sort((x, y) => x - y);
+  return { kicks: sort(kicks), snares: sort(snares), hats: sort(hats) };
+}
+
 export function synthDrums(p: DrumPattern, seconds: number, sampleRate = 44100, opts: { hatGain?: number; pad?: number; noise?: number } = {}): Float32Array {
   const out = new Float32Array(Math.round(seconds * sampleRate));
   let seed = 11;

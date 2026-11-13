@@ -19,10 +19,6 @@ if (theme === "runware") {
   document.head.appendChild(fonts);
 }
 const page = startBeatPath(document.getElementById("app")!);
-// The key panel slot belongs to the Runware look; the neutral page hides it.
-if (theme !== "runware") document.getElementById("keySlot")!.hidden = true;
 if (theme === "runware") {
-  document.getElementById("credit")!.textContent = "Built on Runware · unofficial demo";
-  document.getElementById("keySlot")!.hidden = false;
   void document.fonts.ready.then(() => page.retheme());
 }

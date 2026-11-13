@@ -4,17 +4,13 @@
  * (`node scripts/smoke-beat-path.mjs`, which starts its own dev server):
  * 1. the page opens with the demo track, the first example and lock on kick, and plays after one click;
  * 2. a subject path is drawn with the mouse on the map, lock set to kick, a lane block swapped by its menu;
- * 3. a pasted script round-trips (Copy script gives it back);
+ * 3. the example switcher (shapes, music, kept edits), scenery, Generate (faked in dev) with the output beside the preview;
  * 4. the guide is exported at 1280×720 (193 frames) and the bundle checked against the pinned schema;
  * 5. screenshots of both themes at 1280×720 and 1440×900 in out/.
  */
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { unzipSync, strFromU8 } from "fflate";
 
-const SCRIPT = `beats 0-2 | action: rest | camera: follow behind lock kick 1 hold | shot: medium
-beats 2-12 | action: walk on path (-5,3) (0,-2) (5,2) corners 0.6 lock kick 1 | camera: follow side lock kick 1 hold | shot: medium
-beats 12-17 | action: rest, spin @beat 14.5 | camera: orbit 75 lock kick 1 hold | shot: medium
-`;
 
 export async function smokeBeatPath(browser, base, { fail, OUT, SHOTS }) {
   const page = await browser.newPage({ viewport: { width: 1280, height: 720 }, acceptDownloads: true });
@@ -22,7 +18,7 @@ export async function smokeBeatPath(browser, base, { fail, OUT, SHOTS }) {
   page.on("pageerror", e => errors.push(e.message));
   page.on("console", m => { if (m.type() === "error") errors.push(m.text()); });
   await page.goto(`${base}/path.html`);
-  await page.waitForFunction(() => window.__beatPath?.recipe().audio?.name === "demo-drums-120.wav", null, { timeout: 30_000 })
+  await page.waitForFunction(() => window.__beatPath?.recipe().audio?.name === "generated-straight-120.wav", null, { timeout: 30_000 })
     .catch(async e => {
       const seen = await page.evaluate(() => ({ probe: !!window.__beatPath, audio: window.__beatPath?.recipe().audio ?? null, status: document.getElementById("status")?.textContent, url: window.location.href })).catch(x => x.message);
       throw new Error(`Beat Path did not load the demo (${e.message}); page: ${JSON.stringify(seen)}; page errors: ${errors.join(" | ") || "none"}`);
@@ -31,8 +27,8 @@ export async function smokeBeatPath(browser, base, { fail, OUT, SHOTS }) {
   let p = await probe();
   console.log(`beat path: first run ${p.recipe.character.kind}, ${p.recipe.durationBeats} beats, travel lock ${JSON.stringify(p.recipe.travelLock)}, camera ${p.recipe.camera.segments.map(s => s.modes.join("+")).join(" / ")}`);
   if (p.recipe.character.kind !== "glider" || p.recipe.travelLock?.lock !== "kick") fail("Beat Path did not open on the glider locked to the kicks");
-  const noScroll = await page.evaluate(() => document.documentElement.scrollHeight <= window.innerHeight + 1 && document.documentElement.scrollWidth <= window.innerWidth + 1);
-  if (!noScroll) fail("Beat Path scrolls at 1280×720");
+  const noScroll = await page.evaluate(() => document.getElementById("editor").offsetHeight <= window.innerHeight + 1 && document.documentElement.scrollWidth <= window.innerWidth + 1);
+  if (!noScroll) fail("the Beat Path editor does not fit one screen at 1280×720");
   await page.click("#bigPlay");
   await page.waitForTimeout(1500);
   p = await probe();
@@ -67,15 +63,16 @@ export async function smokeBeatPath(browser, base, { fail, OUT, SHOTS }) {
   const pts = p.recipe.rootShape?.points ?? [];
   console.log(`beat path: drawn path ${p.state.subject.length} points, from (${pts[0]?.x},${pts[0]?.z}) to (${pts.at(-1)?.x},${pts.at(-1)?.z}); lock ${p.recipe.travelLock?.lock}`);
   if (p.state.subject.length < 3 || Math.abs(pts[0].x + 6) > 0.3 || Math.abs(pts.at(-1).x - 6) > 0.3 || p.recipe.travelLock?.lock !== "kick") fail("drawing the path on the map did not set the walk path");
-  // Swap the second camera block to Orbit through its menu.
-  await page.click("#laneCamera .block >> nth=1");
-  await page.click('#menu button:has-text("Orbit")');
+  // Swap the first camera block to Top through its menu; undo brings it back.
+  const lane0 = (await probe()).state.cameraLane;
+  await page.click("#laneCamera .block >> nth=0");
+  await page.click('#menu button:has-text("Top")');
   p = await probe();
   console.log(`beat path: camera lane ${p.state.cameraLane.map(b => `${b.word} ${b.from}-${b.to}`).join(", ")}`);
-  if (!p.recipe.camera.segments.some(s => s.modes[0] === "orbit")) fail("the lane menu did not make an orbit block");
+  if (p.recipe.camera.segments[0].modes[0] !== "top") fail("the lane menu did not make a top block");
   await page.keyboard.press("ControlOrMeta+z");
   p = await probe();
-  if (p.recipe.camera.segments.some(s => s.modes[0] === "orbit")) fail("undo did not take the orbit back");
+  if (JSON.stringify(p.state.cameraLane) !== JSON.stringify(lane0)) fail("undo did not take the block back");
   // A typed camera phrase in the block's popover; invalid words show inline.
   await page.click("#laneCamera .block >> nth=0");
   await page.fill(".menu-field input", "swoop around");
@@ -104,28 +101,29 @@ export async function smokeBeatPath(browser, base, { fail, OUT, SHOTS }) {
   await page.click("#resetMarkers");
   if ((await probe()).recipe.mutedHits) fail("Reset markers did not restore the hits");
 
-  // Paste a script, read it back.
-  await page.evaluate(() => window.navigator.clipboard?.writeText?.("").catch(() => {}));
-  await page.click("#pasteScript");
-  await page.fill("#pasteText", SCRIPT);
-  await page.click("#pasteApply");
+  // The example switcher: each example brings its own figure shape and music; edits stay with their example.
+  const edited = (await probe()).state.subject;
+  await page.click('[data-control="example"] [data-value="1"]');
+  await page.waitForFunction(() => window.__beatPath.recipe().figure?.shape === "runner" && window.__beatPath.recipe().beatGrid.bpm > 130, null, { timeout: 30_000 });
+  await page.screenshot({ path: `${SHOTS}beat-path-example-2.png` });
+  await page.click('[data-control="example"] [data-value="2"]');
+  await page.waitForFunction(() => window.__beatPath.recipe().figure?.shape === "car" && window.__beatPath.recipe().beatGrid.bpm < 110, null, { timeout: 30_000 });
+  await page.screenshot({ path: `${SHOTS}beat-path-example-3.png` });
+  await page.click('[data-control="example"] [data-value="0"]');
+  await page.waitForFunction(() => window.__beatPath.recipe().figure?.shape === "flyer", null, { timeout: 30_000 });
   p = await probe();
-  const back = await page.evaluate(() => window.__beatPath.script());
-  console.log(`beat path: pasted script → ${p.state.character.map(b => b.word).join(", ")} | ${p.state.cameraLane.map(b => b.word).join(", ")}`);
-  if (!back.includes("walk on path (-5,3) (0,-2) (5,2) corners 0.6 lock kick 1") || !back.includes("orbit 75")) fail(`the pasted script does not read back:\n${back}`);
-  await page.screenshot({ path: `${SHOTS}beat-path-script.png` });
-
-  // Landmarks: on by default, the toggle turns them off in the recipe and the script, and back on.
-  const lm = async () => (await probe()).recipe.landmarks;
-  if (!(await lm())?.on) fail("landmarks are not on by default");
-  await page.click("label:has(#landmarksExport)");
-  const offScript = await page.evaluate(() => window.__beatPath.script());
-  if ((await lm())?.on !== false || !/^landmarks: off$/m.test(offScript)) fail("the landmarks toggle did not turn them off");
-  await page.click("label:has(#landmarksExport)");
-  console.log(`beat path: landmarks ${JSON.stringify(await lm())}, toggle off and on`);
+  console.log(`beat path: examples switch: runner 140, car 100, back to flyer (${p.recipe.beatGrid.bpm} BPM), edits kept ${JSON.stringify(p.state.subject) === JSON.stringify(edited)}`);
+  if (JSON.stringify(p.state.subject) !== JSON.stringify(edited)) fail("switching examples lost the edits of Example 1");
+  // Scenery: the Settings chevron, scenery none and back to city.
+  await page.click("#settings summary");
+  await page.selectOption("#scenery", "none");
+  if ((await probe()).recipe.scenery !== "none") fail("the scenery picker did not set none");
+  await page.selectOption("#scenery", "city");
+  if ((await probe()).recipe.scenery !== "city") fail("the scenery picker did not set city");
 
   // Export the guide.
   const dl = page.waitForEvent("download", { timeout: 180_000 });
+  if (!(await page.isVisible("#exportGuide"))) await page.click("#settings summary");
   await page.click("#exportGuide");
   const zip = unzipSync(new Uint8Array(readFileSync(await (await dl).path())));
   const meta = JSON.parse(strFromU8(zip["meta.json"])), manifest = JSON.parse(strFromU8(zip["bundle.json"]));
@@ -136,19 +134,30 @@ export async function smokeBeatPath(browser, base, { fail, OUT, SHOTS }) {
     && ajv.validate("guide-bundle.schema.json#/$defs/beats", JSON.parse(strFromU8(zip["beats.json"]))) && ajv.validate("guide-bundle.schema.json#/$defs/camera", JSON.parse(strFromU8(zip["camera.json"])));
   console.log(`beat path export: ${Object.keys(zip).sort().join(", ")}; ${meta.width}x${meta.height} ${meta.frames} frames, ${meta.character.kind}, schema ${meta.schemaVersion} ${ok ? "validates" : `does NOT validate: ${ajv.errorsText()}`}`);
   const exported = JSON.parse(strFromU8(zip["recipe.json"]));
-  if (!ok || meta.frames !== 193 || meta.width !== 1280 || meta.character.kind !== "glider" || meta.schemaVersion !== "0.5.0" || !exported.landmarks?.on) fail("the Beat Path bundle is wrong");
+  if (!ok || meta.frames !== 193 || meta.width !== 1280 || meta.character.kind !== "glider" || meta.schemaVersion !== "0.5.0" || !exported.landmarks?.on || exported.figure?.shape !== "flyer" || !exported.shot?.subject) fail("the Beat Path bundle is wrong");
+  await page.click("#settings summary");
   mkdirSync(`${OUT}beat-path/`, { recursive: true });
   for (const [k, v] of Object.entries(zip)) writeFileSync(`${OUT}beat-path/${k}`, v);
 
   // The bundle in memory (for the Generate section), the sections below the editor.
-  const mem = await page.evaluate(async () => { const f = await window.beatPath.exportGuideInMemory(); return Object.fromEntries(Object.entries(f).map(([k, b]) => [k, b.size])); });
-  console.log(`beat path: in-memory bundle ${Object.keys(mem).sort().join(", ")}`);
-  if (!mem["guide.mp4"] || !mem["recipe.json"]) fail("exportGuideInMemory did not return the bundle's files");
-  for (const id of ["generate", "gallery"]) if (!(await page.isVisible(`#${id} h2`))) fail(`no ${id} section`);
+  const mem = await page.evaluate(async () => { const g = await window.beatPath.exportGuideInMemory(); return { files: Object.fromEntries(Object.entries(g.files).map(([k, b]) => [k, b.size])), prompt: g.prompt, shot: g.shot }; });
+  console.log(`beat path: in-memory bundle ${Object.keys(mem.files).sort().join(", ")}; prompt "${mem.prompt}"`);
+  if (!mem.files["guide.mp4"] || !mem.files["recipe.json"] || !mem.prompt) fail("exportGuideInMemory did not return the bundle's files and the prompt");
+  if (/\(-?\d|lock (beat|kick|snare)|punch \d/.test(mem.prompt)) fail(`script words in the prompt: ${mem.prompt}`);
+  // Generate (faked in dev): the output pane appears beside the preview, with a divider.
+  await page.click("#runGenerate");
+  await page.waitForFunction(() => !document.getElementById("screenOutput").hidden && document.querySelector("#generateSlot video"), null, { timeout: 120_000 });
+  if (await page.isHidden("#divider")) fail("no divider between the preview and the output");
+  await page.click("#play");
+  await page.waitForTimeout(900);
+  await page.click("#play");
+  await page.screenshot({ path: `${SHOTS}beat-path-generated.png` });
+  if (!(await page.isVisible("#gallery h2"))) fail("no gallery section");
   // No track: a plain timed clip that still plays and exports.
   await page.click("#removeTrack");
   if ((await probe()).recipe.audio) fail("Remove did not take the track off");
-  await page.click("#demoTrack");
+  await page.click('[data-control="example"] [data-value="1"]');
+  await page.click('[data-control="example"] [data-value="0"]');
   await page.waitForFunction(() => window.__beatPath.recipe().audio, null, { timeout: 30_000 });
 
   // Themes and sizes.
@@ -158,9 +167,10 @@ export async function smokeBeatPath(browser, base, { fail, OUT, SHOTS }) {
   await page.screenshot({ path: `${SHOTS}beat-path-runware.png` });
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.waitForTimeout(300);
-  const fits = await page.evaluate(() => document.documentElement.scrollHeight <= window.innerHeight + 1);
-  if (!fits) fail("Beat Path scrolls at 1440×900");
+  const fits = await page.evaluate(() => document.getElementById("editor").offsetHeight <= window.innerHeight + 1);
+  if (!fits) fail("the Beat Path editor does not fit one screen at 1440×900");
   await page.screenshot({ path: `${SHOTS}beat-path-runware-1440.png` });
+  await page.screenshot({ path: `${SHOTS}beat-path-runware-full.png`, fullPage: true });
   if (errors.length) fail(`Beat Path page errors: ${errors.join(" | ")}`);
   await page.close();
 }

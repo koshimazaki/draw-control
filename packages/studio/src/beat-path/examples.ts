@@ -1,27 +1,28 @@
 /**
- * The Examples menu: ready states stored as shot scripts in examples/scripts/beat-path-*.txt,
- * so agents use the same files. Each carries a suggested prompt (a `# prompt:` comment) for a
- * subject a video model would render over the abstract guide. The first is the page's first run.
+ * The example switcher: three examples, each its own subject shape, path, scenery, camera,
+ * music (tracks.ts) and shot description, stored as shot scripts in examples/scripts/ so
+ * agents use the same files; "Your own" starts from a plain state. The other scripts in
+ * examples/scripts/ (beat-path-*.txt) stay for agents and tests.
  */
 import { BLANK_STATE, fromScript, type BeatPathState } from "./script";
+import flyer from "../../../../examples/scripts/beat-path-ex1-flyer.txt?raw";
+import runner from "../../../../examples/scripts/beat-path-ex2-runner.txt?raw";
+import car from "../../../../examples/scripts/beat-path-ex3-car.txt?raw";
 
 export { BLANK_STATE, DEFAULT_CAMERA_PATH } from "./script";
-import road from "../../../../examples/scripts/beat-path-road-bend.txt?raw";
-import leap from "../../../../examples/scripts/beat-path-run-leap.txt?raw";
-import flight from "../../../../examples/scripts/beat-path-flight.txt?raw";
-import spin from "../../../../examples/scripts/beat-path-orbit-spin.txt?raw";
-import split from "../../../../examples/scripts/beat-path-kick-snare.txt?raw";
-import shoulder from "../../../../examples/scripts/beat-path-shoulder-above.txt?raw";
-import free from "../../../../examples/scripts/beat-path-free-flow.txt?raw";
 
 export const EXAMPLES = [
-  { id: "road", label: "Car on a road with a bend", script: road },
-  { id: "leap", label: "Runner leaps a gap", script: leap },
-  { id: "flight", label: "Something flying", script: flight },
-  { id: "spin", label: "Dancer spins, camera circles", script: spin },
-  { id: "split", label: "Kicks for the figure, snares for the camera", script: split },
-  { id: "shoulder", label: "Over the shoulder, then above", script: shoulder },
-  { id: "free", label: "Free flow, no lock", script: free },
+  { id: "flyer", label: "Flying car", script: flyer },
+  { id: "runner", label: "Runner", script: runner },
+  { id: "car", label: "Car on a bend", script: car },
 ] as const;
 
-export const exampleState = (i: number): BeatPathState => fromScript(EXAMPLES[i].script, BLANK_STATE).state;
+const TEMPO = { flyer: 120, runner: 140, car: 100 } as const;
+export const exampleState = (i: number): BeatPathState => fromScript(EXAMPLES[i].script, BLANK_STATE, { bpm: TEMPO[EXAMPLES[i].id], offsetSeconds: 0.09 }).state;
+
+/** "Your own": a plain path and camera to start from, no music of its own. */
+export const ownState = (): BeatPathState => ({
+  ...structuredClone(BLANK_STATE),
+  subject: [{ x: -6, z: 3 }, { x: -2, z: -1 }, { x: 2, z: 1.5 }, { x: 6, z: -1 }], subjectCorners: 0.6,
+  character: [{ from: 0, to: 17, word: "glide" }], cameraLane: [{ from: 0, to: 17, word: "behind" }],
+});

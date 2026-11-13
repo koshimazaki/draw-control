@@ -30,7 +30,7 @@ export type ActivePhase = {
 };
 export type FrameState = {
   frame: number; seconds: number; beat: number;
-  root: { x: number; y: number; z: number; yawRadians: number };
+  root: { x: number; y: number; z: number; yawRadians: number; /** The glider's lean into a turn, radians (+ leans right). */ bank?: number };
   pose: Pose;
   layers: ClipLayer[];
   active: ActivePhase | null;

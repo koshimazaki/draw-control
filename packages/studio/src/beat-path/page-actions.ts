@@ -1,19 +1,18 @@
 /**
- * The Beat Path page's controls: the global lock, on-hit and clip choices, the map tools,
- * the lane menus, the Examples menu, Copy and Paste script (and a dropped .txt), Export
- * guide, the full-studio link, and the keyboard (Space plays, Cmd/Ctrl-Z undoes, Shift
- * redoes, Escape cancels a stroke or closes a menu). Split from page.ts.
+ * The Beat Path page's controls: the example switcher, the map tools, the lane menus and
+ * lock chips, Settings (clip, locks, snap, grid, scenery, figure, download guide), the shot
+ * fields, the music strip, and the keyboard (Space plays, Cmd/Ctrl-Z undoes, Shift redoes,
+ * Delete removes the selection, Escape cancels a stroke or clears it). Split from page.ts.
+ * The shot script is the engine's format (CLI, MCP, examples/scripts); nothing about it shows here.
  */
 import { clipBeats } from "@motion-studio/core";
 import { exportBundle } from "../export/bundle";
-import { APP_NAME } from "./name";
-import { browserStore, saveSequence } from "../sequence-library";
 import { download } from "../shared/download";
-import { DEFAULT_CAMERA_PATH, EXAMPLES, exampleState } from "./examples";
+import { DEFAULT_CAMERA_PATH } from "./examples";
 import { removeAt, splitAt, type LaneView, type MenuField, type MenuItem } from "./lanes";
 import type { Page } from "./page";
 import { beatPathRecipe, exportRange } from "./recipe-map";
-import { HIT_CHOICES, LABELS, LOCK_CHOICES, legendFor, fitLanes, fromScript, setWord, toScript, type BeatPathState, type Block, type CameraWord, type ClipChoice } from "./script";
+import { HIT_CHOICES, LABELS, LOCK_CHOICES, legendFor, fitLanes, setWord, toScript, type BeatPathState, type Block, type CameraWord, type ClipChoice } from "./script";
 
 /** What each block's shape on the map is, said in its popover. */
 const CAMERA_NOTES: Record<CameraWord, string> = {
@@ -43,7 +42,6 @@ function wordOf(phrase: string, fallback: CameraWord): CameraWord {
   return fallback;
 }
 
-export const STUDIO_SEQUENCE = APP_NAME;
 const EXPORT = { width: 1280, height: 720 } as const;
 
 export function bindActions(p: Page) {
@@ -56,8 +54,9 @@ export function bindActions(p: Page) {
       const on = b.dataset.value === String(value);
       b.classList.toggle("on", on); b.setAttribute("aria-checked", String(on));
     });
-    pick("tool", p.tool); pick("view", p.view); pick("clip", s.clip); pick("pen", p.pen);
-    input("landmarksExport").checked = s.landmarks.on;
+    pick("tool", p.tool); pick("view", p.view); pick("clip", s.clip); pick("pen", p.pen); pick("example", p.slot);
+    $<HTMLSelectElement>("scenery").value = s.scenery;
+    $<HTMLSelectElement>("figureShape").value = s.figure.shape;
     input("figureBody").value = s.figure.body; input("figureHead").value = s.figure.head;
     const chip = (id: string, l: { lock: string; strength: number }, extra = "") => {
       $(id).textContent = l.lock === "off" ? "no lock" : `${l.lock}${l.strength < 1 ? ` ${+l.strength.toFixed(2)}` : ""}${extra}`;
@@ -92,10 +91,11 @@ export function bindActions(p: Page) {
     if (name === "tool") return p.setTool(v as "subject" | "camera");
     if (name === "view") return p.setView(v as "top" | "side");
     if (name === "pen") return p.setPen(v as "edit" | "draw");
+    if (name === "example") return void p.switchSlot(v);
     if (name === "clip") { const clip = Number(v) as ClipChoice; p.update(fitLanes({ ...s, clip }, clipBeats(clip, p.info?.bpm ?? 120))); }
   }));
   // Lane lock chips: each lane's own source and strength; the camera's also what it does on each hit.
-  const lockMenu = (lane: "charLock" | "camLock") => {
+  const lockMenu = (lane: "charLock" | "camLock", anchor?: HTMLElement) => {
     const l = p.state[lane], set = (patch: Partial<BeatPathState["camLock"]>) => p.update({ ...p.state, [lane]: { ...p.state[lane], ...patch } });
     const items: MenuItem[] = LOCK_CHOICES.map(v => ({ label: `Lock to ${LABELS.lock[v].toLowerCase()}`, on: l.lock === v, run: () => set({ lock: v }) }));
     items.push("-", ...[0.25, 0.5, 0.75, 1].map(v => ({ label: `Strength ${v.toFixed(2)}`, on: Math.abs(l.strength - v) < 1e-6, disabled: l.lock === "off", run: () => set({ strength: v }) })));
@@ -104,8 +104,10 @@ export function bindActions(p: Page) {
       items.push("-", ...HIT_CHOICES.map(v => ({ label: `On each hit: ${LABELS.hit[v].toLowerCase()}`, on: c.onHit === v, disabled: c.lock === "off", run: () => set({ onHit: v }) })),
         { label: "Next move on each hit", on: c.advance, disabled: c.lock !== "kick" && c.lock !== "snare", run: () => set({ advance: !c.advance }) });
     }
-    p.menu.show($(lane === "charLock" ? "chipCharacter" : "chipCamera"), lane === "charLock" ? "Character lock" : "Camera lock", items);
+    p.menu.show(anchor ?? $(lane === "charLock" ? "chipCharacter" : "chipCamera"), lane === "charLock" ? "Character lock" : "Camera lock", items);
   };
+  $("setCharLock").onclick = () => lockMenu("charLock", $("setCharLock"));
+  $("setCamLock").onclick = () => lockMenu("camLock", $("setCamLock"));
   $("chipCharacter").onclick = () => lockMenu("charLock");
   $("chipCamera").onclick = () => lockMenu("camLock");
   const corners = (final: boolean) => { const c = Number(input("corners").value); p.update({ ...p.state, ...(p.tool === "subject" ? { subjectCorners: c } : { cameraCorners: c }) }, final); };
@@ -115,11 +117,12 @@ export function bindActions(p: Page) {
   const greyish = (hex: string) => { const v = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16)); return Math.max(...v) - Math.min(...v) < 48 && Math.max(...v) > 90 && Math.max(...v) < 230; };
   const figure = (final: boolean) => {
     const body = input("figureBody").value, head = input("figureHead").value;
-    p.update({ ...p.state, figure: { body, head } }, final);
+    p.update({ ...p.state, figure: { ...p.state.figure, body, head } }, final);
     if (final) p.say(greyish(body) || greyish(head) ? "That colour is close to the grey landmarks: the figure may not stand out" : `Figure: body ${body}, head ${head}`);
   };
   for (const id of ["figureBody", "figureHead"]) { input(id).oninput = () => figure(false); input(id).onchange = () => figure(true); }
-  input("landmarksExport").onchange = () => p.update({ ...p.state, landmarks: { ...p.state.landmarks, on: input("landmarksExport").checked } });
+  $<HTMLSelectElement>("scenery").onchange = () => { const v = $<HTMLSelectElement>("scenery").value as BeatPathState["scenery"]; p.update({ ...p.state, scenery: v, landmarks: { ...p.state.landmarks, on: v !== "none" } }); };
+  $<HTMLSelectElement>("figureShape").onchange = () => p.update({ ...p.state, figure: { ...p.state.figure, shape: $<HTMLSelectElement>("figureShape").value as BeatPathState["figure"]["shape"] } });
   input("gridExport").onchange = () => { p.viewport.setExportGrid(input("gridExport").checked); p.viewport.setGrid(input("gridExport").checked); p.rebuild(); };
   $("clearPath").onclick = () => {
     const s = p.state;
@@ -162,62 +165,13 @@ export function bindActions(p: Page) {
       key === "cameraLane" ? CAMERA_NOTES[b.word as CameraWord] : CHARACTER_NOTES[b.word as keyof typeof CHARACTER_NOTES]);
   }
 
-  // Examples
-  $("examples").onclick = () => p.menu.show($("examples"), "Examples", EXAMPLES.map((ex, i) => ({
-    label: ex.label, run: () => { const s = exampleState(i); p.load(fitLanes(s, clipBeats(s.clip, p.info?.bpm ?? 120))); p.say(`Example: ${ex.label}`); },
-  })));
   // The shot description: three fields, stored in the recipe (recipe.json in the bundle) and the script.
   for (const k of ["subject", "environment", "action"] as const) {
     const el = input(`shot${k[0].toUpperCase()}${k.slice(1)}`);
     el.oninput = () => p.update({ ...p.state, shot: { ...p.state.shot, [k]: el.value } }, false);
     el.onchange = () => p.update({ ...p.state, shot: { ...p.state.shot, [k]: el.value } }, true);
   }
-  $("copyPrompt").onclick = () => {
-    const s = p.state.shot, parts = [s.subject, s.environment, s.action].filter(Boolean);
-    void copy(`${parts.join(". ")}${parts.length ? ". " : ""}${legendFor(p.state.figure)}.`, "Prompt copied");
-  };
-
-  // Scripts in and out
   const script = () => toScript(p.state);
-  async function copy(text: string, done: string) {
-    try { await navigator.clipboard.writeText(text); p.say(done); }
-    catch { download(text, "beat-path-script.txt", "text/plain"); p.say("Clipboard blocked: saved as a file"); }
-  }
-  /** Read a script into the state; the reason when it cannot be applied. */
-  function applyScript(text: string): string | null {
-    try {
-      const { state, notes } = fromScript(text, p.state, p.recipe.beatGrid);
-      const next = fitLanes(state, clipBeats(state.clip, p.info?.bpm ?? 120));
-      beatPathRecipe(next, p.info, p.track && p.drive ? { drive: p.drive, bands: p.drive.bands } : {});
-      p.load(next);
-      p.say(notes.length ? `Script applied; ${notes.join("; ")}` : "Script applied");
-      return null;
-    } catch (e) { return (e as Error).message; }
-  }
-  $("copyScript").onclick = () => void copy(script(), "Shot script copied");
-  const dialog = $("pasteDialog");
-  const closeDialog = () => { dialog.hidden = true; $("pasteScript").focus(); };
-  $("pasteScript").onclick = async () => {
-    $("pasteError").textContent = "";
-    $<HTMLTextAreaElement>("pasteText").value = await navigator.clipboard.readText().catch(() => "") || script();
-    dialog.hidden = false;
-    $<HTMLTextAreaElement>("pasteText").focus();
-  };
-  $("pasteCancel").onclick = closeDialog;
-  $("pasteApply").onclick = () => { const err = applyScript($<HTMLTextAreaElement>("pasteText").value); if (err) $("pasteError").textContent = err; else closeDialog(); };
-
-  /**
-   * The guide bundle in memory: every file as a Blob, the same content as the zip export
-   * (guide.mp4, frame0.png, audio.wav, beats.json, camera.json, recipe.json with the shot
-   * description, meta.json, bundle.json). For the Generate section; it does not download.
-   */
-  async function exportGuideInMemory(onProgress?: (done: number, total: number) => void): Promise<Record<string, Blob>> {
-    const recipe = p.recipe, range = exportRange(recipe, p.state.clip);
-    const result = await exportBundle({ recipe, range, viewport: p.viewport, ...EXPORT, audio: p.track?.buffer ?? null, drive: p.drive, onProgress });
-    const type = (name: string) => (name.endsWith(".mp4") ? "video/mp4" : name.endsWith(".png") ? "image/png" : name.endsWith(".wav") ? "audio/wav" : "application/json");
-    return Object.fromEntries(Object.entries(result.contents).map(([name, bytes]) => [name, new Blob([bytes as BlobPart], { type: type(name) })]));
-  }
-  (window as unknown as { beatPath: unknown }).beatPath = { exportGuideInMemory, script: () => toScript(p.state), recipe: () => p.recipe };
 
   // Export
   $("exportGuide").onclick = async () => {
@@ -233,20 +187,11 @@ export function bindActions(p: Page) {
       download(result.zip, "beat-path-guide.zip", "application/zip");
       p.say(`Exported ${result.frames} frames, ${EXPORT.width}×${EXPORT.height}, ${(result.zip.length / 1e6).toFixed(1)} MB`);
     } catch (e) { p.say(`Export failed: ${(e as Error).message}`); }
-    finally { p.busy = false; button.disabled = false; button.textContent = "Export guide"; }
+    finally { p.busy = false; button.disabled = false; button.textContent = "Download guide (.zip)"; }
   };
-  $("openStudio").onclick = e => {
-    const store = browserStore();
-    if (!store) return;
-    e.preventDefault();
-    saveSequence(store, STUDIO_SEQUENCE, p.recipe);
-    window.open(`./?sequence=${encodeURIComponent(STUDIO_SEQUENCE)}`, "_blank");
-  };
-
   // Transport and files
   $("play").onclick = () => p.setPlaying(!p.player.playing);
   $("bigPlay").onclick = () => p.setPlaying(true);
-  $("demoTrack").onclick = () => void p.useDemo();
   $("removeTrack").onclick = () => p.removeTrack();
   $("resetMarkers").onclick = () => p.update({ ...p.state, muted: [] });
   $("sound").onclick = () => {
@@ -263,19 +208,17 @@ export function bindActions(p: Page) {
     e.preventDefault();
     wrap.classList.remove("drop");
     for (const f of e.dataTransfer?.files ?? []) {
-      if (/\.txt$/i.test(f.name) || f.type === "text/plain") void f.text().then(t => { const err = applyScript(t); if (err) p.say(`Script not applied: ${err}`); });
-      else if (f.type.startsWith("audio/") || /\.(wav|mp3|m4a|ogg|flac|aac)$/i.test(f.name)) void p.useFile(f);
+      if (f.type.startsWith("audio/") || /\.(wav|mp3|m4a|ogg|flac|aac)$/i.test(f.name)) void p.useFile(f);
     }
   });
   window.addEventListener("keydown", e => {
     const typing = (e.target as HTMLElement).closest("input[type=text], textarea");
     if (e.key === "Escape") {
-      if (!dialog.hidden) closeDialog();
-      else if (p.map.busy) p.map.cancelStroke();
+      if (p.map.busy) p.map.cancelStroke();
       else { p.setSelection(null); if (p.pen === "draw") p.setPen("edit"); }
       return;
     }
-    if (typing || !dialog.hidden) return;
+    if (typing) return;
     // Delete or Backspace removes the selected lane block or path point (undoable).
     if ((e.key === "Delete" || e.key === "Backspace") && p.selection && !(e.target as HTMLElement).closest("input")) {
       e.preventDefault();

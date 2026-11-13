@@ -7,7 +7,7 @@ import * as THREE from "three";
 import type { Landmark } from "@motion-studio/core/internal";
 
 /** Block colours by kind (the guide's colour coding: neutral greys). */
-export const LANDMARK_COLOURS = { box: 0xa7aaaf, pillar: 0xc3c5c9, wall: 0x8f9297 } as const;
+export const LANDMARK_COLOURS = { box: 0xa7aaaf, pillar: 0xc3c5c9, wall: 0x8f9297, building: 0x9a9da2 } as const;
 
 /** A soft dark rectangle with blurred edges, for contact shading. */
 function contactTexture(): THREE.Texture {

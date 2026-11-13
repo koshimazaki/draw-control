@@ -1,5 +1,5 @@
 /* Beat Path page layout: one screen, no scrolling; tokens and components only (ui/components.css, themes/). */
-:root { --top: 52px; --dock: 136px; --controls: 168px; --gap: 14px; --pad: 20px; }
+:root { --top: 52px; --dock: 136px; --controls: 128px; --gap: 14px; --pad: 20px; }
 html, body { overflow: auto; }
 .editor { display: grid; grid-template-rows: var(--top) minmax(0, 1fr) var(--dock); height: 100vh; }
 html { scroll-behavior: smooth; }
@@ -43,8 +43,61 @@ h1 { margin: 0; font-size: var(--text-lg); font-weight: var(--weight-semibold); 
   background: var(--surface); border: 1px dashed var(--border-strong); border-radius: var(--radius-lg); color: var(--text-muted); }
 .map-empty[hidden] { display: none; }
 
-.side { display: grid; grid-template-rows: auto minmax(0, 1fr); gap: var(--gap); min-height: 0;
-  width: min(58vw, calc((100vh - var(--top) - var(--dock) - var(--controls) - 2 * var(--gap)) * 16 / 9)); }
+.side { --screen-h: calc(100vh - var(--top) - var(--dock) - var(--controls) - 2 * var(--gap));
+  display: grid; grid-template-rows: auto minmax(0, 1fr); gap: var(--gap); min-height: 0; width: min(58vw, calc(var(--screen-h) * 16 / 9)); }
+/* With an output, the two screens sit side by side and the right column takes more of the width. */
+.stage:has(.screens.split) .side { width: min(66vw, calc(var(--screen-h) * 16 / 9 * 2 + 12px)); }
+.map-tools { flex-wrap: wrap; right: var(--s-2); }
+.screens { --split: .5; position: relative; display: flex; gap: 0; align-items: stretch; }
+.screens .screen { position: relative; min-width: 0; }
+.screens:not(.split) #screenPreview { flex: 1; }
+.screens.split #screenPreview { flex: 0 0 calc(var(--split) * (100% - 12px)); }
+.screens.split #screenOutput { flex: 1; }
+.screens.swapped { flex-direction: row-reverse; }
+.divider { flex: 0 0 12px; cursor: col-resize; position: relative; }
+.divider::after { content: ""; position: absolute; top: 20%; bottom: 20%; left: 5px; width: 2px; border-radius: 1px; background: var(--border-strong); transition: background var(--dur-fast) var(--ease); }
+.divider:hover::after, .divider:focus-visible::after { background: var(--accent-ink); }
+.divider[hidden], .screen[hidden] { display: none; }
+.output-frame { position: relative; aspect-ratio: 16 / 9; display: grid; place-items: center; gap: var(--s-2); border-radius: var(--radius-lg); overflow: hidden; background: var(--surface-sunk); border: 1px solid var(--border); }
+.output-video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.output-video.fake { filter: saturate(1.6) hue-rotate(160deg) contrast(1.1); }
+.progress { width: 60%; height: 4px; border-radius: 2px; background: var(--track); overflow: hidden; }
+.progress span { display: block; width: 0; height: 100%; background: var(--accent); transition: width var(--dur) var(--ease); }
+.progress[hidden] { display: none; }
+.swap { position: absolute; right: 8px; top: 8px; height: 26px; padding: 0 8px; background: rgba(18, 19, 22, .55); color: #e6e7e9; }
+.compose { display: grid; gap: var(--s-2); align-content: start; }
+.compose .row { gap: var(--s-2); }
+.drop { position: relative; display: inline-flex; align-items: center; gap: 6px; height: var(--control-h); padding: 0 var(--s-2) 0 4px; border: 1px dashed var(--border-strong); border-radius: var(--radius-sm);
+  color: var(--text-muted); font-size: var(--text-xs); cursor: pointer; white-space: nowrap; transition: border-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease); }
+.drop:hover { border-color: var(--accent-ink); color: var(--text); }
+.drop input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.drop-thumb { width: 22px; height: 22px; border-radius: 3px; background: var(--surface-2) center / cover no-repeat; }
+.drop-thumb.set { box-shadow: 0 0 0 1px var(--accent-ink); }
+.run-btn { min-width: 108px; }
+.options { position: relative; margin-left: auto; }
+.options summary { list-style: none; }
+.options summary::-webkit-details-marker { display: none; }
+.options summary::after { content: ""; display: inline-block; width: 6px; height: 6px; margin-left: 8px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: translateY(-2px) rotate(45deg); transition: transform var(--dur) var(--ease); }
+.options[open] summary::after { transform: translateY(1px) rotate(-135deg); }
+.options-body { position: absolute; right: 0; bottom: calc(100% + 6px); z-index: 30; display: grid; gap: var(--s-2); min-width: 380px; padding: var(--s-3); box-shadow: var(--shadow-lg); background: var(--popover); }
+.opt-row { display: flex; align-items: center; gap: var(--s-2); flex-wrap: wrap; }
+.opt-row .lab { width: 64px; }
+.pick { display: inline-flex; align-items: center; gap: 6px; color: var(--text-muted); font-size: var(--text-sm); }
+select { height: var(--control-h); padding: 0 var(--s-2); border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text); }
+select:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
+.key-placeholder { gap: 8px; }
+.key-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent); }
+.top .seg[data-control="example"] { margin-left: var(--s-3); }
+.gallery-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s-4); }
+.gallery-card { display: grid; gap: var(--s-2); padding: var(--s-3); align-content: start; }
+.gallery-card h3 { margin: 0; font-size: var(--text-md); font-weight: var(--weight-semibold); }
+.gallery-media { aspect-ratio: 16 / 9; display: grid; place-items: center; border-radius: var(--radius-md); background: var(--surface-sunk); border: 1px solid var(--border); overflow: hidden; text-align: center; padding: var(--s-2); }
+.gallery-media video { width: 100%; height: 100%; object-fit: cover; }
+.gallery-card dl { display: grid; grid-template-columns: 90px 1fr; gap: 2px 8px; margin: 0; font-size: var(--text-xs); }
+.gallery-card dt { color: var(--text-muted); } .gallery-card dd { margin: 0; }
+.oss-panel { font-size: var(--text-sm); color: var(--text-muted); }
+.oss-panel a { color: var(--accent-ink); }
+.oss-panel strong { color: var(--text); }
 .preview { position: relative; aspect-ratio: 16 / 9; border-radius: var(--radius-lg); overflow: hidden; background: #000; border: 1px solid var(--border); }
 .preview canvas { display: block; width: 100%; height: 100%; }
 .hud { position: absolute; left: var(--s-2); top: var(--s-2); display: flex; align-items: center; gap: var(--s-2); padding: 3px 9px; border-radius: var(--radius-sm);

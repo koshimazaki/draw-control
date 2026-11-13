@@ -24,14 +24,15 @@ describe("Beat Path: the page state is a shot script", () => {
       expect(again.notes).toEqual([]);
       expect(again.state).toEqual(s);
       expect(toScript(again.state)).toBe(printed);
-      expect(s.prompt).toMatch(/orange figure/);
+      expect(s.shot.subject.length).toBeGreaterThan(5);
+      expect(toScript(s)).not.toMatch(/shot (subject|environment|action):.*(\(-?\d|lock (beat|kick|snare)|punch \d)/);   // no script words in the shot description
     }
   });
   it("a typed camera phrase and muted hits round-trip through the script", () => {
     const s = S({ muted: [2.1, 4.6], cameraLane: [{ from: 0, to: 9, word: "behind", phrase: "go above then dolly in 2m fast" }, { from: 9, to: 17, word: "orbit", phrase: "orbit 180 slow" }] });
     const printed = toScript(s);
     expect(printed).toMatch(/^muted: 2\.1 4\.6$/m);
-    expect(printed).toMatch(/camera: go above then dolly in 2m fast lock kick 1 hold/);
+    expect(printed).toMatch(/camera: go above then dolly in 2m fast lock snare 1 hold/);
     const back = fromScript(printed, BLANK_STATE);
     expect(back.notes).toEqual([]);
     expect(back.state.cameraLane.map(b => b.phrase)).toEqual(["go above then dolly in 2m fast", "orbit 180 slow"]);

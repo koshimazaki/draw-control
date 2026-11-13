@@ -35,9 +35,9 @@ const number = (row: Row, t: string, what: string) => {
 };
 
 /** A settings line: `landmarks: on seed 7` or `landmarks: off` (not a row). */
-const SETTING = /^(landmarks|muted|figure|shot (subject|environment|action|legend))\s*:/i;
+const SETTING = /^(landmarks|muted|figure|scenery|shot (subject|environment|action|legend))\s*:/i;
 /** The script's settings lines; a script without one leaves the setting as it was. */
-export type ScriptSettings = { landmarks?: { on: boolean; seed?: number }; muted?: number[]; figure?: { body: string; head: string }; shot?: Partial<Record<"subject" | "environment" | "action" | "legend", string>> };
+export type ScriptSettings = { landmarks?: { on: boolean; seed?: number }; muted?: number[]; figure?: { shape?: "car" | "flyer" | "runner"; body: string; head: string }; scenery?: "none" | "scatter" | "street" | "city"; shot?: Partial<Record<"subject" | "environment" | "action" | "legend", string>> };
 export function parseSettings(script: string): ScriptSettings {
   const out: ScriptSettings = {};
   script.split(/\r?\n/).forEach((raw, i) => {
@@ -45,10 +45,18 @@ export function parseSettings(script: string): ScriptSettings {
     if (!SETTING.test(text)) return;
     const shotLine = /^shot (subject|environment|action|legend)\s*:\s*(.*)$/i.exec(raw.trim());
     if (shotLine) { (out.shot ??= {})[shotLine[1].toLowerCase() as "subject"] = shotLine[2].trim(); return; }
+    if (/^scenery\s*:/i.test(text)) {
+      const m = /^scenery\s*:\s*(none|scatter|street|city)\s*$/i.exec(text);
+      if (!m) throw new RecipeError(`script line ${i + 1}: scenery reads "scenery: city" (none, scatter, street, city)`);
+      out.scenery = m[1].toLowerCase() as "city";
+      return;
+    }
     if (/^figure\s*:/i.test(text)) {
-      const m = /^figure\s*:\s*body\s+(#[0-9a-f]{6})(?:\s+head\s+(#[0-9a-f]{6}))?\s*$/i.exec(text);
-      if (!m) throw new RecipeError(`script line ${i + 1}: figure reads "figure: body #e8632a head #f2a35e"`);
-      out.figure = { body: m[1].toLowerCase(), head: (m[2] ?? m[1]).toLowerCase() };
+      // Colours carry "#", so this line is read before comments are stripped.
+      const m = /^figure\s*:\s*(?:shape\s+(glider|car|flyer|runner)\s*)?(?:body\s+(#[0-9a-f]{6}))?(?:\s+head\s+(#[0-9a-f]{6}))?\s*$/i.exec(raw.trim());
+      if (!m || (!m[1] && !m[2])) throw new RecipeError(`script line ${i + 1}: figure reads "figure: shape car body #e8632a head #f2a35e" (shape: glider, car, flyer, runner)`);
+      const body = (m[2] ?? "#ff6a13").toLowerCase();
+      out.figure = { ...(m[1] && m[1].toLowerCase() !== "glider" ? { shape: m[1].toLowerCase() as "car" } : {}), body, head: (m[3] ?? body).toLowerCase() };
       return;
     }
     if (/^muted\s*:/i.test(text)) {
@@ -279,6 +287,7 @@ export function applyScript(recipe: Recipe, args: { script: string }, ctx: { ban
   const settings = parseSettings(args.script);
   if (settings.muted) r = validateRecipe({ ...r, mutedHits: settings.muted });
   if (settings.figure) r = validateRecipe({ ...r, figure: settings.figure });
+  if (settings.scenery) r = validateRecipe({ ...r, scenery: settings.scenery });
   if (settings.shot) r = validateRecipe({ ...r, shot: { subject: "", environment: "", action: "", legend: "", ...r.shot, ...settings.shot } });
   if (settings.landmarks) r = validateRecipe({ ...r, landmarks: { seed: settings.landmarks.seed ?? recipe.landmarks?.seed ?? 7, on: settings.landmarks.on } });
   // Action track: blocks from rows, a block running on over `continue` rows.

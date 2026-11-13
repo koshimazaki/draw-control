@@ -6,7 +6,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { analyseSamples, applyScript, beatPathBase, buildDrive, frameAt, planCamera, type AudioDrive, type Recipe } from "@motion-studio/core";
-import { patternTimes, synthDrums } from "@motion-studio/core/internal";
+import { grooveTimes, patternTimes, synthDrums } from "@motion-studio/core/internal";
 import { BLANK_STATE, fromScript, toScript, type BeatPathState, type CameraWord } from "../src/beat-path/script";
 import { beatPathRecipe } from "../src/beat-path/recipe-map";
 
@@ -40,15 +40,24 @@ function worst(r: Recipe, drive?: AudioDrive) {
   }
   return w;
 }
+
+/** The drive for an example script's own music (its "# track:" comment; straight 120 BPM by default). */
+const grooveDrive = (text: string) => {
+  const style = (/^#\s*track:\s*(straight|drive|laidback)/m.exec(text)?.[1] ?? "straight") as "straight" | "drive" | "laidback";
+  const bpm = { straight: 120, drive: 140, laidback: 100 }[style];
+  return drumsDrive(grooveTimes(style, 10, 0.1), 0.1 + 10 * 4 * 60 / bpm + 0.5);
+};
 const MARGIN = 0.85;   // inside 85 % of the half-frame on each axis
 
 const scripts = new URL("../../../examples/scripts/", import.meta.url);
 describe("the subject stays in frame", () => {
   for (const file of readdirSync(scripts).filter(f => f.startsWith("beat-path-"))) it(file, () => {
-    const s = fromScript(readFileSync(new URL(file, scripts), "utf8"), BLANK_STATE).state;
-    const base = beatPathBase({ seconds: s.clip, bpm: demo.f.estimatedBpm!, offsetSeconds: demo.f.estimatedOffsetSeconds });
-    const r = applyScript(base, { script: toScript(s) }, { drive: demo.drive, bands: demo.drive.bands });
-    expect(worst(r, demo.drive).v).toBeLessThan(MARGIN);
+    const text = readFileSync(new URL(file, scripts), "utf8"), g = grooveDrive(text);
+    const grid = { bpm: g.f.estimatedBpm!, offsetSeconds: g.f.estimatedOffsetSeconds };
+    const s = fromScript(text, BLANK_STATE, grid).state;
+    const base = beatPathBase({ seconds: s.clip, ...grid });
+    const r = applyScript(base, { script: toScript(s) }, { drive: g.drive, bands: g.drive.bands });
+    expect(worst(r, g.drive).v).toBeLessThan(MARGIN);
   });
   for (const rig of ["follow behind", "follow side", "over shoulder"]) for (const lock of ["kick 1", "beat 1"]) it(`stress: 26 m path, ${lock}, ${rig}`, () => {
     const f = lock.startsWith("kick") ? sparse : demo;

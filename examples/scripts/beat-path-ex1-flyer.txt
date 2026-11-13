@@ -1,0 +1,13 @@
+# Beat Path example 1: a flying car climbs and banks between tall towers. The figure is a flyer shape.
+# track: straight
+# clip: 8 s · figure: flyer · Beat Path
+landmarks: on seed 7
+figure: shape flyer body #ff6a13 head #ffb27a
+scenery: city
+shot subject: an unbranded flying car, sleek and low (the orange figure; white marks its nose)
+shot environment: a futuristic city at night, neon signs on tall towers, light rain
+shot action: it climbs between the towers and banks through the turns, cinematic
+shot legend: the orange figure is the character; grey blocks are placeholders for the environment
+beats 0-7   | action: walk on path (-14,6,1.5) (-6,1,2.5) (1,5,4) (8,-1,5) (14,4,6) corners 1 lock kick 0.8 | camera: follow behind lock snare 1 hold | shot: wide
+beats 7-12  | action: continue | camera: follow side lock snare 1 hold | shot: wide
+beats 12-17 | action: continue | camera: orbit 75 lock snare 1 hold | shot: wide

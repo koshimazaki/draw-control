@@ -1,6 +1,13 @@
-/** The Beat Path page: map on the left, the camera's view and the few global controls on the right, the track and its two lanes along the bottom. */
+/**
+ * The page, one screen: a header (name, the example switcher, the open-source link, the API
+ * key slot); the map on the left; on the right the preview and, once there is a result, the
+ * output beside it (a draggable divider, a swap control), then the shot fields with the
+ * reference drops, the model and Generate, and Settings (closed); the music strip and the
+ * two lanes along the bottom. The Gallery is below, reached by scrolling.
+ */
 import { CLIP_CHOICES } from "./script";
-import { APP_NAME } from "./name";
+import { APP_NAME, REPO_URL, LICENCE } from "./name";
+import { MODELS } from "./generate";
 
 const seg = (name: string, values: readonly (string | number)[], labels: Record<string, string>, tip = "") =>
   `<div class="seg" role="radiogroup" data-control="${name}"${tip ? ` aria-label="${tip}"` : ""}>${values.map(v => `<button type="button" role="radio" data-value="${v}">${labels[v]}</button>`).join("")}</div>`;
@@ -9,19 +16,16 @@ export const LAYOUT = `
 <div class="editor" id="editor">
 <header class="top">
   <div class="brand"><span class="mark" aria-hidden="true"></span><h1>${APP_NAME}</h1></div>
-  <p class="tag muted">Draw a path, add music: movement and camera lock to the beat.</p>
-  <nav class="sections" aria-label="Sections"><a href="#editor">Editor</a><span aria-hidden="true">·</span><a href="#generate">Generate</a><span aria-hidden="true">·</span><a href="#gallery">Gallery</a></nav>
+  ${seg("example", ["0", "1", "2", "own"], { 0: "Example 1", 1: "Example 2", 2: "Example 3", own: "Your own" }, "Example")}
   <div class="top-right">
-    <button type="button" id="examples" class="btn ghost" aria-haspopup="menu">Examples</button>
-    <button type="button" id="pasteScript" class="btn ghost tip-below" data-tip="The page state is a shot script: paste one (or drop a .txt)">Paste script</button>
-    <button type="button" id="copyScript" class="btn ghost tip-below" data-tip="Copy the shot script an agent, the CLI or the MCP server can replay">Copy script</button>
-    <a id="openStudio" class="btn ghost tip-below" href="./" data-tip="Saves this as a sequence and opens the full studio">Full studio ↗</a>
-    <div class="key-slot" id="keySlot" data-tip="The key panel mounts here"><button type="button" class="btn outline" disabled>Connect Runware key</button></div>
+    <a class="btn ghost" href="#gallery">Gallery</a>
+    <a class="btn ghost oss tip-below" href="${REPO_URL}" target="_blank" rel="noopener" data-tip="Open source (${LICENCE}). Runs in your browser with your own Runware key">Get the code ↗</a>
+    <div class="key-slot" id="keySlot"><button type="button" class="btn outline key-placeholder tip-below" id="keyButton" data-tip="The key panel mounts here when it is installed (vendor/)"><span class="key-dot" aria-hidden="true"></span>Add your Runware API key</button></div>
   </div>
 </header>
 <main class="stage">
   <section class="map-pane panel" aria-label="Map">
-    <canvas id="map" tabindex="0" aria-label="Map: drag to draw a path, click to place points, drag a point to move it"></canvas>
+    <canvas id="map" tabindex="0" aria-label="Map: Edit points moves points, Draw new draws a path"></canvas>
     <div class="map-tools">
       ${seg("tool", ["subject", "camera"], { subject: "Subject path", camera: "Camera path" })}
       ${seg("view", ["top", "side"], { top: "Top", side: "Side" })}
@@ -35,31 +39,46 @@ export const LAYOUT = `
     <p class="map-hint muted" id="mapHint"></p>
   </section>
   <section class="side">
-    <div class="preview" id="preview">
-      <div class="hud mono"><span id="hudBeat">beat 0.0</span><span class="pulse" id="hudPulse"></span><span id="hudLock"></span></div>
-      <button type="button" id="bigPlay" class="big-play"><span class="glyph"></span>Play</button>
+    <div class="screens" id="screens">
+      <div class="screen" id="screenPreview">
+        <div class="preview" id="preview">
+          <div class="hud mono"><span id="hudBeat">beat 0.0</span><span class="pulse" id="hudPulse"></span><span id="hudLock"></span></div>
+          <button type="button" id="bigPlay" class="big-play"><span class="glyph"></span>Play</button>
+        </div>
+      </div>
+      <div class="divider" id="divider" role="separator" aria-orientation="vertical" tabindex="0" hidden data-tip="Drag to resize · double-click resets"></div>
+      <div class="screen" id="screenOutput" hidden>
+        <div class="output-frame" id="generateSlot"><p id="outputNote" class="muted">Output</p><div class="progress" id="genProgress" hidden><span></span></div></div>
+        <button type="button" id="swapScreens" class="btn ghost swap" data-tip="Swap the two sides">⇄</button>
+      </div>
     </div>
-    <div class="controls">
-      <span class="lab">Clip</span>
-      <div class="row">${seg("clip", CLIP_CHOICES, { 5: "5 s", 8: "8 s" })}
-        <label class="toggle" data-tip="On: edges snap to beats and hits. Off: they move by single frames (24 fps)"><input id="snap" type="checkbox" checked /><span class="knob"></span>Snap to beats</label>
-      </div>
-      <span class="lab">Guide</span>
-      <div class="row">
-        <label class="toggle" data-tip="Draw the ground grid in the exported clip"><input id="gridExport" type="checkbox" checked /><span class="knob"></span>Grid</label>
-        <label class="toggle" data-tip="Grey blocks around the scene, clear of both paths: travel and parallax read in every still"><input id="landmarksExport" type="checkbox" checked /><span class="knob"></span>Landmarks in export</label>
-        <span class="swatches" data-tip="The figure's colours: body and head (a prompt can name them)"><input id="figureBody" type="color" aria-label="Figure body colour" /><input id="figureHead" type="color" aria-label="Figure head colour" /></span>
-        <span class="push-right"></span>
-        <button type="button" id="exportGuide" class="btn primary">Export guide</button>
-      </div>
-      <span class="lab">Shot</span>
+    <div class="compose">
       <div class="row shot">
         <input id="shotSubject" class="field" type="text" maxlength="300" placeholder="Subject" aria-label="Subject" />
         <input id="shotEnvironment" class="field" type="text" maxlength="300" placeholder="Environment" aria-label="Environment" />
         <input id="shotAction" class="field" type="text" maxlength="300" placeholder="Action" aria-label="Action" />
       </div>
-      <span class="lab"></span>
-      <div class="row"><p id="shotLegend" class="legend-line muted"></p><button type="button" id="copyPrompt" class="btn ghost" data-tip="Copy subject, environment, action and the colour legend as one prompt">Copy prompt</button></div>
+      <div class="row">
+        <label class="drop" id="dropCharacter" data-tip="A character sheet the model follows"><input type="file" accept="image/*" id="refCharacter" /><span class="drop-thumb" id="thumbCharacter"></span><span>Character</span></label>
+        <label class="drop" id="dropEnvironment" data-tip="An environment image the model follows"><input type="file" accept="image/*" id="refEnvironment" /><span class="drop-thumb" id="thumbEnvironment"></span><span>Environment</span></label>
+        <p id="shotLegend" class="legend-line muted"></p>
+      </div>
+      <div class="row">
+        ${seg("model", MODELS.map(m => m.id), Object.fromEntries(MODELS.map(m => [m.id, m.label])), "Model")}
+        <button type="button" id="runGenerate" class="btn primary run-btn">Generate</button>
+        <details class="options" id="settings"><summary class="btn ghost">Settings</summary>
+          <div class="options-body panel">
+            <div class="opt-row"><span class="lab">Clip</span>${seg("clip", CLIP_CHOICES, { 5: "5 s", 8: "8 s" }, "Clip length")}
+              <label class="toggle" data-tip="On: edges snap to beats and hits. Off: they move by single frames"><input id="snap" type="checkbox" checked /><span class="knob"></span>Snap</label></div>
+            <div class="opt-row"><span class="lab">Locks</span><button type="button" class="btn outline" id="setCharLock">Character…</button><button type="button" class="btn outline" id="setCamLock">Camera…</button></div>
+            <div class="opt-row"><span class="lab">Guide</span><label class="toggle"><input id="gridExport" type="checkbox" checked /><span class="knob"></span>Ground grid</label>
+              <label class="pick">Scenery <select id="scenery"><option value="none">None</option><option value="scatter">Scatter</option><option value="street">Street</option><option value="city">City</option></select></label></div>
+            <div class="opt-row"><span class="lab">Figure</span><select id="figureShape" aria-label="Figure shape"><option value="glider">Pyramid</option><option value="car">Car</option><option value="flyer">Flyer</option><option value="runner">Runner</option></select>
+              <span class="swatches" data-tip="Body and head colours (a prompt can name them)"><input id="figureBody" type="color" aria-label="Figure body colour" /><input id="figureHead" type="color" aria-label="Figure head colour" /></span></div>
+            <div class="opt-row"><span class="lab">Guide file</span><button type="button" id="exportGuide" class="btn outline">Download guide (.zip)</button></div>
+          </div>
+        </details>
+      </div>
     </div>
   </section>
 </main>
@@ -69,35 +88,25 @@ export const LAYOUT = `
     <button type="button" id="sound" class="btn ghost sound" aria-pressed="true" data-tip="Music on or off (the clock keeps running)">Sound on</button>
   </div>
   <div class="audio-src">
-    <button type="button" id="demoTrack" class="btn outline">Demo track</button>
     <label class="btn outline file">Your track<input id="trackFile" type="file" accept="audio/*,.wav,.mp3,.m4a,.ogg,.flac" /></label>
+    <button type="button" id="removeTrack" class="btn ghost" data-tip="Play without music: a plain timed clip">No music</button>
   </div>
   <div class="timeline">
     <span class="lane-lab">Music</span><div class="wave-wrap" id="waveWrap"><canvas id="wave"></canvas></div>
     <button type="button" class="chip" id="chipCharacter" aria-haspopup="menu" data-tip="The character's lock: what its travel lands on"><span class="chip-name">Character</span><span class="chip-lock" id="chipCharacterLock"></span></button><div class="lane" id="laneCharacter" role="list" aria-label="Character lane"></div>
     <button type="button" class="chip" id="chipCamera" aria-haspopup="menu" data-tip="The camera's lock: its own source, what it does on each hit"><span class="chip-name">Camera</span><span class="chip-lock" id="chipCameraLock"></span></button><div class="lane" id="laneCamera" role="list" aria-label="Camera lane"></div>
   </div>
-  <div class="audio-info"><p class="track-row"><span id="trackName">No track</span><button type="button" id="removeTrack" class="link-btn" hidden data-tip="Play without music: a plain timed clip">Remove</button></p><button type="button" id="resetMarkers" class="link-btn" hidden>Reset markers</button><p class="legend muted"><i class="k"></i>kick <i class="s"></i>snare</p><p id="status" class="status muted" aria-live="polite"></p></div>
+  <div class="audio-info"><p class="track-row"><span id="trackName">No track</span></p><button type="button" id="resetMarkers" class="link-btn" hidden>Reset markers</button><p class="legend muted"><i class="k"></i>kick <i class="s"></i>snare</p><p id="status" class="status muted" aria-live="polite"></p></div>
 </footer>
 </div>
-<section class="page-section" id="generate" aria-labelledby="generateTitle">
-  <h2 id="generateTitle">Generate</h2>
-  <p class="muted">Turn the guide into a video with a model. The generate panel mounts here (it reads the guide and its shot description from this page).</p>
-  <div class="placeholder" id="generateSlot"><span class="placeholder-mark" aria-hidden="true"></span><p><strong>Coming here:</strong> pick a model, check the prompt built from the shot description, generate. Until then, <em>Export guide</em> downloads the same bundle.</p></div>
-</section>
 <section class="page-section" id="gallery" aria-labelledby="galleryTitle">
   <h2 id="galleryTitle">Gallery</h2>
-  <p class="muted">Generated clips next to their guides.</p>
-  <div class="placeholder" id="gallerySlot"><span class="placeholder-mark" aria-hidden="true"></span><p><strong>Coming here:</strong> a player for each clip with its guide, script and prompt.</p></div>
+  <p class="muted">The three examples with their inputs (guide, music, shot description, references) and outputs.</p>
+  <div class="gallery-grid" id="gallerySlot"></div>
 </section>
-<footer class="site-foot"><span>${APP_NAME}</span><span class="muted" id="credit"></span></footer>
+<footer class="site-foot">
+  <div class="oss-panel"><strong>Open source.</strong> <a href="${REPO_URL}" target="_blank" rel="noopener">Get the code</a> · ${LICENCE} licence · Runs in your browser with your own Runware key.</div>
+  <span class="muted" id="credit">${APP_NAME} · built on Runware · unofficial demo</span>
+</footer>
 <div class="menu" id="menu" role="menu" hidden></div>
-<div class="dialog" id="pasteDialog" hidden>
-  <div class="panel" role="dialog" aria-label="Paste a shot script">
-    <strong>Paste a shot script</strong>
-    <p class="muted" style="margin:0">One row per block: <span class="mono">beats 0-9 | action: walk on path (0,0) (4,0) corners 0.5 lock kick 1 | camera: follow behind</span>. A .txt file dropped on the page loads too.</p>
-    <textarea id="pasteText" spellcheck="false"></textarea>
-    <div class="row"><p class="err" id="pasteError"></p><button type="button" id="pasteCancel" class="btn ghost">Cancel</button><button type="button" id="pasteApply" class="btn primary">Apply</button></div>
-  </div>
-</div>
 `;

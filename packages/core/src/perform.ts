@@ -92,8 +92,17 @@ export function humanisedPoseAt(recipe: Recipe, plan: ReactivePlan, seconds: num
  * mannequin's clips, then the amplitude envelope on top (it scales the move on every
  * character: pose angles on the procedural figures, clip amplitude on the rigged one).
  */
+/** How far each glider shape leans into a turn: radians of bank per radian a second of turning, and the most it leans. */
+const BANK = { flyer: [0.45, 0.65], car: [0.05, 0.08], runner: [0.12, 0.2], glider: [0, 0] } as const;
+
 export function frameAt(recipe: Recipe, frame: number, drive?: AudioDrive): FrameState {
   const state = recipe.freezes?.length ? frozenFrameAt(recipe, frame, drive) : movedFrameAt(recipe, frame, drive);
+  if (recipe.character.kind === "glider" && recipe.figure?.shape) {
+    // Lean into a turn: from the path's turning rate around this frame (a pure function of the recipe and the frame).
+    const g = recipe.beatGrid, yaw = (n: number) => rootAt(recipe, frozenBeat(recipe, beatAtSeconds(g, n / recipe.fps)), drive).yaw * Math.PI / 180;
+    const rate = (yaw(frame + 2) - yaw(frame - 2)) / (4 / recipe.fps), [k, max] = BANK[recipe.figure.shape];
+    state.root = { ...state.root, bank: Math.max(-max, Math.min(max, -rate * k)) };
+  }
   if (!recipe.envelope) return state;
   const env = envelopeAt(recipe.envelope, frame);
   state.envelope = env;

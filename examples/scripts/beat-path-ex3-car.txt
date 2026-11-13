@@ -1,0 +1,12 @@
+# Beat Path example 3: a car on a coastal road takes the bend. The figure is a car shape.
+# track: laidback
+# clip: 8 s · figure: car · Beat Path
+landmarks: on seed 7
+figure: shape car body #ff6a13 head #ffb27a
+shot subject: a realistic mid-size saloon car in bright orange paint (the orange figure; white marks the headlights)
+shot environment: a coastal road with a sweeping bend above the sea, late afternoon light
+shot action: it drives along the coast road and takes the bend, filmed from behind, alongside and from above
+shot legend: the orange figure is the character; grey blocks are placeholders for the environment
+beats 0-6   | action: walk on path (-12,6) (-4,6) (2,4) (5,-1) (4,-8) corners 0.8 lock kick 1 | camera: follow behind lock snare 1 hold | shot: wide
+beats 6-11  | action: continue | camera: follow side lock snare 1 hold | shot: wide
+beats 11-14 | action: continue | camera: top lock snare 1 hold | shot: top
