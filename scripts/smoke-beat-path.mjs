@@ -208,7 +208,7 @@ export async function smokeBeatPath(browser, base, { fail, OUT, SHOTS }) {
   if (!(await probe()).playing) fail("the transport bar did not start playback");
   await page.click("#barPlay");
   if ((await probe()).playing) fail("the transport bar did not pause");
-  await page.evaluate(() => { const s = document.getElementById("scrub"); s.value = "0.5"; s.dispatchEvent(new Event("input", { bubbles: true })); });
+  await page.evaluate(() => { const s = document.getElementById("scrub"); s.value = "0.5"; s.dispatchEvent(new window.Event("input", { bubbles: true })); });
   await page.waitForTimeout(300);
   const clocks = await page.evaluate(() => ({ head: window.__beatPath.head(), shown: window.__beatPath.shown(), t0: window.__beatPath.recipe().beatGrid.offsetSeconds, clip: window.__beatPath.state().clip,
     output: document.querySelector("#generateSlot arena-player")?.currentTime ?? null }));
