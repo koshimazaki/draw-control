@@ -1,0 +1,6 @@
+# Beat Path example: over the shoulder, then the camera rises above and pushes in (typed camera direction).
+# prompt: A hiker in a yellow jacket walks a ridge trail; the camera starts over her shoulder, then lifts above her and pushes in; the orange figure is the hiker, white marks her front.
+# clip: 8 s · figure: glider · Beat Path
+landmarks: on seed 7
+beats 0-9   | action: walk on path (-6,4) (-1,1) (3,-2) (6,-6) corners 0.7 lock kick 0.8 | camera: over shoulder slow lock kick 1 hold | shot: wide
+beats 9-17  | action: continue | camera: go above then dolly in 2m fast lock kick 1 hold | shot: top

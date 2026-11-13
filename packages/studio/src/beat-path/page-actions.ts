@@ -9,10 +9,21 @@ import { exportBundle } from "../export/bundle";
 import { browserStore, saveSequence } from "../sequence-library";
 import { download } from "../shared/download";
 import { DEFAULT_CAMERA_PATH, EXAMPLES, exampleState } from "./examples";
-import { removeAt, splitAt, type LaneView, type MenuItem } from "./lanes";
+import { removeAt, splitAt, type LaneView, type MenuField, type MenuItem } from "./lanes";
 import type { Page } from "./page";
 import { beatPathRecipe, exportRange } from "./recipe-map";
-import { fitLanes, fromScript, setWord, toScript, type BeatPathState, type Block, type ClipChoice } from "./script";
+import { HIT_CHOICES, LABELS, LOCK_CHOICES, fitLanes, fromScript, setWord, toScript, type BeatPathState, type Block, type CameraWord, type ClipChoice } from "./script";
+
+/** The lane word a typed phrase reads as (its colour and fallback). */
+function wordOf(phrase: string, fallback: CameraWord): CameraWord {
+  if (/^(follow side|side)\b/.test(phrase)) return "side";
+  if (/^(follow behind|chase|over shoulder|shoulder)\b/.test(phrase)) return "behind";
+  if (/^orbit\b/.test(phrase)) return "orbit";
+  if (/^(go )?(top|above)\b/.test(phrase)) return "top";
+  if (/^path\b/.test(phrase)) return "path";
+  if (/^(push in|dolly in)\b/.test(phrase)) return "push";
+  return fallback;
+}
 
 export const STUDIO_SEQUENCE = "Beat Path";
 const EXPORT = { width: 1280, height: 720 } as const;
@@ -27,26 +38,28 @@ export function bindActions(p: Page) {
       const on = b.dataset.value === String(value);
       b.classList.toggle("on", on); b.setAttribute("aria-checked", String(on));
     });
-    pick("tool", p.tool); pick("view", p.view); pick("lock", s.lock); pick("hit", s.onHit); pick("clip", s.clip);
-    const locked = s.lock !== "off";
-    input("strength").disabled = !locked;
-    input("strength").closest(".slider")!.classList.toggle("off", !locked);
-    document.querySelector('[data-control="hit"]')!.classList.toggle("off", !locked);
-    input("strength").value = String(s.strength);
+    pick("tool", p.tool); pick("view", p.view); pick("clip", s.clip); pick("pen", p.pen);
     input("landmarksExport").checked = s.landmarks.on;
-    $("strengthOut").textContent = s.strength.toFixed(2);
+    input("figureBody").value = s.figure.body; input("figureHead").value = s.figure.head;
+    const chip = (id: string, l: { lock: string; strength: number }, extra = "") => {
+      $(id).textContent = l.lock === "off" ? "no lock" : `${l.lock} ${l.strength.toFixed(2)}${extra}`;
+      $(id).classList.toggle("off", l.lock === "off");
+    };
+    chip("chipCharacterLock", s.charLock);
+    chip("chipCameraLock", s.camLock, s.camLock.lock === "off" ? "" : ` · ${s.camLock.advance ? "next on hit" : LABELS.hit[s.camLock.onHit].toLowerCase()}`);
     const corners = p.tool === "subject" ? s.subjectCorners : s.cameraCorners;
     input("corners").value = String(corners);
     $("cornersOut").textContent = corners.toFixed(2);
-    $("hudLock").textContent = locked ? `lock ${s.lock} ${s.strength.toFixed(2)}` : "no lock";
+    $("hudLock").textContent = `figure ${s.charLock.lock === "off" ? "free" : s.charLock.lock} · camera ${s.camLock.lock === "off" ? "free" : s.camLock.lock}`;
     $("prompt").textContent = s.prompt ?? "Pick an example for a suggested prompt, or write your own.";
     const pts = p.tool === "subject" ? s.subject : s.camera;
     const empty = $("mapEmpty");
     empty.hidden = pts.length >= 2;
-    empty.textContent = p.view === "side" ? `Draw the ${p.tool} path in the top view first.` : `Draw the ${p.tool === "subject" ? "subject’s" : "camera’s"} path: drag on the map, or click to place points.`;
-    $("mapHint").textContent = p.view === "top"
-      ? "Drag to draw · click to add a point · drag a point to move it · double-click removes it"
-      : `Drag a point up or down to set the ${p.tool}’s height`;
+    empty.textContent = p.view === "side" ? `Draw the ${p.tool} path in the top view first.` : `No ${p.tool} path yet: press Draw new, then drag on the map or click to place points.`;
+    $("mapHint").textContent = p.view !== "top" ? `Drag a point up or down to set the ${p.tool}’s height`
+      : p.pen === "draw" ? "Drawing a new path: drag a stroke, or click to place points · Escape stops"
+      : "Drag a point to move it · Delete removes the selected point · Draw new to start a path";
+    $("map").classList.toggle("pen", p.pen === "draw");
   }
 
   // Segmented controls
@@ -56,15 +69,34 @@ export function bindActions(p: Page) {
     const s = p.state, name = group.dataset.control;
     if (name === "tool") return p.setTool(v as "subject" | "camera");
     if (name === "view") return p.setView(v as "top" | "side");
-    if (name === "lock") p.update({ ...s, lock: v as BeatPathState["lock"] });
-    if (name === "hit") p.update({ ...s, onHit: v as BeatPathState["onHit"] });
+    if (name === "pen") return p.setPen(v as "edit" | "draw");
     if (name === "clip") { const clip = Number(v) as ClipChoice; p.update(fitLanes({ ...s, clip }, clipBeats(clip, p.info?.bpm ?? 120))); }
   }));
-  input("strength").oninput = () => p.update({ ...p.state, strength: Number(input("strength").value) }, false);
-  input("strength").onchange = () => p.update({ ...p.state, strength: Number(input("strength").value) }, true);
+  // Lane lock chips: each lane's own source and strength; the camera's also what it does on each hit.
+  const lockMenu = (lane: "charLock" | "camLock") => {
+    const l = p.state[lane], set = (patch: Partial<BeatPathState["camLock"]>) => p.update({ ...p.state, [lane]: { ...p.state[lane], ...patch } });
+    const items: MenuItem[] = LOCK_CHOICES.map(v => ({ label: `Lock to ${LABELS.lock[v].toLowerCase()}`, on: l.lock === v, run: () => set({ lock: v }) }));
+    items.push("-", ...[0.25, 0.5, 0.75, 1].map(v => ({ label: `Strength ${v.toFixed(2)}`, on: Math.abs(l.strength - v) < 1e-6, disabled: l.lock === "off", run: () => set({ strength: v }) })));
+    if (lane === "camLock") {
+      const c = p.state.camLock;
+      items.push("-", ...HIT_CHOICES.map(v => ({ label: `On each hit: ${LABELS.hit[v].toLowerCase()}`, on: c.onHit === v, disabled: c.lock === "off", run: () => set({ onHit: v }) })),
+        { label: "Next move on each hit", on: c.advance, disabled: c.lock !== "kick" && c.lock !== "snare", run: () => set({ advance: !c.advance }) });
+    }
+    p.menu.show($(lane === "charLock" ? "chipCharacter" : "chipCamera"), lane === "charLock" ? "Character lock" : "Camera lock", items);
+  };
+  $("chipCharacter").onclick = () => lockMenu("charLock");
+  $("chipCamera").onclick = () => lockMenu("camLock");
   const corners = (final: boolean) => { const c = Number(input("corners").value); p.update({ ...p.state, ...(p.tool === "subject" ? { subjectCorners: c } : { cameraCorners: c }) }, final); };
   input("corners").oninput = () => corners(false);
   input("corners").onchange = () => corners(true);
+  /** A colour too close to the landmarks' greys (low chroma, mid lightness) loses the figure: say so. */
+  const greyish = (hex: string) => { const v = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16)); return Math.max(...v) - Math.min(...v) < 48 && Math.max(...v) > 90 && Math.max(...v) < 230; };
+  const figure = (final: boolean) => {
+    const body = input("figureBody").value, head = input("figureHead").value;
+    p.update({ ...p.state, figure: { body, head } }, final);
+    if (final) p.say(greyish(body) || greyish(head) ? "That colour is close to the grey landmarks: the figure may not stand out" : `Figure: body ${body}, head ${head}`);
+  };
+  for (const id of ["figureBody", "figureHead"]) { input(id).oninput = () => figure(false); input(id).onchange = () => figure(true); }
   input("landmarksExport").onchange = () => p.update({ ...p.state, landmarks: { ...p.state.landmarks, on: input("landmarksExport").checked } });
   input("gridExport").onchange = () => { p.viewport.setExportGrid(input("gridExport").checked); p.viewport.setGrid(input("gridExport").checked); p.rebuild(); };
   $("clearPath").onclick = () => {
@@ -83,14 +115,28 @@ export function bindActions(p: Page) {
       run: () => {
         const extra: Partial<BeatPathState> = {};
         if (w === "path" && p.state.camera.length < 2) extra.camera = DEFAULT_CAMERA_PATH.map(q => ({ ...q }));
-        set(setWord(blocks, i, w, single), extra);
+        set(setWord(blocks, i, w, single).map((x, k) => (k === i ? { from: x.from, to: x.to, word: x.word } : x)), extra);
       },
     }));
     items.push("-",
       { label: `Split at beat ${Math.round(beat * 2) / 2}`, disabled: !splitAt(blocks, i, beat), run: () => set(splitAt(blocks, i, beat)) },
       { label: "Remove (the block before takes its beats)", disabled: blocks.length < 2, run: () => set(removeAt(blocks, i)) });
+    p.setSelection({ kind: "block", lane: key, index: i });
     view.render(i);   // marks the block open; it replaces the clicked element, so anchor on the new one
-    p.menu.show((view.root.children[i] as HTMLElement) ?? anchor, `${key === "character" ? "Character" : "Camera"} · beats ${b.from}–${b.to}`, items, () => view.render());
+    const field: MenuField | undefined = key !== "cameraLane" ? undefined : {
+      label: "Camera direction (the script's words)", value: b.phrase ?? "", placeholder: `${labels[b.word].toLowerCase()} · e.g. go above then dolly in 2m fast`,
+      apply: text => {
+        const phrase = text.replace(/\s*\block\s+(beat|kick|snare|hat)\b.*$/i, "").trim().toLowerCase();
+        const next = (blocks as unknown as Block<CameraWord>[]).map((x, k) => (k !== i ? x : phrase ? { ...x, word: wordOf(phrase, x.word), phrase } : { from: x.from, to: x.to, word: x.word }));
+        const state = { ...p.state, cameraLane: next };
+        if (/\bpath\b/.test(phrase) && state.camera.length < 2) state.camera = DEFAULT_CAMERA_PATH.map(q => ({ ...q }));
+        try { beatPathRecipe(state, p.info, p.track && p.drive ? { drive: p.drive, bands: p.drive.bands } : {}); }
+        catch (e) { return (e as Error).message.replace(/^script line \d+: /, ""); }
+        p.update(state);
+        return null;
+      },
+    };
+    p.menu.show((view.root.children[i] as HTMLElement) ?? anchor, `${key === "character" ? "Character" : "Camera"} · beats ${b.from}–${b.to}`, items, () => view.render(), field);
   }
 
   // Examples
@@ -156,6 +202,14 @@ export function bindActions(p: Page) {
   $("play").onclick = () => p.setPlaying(!p.player.playing);
   $("bigPlay").onclick = () => p.setPlaying(true);
   $("demoTrack").onclick = () => void p.useDemo();
+  $("removeTrack").onclick = () => p.removeTrack();
+  $("resetMarkers").onclick = () => p.update({ ...p.state, muted: [] });
+  $("sound").onclick = () => {
+    const on = !p.player.muted;
+    p.player.setMuted(on);
+    $("sound").setAttribute("aria-pressed", String(!on));
+    $("sound").textContent = on ? "Sound off" : "Sound on";
+  };
   input("trackFile").onchange = () => { const f = input("trackFile").files?.[0]; if (f) void p.useFile(f); };
   const wrap = $("waveWrap");
   window.addEventListener("dragover", e => { e.preventDefault(); wrap.classList.add("drop"); });
@@ -170,8 +224,28 @@ export function bindActions(p: Page) {
   });
   window.addEventListener("keydown", e => {
     const typing = (e.target as HTMLElement).closest("input[type=text], textarea");
-    if (e.key === "Escape") { if (!dialog.hidden) closeDialog(); else if (p.map.busy) p.map.cancelStroke(); return; }
+    if (e.key === "Escape") {
+      if (!dialog.hidden) closeDialog();
+      else if (p.map.busy) p.map.cancelStroke();
+      else { p.setSelection(null); if (p.pen === "draw") p.setPen("edit"); }
+      return;
+    }
     if (typing || !dialog.hidden) return;
+    // Delete or Backspace removes the selected lane block or path point (undoable).
+    if ((e.key === "Delete" || e.key === "Backspace") && p.selection && !(e.target as HTMLElement).closest("input")) {
+      e.preventDefault();
+      const sel = p.selection, s = p.state;
+      if (sel.kind === "point") {
+        const key = sel.tool === "subject" ? "subject" : "camera";
+        p.update({ ...s, [key]: s[key].filter((_, k) => k !== sel.index) });
+      } else {
+        const next = removeAt(s[sel.lane] as Block<string>[], sel.index);
+        if (next) p.update({ ...s, [sel.lane]: next });
+      }
+      p.menu.hide();
+      p.setSelection(null);
+      return;
+    }
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z") { e.preventDefault(); p.undo(e.shiftKey); return; }
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "y") { e.preventDefault(); p.undo(true); return; }
     if (e.code === "Space" && !(e.target as HTMLElement).closest("button, [role=listitem]")) { e.preventDefault(); p.setPlaying(!p.player.playing); }

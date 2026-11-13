@@ -1,0 +1,10 @@
+# Beat Path example: the figure lands on the kicks, the camera moves on the snares (each lane its own lock).
+# prompt: A skateboarder pushes across an empty plaza, landing each push on the kick while the camera changes its angle on the snares; the orange figure is the skater, white marks the front.
+# clip: 8 s · figure: glider · Beat Path
+landmarks: on seed 7
+beats 0-1   | action: rest | camera: follow behind lock snare 1 hold | shot: wide
+beats 1-5   | action: walk on path (-7,3) (-2,-1) (3,2) (7,-2) corners 0.6 lock kick 1 | camera: continue
+beats 5-9   | action: continue | camera: follow side lock snare 1 hold @snare 1 | shot: wide
+beats 9-13  | action: continue | camera: orbit 60 lock snare 1 hold @snare 1 | shot: wide
+beats 13-15 | action: continue | camera: follow behind lock snare 1 hold @snare 1 | shot: wide
+beats 15-17 | action: rest | camera: continue

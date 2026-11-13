@@ -35,14 +35,20 @@ const number = (row: Row, t: string, what: string) => {
 };
 
 /** A settings line: `landmarks: on seed 7` or `landmarks: off` (not a row). */
-const SETTING = /^(landmarks|muted)\s*:/i;
+const SETTING = /^(landmarks|muted|figure)\s*:/i;
 /** The script's settings lines; a script without one leaves the setting as it was. */
-export type ScriptSettings = { landmarks?: { on: boolean; seed?: number }; muted?: number[] };
+export type ScriptSettings = { landmarks?: { on: boolean; seed?: number }; muted?: number[]; figure?: { body: string; head: string } };
 export function parseSettings(script: string): ScriptSettings {
   const out: ScriptSettings = {};
   script.split(/\r?\n/).forEach((raw, i) => {
     const text = raw.replace(/#.*$/, "").trim();
     if (!SETTING.test(text)) return;
+    if (/^figure\s*:/i.test(text)) {
+      const m = /^figure\s*:\s*body\s+(#[0-9a-f]{6})(?:\s+head\s+(#[0-9a-f]{6}))?\s*$/i.exec(text);
+      if (!m) throw new RecipeError(`script line ${i + 1}: figure reads "figure: body #e8632a head #f2a35e"`);
+      out.figure = { body: m[1].toLowerCase(), head: (m[2] ?? m[1]).toLowerCase() };
+      return;
+    }
     if (/^muted\s*:/i.test(text)) {
       const list = text.replace(/^muted\s*:/i, "").trim().split(/[\s,]+/).filter(Boolean).filter(w => w !== "none").map(w => Number(w.replace(/s$/, "")));
       if (list.some(t => !Number.isFinite(t) || t < 0)) throw new RecipeError(`script line ${i + 1}: muted lists hit times in seconds: "muted: 1.6 2.35" (or "muted: none")`);
@@ -260,6 +266,7 @@ export function applyScript(recipe: Recipe, args: { script: string }, ctx: { ban
   let r: Recipe = validateRecipe({ ...structuredClone(recipe), moves: [] });
   const settings = parseSettings(args.script);
   if (settings.muted) r = validateRecipe({ ...r, mutedHits: settings.muted });
+  if (settings.figure) r = validateRecipe({ ...r, figure: settings.figure });
   if (settings.landmarks) r = validateRecipe({ ...r, landmarks: { seed: settings.landmarks.seed ?? recipe.landmarks?.seed ?? 7, on: settings.landmarks.on } });
   // Action track: blocks from rows, a block running on over `continue` rows.
   type Block = { from: number; to: number; action: Action };

@@ -25,7 +25,7 @@ const examples = readdirSync(scriptsDir).filter(f => f.startsWith("beat-path-"))
 const cli = async (...argv: string[]) => { const err: string[] = []; const code = await main(argv, () => {}, s => err.push(s)); if (code) throw new Error(err.join("\n")); };
 
 describe("Beat Path scripts: page, CLI and MCP agree", () => {
-  it("has the examples", () => expect(examples.length).toBe(4));
+  it("has the examples", () => expect(examples.length).toBe(7));
   for (const file of examples) it(file, async () => {
     const text = readFileSync(new URL(file, scriptsDir), "utf8");
     await cli("analyse", wav, "--out", analysisPath);

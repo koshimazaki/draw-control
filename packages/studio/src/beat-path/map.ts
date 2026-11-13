@@ -24,6 +24,13 @@ export type MapHost = {
   points(tool: Tool): PathPt[];
   corners(tool: Tool): number;
   change(tool: Tool, points: PathPt[], final: boolean): void;
+  /** "draw": a stroke or clicks make a new path; "edit": only existing points move (a stray click never draws). */
+  pen(): "edit" | "draw";
+  /** A freehand stroke finished: the page returns the pen to "edit". */
+  drew(): void;
+  /** The selected point (Delete removes it), or null. */
+  selected(): { tool: Tool; index: number } | null;
+  select(sel: { tool: Tool; index: number } | null): void;
 };
 type Live = { subject?: { x: number; z: number; yaw: number }; camera?: { x: number; z: number; tx: number; tz: number; fov: number } };
 
@@ -154,6 +161,7 @@ export class MapView {
     let move: (ev: PointerEvent) => void, up: (ev: PointerEvent) => void, revert: () => void;
     if (i >= 0) {
       const pts = original.map(p => ({ ...p }));
+      this.host.select({ tool, index: i });
       c.classList.add("dragging");
       move = ev => {
         const [px, py] = this.local(ev);
@@ -164,7 +172,8 @@ export class MapView {
       up = () => this.host.change(tool, pts, true);
       revert = () => this.host.change(tool, original, true);
     } else {
-      if (view !== "top") return;
+      // Only an armed pen draws; otherwise a click on empty ground just clears the selection.
+      if (view !== "top" || this.host.pen() !== "draw") { this.host.select(null); this.refresh(); return; }
       const y = original.at(-1)?.y ?? (DEFAULT_Y[tool] || undefined);
       const first = this.clamp(this.fromTop(...start)), stroke = [first];
       let drawing = false;
@@ -180,8 +189,8 @@ export class MapView {
         const withY = (p: PathPt): PathPt => ({ x: r2(p.x), z: r2(p.z), ...(y ? { y } : {}) });
         let length = 0;
         for (let k = 1; k < stroke.length; k++) length += Math.hypot(stroke[k].x - stroke[k - 1].x, stroke[k].z - stroke[k - 1].z);
-        if (drawing && length > 0.6) this.host.change(tool, simplifyPen(stroke).map(withY), true);
-        else if (!drawing) this.host.change(tool, [...original, withY(first)].slice(-MAX_POINTS * 2), true);   // a click places a point
+        if (drawing && length > 0.6) { this.host.change(tool, simplifyPen(stroke).map(withY), true); this.host.drew(); }
+        else if (!drawing) this.host.change(tool, [...original, withY(first)].slice(-MAX_POINTS * 2), true);   // in draw mode a click adds a point
         this.draw();
       };
       revert = () => { this.stroke = null; this.draw(); };
@@ -210,8 +219,10 @@ export class MapView {
     g.stroke();
     g.restore();
   }
-  private handles(g: CanvasRenderingContext2D, pts: [number, number][], colour: string, active: boolean) {
-    for (const [x, y] of pts) {
+  private handles(g: CanvasRenderingContext2D, pts: [number, number][], colour: string, active: boolean, tool: Tool = this.host.tool()) {
+    const sel = this.host.selected();
+    for (const [k, [x, y]] of pts.entries()) {
+      if (active && sel?.tool === tool && sel.index === k) { g.beginPath(); g.arc(x, y, 10, 0, Math.PI * 2); g.strokeStyle = colour; g.lineWidth = 2; g.stroke(); }
       g.beginPath(); g.arc(x, y, active ? 5.5 : 3, 0, Math.PI * 2);
       g.fillStyle = active ? colour : this.colours["map-bg"]; g.fill();
       g.lineWidth = active ? 2 : 1.4; g.strokeStyle = active ? this.colours["map-bg"] : colour; g.stroke();
@@ -254,7 +265,7 @@ export class MapView {
       const pts = this.host.points(t), active = t === tool, colour = t === "camera" ? C.camera : C.subject;
       if (t === "camera" && pts.length >= 2) this.line(g, cornerPath(pts, this.host.corners(t)).map(p => this.top(p)), colour, 2, active ? 0.9 : 0.45);
       if (active && pts.length >= 2) this.line(g, pts.map(p => this.top(p)), colour, 1, 0.35, [3, 4]);
-      this.handles(g, pts.map(p => this.top(p)), colour, active);
+      this.handles(g, pts.map(p => this.top(p)), colour, active, t);
     }
   }
 

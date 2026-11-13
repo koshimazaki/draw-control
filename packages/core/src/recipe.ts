@@ -110,6 +110,8 @@ export type Recipe = {
   landmarks?: { seed: number; on: boolean };
   /** Hits switched off (onset times, seconds): skipped by every lock (lock.ts `unmutedBands`). Absent or empty: none. */
   mutedHits?: number[];
+  /** The glider's colours, "#rrggbb" (body: the pyramid, head: the sphere); the front marker stays white. Absent: orange. */
+  figure?: { body: string; head: string };
 };
 export type RootShape = { corners: number; points: { x: number; z: number; y?: number }[] };
 
@@ -182,7 +184,7 @@ function validateMove(input: unknown, where: string, durationBeats: number): Mov
 /** Strict validation for agent-supplied JSON and imported recipes. Returns a fresh copy. */
 export function validateRecipe(input: unknown): Recipe {
   if (!isObject(input)) return fail("expected an object");
-  only(input, ["version", "fps", "durationBeats", "beatGrid", "character", "energy", "moves", "rootPath", "jumps", "audio", "camera", "reactive", "steps", "energyCurve", "envelope", "travelLock", "rootShape", "landmarks", "mutedHits"], "recipe");
+  only(input, ["version", "fps", "durationBeats", "beatGrid", "character", "energy", "moves", "rootPath", "jumps", "audio", "camera", "reactive", "steps", "energyCurve", "envelope", "travelLock", "rootShape", "landmarks", "mutedHits", "figure"], "recipe");
   if (input.version !== RECIPE_VERSION) fail(`expected version ${RECIPE_VERSION}`);
   if (input.fps !== 24) fail("fps must be 24");
   if (!Number.isInteger(input.durationBeats) || !finite(input.durationBeats, 1, 512)) fail("durationBeats must be a whole number 1–512");
@@ -257,6 +259,13 @@ export function validateRecipe(input: unknown): Recipe {
     if (lock.lock) recipe.travelLock = lock;
   }
   if (input.rootShape !== undefined) recipe.rootShape = validateRootShape(input.rootShape);
+  if (input.figure !== undefined) {
+    const fg = input.figure;
+    if (!isObject(fg)) return fail("figure must be an object");
+    only(fg, ["body", "head"], "figure");
+    for (const k of ["body", "head"] as const) if (typeof fg[k] !== "string" || !/^#[0-9a-f]{6}$/i.test(fg[k] as string)) fail(`figure.${k} must be a colour "#rrggbb"`);
+    recipe.figure = { body: (fg.body as string).toLowerCase(), head: (fg.head as string).toLowerCase() };
+  }
   if (input.mutedHits !== undefined) {
     if (!Array.isArray(input.mutedHits) || input.mutedHits.length > 512 || input.mutedHits.some(t => !finite(t, 0, 3600))) fail("mutedHits must be up to 512 times, 0–3600 s");
     const list = [...new Set((input.mutedHits as number[]).map(t => Math.round(t * 1000) / 1000))].sort((a, b) => a - b);

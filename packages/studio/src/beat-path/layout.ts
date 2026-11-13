@@ -1,5 +1,5 @@
 /** The Beat Path page: map on the left, the camera's view and the few global controls on the right, the track and its two lanes along the bottom. */
-import { CLIP_CHOICES, HIT_CHOICES, LABELS, LOCK_CHOICES } from "./script";
+import { CLIP_CHOICES } from "./script";
 
 const seg = (name: string, values: readonly (string | number)[], labels: Record<string, string>, tip = "") =>
   `<div class="seg" role="radiogroup" data-control="${name}"${tip ? ` aria-label="${tip}"` : ""}>${values.map(v => `<button type="button" role="radio" data-value="${v}">${labels[v]}</button>`).join("")}</div>`;
@@ -22,6 +22,7 @@ export const LAYOUT = `
     <div class="map-tools">
       ${seg("tool", ["subject", "camera"], { subject: "Subject path", camera: "Camera path" })}
       ${seg("view", ["top", "side"], { top: "Top", side: "Side" })}
+      ${seg("pen", ["edit", "draw"], { edit: "Edit points", draw: "Draw new" })}
     </div>
     <div class="map-tools end">
       <label class="slider" data-tip="From sharp corners (hard turns) to a round curve"><span>Corners</span><input id="corners" type="range" min="0" max="1" step="0.05" /><output id="cornersOut"></output></label>
@@ -36,18 +37,15 @@ export const LAYOUT = `
       <button type="button" id="bigPlay" class="big-play"><span class="glyph"></span>Play</button>
     </div>
     <div class="controls">
-      <span class="lab">Lock to</span>
-      <div class="row">${seg("lock", LOCK_CHOICES, LABELS.lock)}
-        <label class="slider" data-tip="0 travels steadily, 1 arrives exactly on each hit"><span>Strength</span><input id="strength" type="range" min="0" max="1" step="0.05" /><output id="strengthOut"></output></label>
-      </div>
-      <span class="lab">On each hit</span>
-      <div class="row">${seg("hit", HIT_CHOICES, LABELS.hit)}
-        <span class="push-right"></span>${seg("clip", CLIP_CHOICES, { 5: "5 s", 8: "8 s" })}
+      <span class="lab">Clip</span>
+      <div class="row">${seg("clip", CLIP_CHOICES, { 5: "5 s", 8: "8 s" })}
+        <label class="toggle" data-tip="On: edges snap to beats and hits. Off: they move by single frames (24 fps)"><input id="snap" type="checkbox" checked /><span class="knob"></span>Snap to beats</label>
       </div>
       <span class="lab">Guide</span>
       <div class="row">
         <label class="toggle" data-tip="Draw the ground grid in the exported clip"><input id="gridExport" type="checkbox" checked /><span class="knob"></span>Grid</label>
         <label class="toggle" data-tip="Grey blocks around the scene, clear of both paths: travel and parallax read in every still"><input id="landmarksExport" type="checkbox" checked /><span class="knob"></span>Landmarks in export</label>
+        <span class="swatches" data-tip="The figure's colours: body and head (a prompt can name them)"><input id="figureBody" type="color" aria-label="Figure body colour" /><input id="figureHead" type="color" aria-label="Figure head colour" /></span>
         <span class="push-right"></span>
         <button type="button" id="exportGuide" class="btn primary">Export guide</button>
       </div>
@@ -57,17 +55,20 @@ export const LAYOUT = `
   </section>
 </main>
 <footer class="dock">
-  <button type="button" id="play" class="icon-btn" aria-label="Play"><span class="glyph"></span></button>
+  <div class="transport">
+    <button type="button" id="play" class="icon-btn" aria-label="Play"><span class="glyph"></span></button>
+    <button type="button" id="sound" class="btn ghost sound" aria-pressed="true" data-tip="Music on or off (the clock keeps running)">Sound on</button>
+  </div>
   <div class="audio-src">
     <button type="button" id="demoTrack" class="btn outline">Demo track</button>
     <label class="btn outline file">Your track<input id="trackFile" type="file" accept="audio/*,.wav,.mp3,.m4a,.ogg,.flac" /></label>
   </div>
   <div class="timeline">
     <span class="lane-lab">Music</span><div class="wave-wrap" id="waveWrap"><canvas id="wave"></canvas></div>
-    <span class="lane-lab">Character</span><div class="lane" id="laneCharacter" role="list" aria-label="Character lane"></div>
-    <span class="lane-lab">Camera</span><div class="lane" id="laneCamera" role="list" aria-label="Camera lane"></div>
+    <button type="button" class="chip" id="chipCharacter" aria-haspopup="menu" data-tip="The character's lock: what its travel lands on"><span class="chip-name">Character</span><span class="chip-lock" id="chipCharacterLock"></span></button><div class="lane" id="laneCharacter" role="list" aria-label="Character lane"></div>
+    <button type="button" class="chip" id="chipCamera" aria-haspopup="menu" data-tip="The camera's lock: its own source, what it does on each hit"><span class="chip-name">Camera</span><span class="chip-lock" id="chipCameraLock"></span></button><div class="lane" id="laneCamera" role="list" aria-label="Camera lane"></div>
   </div>
-  <div class="audio-info"><p id="trackName">No track</p><p class="legend muted"><i class="k"></i>kick <i class="s"></i>snare</p><p id="status" class="status muted" aria-live="polite"></p></div>
+  <div class="audio-info"><p class="track-row"><span id="trackName">No track</span><button type="button" id="removeTrack" class="link-btn" hidden data-tip="Play without music: a plain timed clip">Remove</button></p><button type="button" id="resetMarkers" class="link-btn" hidden>Reset markers</button><p class="legend muted"><i class="k"></i>kick <i class="s"></i>snare</p><p id="status" class="status muted" aria-live="polite"></p></div>
 </footer>
 <div class="menu" id="menu" role="menu" hidden></div>
 <div class="dialog" id="pasteDialog" hidden>

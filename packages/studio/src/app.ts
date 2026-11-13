@@ -70,6 +70,8 @@ export function startApp(root: HTMLElement) {
     cameraPlan = plan;
     viewport.setRig(plan, recipe, drive, totalFrames());
     viewport.setLandmarks(placeLandmarks(recipe, plan, drive === FLAT ? undefined : drive));
+    const figure = viewport.getCharacter() as { setColours?(body: number, head: number): void } | undefined;
+    if (recipe.figure && figure?.setColours) figure.setColours(parseInt(recipe.figure.body.slice(1), 16), parseInt(recipe.figure.head.slice(1), 16));
     if (!plan && viewport.view === "rig") { viewport.setView("front"); markView("front"); }
   }
   /** A recipe applied as JSON may name another procedural character: show it. */

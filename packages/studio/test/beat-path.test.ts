@@ -27,6 +27,19 @@ describe("Beat Path: the page state is a shot script", () => {
       expect(s.prompt).toMatch(/orange figure/);
     }
   });
+  it("a typed camera phrase and muted hits round-trip through the script", () => {
+    const s = S({ muted: [2.1, 4.6], cameraLane: [{ from: 0, to: 9, word: "behind", phrase: "go above then dolly in 2m fast" }, { from: 9, to: 17, word: "orbit", phrase: "orbit 180 slow" }] });
+    const printed = toScript(s);
+    expect(printed).toMatch(/^muted: 2\.1 4\.6$/m);
+    expect(printed).toMatch(/camera: go above then dolly in 2m fast lock kick 1 hold/);
+    const back = fromScript(printed, BLANK_STATE);
+    expect(back.notes).toEqual([]);
+    expect(back.state.cameraLane.map(b => b.phrase)).toEqual(["go above then dolly in 2m fast", "orbit 180 slow"]);
+    expect(back.state.muted).toEqual([2.1, 4.6]);
+    const r = build(s);
+    expect(r.mutedHits).toEqual([2.1, 4.6]);
+    expect(r.camera!.segments.map(x => x.modes.join("+"))).toEqual(["top", "pushIn", "orbit"]);
+  });
   it("only one glide block: making a second one turns the first to hover", () => {
     const lane = setWord([{ from: 0, to: 4, word: "glide" }, { from: 4, to: 8, word: "hover" }], 1, "glide", "glide");
     expect(lane.map(b => b.word)).toEqual(["hover", "glide"]);
@@ -42,15 +55,18 @@ describe("Beat Path: the page state is a shot script", () => {
 });
 
 describe("Beat Path: each control's recipe fields", () => {
-  it("lock and strength set the travel lock and every camera block's lock", () => {
-    const r = build(S({ lock: "snare", strength: 0.7, onHit: "hold" }));
-    expect(r.travelLock).toEqual({ lock: "snare", strength: 0.7 });
-    for (const s of r.camera!.segments) expect([s.lock, s.strength, s.onHit]).toEqual(["snare", 0.7, "hold"]);
+  it("each lane locks on its own: the character on kicks, the camera on snares", () => {
+    const r = build(S({ charLock: { lock: "kick", strength: 0.7 }, camLock: { lock: "snare", strength: 0.5, onHit: "hold", advance: false } }));
+    expect(r.travelLock).toEqual({ lock: "kick", strength: 0.7 });
+    for (const s of r.camera!.segments) expect([s.lock, s.strength, s.onHit]).toEqual(["snare", 0.5, "hold"]);
+    const back = fromScript(toScript(S({ charLock: { lock: "kick", strength: 0.7 }, camLock: { lock: "snare", strength: 0.5, onHit: "punch", advance: true } })), BLANK_STATE).state;
+    expect([back.charLock, back.camLock]).toEqual([{ lock: "kick", strength: 0.7 }, { lock: "snare", strength: 0.5, onHit: "punch", advance: true }]);
     expect(travelStations(r, drive).length).toBeGreaterThan(2);
   });
   it("on each hit: keeps moving leaves the camera unlocked, punches in sets the punch", () => {
-    for (const s of build(S({ onHit: "move" })).camera!.segments) expect(s.lock).toBeUndefined();
-    for (const s of build(S({ onHit: "punch" })).camera!.segments) expect([s.onHit, s.punch]).toEqual(["punch", 0.9]);
+    const cam = (patch: Partial<BeatPathState["camLock"]>) => ({ camLock: { ...S().camLock, ...patch } });
+    for (const s of build(S(cam({ onHit: "move" }))).camera!.segments) expect(s.lock).toBeUndefined();
+    for (const s of build(S(cam({ onHit: "punch" }))).camera!.segments) expect([s.onHit, s.punch]).toEqual(["punch", 0.9]);
   });
   it("camera words map to rig modes", () => {
     const words = ["behind", "side", "orbit", "top", "path", "push"] as const;
@@ -79,12 +95,12 @@ describe("Beat Path: each control's recipe fields", () => {
     expect(exportRange(build(S({ clip: 8 })), 8).frames).toBe(193);
   });
   it("lock off and strength 0 give the unlocked motion and camera", () => {
-    const off = build(S({ lock: "off" }));
+    const off = build(S({ charLock: { lock: "off", strength: 1 }, camLock: { lock: "off", strength: 1, onHit: "hold", advance: false } }));
     for (const onHit of ["hold", "punch"] as const) {
-      const zero = build(S({ lock: "kick", strength: 0, onHit }));
+      const zero = build(S({ charLock: { lock: "kick", strength: 0 }, camLock: { lock: "kick", strength: 0, onHit, advance: false } }));
       expect(frames(zero)).toEqual(frames(off));
       expect(cams(zero)).toEqual(cams(off));
     }
-    expect(frames(build(S({ lock: "kick", strength: 1 })))).not.toEqual(frames(off));
+    expect(frames(build(S({ charLock: { lock: "kick", strength: 1 } })))).not.toEqual(frames(off));
   });
 });

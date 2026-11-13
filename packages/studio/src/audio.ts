@@ -33,6 +33,10 @@ export class Player {
   private wallStart = 0;
   private rate = 1;
   playing = false;
+  private gain?: GainNode;
+  /** Silent playback: the clock still runs on the track. */
+  muted = false;
+  setMuted(on: boolean) { this.muted = on; if (this.gain) this.gain.gain.value = on ? 0 : 1; }
 
   /** Play from a time. Below 1× the preview runs silent on the wall clock (slow motion). */
   play(track: Track | null, fromSeconds: number, rate = 1) {
@@ -44,7 +48,10 @@ export class Player {
     this.ctx ??= new AudioContext();
     this.source = this.ctx.createBufferSource();
     this.source.buffer = track.buffer;
-    this.source.connect(this.ctx.destination);
+    this.gain ??= this.ctx.createGain();
+    this.gain.gain.value = this.muted ? 0 : 1;
+    this.gain.connect(this.ctx.destination);
+    this.source.connect(this.gain);
     this.startedAt = this.ctx.currentTime;
     this.source.start(0, fromSeconds);
   }

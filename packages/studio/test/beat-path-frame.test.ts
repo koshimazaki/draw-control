@@ -64,7 +64,7 @@ describe("the subject stays in frame", () => {
   const words: CameraWord[] = ["behind", "side", "orbit", "top", "path", "push"];
   for (const clip of [5, 8] as const) for (const word of words) it(`no track, lock off, ${clip} s, ${word}`, () => {
     const beats = clip === 5 ? 11 : 17;
-    const state: BeatPathState = { ...BLANK_STATE, clip, lock: "off", subject: FAST, subjectCorners: 0.2, camera: WANDER, cameraCorners: 0.5,
+    const state: BeatPathState = { ...BLANK_STATE, clip, charLock: { lock: "off", strength: 1 }, camLock: { ...BLANK_STATE.camLock, lock: "off" }, subject: FAST, subjectCorners: 0.2, camera: WANDER, cameraCorners: 0.5,
       character: [{ from: 0, to: beats, word: "glide" }], cameraLane: [{ from: 0, to: beats, word }] };
     const w = worst(beatPathRecipe(state, null));
     expect(w.v, `worst at frame ${w.n}`).toBeLessThan(MARGIN);
@@ -72,7 +72,7 @@ describe("the subject stays in frame", () => {
   it("no track, lock off: blends between every pair of camera words", () => {
     let bad = "";
     for (const a of words) for (const b of words) {
-      const state: BeatPathState = { ...BLANK_STATE, lock: "off", subject: FAST, subjectCorners: 0.5, camera: WANDER,
+      const state: BeatPathState = { ...BLANK_STATE, charLock: { lock: "off", strength: 1 }, camLock: { ...BLANK_STATE.camLock, lock: "off" }, subject: FAST, subjectCorners: 0.5, camera: WANDER,
         character: [{ from: 0, to: 17, word: "glide" }], cameraLane: [{ from: 0, to: 6, word: a }, { from: 6, to: 11, word: b }, { from: 11, to: 17, word: a }] };
       const w = worst(beatPathRecipe(state, null));
       if (!(w.v < MARGIN)) bad += `${a}->${b} ${w.v.toFixed(2)}@${w.n}; `;

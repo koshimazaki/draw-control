@@ -12,7 +12,8 @@ export const CHARACTER_WORDS = ["glide", "hover", "spin", "jump"] as const;
 export type CharacterWord = (typeof CHARACTER_WORDS)[number];
 export const CAMERA_WORDS = ["behind", "side", "orbit", "top", "path", "push"] as const;
 export type CameraWord = (typeof CAMERA_WORDS)[number];
-export type Block<W extends string> = { from: number; to: number; word: W };
+/** A lane block; a camera block may carry a typed phrase (the script's camera words, e.g. "go above then dolly in 2m fast"). */
+export type Block<W extends string> = { from: number; to: number; word: W; phrase?: string };
 export const LOCK_CHOICES = ["off", "beat", "kick", "snare"] as const;
 export type LockChoice = (typeof LOCK_CHOICES)[number];
 export const HIT_CHOICES = ["move", "hold", "punch"] as const;
@@ -30,11 +31,16 @@ export type BeatPathState = {
   cameraCorners: number;
   character: Block<CharacterWord>[];
   cameraLane: Block<CameraWord>[];
-  lock: LockChoice;
-  strength: number;
-  onHit: HitChoice;
+  /** The character lane's lock: what the travel lands on (stations), and how strongly. */
+  charLock: { lock: LockChoice; strength: number };
+  /** The camera lane's own lock: its source and strength, what it does on each hit, and whether its blocks advance on successive hits. */
+  camLock: { lock: LockChoice; strength: number; onHit: HitChoice; advance: boolean };
   /** Landmark blocks around the scene (on by default; seed places them). */
   landmarks: { on: boolean; seed: number };
+  /** Hits switched off (onset seconds): skipped by every lock. */
+  muted: number[];
+  /** The figure's colours (body, head), "#rrggbb". */
+  figure: { body: string; head: string };
   /** A suggested prompt line (examples carry one); printed as a comment. */
   prompt?: string;
 };
@@ -45,6 +51,9 @@ export const LABELS = {
   lock: { off: "Off", beat: "Beat", kick: "Kick", snare: "Snare" },
   hit: { move: "Keeps moving", hold: "Holds", punch: "Punches in" },
 } as const;
+
+/** The figure's default colours: the guide's orange. */
+export const FIGURE_DEFAULT = { body: "#ff6a13", head: "#ff6a13" } as const;
 
 /** Fixed amounts behind the camera words. */
 export const CAMERA_AMOUNTS = { orbitPerBeat: 15, pushTo: 2.6, punch: 0.9 } as const;
@@ -61,14 +70,19 @@ function cuts(state: BeatPathState): number[] {
 
 export function toScript(state: BeatPathState): string {
   const edges = cuts(state);
-  const lock = state.lock !== "off" ? ` lock ${state.lock} ${f(state.strength)}` : "";
-  const camLock = lock && state.onHit !== "move" ? `${lock} ${state.onHit === "punch" ? `punch ${f(CAMERA_AMOUNTS.punch)}m` : "hold"}` : "";
+  const cl = state.charLock, kl = state.camLock;
+  const lock = cl.lock !== "off" ? ` lock ${cl.lock} ${f(cl.strength)}` : "";
+  const camLock = kl.lock !== "off" && kl.onHit !== "move" ? ` lock ${kl.lock} ${f(kl.strength)} ${kl.onHit === "punch" ? `punch ${f(CAMERA_AMOUNTS.punch)}m` : "hold"}` : "";
+  // Next move on each hit: every camera block after the first starts on the first hit of the camera's source in it.
+  const advance = kl.advance && (kl.lock === "kick" || kl.lock === "snare") ? ` @${kl.lock} 1` : "";
   const glide = state.character.find(b => b.word === "glide");
   let pathPrinted = false;
   const lines: string[] = [];
   if (state.prompt) lines.push(`# prompt: ${state.prompt}`);
   lines.push(`# clip: ${state.clip} s · figure: glider · Beat Path`);
   lines.push(`landmarks: ${state.landmarks.on ? `on seed ${state.landmarks.seed}` : "off"}`);
+  if (state.muted.length) lines.push(`muted: ${state.muted.map(f).join(" ")}`);
+  if (state.figure.body !== FIGURE_DEFAULT.body || state.figure.head !== FIGURE_DEFAULT.head) lines.push(`figure: body ${state.figure.body} head ${state.figure.head}`);
   for (let i = 0; i < edges.length - 1; i++) {
     const from = edges[i], to = edges[i + 1];
     const c = state.character.find(b => b.from === from), k = state.cameraLane.find(b => b.from === from);
@@ -83,12 +97,20 @@ export function toScript(state: BeatPathState): string {
     if (k) {
       const word = k.word === "path" && state.camera.length < 2 ? "behind" : k.word;
       const len = k.to - k.from;
-      camera = {
-        behind: "follow behind", side: "follow side", orbit: `orbit ${f(CAMERA_AMOUNTS.orbitPerBeat * len)}`, top: "top",
-        path: pathPrinted ? "path" : `path ${pts(state.camera)} corners ${f(state.cameraCorners)}`, push: `push in to ${f(CAMERA_AMOUNTS.pushTo)}m`,
-      }[word] + camLock;
-      if (word === "path") pathPrinted = true;
-      shot = word === "path" ? "-" : word === "top" ? "top" : "wide";
+      if (k.phrase) {
+        // A typed phrase: printed as typed, with the page's lock words; a path in it uses the drawn camera path.
+        const withPath = /\bpath\b/.test(k.phrase) && !pathPrinted && state.camera.length >= 2;
+        camera = (withPath ? k.phrase.replace(/\bpath\b/, `path ${pts(state.camera)} corners ${f(state.cameraCorners)}`) : k.phrase) + camLock + (k.from > 0 ? advance : "");
+        if (withPath) pathPrinted = true;
+        shot = /\bpath\b/.test(k.phrase) ? "-" : /^(go )?(top|above)\b/.test(k.phrase) ? "top" : "wide";
+      } else {
+        camera = {
+          behind: "follow behind", side: "follow side", orbit: `orbit ${f(CAMERA_AMOUNTS.orbitPerBeat * len)}`, top: "top",
+          path: pathPrinted ? "path" : `path ${pts(state.camera)} corners ${f(state.cameraCorners)}`, push: `push in to ${f(CAMERA_AMOUNTS.pushTo)}m`,
+        }[word] + camLock + (k.from > 0 ? advance : "");
+        if (word === "path") pathPrinted = true;
+        shot = word === "path" ? "-" : word === "top" ? "top" : "wide";
+      }
     }
     lines.push(`beats ${f(from)}-${f(to)} | action: ${action} | camera: ${camera}${shot ? ` | shot: ${shot}` : ""}`);
   }
@@ -109,17 +131,18 @@ export function fromScript(text: string, base: BeatPathState): { state: BeatPath
   if (prompt) state.prompt = prompt[1].trim();
   const clip = /^#\s*clip:\s*(\d+)/im.exec(text);
   if (clip) state.clip = Number(clip[1]) <= 6 ? 5 : 8;
-  const settings = parseSettings(text).landmarks;
+  const parsed = parseSettings(text), settings = parsed.landmarks;
+  state.muted = parsed.muted ?? [];
+  state.figure = parsed.figure ?? { ...FIGURE_DEFAULT };
   if (settings) state.landmarks = { on: settings.on, seed: settings.seed ?? state.landmarks.seed };
-  let lockSeen = false, hitSeen = false;
+  let charSeen = false, camSeen = false, hitSeen = false, advanceSeen = false;
   const orbits: { index: number; degrees: number; line: number }[] = [];
-  const readLock = (cell: string) => {
+  const readLock = (cell: string, into: { lock: LockChoice; strength: number }) => {
     const m = /lock\s+(beat|kick|snare|hat)(?:\s+([\d.]+))?/.exec(cell);
     if (!m) return false;
     if (m[1] === "hat") notes.push("hat locks become beat locks");
-    state.lock = m[1] === "hat" ? "beat" : (m[1] as LockChoice);
-    state.strength = m[2] !== undefined ? Number(m[2]) : 1;
-    lockSeen = true;
+    into.lock = m[1] === "hat" ? "beat" : (m[1] as LockChoice);
+    into.strength = m[2] !== undefined ? Number(m[2]) : 1;
     return true;
   };
   for (const row of rows) {
@@ -133,7 +156,7 @@ export function fromScript(text: string, base: BeatPathState): { state: BeatPath
         if (p.length >= 2) state.subject = p;
         const c = cornersIn(a);
         state.subjectCorners = c ?? 0;
-        readLock(a);
+        if (readLock(a, state.charLock)) charSeen = true;
       } else if (/\bspin\s*@/.test(a)) word = "spin";
       else if (/\b(jump|kick)\s*@/.test(a)) word = "jump";
       else if (!/^(rest|idle)\b/.test(a)) notes.push(`line ${row.line}: "${a}" reads as hover`);
@@ -155,16 +178,26 @@ export function fromScript(text: string, base: BeatPathState): { state: BeatPath
       const p = pointsIn(c);
       if (p.length >= 2) { state.camera = p; state.cameraCorners = cornersIn(c) ?? 0.5; }
     } else if (/^(push in|dolly in)\b/.test(c)) word = "push";
-    else notes.push(`line ${row.line}: camera "${c}" reads as follow behind`);
-    if (readLock(c)) { state.onHit = /\bpunch\b/.test(c) ? "punch" : /\bhold\b/.test(c) ? "hold" : "move"; hitSeen = true; }
-    state.cameraLane.push({ from: row.from, to: row.to, word });
+    else if (/\b(shoulder)\b/.test(c)) word = "behind";
+    else if (/^(go )?above\b/.test(c)) word = "top";
+    if (readLock(c, state.camLock)) { state.camLock.onHit = /\bpunch\b/.test(c) ? "punch" : /\bhold\b/.test(c) ? "hold" : "move"; hitSeen = camSeen = true; }
+    const anchor = /@(kick|snare)\s+1\b/.exec(c);
+    if (anchor) { advanceSeen = true; if (!camSeen) state.camLock.lock = anchor[1] as LockChoice; }
+    // Anything richer than a lane word stays as the block's phrase (lock words stripped: the lock is global).
+    const bare = c.replace(/\s*@(kick|snare)\s+1\b/, "").replace(/\s*\block\s+(beat|kick|snare|hat)(\s+[\d.]+)?(\s+(hold|punch(\s+[\d.]+m?)?))?\s*$/, "").trim();
+    const plain = /^(follow behind|follow side|top|push in to 2\.6m|orbit\s+-?[\d.]+)$/.test(bare) || /^path\b/.test(bare) && !/\bthen\b/.test(bare);
+    const block: Block<CameraWord> = { from: row.from, to: row.to, word };
+    if (!plain) block.phrase = bare.replace(/\(([^)]*)\)\s*/g, "").replace(/\s*corners\s+[\d.]+/, "").trim();
+    state.cameraLane.push(block);
   }
+  // An orbit whose degrees differ from the page's 15° a beat keeps them as its phrase.
   for (const o of orbits) {
     const b = state.cameraLane[o.index];
-    if (Math.abs(o.degrees - CAMERA_AMOUNTS.orbitPerBeat * (b.to - b.from)) > 1e-6) notes.push(`line ${o.line}: orbits turn ${CAMERA_AMOUNTS.orbitPerBeat}° a beat here`);
+    if (!b.phrase && Math.abs(o.degrees - CAMERA_AMOUNTS.orbitPerBeat * (b.to - b.from)) > 1e-6) b.phrase = `orbit ${f(o.degrees)}`;
   }
-  if (!lockSeen) state.lock = "off";
-  else if (!hitSeen) state.onHit = "move";
+  if (!charSeen) state.charLock = { ...state.charLock, lock: "off" };
+  if (!hitSeen) state.camLock = { ...state.camLock, onHit: "move", ...(advanceSeen ? {} : { lock: "off" as LockChoice }) };
+  state.camLock = { ...state.camLock, advance: advanceSeen };
   for (const lane of [state.character, state.cameraLane] as Block<string>[][]) {
     if (!lane.length) lane.push({ from: 0, to: rows.at(-1)!.to, word: lane === state.character ? "hover" : "behind" });
     if (lane[0].from > 0) lane[0].from = 0;
@@ -199,7 +232,8 @@ export function setWord<W extends string>(lane: Block<W>[], index: number, word:
 export const BLANK_STATE: BeatPathState = {
   clip: 8, subject: [], subjectCorners: 0.5, camera: [], cameraCorners: 0.5,
   character: [{ from: 0, to: 17, word: "hover" }], cameraLane: [{ from: 0, to: 17, word: "behind" }],
-  lock: "kick", strength: 1, onHit: "hold", landmarks: { on: true, seed: 7 },
+  charLock: { lock: "kick", strength: 1 }, camLock: { lock: "kick", strength: 1, onHit: "hold", advance: false },
+  landmarks: { on: true, seed: 7 }, muted: [], figure: { body: "#ff6a13", head: "#ff6a13" },
 };
 
 /** A camera path to start from when "My path" is picked with none drawn: a slow arc in front. */

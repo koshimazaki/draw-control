@@ -6,7 +6,7 @@
  * strip and lanes redraw. page-actions.ts binds the buttons, the menus and the keyboard.
  */
 import {
-  beatAtSeconds, buildDrive, placeLandmarks, cameraAtSeconds, clipBeats, flatDrive, frameAt, planCamera, secondsAtBeat, snapBeat, travelStations,
+  beatAtSeconds, buildDrive, placeLandmarks, onsetBeats, cameraAtSeconds, clipBeats, flatDrive, frameAt, planCamera, secondsAtBeat, snapBeat, travelStations,
   type AudioDrive, type CameraPlan, type Recipe,
 } from "@motion-studio/core";
 import { Player, loadTrack, trackFromSamples, type Track } from "../audio";
@@ -29,7 +29,9 @@ export function startBeatPath(root: HTMLElement) {
   root.innerHTML = LAYOUT;
   const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
   let state: BeatPathState = exampleState(0);
-  let tool: Tool = "subject", view: View = "top";
+  let tool: Tool = "subject", view: View = "top", pen: "edit" | "draw" = "edit";
+  /** What Delete removes and Escape clears: a lane block or a path point. */
+  let selection: { kind: "point"; tool: Tool; index: number } | { kind: "block"; lane: "character" | "cameraLane"; index: number } | null = null;
   let track: Track | null = null, info: TrackInfo | null = null;
   let drive: AudioDrive = flatDrive(24, 1);
   let recipe: Recipe = beatPathRecipe(state, null), plan: CameraPlan;
@@ -45,7 +47,8 @@ export function startBeatPath(root: HTMLElement) {
   const window1 = () => window0() + state.clip;
 
   const viewport = new Viewport($("preview"));
-  viewport.setCharacter(createGlider());
+  const glider = createGlider();
+  viewport.setCharacter(glider);
   viewport.setShowPaths(false);
   viewport.setGrid(true);
   // The guide's colour coding: a dark ground with lighter 1 m and 4 m lines, fading to a dark horizon.
@@ -76,25 +79,44 @@ export function startBeatPath(root: HTMLElement) {
     points: t => (t === "subject" ? state.subject : state.camera),
     corners: t => (t === "subject" ? state.subjectCorners : state.cameraCorners),
     change: (t, points, final) => {
-      const next = { ...state, ...(t === "subject" ? { subject: points } : { camera: points }) };
-      // A drawn camera path is used: a lane without "my path" gets it over its whole length.
-      if (t === "camera" && final && points.length >= 2 && !next.cameraLane.some(b => b.word === "path")) next.cameraLane = [{ from: 0, to: totalBeats(), word: "path" }];
-      update(next, final);
+      // Drawing a camera path never changes the camera lane: a block flies it only when its word is "My path".
+      update({ ...state, ...(t === "subject" ? { subject: points } : { camera: points }) }, final);
     },
+    pen: () => pen,
+    drew: () => page.setPen("edit"),
+    selected: () => (selection?.kind === "point" ? { tool: selection.tool, index: selection.index } : null),
+    select: sel => { selection = sel ? { kind: "point", ...sel } : null; },
   });
-  const strip = new AudioStrip($<HTMLCanvasElement>("wave"), seconds => { head = Math.max(window0(), Math.min(window1(), seconds)); if (player.playing) player.play(track, head); dirty = true; });
+  const strip = new AudioStrip($<HTMLCanvasElement>("wave"), seconds => { head = Math.max(window0(), Math.min(window1(), seconds)); if (player.playing) player.play(track, head); dirty = true; },
+    seconds => toggleHit(seconds));
+  /** Switch a kick or snare off for every lock, or back on (undoable, in the recipe and the script). */
+  function toggleHit(seconds: number) {
+    const t = Math.round(seconds * 1000) / 1000, on = state.muted.some(m => Math.abs(m - t) < 0.012);
+    update({ ...state, muted: on ? state.muted.filter(m => Math.abs(m - t) >= 0.012) : [...state.muted, t].sort((a, b) => a - b) });
+  }
   const menu = new Menu($("menu"));
   const lane = <W extends string>(id: string, key: "character" | "cameraLane", labels: Record<W, string>, words: readonly W[], single?: W) => {
     const view: LaneView<W> = new LaneView<W>($(id), {
       blocks: () => state[key] as unknown as { from: number; to: number; word: W }[],
       total: totalBeats,
       label: w => labels[w],
-      snap: b => snapBeat(recipe, b, "halfBeat"),
+      snap: b => snapLane(b),
       commit: (blocks, final) => update({ ...state, [key]: blocks }, final),
       open: (anchor, i, beat) => actions.openBlock(key, view, anchor, i, beat, labels, words, single),
     });
     return view;
   };
+  /** Snap on: the nearest beat or hit (kick, snare). Off: the nearest frame (24 fps), its number shown while dragging. */
+  function snapLane(b: number): number {
+    const g = recipe.beatGrid;
+    if (!$<HTMLInputElement>("snap").checked) {
+      const frame = Math.max(0, Math.round(secondsAtBeat(g, b) * 24));
+      say(`frame ${frame}`);
+      return Math.round(beatAtSeconds(g, frame / 24) * 10000) / 10000;
+    }
+    const hits = track ? [...onsetBeats(recipe, live()?.bands, "kick"), ...onsetBeats(recipe, live()?.bands, "snare")] : [];
+    return [snapBeat(recipe, b, "beat"), ...hits].reduce((best, x) => (Math.abs(x - b) < Math.abs(best - b) ? x : best));
+  }
   const characterLane = lane<CharacterWord>("laneCharacter", "character", LABELS.character, ["glide", "hover", "spin", "jump"], "glide");
   const cameraLane = lane<CameraWord>("laneCamera", "cameraLane", LABELS.camera, ["behind", "side", "orbit", "top", "path", "push"]);
   const say = (text: string) => { $("status").textContent = text; };
@@ -116,6 +138,7 @@ export function startBeatPath(root: HTMLElement) {
       const n = Math.round(secondsAtBeat(recipe.beatGrid, b) * recipe.fps), p = at(n), a = at(n - 6), c = at(n + 6);
       return { x: p.x, z: p.z, dx: c.x - a.x, dz: c.z - a.z };
     });
+    glider.setColours(parseInt(state.figure.body.slice(1), 16), parseInt(state.figure.head.slice(1), 16));
     const landmarks = placeLandmarks(recipe, plan, live());
     viewport.setLandmarks(landmarks);
     map.setScene({ floor, stations, trail, landmarks });
@@ -123,7 +146,9 @@ export function startBeatPath(root: HTMLElement) {
     const bands = live()?.bands, t0 = window0(), t1 = window1(), inClip = (t: number) => t >= t0 && t <= t1;
     const beats: number[] = [];
     for (let b = 0; secondsAtBeat(recipe.beatGrid, b) <= t1; b++) beats.push(secondsAtBeat(recipe.beatGrid, b));
-    strip.setScene({ track, start: t0, end: t1, beats, kicks: (bands?.low ?? []).map(o => o.seconds).filter(inClip), snares: (bands?.mid ?? []).map(o => o.seconds).filter(inClip), locked: hits });
+    strip.setScene({ track, start: t0, end: t1, beats, kicks: (bands?.low ?? []).map(o => o.seconds).filter(inClip), snares: (bands?.mid ?? []).map(o => o.seconds).filter(inClip), locked: hits, muted: state.muted });
+    $("resetMarkers").hidden = !state.muted.length;
+    $("resetMarkers").textContent = `Reset markers (${state.muted.length})`;
     characterLane.render(); cameraLane.render();
     actions.sync();
     head = Math.max(t0, Math.min(t1, head));
@@ -175,12 +200,24 @@ export function startBeatPath(root: HTMLElement) {
     head = info.offsetSeconds;
     rebuild();
     $("trackName").textContent = `${next.name} · ${info.bpm} BPM`;
+    $("removeTrack").hidden = false;
     say(f.bands ? `${f.bands.low.length} kicks, ${f.bands.mid.length} snares found` : "No drums found: lock to the beat");
+  }
+  /** No track: a plain timed clip at 120 BPM on the wall clock, a time ruler instead of the waveform. */
+  function removeTrack() {
+    setPlaying(false);
+    track = null; info = null; drive = flatDrive(24, 1);
+    state = fitLanes(state, clipBeats(state.clip, 120));
+    head = 0;
+    rebuild();
+    $("trackName").textContent = "No track · 120 BPM";
+    $("removeTrack").hidden = true;
+    say("Plain timed clip: no hits, so locks have nothing to land on");
   }
   const useDemo = () => { const d = demoDrums(); return useTrack(trackFromSamples(DEMO_TRACK_NAME, [d.samples], d.sampleRate), DEMO_LICENCE); };
   async function useFile(file: File) {
     strip.message = `Decoding ${file.name}…`;
-    strip.setScene({ track, start: window0(), end: window1(), beats: [], kicks: [], snares: [], locked: [] });
+    strip.setScene({ track, start: window0(), end: window1(), beats: [], kicks: [], snares: [], locked: [], muted: [] });
     try { await useTrack(await loadTrack(file), "unspecified"); }
     catch (e) { strip.message = ""; rebuild(); say(`Could not read the track: ${(e as Error).message}`); }
   }
@@ -189,9 +226,13 @@ export function startBeatPath(root: HTMLElement) {
     $, map, menu, viewport, strip, player,
     get state() { return state; }, get recipe() { return recipe; }, get tool() { return tool; }, get view() { return view; },
     get track() { return track; }, get drive() { return live(); }, get info() { return info; }, get busy() { return busy; }, set busy(v: boolean) { busy = v; dirty = true; },
-    get head() { return head; }, totalBeats, window0, window1, update, undo, rebuild, setPlaying, useDemo, useFile, say,
+    get head() { return head; }, removeTrack, totalBeats, window0, window1, update, undo, rebuild, setPlaying, useDemo, useFile, say,
     setTool(t: Tool) { tool = t; map.refresh(); actions.sync(); },
     setView(v: View) { view = v; map.refresh(); actions.sync(); },
+    get pen() { return pen; },
+    setPen(v: "edit" | "draw") { pen = v; actions.sync(); },
+    get selection() { return selection; },
+    setSelection(v: typeof selection) { selection = v; map.refresh(); },
     retheme() { map.retheme(); strip.retheme(); },
     /** A new example or script: rebuild and frame it on the map. */
     load(next: BeatPathState) { update(next); map.fit(); },

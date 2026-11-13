@@ -13,23 +13,29 @@ export type StripScene = {
   snares: number[];
   /** Locked hits (seconds), drawn taller. */
   locked: number[];
+  /** Muted hits (seconds): drawn hollow, skipped by every lock. */
+  muted: number[];
 };
 
 export class AudioStrip {
   private ctx: CanvasRenderingContext2D;
   private base = document.createElement("canvas");
-  private scene: StripScene = { track: null, start: 0, end: 8, beats: [], kicks: [], snares: [], locked: [] };
+  private scene: StripScene = { track: null, start: 0, end: 8, beats: [], kicks: [], snares: [], locked: [], muted: [] };
   private colours: Record<string, string> = {};
   /** Shown over the waveform instead of it (loading, errors). */
   message = "";
   private w = 1; private h = 1; private dpr = 1;
   private head = 0;
 
-  constructor(readonly canvas: HTMLCanvasElement, seek: (seconds: number) => void) {
+  constructor(readonly canvas: HTMLCanvasElement, seek: (seconds: number) => void, toggle: (seconds: number) => void = () => {}) {
     this.ctx = canvas.getContext("2d")!;
     new ResizeObserver(() => this.resize()).observe(canvas);
     const at = (e: PointerEvent) => { const r = canvas.getBoundingClientRect(), s = this.scene; return s.start + Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * (s.end - s.start); };
+    canvas.addEventListener("pointermove", e => { if (!e.buttons) canvas.style.cursor = this.markerAt(e) === null ? "pointer" : "cell"; });
     canvas.addEventListener("pointerdown", e => {
+      // A click on a kick or snare marker switches it off (or back on); anywhere else seeks.
+      const hit = this.markerAt(e);
+      if (hit !== null) { toggle(hit); return; }
       canvas.setPointerCapture(e.pointerId);
       seek(at(e));
       const move = (ev: PointerEvent) => seek(at(ev));
@@ -58,6 +64,14 @@ export class AudioStrip {
     this.draw();
   }
 
+  /** The kick or snare marker under the pointer (seconds), or null. */
+  private markerAt(e: PointerEvent): number | null {
+    const r = this.canvas.getBoundingClientRect(), px = e.clientX - r.left;
+    let best: number | null = null, bd = 5;
+    for (const t of [...this.scene.kicks, ...this.scene.snares]) { const d = Math.abs(this.x(t) - px); if (d < bd) { bd = d; best = t; } }
+    return best;
+  }
+
   private x(seconds: number) { return (seconds - this.scene.start) / (this.scene.end - this.scene.start) * this.w; }
 
   private paintBase() {
@@ -76,14 +90,28 @@ export class AudioStrip {
         g.fillRect(px, top, 1, Math.max(1, bottom - top));
       }
     } else {
-      g.fillStyle = C["text-muted"]; g.font = "12px system-ui, sans-serif"; g.textAlign = "center";
-      g.fillText(this.message || "Press Demo track, or drop a track here", this.w / 2, mid + 4);
+      // No track: a time ruler (a tick every half second, seconds labelled).
+      g.fillStyle = C["text-muted"]; g.font = "10px ui-monospace, Menlo, monospace"; g.textAlign = "left";
+      if (!this.message) for (let t = Math.ceil(s.start * 2) / 2; t <= s.end; t += 0.5) {
+        const x = Math.round(this.x(t)), whole = Math.abs(t - Math.round(t)) < 1e-6;
+        g.fillRect(x, this.h - (whole ? 12 : 6), 1, whole ? 12 : 6);
+        if (whole) g.fillText(`${Math.round(t - s.start)} s`, x + 3, this.h - 4);
+      }
+      g.font = "12px system-ui, sans-serif"; g.textAlign = "center";
+      g.fillText(this.message || "No track: a plain timed clip · press Demo track, or drop a track here", this.w / 2, mid - 2);
     }
     const mark = (list: number[], colour: string, y0: number, y1: number) => {
       for (const t of list) {
+        const x = Math.round(this.x(t));
+        if (s.muted.some(m => Math.abs(m - t) < 0.012)) {
+          g.globalAlpha = 0.8; g.strokeStyle = colour; g.lineWidth = 1.5;
+          g.strokeRect(x - 2.5, y0 + 2, 5, Math.max(4, y1 - y0 - 4));
+          g.beginPath(); g.moveTo(x - 3, y0 + 2); g.lineTo(x + 3, y1 - 2); g.stroke();
+          continue;
+        }
         const on = s.locked.some(l => Math.abs(l - t) < 0.006);
         g.globalAlpha = on ? 1 : 0.45; g.fillStyle = colour;
-        g.fillRect(Math.round(this.x(t)) - 1, on ? 0 : y0, 2, on ? this.h : y1 - y0);
+        g.fillRect(x - 1, on ? 0 : y0, 2, on ? this.h : y1 - y0);
       }
       g.globalAlpha = 1;
     };

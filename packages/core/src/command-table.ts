@@ -89,6 +89,7 @@ export const COMMAND_TABLE: Record<string, TableCommand> = {
     const mute = a.on === undefined ? !has : a.on !== true;
     return validateRecipe({ ...r, mutedHits: mute ? (has ? list : [...list, t]) : list.filter(m => Math.abs(m - t) >= 0.012) });
   } },
+  setFigure: { help: "{ body?, head? } the glider's colours as \"#rrggbb\" (body: the pyramid, head: the sphere; the front marker stays white)", run: (r, a) => validateRecipe({ ...r, figure: { body: a.body === undefined ? r.figure?.body ?? "#ff6a13" : str(a, "body"), head: a.head === undefined ? r.figure?.head ?? r.figure?.body ?? "#ff6a13" : str(a, "head") } }) },
   resetMutedHits: { help: "{} switch every muted hit back on", run: r => { const next = structuredClone(r); delete next.mutedHits; return validateRecipe(next); } },
   setLandmarks: { help: "{ on?, seed? } landmark blocks around the scene (grey boxes, pillars, low walls), placed from the seed clear of both paths", run: (r, a) => validateRecipe({ ...r, landmarks: { seed: a.seed === undefined ? r.landmarks?.seed ?? 7 : num(a, "seed"), on: a.on === undefined ? true : a.on === true } }) },
   setTravelLock: { help: "{ lock: off|beat|kick|snare|hat, strength? } lock the travel along the walk path: stations on each locked hit", run: (r, a) => setTravelLock(r, { lock: str(a, "lock"), strength: optNum(a, "strength") }) },
