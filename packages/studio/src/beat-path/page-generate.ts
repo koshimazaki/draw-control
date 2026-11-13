@@ -158,6 +158,7 @@ export function bindGenerate(p: Page) {
       if (here()) { showResult(result.videoURL); if (fake && !key?.connected) player?.classList.add("fake"); }
       p.say(`${labelOf(runModel)}${here() ? "" : ` (${slot === "own" ? "Your own" : `Example ${Number(slot) + 1}`})`}: done${result.costUsd !== null ? `, ${result.costUsd.toFixed(2)} USD` : ""}${fake && !key?.connected ? " (local preview: the guide stands in for the result)" : ""}`);
       renderGallery();
+      if (key?.connected) void key.refreshBalance?.();
     } catch (e) {
       const err = e as { code?: string; message: string };
       const plain = err.code ? ERROR_MESSAGES[err.code] ?? err.message : err.message;
@@ -190,11 +191,12 @@ export function bindGenerate(p: Page) {
       const pop = document.createElement("div");
       pop.className = "key-pop panel"; pop.hidden = true; pop.append(key);
       $("keySlot").append(pop);
-      const button = $("keyButton"), label = () => { button.lastChild!.textContent = key!.connected ? "Runware key connected" : "Add your Runware API key"; button.classList.toggle("connected", key!.connected); };
+      const button = $("keyButton"), label = () => { button.lastChild!.textContent = key!.connected ? "Runware key connected" : "Add your Runware API key"; const b = $("balance"), known = key!.connected && typeof key!.balance === "number"; b.hidden = !known; b.textContent = known ? `Balance ${key!.balance!.toFixed(2)} USD` : ""; button.classList.toggle("connected", key!.connected); };
       button.onclick = () => { pop.hidden = !pop.hidden; };
       window.addEventListener("pointerdown", e => { if (!pop.hidden && !$("keySlot").contains(e.target as Node)) pop.hidden = true; });
       window.addEventListener("keydown", e => { if (e.key === "Escape") pop.hidden = true; });
       key.addEventListener("arena-key-change", () => { label(); if (key!.connected) pop.hidden = true; p.say(key!.connected ? "Runware key connected (kept in this tab only)" : "Runware key removed"); });
+      key.addEventListener("arena-balance-change", label);
       label();
     }
     sync();

@@ -14,7 +14,7 @@ export type ArenaModule = {
   offeredModels(): ArenaModel[];
   composePrompt(shot: Record<string, string>, model: string, references?: { character?: unknown; environment?: unknown }, guide?: { seconds?: number; hasAudio?: boolean }): { prompt: string; notes: string[] };
 };
-export type ArenaKeyElement = HTMLElement & { connected: boolean; getKey(): string | undefined };
+export type ArenaKeyElement = HTMLElement & { connected: boolean; getKey(): string | undefined; balance?: number | null; refreshBalance?(): Promise<number | null> };
 
 let loading: Promise<ArenaModule | null> | null = null;
 /** The embed module, or null when it is not installed. */

@@ -1,5 +1,5 @@
-const Ro = (e) => String(e ?? "").replace(/[|\r\n]+/g, " ").trim() || "-", vt = (e) => e === null ? "-" : `$${e.toFixed(4)}`;
-function To(e) {
+const To = (e) => String(e ?? "").replace(/[|\r\n]+/g, " ").trim() || "-", wt = (e) => e === null ? "-" : `$${e.toFixed(4)}`;
+function Ro(e) {
   return `| ${[
     e.date,
     e.model,
@@ -8,12 +8,12 @@ function To(e) {
     e.duration,
     e.resolution,
     e.inputs,
-    vt(e.estimateUsd),
-    vt(e.costUsd),
+    wt(e.estimateUsd),
+    wt(e.costUsd),
     e.seconds === null ? "-" : e.seconds.toFixed(1),
     e.output,
     e.status
-  ].map(Ro).join(" | ")} |
+  ].map(To).join(" | ")} |
 `;
 }
 const jo = (e) => String(e.resolution ?? `${e.width ?? ""}x${e.height ?? ""}`);
@@ -39,8 +39,8 @@ function Co(e, t, o, r, s) {
     status: r ? "ready" : "pending"
   };
 }
-const Uo = "https://api.runware.ai/v1";
-class se extends Error {
+const Lo = "https://api.runware.ai/v1";
+class oe extends Error {
   constructor(t, o) {
     super(
       o.length ? o.map((r) => `${r.code}: ${r.message}${r.parameter ? ` (${r.parameter})` : ""}`).join("; ") : `Runware API returned HTTP ${t}.`
@@ -49,12 +49,12 @@ class se extends Error {
   status;
   errors;
 }
-const Lo = /^[\x21-\x7e]{8,512}$/;
-class Fo {
+const Fo = /^[\x21-\x7e]{8,512}$/;
+class ot {
   getKey;
   fetchImpl;
   constructor(t) {
-    this.getKey = t.getKey, this.fetchImpl = t.fetch ?? globalThis.fetch;
+    this.getKey = t.getKey, this.fetchImpl = t.fetch ?? ((o, r) => globalThis.fetch(o, r));
   }
   /** Redacts the key from any text before it is shown. */
   redact(t) {
@@ -64,8 +64,8 @@ class Fo {
   async post(t, o) {
     const r = this.getKey();
     if (!r) throw new Error("No Runware API key. Set RUNWARE_API_KEY, or paste it into the key panel.");
-    if (!Lo.test(r)) throw new Error("That does not look like a Runware API key.");
-    const s = await this.fetchImpl(Uo, {
+    if (!Fo.test(r)) throw new Error("That does not look like a Runware API key.");
+    const s = await this.fetchImpl(Lo, {
       method: "POST",
       headers: { Authorization: `Bearer ${r}`, "Content-Type": "application/json" },
       body: JSON.stringify(t),
@@ -75,7 +75,7 @@ class Fo {
     try {
       n = await s.json();
     } catch {
-      throw new se(s.status, []);
+      throw new oe(s.status, []);
     }
     const a = n ?? {}, c = Array.isArray(a.data) ? a.data : [], d = Array.isArray(a.errors) ? a.errors.map((l) => ({
       code: String(l.code ?? "error"),
@@ -83,16 +83,27 @@ class Fo {
       ...l.parameter ? { parameter: String(l.parameter) } : {},
       ...l.taskUUID ? { taskUUID: String(l.taskUUID) } : {}
     })) : [];
-    if (!s.ok && !c.length) throw new se(s.status, d);
+    if (!s.ok && !c.length) throw new oe(s.status, d);
     return { data: c, errors: d };
   }
   /** Stores media (data URI, base64 or public URL) and returns its UUID and URL. */
   async upload(t, o) {
     const r = globalThis.crypto.randomUUID(), { data: s, errors: n } = await this.post([{ taskType: "mediaStorage", taskUUID: r, operation: "upload", media: t }], o), a = n.filter((d) => !d.taskUUID || d.taskUUID === r);
-    if (a.length) throw new se(400, a);
+    if (a.length) throw new oe(400, a);
     const c = s.find((d) => d.taskUUID === r) ?? s[0];
     if (!c || typeof c.mediaUUID != "string") throw new Error("mediaStorage upload returned no mediaUUID.");
     return { mediaUUID: c.mediaUUID, mediaURL: String(c.mediaURL ?? "") };
+  }
+  /**
+   * The account's current balance in USD. The same response lists the team and
+   * the API keys; only the number is read and nothing else is kept or returned.
+   */
+  async balance(t) {
+    const o = globalThis.crypto.randomUUID(), { data: r, errors: s } = await this.post([{ taskType: "accountManagement", taskUUID: o, operation: "getDetails" }], t), n = s.filter((d) => !d.taskUUID || d.taskUUID === o);
+    if (n.length) throw new oe(400, n);
+    const a = (r.find((d) => d.taskUUID === o) ?? r[0])?.balance, c = typeof a == "string" ? Number(a) : a;
+    if (typeof c != "number" || !Number.isFinite(c)) throw new Error("Runware returned no balance.");
+    return c;
   }
   /** Reads back the stored request for a task; used to learn which model the router chose. */
   async taskDetails(t, o) {
@@ -110,7 +121,7 @@ const Mo = [
   "sourceVideo",
   "audioToVideo",
   "elements"
-], ot = [
+], rt = [
   "static",
   "push-in",
   "pull-out",
@@ -121,7 +132,7 @@ const Mo = [
   "orbit",
   "handheld",
   "rack-focus"
-], wt = ["image", "video", "audio"], yt = [
+], yt = ["image", "video", "audio"], xt = [
   "first-frame",
   "last-frame",
   "keyframe",
@@ -141,28 +152,28 @@ class G extends Error {
   path;
 }
 const We = (e) => typeof e == "object" && e !== null && !Array.isArray(e);
-function q(e, t, o, r = !1) {
+function J(e, t, o, r = !1) {
   if (!(r && e === void 0) && (typeof e != "string" || e.length > o || No.test(e)))
     throw new G(t, `must be plain text up to ${o} characters`);
 }
 function Do(e, t = "shot") {
   if (!We(e)) throw new G(t, "must be an object");
-  if (q(e.subject, `${t}.subject`, 500), q(e.action, `${t}.action`, 500), q(e.environment, `${t}.environment`, 500, !0), q(e.legend, `${t}.legend`, 300, !0), q(e.focus, `${t}.focus`, 200, !0), q(e.audio, `${t}.audio`, 500, !0), e.camera !== "guide" && !ot.includes(e.camera))
-    throw new G(`${t}.camera`, `must be "guide" or one of ${ot.join(", ")}`);
+  if (J(e.subject, `${t}.subject`, 500), J(e.action, `${t}.action`, 500), J(e.environment, `${t}.environment`, 500, !0), J(e.legend, `${t}.legend`, 300, !0), J(e.focus, `${t}.focus`, 200, !0), J(e.audio, `${t}.audio`, 500, !0), e.camera !== "guide" && !rt.includes(e.camera))
+    throw new G(`${t}.camera`, `must be "guide" or one of ${rt.join(", ")}`);
   if (typeof e.duration != "number" || !(e.duration > 0 && e.duration <= 60)) throw new G(`${t}.duration`, "must be 1-60 seconds");
   if (!Array.isArray(e.references) || e.references.length > 20) throw new G(`${t}.references`, "must be an array of up to 20");
   if (e.references.forEach((o, r) => {
     const s = `${t}.references[${r}]`;
     if (!We(o) || typeof o.id != "string" || !/^[A-Za-z0-9_-]{1,40}$/.test(o.id)) throw new G(`${s}.id`, "must be a short id");
-    if (!wt.includes(o.kind)) throw new G(`${s}.kind`, `must be one of ${wt.join(", ")}`);
-    if (!yt.includes(o.role)) throw new G(`${s}.role`, `must be one of ${yt.join(", ")}`);
-    q(o.keep, `${s}.keep`, 200, !0), q(o.replaces, `${s}.replaces`, 200, !0);
+    if (!yt.includes(o.kind)) throw new G(`${s}.kind`, `must be one of ${yt.join(", ")}`);
+    if (!xt.includes(o.role)) throw new G(`${s}.role`, `must be one of ${xt.join(", ")}`);
+    J(o.keep, `${s}.keep`, 200, !0), J(o.replaces, `${s}.replaces`, 200, !0);
   }), e.beats !== void 0) {
     if (!Array.isArray(e.beats) || e.beats.length > 20) throw new G(`${t}.beats`, "must be an array of up to 20");
     e.beats.forEach((o, r) => {
       if (!We(o) || typeof o.start != "number" || typeof o.end != "number" || !(o.end > o.start && o.start >= 0))
         throw new G(`${t}.beats[${r}]`, "must have start < end, in seconds");
-      q(o.text, `${t}.beats[${r}].text`, 300);
+      J(o.text, `${t}.beats[${r}].text`, 300);
     });
   }
   return e;
@@ -178,7 +189,7 @@ function _o(e) {
     ...e.dropped.length ? { dropped: e.dropped.slice(0, 40).map((t) => `${t.ref}: ${t.reason}`) } : {}
   };
 }
-const xt = 1, Qt = /^[a-z0-9][a-z0-9-]{0,63}$/, kt = [
+const kt = 1, eo = /^[a-z0-9][a-z0-9-]{0,63}$/, $t = [
   "referenceVideo",
   "referenceImage",
   "referenceAudio",
@@ -200,14 +211,14 @@ function _(e, t, o, r = 0) {
   if (Bo.test(e)) throw new w(t, "must be plain text");
   return e;
 }
-function $t(e, t, o) {
+function St(e, t, o) {
   e !== void 0 && _(e, t, o);
 }
-function St(e, t) {
+function It(e, t) {
   if (e !== null && (typeof e != "number" || !Number.isFinite(e) || e < 0))
     throw new w(t, "must be a non-negative number or null");
 }
-function It(e, t) {
+function Et(e, t) {
   if (!Z(e)) throw new w(t, "must be an object");
   _(e.src, `${t}.src`, 2048, 1);
   for (const o of ["width", "height", "fps", "seconds", "bytes"])
@@ -217,14 +228,14 @@ function It(e, t) {
 function zo(e, t = "guide") {
   if (!Z(e)) throw new w(t, "must be an object");
   if (e.schemaVersion !== 1) throw new w(`${t}.schemaVersion`, "must be 1");
-  It(e.video, `${t}.video`);
+  Et(e.video, `${t}.video`);
   for (const o of ["audio", "firstFrame", "firstFrameStyled", "camera"])
-    e[o] !== void 0 && It(e[o], `${t}.${o}`);
+    e[o] !== void 0 && Et(e[o], `${t}.${o}`);
   if (e.beats !== void 0 && (!Array.isArray(e.beats) || e.beats.some((o) => typeof o != "number" || o < 0)))
     throw new w(`${t}.beats`, "must be non-negative seconds");
-  return e.onsets !== void 0 && eo(e.onsets, `${t}.onsets`), e.peaks !== void 0 && ct(e.peaks, `${t}.peaks`), e;
+  return e.onsets !== void 0 && to(e.onsets, `${t}.onsets`), e.peaks !== void 0 && lt(e.peaks, `${t}.peaks`), e;
 }
-function ct(e, t) {
+function lt(e, t) {
   if (!Array.isArray(e) || e.length > 2e4) throw new w(t, "must be an array");
   return e.forEach((o, r) => {
     if (!Z(o) || typeof o.seconds != "number" || !(o.seconds >= 0))
@@ -233,19 +244,19 @@ function ct(e, t) {
       throw new w(`${t}[${r}].strength`, "must be 0-1");
   }), e;
 }
-function eo(e, t) {
+function to(e, t) {
   if (!Z(e)) throw new w(t, "must be an object");
-  for (const o of ["low", "mid", "high"]) ct(e[o], `${t}.${o}`);
+  for (const o of ["low", "mid", "high"]) lt(e[o], `${t}.${o}`);
   return e;
 }
 function Go(e, t) {
   if (!Z(e)) throw new w(t, "must be an object");
-  if (typeof e.id != "string" || !Qt.test(e.id)) throw new w(`${t}.id`, "must be a slug");
-  if ($t(e.label, `${t}.label`, 120), _(e.provider, `${t}.provider`, 40, 1), _(e.model, `${t}.model`, 120, 1), e.modelRan !== null && _(e.modelRan, `${t}.modelRan`, 120, 1), _(e.prompt, `${t}.prompt`, 5e4), !Array.isArray(e.inputsSent)) throw new w(`${t}.inputsSent`, "must be an array");
+  if (typeof e.id != "string" || !eo.test(e.id)) throw new w(`${t}.id`, "must be a slug");
+  if (St(e.label, `${t}.label`, 120), _(e.provider, `${t}.provider`, 40, 1), _(e.model, `${t}.model`, 120, 1), e.modelRan !== null && _(e.modelRan, `${t}.modelRan`, 120, 1), _(e.prompt, `${t}.prompt`, 5e4), !Array.isArray(e.inputsSent)) throw new w(`${t}.inputsSent`, "must be an array");
   if (e.inputsSent.forEach((o, r) => {
     const s = `${t}.inputsSent[${r}]`;
-    if (!Z(o) || !kt.includes(o.role))
-      throw new w(s, `role must be one of ${kt.join(", ")}`);
+    if (!Z(o) || !$t.includes(o.role))
+      throw new w(s, `role must be one of ${$t.join(", ")}`);
     _(o.src, `${s}.src`, 2048, 1);
   }), !["A", "B", "C"].includes(e.firstFrameVariant))
     throw new w(`${t}.firstFrameVariant`, "must be A, B or C");
@@ -253,7 +264,7 @@ function Go(e, t) {
     if (!Z(e.output)) throw new w(`${t}.output`, "must be an object or null");
     _(e.output.src, `${t}.output.src`, 2048, 1);
   }
-  if (St(e.costUsd, `${t}.costUsd`), St(e.generationSeconds, `${t}.generationSeconds`), $t(e.note, `${t}.note`, 2e3), e.composed !== void 0) {
+  if (It(e.costUsd, `${t}.costUsd`), It(e.generationSeconds, `${t}.generationSeconds`), St(e.note, `${t}.note`, 2e3), e.composed !== void 0) {
     if (!Z(e.composed)) throw new w(`${t}.composed`, "must be an object");
     _(e.composed.model, `${t}.composed.model`, 120, 1);
     for (const o of ["notes", "dropped"]) {
@@ -264,9 +275,9 @@ function Go(e, t) {
       }
     }
   }
-  return e.shot !== void 0 && to(e.shot, `${t}.shot`), e;
+  return e.shot !== void 0 && oo(e.shot, `${t}.shot`), e;
 }
-function to(e, t) {
+function oo(e, t) {
   try {
     Do(e, t);
   } catch (o) {
@@ -275,10 +286,10 @@ function to(e, t) {
 }
 function ce(e) {
   if (!Z(e)) throw new w("record", "must be an object");
-  if (e.schemaVersion !== xt)
-    throw new w("schemaVersion", `must be ${xt}`);
-  if (typeof e.id != "string" || !Qt.test(e.id)) throw new w("id", "must be a slug");
-  if (_(e.title, "title", 200, 1), e.guide !== void 0 && zo(e.guide), e.shot !== void 0 && to(e.shot, "shot"), !Array.isArray(e.lanes) || e.lanes.length < 1 || e.lanes.length > 12)
+  if (e.schemaVersion !== kt)
+    throw new w("schemaVersion", `must be ${kt}`);
+  if (typeof e.id != "string" || !eo.test(e.id)) throw new w("id", "must be a slug");
+  if (_(e.title, "title", 200, 1), e.guide !== void 0 && zo(e.guide), e.shot !== void 0 && oo(e.shot, "shot"), !Array.isArray(e.lanes) || e.lanes.length < 1 || e.lanes.length > 12)
     throw new w("lanes", "must hold 1-12 lanes");
   const t = e.lanes.map((r, s) => Go(r, `lanes[${s}]`)), o = new Set(t.map((r) => r.id));
   if (o.size !== t.length) throw new w("lanes", "lane ids must be distinct");
@@ -290,7 +301,7 @@ function ce(e) {
   }
   return e;
 }
-const Et = ["mannequin", "block", "stick", "blob", "glider", "file", "rigged"], Ko = [
+const At = ["mannequin", "block", "stick", "blob", "glider", "file", "rigged"], Ko = [
   "video",
   "audio",
   "firstFrame",
@@ -306,12 +317,12 @@ function ye(e, t, o) {
   if (o && !o.test(e)) throw new w(t, `must match ${o}`);
   return e;
 }
-function At(e, t) {
+function Pt(e, t) {
   if (!Array.isArray(e) || e.some((o) => typeof o != "number" || !(o >= 0)))
     throw new w(t, "must be non-negative seconds");
   return e;
 }
-function oo(e, t = "bundle") {
+function ro(e, t = "bundle") {
   if (!Se(e)) throw new w(t, "must be an object");
   if (typeof e.schemaVersion != "string" || !Wo.test(e.schemaVersion))
     throw new w(`${t}.schemaVersion`, "must be x.y.z");
@@ -323,7 +334,7 @@ function oo(e, t = "bundle") {
   for (const o of ["audio", "firstFrameStyled"]) e[o] !== void 0 && ye(e[o], `${t}.${o}`);
   return e;
 }
-function ro(e, t = "beats") {
+function so(e, t = "beats") {
   if (!Se(e)) throw new w(t, "must be an object");
   if (typeof e.bpm != "number" || !(e.bpm >= 40 && e.bpm <= 240)) throw new w(`${t}.bpm`, "must be 40-240");
   if (typeof e.offsetSeconds != "number" || !(e.offsetSeconds >= 0))
@@ -331,16 +342,16 @@ function ro(e, t = "beats") {
   if (!Number.isInteger(e.beatsPerBar) || e.beatsPerBar < 1)
     throw new w(`${t}.beatsPerBar`, "must be a positive integer");
   if (e.source !== "manual" && e.source !== "analysis") throw new w(`${t}.source`, "must be manual or analysis");
-  return At(e.beats, `${t}.beats`), At(e.downbeats, `${t}.downbeats`), e.onsets !== void 0 && eo(e.onsets, `${t}.onsets`), e.peaks !== void 0 && ct(e.peaks, `${t}.peaks`), e;
+  return Pt(e.beats, `${t}.beats`), Pt(e.downbeats, `${t}.downbeats`), e.onsets !== void 0 && to(e.onsets, `${t}.onsets`), e.peaks !== void 0 && lt(e.peaks, `${t}.peaks`), e;
 }
-function so(e, t = "meta") {
+function no(e, t = "meta") {
   if (!Se(e)) throw new w(t, "must be an object");
   for (const r of ["width", "height", "frames"])
     if (!Number.isInteger(e[r]) || e[r] < 1) throw new w(`${t}.${r}`, "must be a positive integer");
   if (e.fps !== 24) throw new w(`${t}.fps`, "must be 24");
   const o = e.character;
-  if (!Se(o) || !Et.includes(o.kind) || typeof o.name != "string")
-    throw new w(`${t}.character`, `kind must be one of ${Et.join(", ")}`);
+  if (!Se(o) || !At.includes(o.kind) || typeof o.name != "string")
+    throw new w(`${t}.character`, `kind must be one of ${At.join(", ")}`);
   if (!Array.isArray(e.assets) || e.assets.length < 1) throw new w(`${t}.assets`, "must list at least one asset");
   return e.assets.forEach((r, s) => {
     if (!Se(r) || !Ko.includes(r.role)) throw new w(`${t}.assets[${s}].role`, "unknown role");
@@ -348,7 +359,7 @@ function so(e, t = "meta") {
   }), e;
 }
 function Xo(e, t, o) {
-  const r = oo(e.manifest), s = ro(e.beats), n = so(e.meta), a = t.endsWith("/") ? t : `${t}/`, c = (p) => `${a}${p}`, d = n.fps, l = {
+  const r = ro(e.manifest), s = so(e.beats), n = no(e.meta), a = t.endsWith("/") ? t : `${t}/`, c = (p) => `${a}${p}`, d = n.fps, l = {
     schemaVersion: 1,
     video: { src: c(r.video), contentType: "video/mp4", width: n.width, height: n.height, fps: d, seconds: n.durationSeconds },
     firstFrame: { src: c(r.firstFrame), contentType: "image/png", width: n.width, height: n.height },
@@ -372,7 +383,7 @@ class B extends Error {
     super(t), this.name = "GuideError";
   }
 }
-const Jo = {
+const qo = {
   mp4: "video/mp4",
   png: "image/png",
   jpg: "image/jpeg",
@@ -381,9 +392,9 @@ const Jo = {
   wav: "audio/wav",
   mp3: "audio/mpeg",
   m4a: "audio/mp4"
-}, qo = 2 * 1048576, Yo = 300 * 1048576, Zo = /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/;
-function lt(e) {
-  return Jo[e.toLowerCase().split(".").pop() ?? ""];
+}, Jo = 2 * 1048576, Yo = 300 * 1048576, Zo = /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/;
+function ut(e) {
+  return qo[e.toLowerCase().split(".").pop() ?? ""];
 }
 function Qo(e) {
   let t = "";
@@ -408,8 +419,8 @@ function er(e) {
     }
   }
 }
-async function Re(e, t, o = {}, r = e.name) {
-  const s = lt(e.name);
+async function Ve(e, t, o = {}, r = e.name) {
+  const s = ut(e.name);
   if (!s?.startsWith(t)) throw new B(`${e.name}: expected a ${t} file.`);
   if (e.size > Yo) throw new B(`${e.name} is over 300 MB.`);
   const n = await e.bytes(), a = t === "image" ? er(n) : void 0;
@@ -423,17 +434,17 @@ async function Re(e, t, o = {}, r = e.name) {
 }
 const tr = ["image/png", "image/jpeg", "image/webp"];
 async function or(e, t) {
-  const o = lt(e.name);
+  const o = ut(e.name);
   if (!o || !tr.includes(o))
     throw new B(`${e.name}: a reference image must be a PNG, JPEG or WebP file (the name ends in .png, .jpg, .jpeg or .webp).`);
-  const r = await Re(e, "image", {}, t ?? e.name);
+  const r = await Ve(e, "image", {}, t ?? e.name);
   if (!r.info?.width || !r.info.height)
     throw new B(`${e.name}: its width and height could not be read, so the model's size limits cannot be checked. Re-save it as a PNG or JPEG.`);
   return r;
 }
 async function Ae(e, t) {
   if (!e) throw new B(`The bundle has no ${t}.`);
-  if (e.size > qo) throw new B(`${t} is over 2 MB.`);
+  if (e.size > Jo) throw new B(`${t} is over 2 MB.`);
   try {
     return JSON.parse(new TextDecoder().decode(await e.bytes()));
   } catch {
@@ -441,19 +452,19 @@ async function Ae(e, t) {
   }
 }
 const Pe = (e, t) => typeof e == "string" && e.trim().length > 0 && e.length <= t && !Zo.test(e);
-function no(e) {
+function ao(e) {
   if (typeof e != "object" || e === null) return;
   const t = e;
   if (!Pe(t.subject, 500) || !(t.action === void 0 || t.action === "" || Pe(t.action, 500))) return;
   const o = { subject: t.subject.trim(), action: typeof t.action == "string" ? t.action.trim() : "" };
-  return Pe(t.environment, 500) && (o.environment = t.environment.trim()), Pe(t.legend, 300) && (o.legend = t.legend.trim()), (t.camera === "guide" || ot.includes(t.camera)) && (o.camera = t.camera), o;
+  return Pe(t.environment, 500) && (o.environment = t.environment.trim()), Pe(t.legend, 300) && (o.legend = t.legend.trim()), (t.camera === "guide" || rt.includes(t.camera)) && (o.camera = t.camera), o;
 }
-async function ao(e, t = {}) {
+async function io(e, t = {}) {
   const o = t.base ? t.base.endsWith("/") ? t.base : `${t.base}/` : "./", r = (g) => /^https?:\/\//.test(o) ? new URL(g, o).href : g, s = /* @__PURE__ */ new Map();
   for (const g of e) s.set(g.name.split(/[\\/]/).pop(), g);
   let n, a, c;
   try {
-    n = oo(await Ae(s.get("bundle.json"), "bundle.json")), a = so(await Ae(s.get(n.meta), n.meta)), c = ro(await Ae(s.get(n.beats), n.beats));
+    n = ro(await Ae(s.get("bundle.json"), "bundle.json")), a = no(await Ae(s.get(n.meta), n.meta)), c = so(await Ae(s.get(n.beats), n.beats));
   } catch (g) {
     throw g instanceof B ? g : new B(`The bundle does not match the guide-bundle schema: ${g.message}`);
   }
@@ -463,7 +474,7 @@ async function ao(e, t = {}) {
     return y;
   }, u = a.durationSeconds;
   if (typeof u != "number" || !(u > 0 && u <= 600)) throw new B("meta.json: durationSeconds must be 0-600 seconds.");
-  const m = await Re(p(n.video), "video", { width: a.width, height: a.height, seconds: u, fps: a.fps, hasAudio: a.audioInVideo === !0 }, r(n.video)), f = await Re(p(n.firstFrame), "image", {}, r(n.firstFrame)), v = n.audio ? await Re(p(n.audio), "audio", { seconds: u }, r(n.audio)) : void 0, b = Xo({ manifest: n, beats: c, meta: a, ...l ? { recipe: l } : {} }, o), h = no(l?.shot);
+  const m = await Ve(p(n.video), "video", { width: a.width, height: a.height, seconds: u, fps: a.fps, hasAudio: a.audioInVideo === !0 }, r(n.video)), f = await Ve(p(n.firstFrame), "image", {}, r(n.firstFrame)), v = n.audio ? await Ve(p(n.audio), "audio", { seconds: u }, r(n.audio)) : void 0, b = Xo({ manifest: n, beats: c, meta: a, ...l ? { recipe: l } : {} }, o), h = ao(l?.shot);
   return { manifest: n, meta: a, beats: c, ...l ? { recipe: l } : {}, ...h ? { shot: h } : {}, video: m, audio: v, firstFrame: f, seconds: u, guide: b };
 }
 const le = {
@@ -499,12 +510,12 @@ function sr(e, t, o = "the subject") {
   }
   return { text: rr[t], note: `"${t}" is not in ${e.name}'s guide vocabulary; plain words are used.` };
 }
-const J = (e) => {
+const q = (e) => {
   const t = e.trim().replace(/\s+/g, " ");
   if (!t) return "";
   const o = t[0].toUpperCase() + t.slice(1);
   return /[.!?]$/.test(o) ? o : `${o}.`;
-}, ue = (e, t) => t.references.find((o) => o.id === e.ref)?.keep ?? le[e.role].keep, N = (e, t = " ") => e.filter(Boolean).join(t), Ce = (e, t = J(`${e.subject} ${e.action}`)) => N([t, e.environment ? J(e.environment) : null]), Ue = (e) => e.legend ? J(e.legend) : null, nr = (e) => `${e.start}–${e.end} s`;
+}, ue = (e, t) => t.references.find((o) => o.id === e.ref)?.keep ?? le[e.role].keep, N = (e, t = " ") => e.filter(Boolean).join(t), je = (e, t = q(`${e.subject} ${e.action}`)) => N([t, e.environment ? q(e.environment) : null]), Ce = (e) => e.legend ? q(e.legend) : null, nr = (e) => `${e.start}–${e.end} s`;
 function ar(e, t, o, r) {
   const s = o.find((d) => d.input === "referenceVideos" && d.role === "motion" && d.address), n = [];
   if (s) {
@@ -516,30 +527,30 @@ function ar(e, t, o, r) {
     const l = t.references.find((p) => p.id === d.ref);
     d.input === "firstFrame" ? n.push(`${d.address} is the first frame.`) : d.input === "lastFrame" ? n.push(`${d.address} is the last frame.`) : s && l?.replaces ? n.push(`Replace ${l.replaces} with ${le[d.role].noun} in ${d.address}; keep ${ue(d, t)}.`) : n.push(`${d.address} defines ${le[d.role].noun}; keep ${ue(d, t)}.`);
   }
-  const a = t.beats?.length ? t.beats.map((d) => `${nr(d)}: ${J(d.text)}`).join(`
-`) : null, c = t.audio ? `Audio: ${J(t.audio)} No subtitles.` : null;
-  return N([N([...n, Ue(t)]), N([Ce(t), r.text]), a, c], `
+  const a = t.beats?.length ? t.beats.map((d) => `${nr(d)}: ${q(d.text)}`).join(`
+`) : null, c = t.audio ? `Audio: ${q(t.audio)} No subtitles.` : null;
+  return N([N([...n, Ce(t)]), N([je(t), r.text]), a, c], `
 
 `);
 }
 function ir(e, t, o, r) {
-  const s = o.filter((d) => d.address && d.input !== "referenceAudios").map((d) => d.role === "motion" ? `${d.address} is ${le.motion.noun}: follow its ${ue(d, t)}.` : `${d.address} is ${le[d.role].noun}; keep ${ue(d, t)}.`), n = o.find((d) => d.input === "referenceAudios"), a = t.audio || n ? N(["Audio:", t.audio ? J(t.audio) : null, n?.address ? `Sync the motion to ${n.address}.` : null]) : null, c = t.beats?.length ? t.beats.map((d) => `[${d.start}-${d.end}s] ${J(d.text)}`).join(`
+  const s = o.filter((d) => d.address && d.input !== "referenceAudios").map((d) => d.role === "motion" ? `${d.address} is ${le.motion.noun}: follow its ${ue(d, t)}.` : `${d.address} is ${le[d.role].noun}; keep ${ue(d, t)}.`), n = o.find((d) => d.input === "referenceAudios"), a = t.audio || n ? N(["Audio:", t.audio ? q(t.audio) : null, n?.address ? `Sync the motion to ${n.address}.` : null]) : null, c = t.beats?.length ? t.beats.map((d) => `[${d.start}-${d.end}s] ${q(d.text)}`).join(`
 `) : null;
-  return N([r.text, N([...s, Ue(t)]), Ce(t), c, a], `
+  return N([r.text, N([...s, Ce(t)]), je(t), c, a], `
 
 `);
 }
 function dr(e, t, o, r) {
-  const s = o.find((l) => l.role === "motion" && l.address), n = o.filter((l) => l.address && l.input !== "referenceAudios").map((l) => l === s ? `${l.address} is the motion reference: follow its ${ue(l, t)}.` : `${l.address} is ${le[l.role].noun}; keep ${ue(l, t)}.`), a = Ce(t, s ? J(`${t.subject}, moving as in ${s.address}`) : void 0), c = o.some((l) => l.input === "referenceAudios"), d = t.audio || c ? N(["Sound:", t.audio ? J(t.audio) : null, c ? "Follow the reference audio." : null]) : null;
-  return N([N([...n, Ue(t)]), N([a, r.text]), d], `
+  const s = o.find((l) => l.role === "motion" && l.address), n = o.filter((l) => l.address && l.input !== "referenceAudios").map((l) => l === s ? `${l.address} is the motion reference: follow its ${ue(l, t)}.` : `${l.address} is ${le[l.role].noun}; keep ${ue(l, t)}.`), a = je(t, s ? q(`${t.subject}, moving as in ${s.address}`) : void 0), c = o.some((l) => l.input === "referenceAudios"), d = t.audio || c ? N(["Sound:", t.audio ? q(t.audio) : null, c ? "Follow the reference audio." : null]) : null;
+  return N([N([...n, Ce(t)]), N([a, r.text]), d], `
 
 `);
 }
-function Pt(e, t, o, r) {
+function Ut(e, t, o, r) {
   const s = e.id.startsWith("flux") ? o.map(
     (a) => a.input === "firstFrame" ? "Use this image as the first frame." : a.input === "lastFrame" ? "Use this image as the last frame." : a.input === "keyframes" ? "Use these images as keyframes, in order." : null
-  ) : [], n = t.audio ? `Audio: ${J(t.audio)}` : null;
-  return N([...new Set(s)], " ") + (s.some(Boolean) ? " " : "") + N([Ce(t), Ue(t), r.text, n]);
+  ) : [], n = t.audio ? `Audio: ${q(t.audio)}` : null;
+  return N([...new Set(s)], " ") + (s.some(Boolean) ? " " : "") + N([je(t), Ce(t), r.text, n]);
 }
 function cr(e, t, o, r) {
   switch (e.prompting.addressing.style) {
@@ -548,12 +559,12 @@ function cr(e, t, o, r) {
     case "at-mentions":
       return ir(e, t, o, r);
     case "plain-words":
-      return e.prompting.addressing.tokens.length ? dr(e, t, o, r) : Pt(e, t, o, r);
+      return e.prompting.addressing.tokens.length ? dr(e, t, o, r) : Ut(e, t, o, r);
     default:
-      return Pt(e, t, o, r);
+      return Ut(e, t, o, r);
   }
 }
-const ut = "https://runware.ai/docs/models", fe = (e) => `${ut}/${e}`, he = (e) => `${ut}/${e}/schema.json`, Ie = (e, t) => `${ut}/${e}/guides/${t}`, D = 1048576;
+const mt = "https://runware.ai/docs/models", fe = (e) => `${mt}/${e}`, he = (e) => `${mt}/${e}/schema.json`, Ie = (e, t) => `${mt}/${e}/guides/${t}`, D = 1048576;
 function F(e) {
   return {
     secondsEach: null,
@@ -570,7 +581,7 @@ const x = (e, t) => ({ min: e, max: t });
 function $(e, t, o, r = null, s) {
   return { supported: !0, field: e, maxCount: t, limits: r, source: o, ...s ? { note: s } : {} };
 }
-function V(e, t) {
+function U(e, t) {
   return { supported: !1, field: null, maxCount: null, limits: null, source: e, ...t ? { note: t } : {} };
 }
 const Le = "bfl-flux-3-video", xe = fe(Le), ee = he(Le), E = (e) => Ie(Le, e), L = (e, t, o) => ({ label: e, width: t, height: o }), lr = {
@@ -595,12 +606,12 @@ const Le = "bfl-flux-3-video", xe = fe(Le), ee = he(Le), E = (e) => Ie(Le, e), L
     firstFrame: $("inputs.frameImages", 1, E("keyframes")),
     lastFrame: $("inputs.frameImages", 1, E("keyframes")),
     keyframes: $("inputs.frameImages", 10, xe, null, "Placed by frame index (24 fps), timestamp, or first/last; unplaced images are spread evenly. Guidance, not a pixel-exact pin."),
-    referenceImages: V(ee),
-    referenceVideos: V(ee),
-    referenceAudios: V(ee),
+    referenceImages: U(ee),
+    referenceVideos: U(ee),
+    referenceAudios: U(ee),
     sourceVideo: $("inputs.video", 1, E("video-continuation"), F({ secondsEach: x(null, 15), maxBytesEach: 50 * D }), "Extension only: the clip is continued, not used as a motion reference."),
-    audioToVideo: V(ee, "No audio input; speech is a quoted line with a visible speaker."),
-    elements: V(ee)
+    audioToVideo: U(ee, "No audio input; speech is a quoted line with a visible speaker."),
+    elements: U(ee)
   },
   combinations: [
     {
@@ -744,7 +755,7 @@ const Le = "bfl-flux-3-video", xe = fe(Le), ee = he(Le), E = (e) => Ie(Le, e), L
         aspect: x(0.4, 2.5)
       })
     ),
-    referenceAudios: V(X, "No audio input in the schema."),
+    referenceAudios: U(X, "No audio input in the schema."),
     sourceVideo: $(
       "inputs.video",
       1,
@@ -752,7 +763,7 @@ const Le = "bfl-flux-3-video", xe = fe(Le), ee = he(Le), E = (e) => Ie(Le, e), L
       F({ secondsEach: x(3, 30), sidePx: x(700, 4553), maxAreaPx: 8294400, fps: x(24, 60), maxBytesEach: 300 * D, aspect: x(0.4, 2.5) }),
       "Prompt-based edit of the source clip."
     ),
-    audioToVideo: V(X),
+    audioToVideo: U(X),
     elements: $(
       "inputs.elements",
       7,
@@ -860,18 +871,18 @@ const Le = "bfl-flux-3-video", xe = fe(Le), ee = he(Le), E = (e) => Ie(Le, e), L
     "Element `images` is called optional on the model page but required with frontalImage by its own rule.",
     "Resolution preset only with an input; without inputs, width and height are required (schema allOf)."
   ]
-}, mt = "klingai-video-4-0-flash", Rt = fe(mt), O = he(mt), Y = {
+}, pt = "klingai-video-4-0-flash", Tt = fe(pt), O = he(pt), Y = {
   ...ie,
   id: "kling-4-flash",
   name: "Kling VIDEO 4.0 Flash",
   air: "klingai:kling-video@4.0-flash",
-  slug: mt,
-  sources: { model: Rt, schema: O, guides: ie.sources.guides },
+  slug: pt,
+  sources: { model: Tt, schema: O, guides: ie.sources.guides },
   inputs: {
     ...ie.inputs,
     firstFrame: $("inputs.frameImages", 1, O, de, "This model only supports the first frame."),
-    lastFrame: V(O, "First frame only."),
-    keyframes: V(O, "First frame only."),
+    lastFrame: U(O, "First frame only."),
+    keyframes: U(O, "First frame only."),
     referenceImages: $("inputs.referenceImages", 10, O, de),
     referenceVideos: $(
       "inputs.referenceVideos",
@@ -938,7 +949,7 @@ const Le = "bfl-flux-3-video", xe = fe(Le), ee = he(Le), E = (e) => Ie(Le, e), L
       { usdPerSecond: 0.126, tier: "720p", mode: "video-input", label: "720p · Video input" }
     ],
     surcharges: [],
-    source: Rt,
+    source: Tt,
     note: "The model page shows two figures per rate ($0.0799 / $0.094, $0.107 / $0.126) without saying which applies; the schema's x-pricing gives the higher, used here."
   },
   notes: [
@@ -948,13 +959,13 @@ const Le = "bfl-flux-3-video", xe = fe(Le), ee = he(Le), E = (e) => Ie(Le, e), L
     "Output fps: not stated. Frame-count rule: not stated.",
     "Seed: no request field; the response returns one."
   ]
-}, io = "lightricks-ltx-2-5-pro", ur = "lightricks-ltx-2-5-fast", R = (e) => Ie(io, e), co = [
+}, co = "lightricks-ltx-2-5-pro", ur = "lightricks-ltx-2-5-fast", V = (e) => Ie(co, e), lo = [
   { label: "720p (16:9)", width: 1280, height: 720 },
   { label: "720p (9:16)", width: 720, height: 1280 },
   { label: "1080p (16:9)", width: 1920, height: 1080 },
   { label: "1080p (9:16)", width: 1080, height: 1920 }
-], lo = "No 8k+1 frame rule and no divisibility rule in the API or docs: durations, fps and width/height are fixed lists, so any frame padding is hidden server-side.";
-function uo(e, t) {
+], uo = "No 8k+1 frame rule and no divisibility rule in the API or docs: durations, fps and width/height are fixed lists, so any frame padding is hidden server-side.";
+function mo(e, t) {
   const o = fe(e), r = he(e);
   return {
     id: "ltx-2.5",
@@ -967,24 +978,24 @@ function uo(e, t) {
       model: o,
       schema: r,
       guides: [
-        { title: "Prompting", url: R("prompting") },
-        { title: "Camera movement", url: R("camera-movement") },
-        { title: "First and last frame", url: R("first-and-last-frame") },
-        { title: "Audio-driven", url: R("audio-driven") },
-        { title: "Native audio", url: R("native-audio") },
-        { title: "Multi-shot", url: R("multi-shot") }
+        { title: "Prompting", url: V("prompting") },
+        { title: "Camera movement", url: V("camera-movement") },
+        { title: "First and last frame", url: V("first-and-last-frame") },
+        { title: "Audio-driven", url: V("audio-driven") },
+        { title: "Native audio", url: V("native-audio") },
+        { title: "Multi-shot", url: V("multi-shot") }
       ]
     },
     inputs: {
-      firstFrame: $("inputs.frameImages", 1, R("first-and-last-frame")),
-      lastFrame: $("inputs.frameImages", 1, R("first-and-last-frame")),
-      keyframes: V(r, "frameImages holds at most two items (first and last)."),
+      firstFrame: $("inputs.frameImages", 1, V("first-and-last-frame")),
+      lastFrame: $("inputs.frameImages", 1, V("first-and-last-frame")),
+      keyframes: U(r, "frameImages holds at most two items (first and last)."),
       referenceImages: $("inputs.referenceImages", 1, r, null, "Only in audio-driven mode, exactly one."),
-      referenceVideos: V(r),
-      referenceAudios: V(r),
-      sourceVideo: V(r, "Capabilities list Edit/Extend on Pro, but the schema has no source-video field."),
-      audioToVideo: $("inputs.audio", 1, R("audio-driven"), F({ secondsEach: x(2, t) }), "The clip runs as long as the audio."),
-      elements: V(r)
+      referenceVideos: U(r),
+      referenceAudios: U(r),
+      sourceVideo: U(r, "Capabilities list Edit/Extend on Pro, but the schema has no source-video field."),
+      audioToVideo: $("inputs.audio", 1, V("audio-driven"), F({ secondsEach: x(2, t) }), "The clip runs as long as the audio."),
+      elements: U(r)
     },
     combinations: [
       {
@@ -1009,7 +1020,7 @@ function uo(e, t) {
       defaultDuration: 6,
       resolutionField: "width-height",
       resolutions: ["720p", "1080p"],
-      sizes: co,
+      sizes: lo,
       fps: [24, 25, 50],
       frameCountRule: null,
       audio: { generates: !0, toggle: "settings.audio" },
@@ -1022,14 +1033,14 @@ function uo(e, t) {
         style: "none",
         tokens: [],
         numbering: "Inputs are not named in the prompt: the image sets the look and the prompt says what happens; with audio, describe the performance, not the words.",
-        source: R("first-and-last-frame")
+        source: V("first-and-last-frame")
       },
       rules: [
-        { text: "Cover six layers: shot, scene, action, character, camera, audio.", source: R("prompting") },
-        { text: "Write one flowing paragraph in the present tense, not a list.", source: R("prompting") },
-        { text: "Keep camera and subject motion in separate clauses, with one main action arc.", source: R("prompting") },
-        { text: "With a cameraMovement preset set, leave the move out of the prompt.", source: R("camera-movement") },
-        { text: "The tighter the shot, the more concrete the nouns.", source: R("prompting") }
+        { text: "Cover six layers: shot, scene, action, character, camera, audio.", source: V("prompting") },
+        { text: "Write one flowing paragraph in the present tense, not a list.", source: V("prompting") },
+        { text: "Keep camera and subject motion in separate clauses, with one main action arc.", source: V("prompting") },
+        { text: "With a cameraMovement preset set, leave the move out of the prompt.", source: V("camera-movement") },
+        { text: "The tighter the shot, the more concrete the nouns.", source: V("prompting") }
       ],
       seed: { supported: !1, max: null, source: o },
       negativePrompt: !1
@@ -1049,10 +1060,10 @@ function uo(e, t) {
       ],
       forbiddenWith: ["audioToVideo"],
       vocabulary: [
-        { term: "orbit", source: R("camera-movement"), move: "orbit", phrase: "The camera orbits slowly around the subject and ends facing it." },
-        { term: "handheld", source: R("camera-movement"), move: "handheld", phrase: "Handheld camera, following the subject closely." },
-        { term: "push in, pull back, track, tilt, pan, over-the-shoulder, crane", source: R("camera-movement") },
-        { term: "say where a described move ends", source: R("camera-movement") }
+        { term: "orbit", source: V("camera-movement"), move: "orbit", phrase: "The camera orbits slowly around the subject and ends facing it." },
+        { term: "handheld", source: V("camera-movement"), move: "handheld", phrase: "Handheld camera, following the subject closely." },
+        { term: "push in, pull back, track, tilt, pan, over-the-shoulder, crane", source: V("camera-movement") },
+        { term: "say where a described move ends", source: V("camera-movement") }
       ],
       source: r
     },
@@ -1065,7 +1076,7 @@ function uo(e, t) {
       source: o
     },
     notes: [
-      lo,
+      uo,
       "Frame count = duration × fps (e.g. 6 s at 24 fps is 144 frames, not 8k+1).",
       "Seed: no request field; the response returns one.",
       "settings.audio has no stated default.",
@@ -1074,27 +1085,27 @@ function uo(e, t) {
     ]
   };
 }
-const mr = uo(io, 10), re = uo(ur, 20), pr = {
-  ...re,
+const mr = mo(co, 10), se = mo(ur, 20), pr = {
+  ...se,
   id: "ltx-2.5-fast",
   name: "LTX-2.5 Fast",
   air: "lightricks:ltx@2.5-fast",
-  inputs: { ...re.inputs, sourceVideo: V(re.sources.schema) },
+  inputs: { ...se.inputs, sourceVideo: U(se.sources.schema) },
   combinations: [
-    ...re.combinations,
+    ...se.combinations,
     {
       id: "long-clip-size",
       text: "Clips over 10 s: no 48/50 fps, no explicit width/height and no 2K/4K (the default 1920×1080 applies).",
       when: [],
-      source: re.sources.schema
+      source: se.sources.schema
     }
   ],
   output: {
-    ...re.output,
+    ...se.output,
     durations: { kind: "list", values: [6, 8, 10, 12, 14, 16, 18, 20], auto: !0 },
     resolutions: ["720p", "1080p", "2K", "4K"],
     sizes: [
-      ...co,
+      ...lo,
       { label: "2K (16:9)", width: 2560, height: 1440 },
       { label: "2K (9:16)", width: 1440, height: 2560 },
       { label: "4K (16:9)", width: 3840, height: 2160 },
@@ -1110,16 +1121,16 @@ const mr = uo(io, 10), re = uo(ur, 20), pr = {
       { usdPerSecond: 0.3, tier: "4K", mode: "any", label: "4K" }
     ],
     surcharges: [],
-    source: re.sources.model
+    source: se.sources.model
   },
   notes: [
-    lo,
+    uo,
     "No Fast guides: prompting and camera rules are from the LTX-2.5 Pro guides, which say Fast shares the prompt structure.",
     "When width or height is sent, or fps is 48/50, duration must be at most 10 s; the page's own 12 s example at 1280×720 breaks this.",
     "Seed: no request field; the response returns one.",
     "settings.audio has no stated default."
   ]
-}, Me = "minimax-h3", ke = fe(Me), z = he(Me), P = (e) => Ie(Me, e), He = F({ sidePx: x(256, 5760), maxBytesEach: 30 * D, aspect: x(0.4, 2.5) }), Tt = F({ secondsEach: x(2, 15), secondsTotalMax: 15, maxBytesEach: 15 * D }), fr = {
+}, Me = "minimax-h3", ke = fe(Me), z = he(Me), P = (e) => Ie(Me, e), He = F({ sidePx: x(256, 5760), maxBytesEach: 30 * D, aspect: x(0.4, 2.5) }), Rt = F({ secondsEach: x(2, 15), secondsTotalMax: 15, maxBytesEach: 15 * D }), fr = {
   id: "h3",
   name: "MiniMax H3",
   lab: "MiniMax",
@@ -1141,7 +1152,7 @@ const mr = uo(io, 10), re = uo(ur, 20), pr = {
   inputs: {
     firstFrame: $("inputs.frameImages", 1, P("first-and-last-frame"), He),
     lastFrame: $("inputs.frameImages", 1, P("first-and-last-frame"), He),
-    keyframes: V(z, "frameImages holds at most two items (first and last)."),
+    keyframes: U(z, "frameImages holds at most two items (first and last)."),
     referenceImages: $("inputs.referenceImages", 9, z, He, "The guide advises two well-described images over nine loose ones."),
     referenceVideos: $(
       "inputs.referenceVideos",
@@ -1157,10 +1168,10 @@ const mr = uo(io, 10), re = uo(ur, 20), pr = {
       }),
       "Reference videos and reference audios share the 15 s total. Edits also go through this field."
     ),
-    referenceAudios: $("inputs.referenceAudios", 3, z, Tt, "Needs a reference image or video beside it."),
-    sourceVideo: V(z, "No inputs.video; the editing guide passes the clip to edit as a reference video."),
-    audioToVideo: $("inputs.referenceAudios", 3, z, Tt, "Through reference audio, beside an image or video reference."),
-    elements: V(z)
+    referenceAudios: $("inputs.referenceAudios", 3, z, Rt, "Needs a reference image or video beside it."),
+    sourceVideo: U(z, "No inputs.video; the editing guide passes the clip to edit as a reference video."),
+    audioToVideo: $("inputs.referenceAudios", 3, z, Rt, "Through reference audio, beside an image or video reference."),
+    elements: U(z)
   },
   combinations: [
     {
@@ -1265,7 +1276,7 @@ const mr = uo(io, 10), re = uo(ur, 20), pr = {
     "Prompt limit: the guide says 2,000 characters, the schema 7000.",
     "The model description claims continuation; there is no extension field or guide."
   ]
-}, Ne = "bytedance-seedance-2-5", Xe = fe(Ne), te = he(Ne), I = (e) => Ie(Ne, e), Je = F({ sidePx: x(300, 6e3), maxBytesEach: 30 * D, aspect: x(0.4, 2.5) }), hr = F({ secondsEach: x(2, 30), secondsTotalMax: 30, sidePx: x(300, 6e3), maxBytesEach: 200 * D, aspect: x(0.4, 2.5) }), jt = F({ secondsEach: x(2, 30), secondsTotalMax: 30, maxBytesEach: 15 * D }), qe = (e, t) => t.map(([o, r, s]) => ({ label: `${e} (${o})`, width: r, height: s })), gr = {
+}, Ne = "bytedance-seedance-2-5", Xe = fe(Ne), te = he(Ne), I = (e) => Ie(Ne, e), qe = F({ sidePx: x(300, 6e3), maxBytesEach: 30 * D, aspect: x(0.4, 2.5) }), hr = F({ secondsEach: x(2, 30), secondsTotalMax: 30, sidePx: x(300, 6e3), maxBytesEach: 200 * D, aspect: x(0.4, 2.5) }), jt = F({ secondsEach: x(2, 30), secondsTotalMax: 30, maxBytesEach: 15 * D }), Je = (e, t) => t.map(([o, r, s]) => ({ label: `${e} (${o})`, width: r, height: s })), gr = {
   id: "seedance-2.5",
   name: "Seedance 2.5",
   lab: "ByteDance",
@@ -1286,10 +1297,10 @@ const mr = uo(io, 10), re = uo(ur, 20), pr = {
     ]
   },
   inputs: {
-    firstFrame: $("inputs.frameImages", 1, I("image-to-video"), Je),
-    lastFrame: $("inputs.frameImages", 1, I("image-to-video"), Je, "Only beside a first frame; a last frame alone is rejected."),
-    keyframes: V(te, "frameImages holds at most two items (first and last)."),
-    referenceImages: $("inputs.referenceImages", 30, te, Je, "The guide calls 1-8 the stable band."),
+    firstFrame: $("inputs.frameImages", 1, I("image-to-video"), qe),
+    lastFrame: $("inputs.frameImages", 1, I("image-to-video"), qe, "Only beside a first frame; a last frame alone is rejected."),
+    keyframes: U(te, "frameImages holds at most two items (first and last)."),
+    referenceImages: $("inputs.referenceImages", 30, te, qe, "The guide calls 1-8 the stable band."),
     referenceVideos: $("inputs.referenceVideos", 10, te, hr, "The guide calls 1-5 the stable band, each about 5-10 s."),
     referenceAudios: $("inputs.referenceAudios", 10, te, jt, "Audio can be used on its own."),
     sourceVideo: $(
@@ -1300,7 +1311,7 @@ const mr = uo(io, 10), re = uo(ur, 20), pr = {
       "Edit or extend; settings.operation picks, or the prompt decides."
     ),
     audioToVideo: $("inputs.referenceAudios", 10, Xe, jt, "Audio-to-video runs through reference audio; there is no separate driving-audio field."),
-    elements: V(te)
+    elements: U(te)
   },
   combinations: [
     {
@@ -1331,9 +1342,9 @@ const mr = uo(io, 10), re = uo(ur, 20), pr = {
     resolutionField: "both",
     resolutions: ["480p", "720p", "1080p"],
     sizes: [
-      ...qe("480p", [["~16:9", 854, 480], ["~4:3", 752, 560], ["1:1", 640, 640], ["~3:4", 560, 752], ["~9:16", 480, 854], ["~21:9", 992, 432]]),
-      ...qe("720p", [["16:9", 1280, 720], ["4:3", 1112, 834], ["1:1", 960, 960], ["3:4", 834, 1112], ["9:16", 720, 1280], ["21:9", 1470, 630]]),
-      ...qe("1080p", [["16:9", 1920, 1080], ["4:3", 1664, 1248], ["1:1", 1440, 1440], ["3:4", 1248, 1664], ["9:16", 1080, 1920], ["~21:9", 2206, 946]])
+      ...Je("480p", [["~16:9", 854, 480], ["~4:3", 752, 560], ["1:1", 640, 640], ["~3:4", 560, 752], ["~9:16", 480, 854], ["~21:9", 992, 432]]),
+      ...Je("720p", [["16:9", 1280, 720], ["4:3", 1112, 834], ["1:1", 960, 960], ["3:4", 834, 1112], ["9:16", 720, 1280], ["21:9", 1470, 630]]),
+      ...Je("1080p", [["16:9", 1920, 1080], ["4:3", 1664, 1248], ["1:1", 1440, 1440], ["3:4", 1248, 1664], ["9:16", 1080, 1920], ["~21:9", 2206, 946]])
     ],
     fps: null,
     frameCountRule: null,
@@ -1399,7 +1410,7 @@ const mr = uo(io, 10), re = uo(ur, 20), pr = {
     "Prompt limit: the guide says 10,000 characters, the schema 50,000.",
     "Seed maximum is 2^31-1 while the text says random seeds use the unsigned 32-bit range."
   ]
-}, je = [
+}, Re = [
   ie,
   Y,
   gr,
@@ -1408,9 +1419,9 @@ const mr = uo(io, 10), re = uo(ur, 20), pr = {
   pr,
   lr
 ];
-function mo(e) {
-  const t = je.find((o) => o.id === e || o.air === e || o.slug === e);
-  if (!t) throw new Error(`No spec for "${e}". Known: ${je.map((o) => o.id).join(", ")}.`);
+function po(e) {
+  const t = Re.find((o) => o.id === e || o.air === e || o.slug === e);
+  if (!t) throw new Error(`No spec for "${e}". Known: ${Re.map((o) => o.id).join(", ")}.`);
   return t;
 }
 const br = {
@@ -1432,12 +1443,12 @@ function wr(e, t, o) {
   for (const u of t.references) {
     const m = vr(e, u), f = { ref: u, input: m };
     if (!e.inputs[m].supported) {
-      r.push({ ref: u.id, role: u.role, wanted: m, reason: `${e.name} takes no ${Ut(m)}.` });
+      r.push({ ref: u.id, role: u.role, wanted: m, reason: `${e.name} takes no ${Lt(m)}.` });
       continue;
     }
     const v = e.inputs[m].maxCount;
     if (v !== null && d(m) >= v) {
-      r.push({ ref: u.id, role: u.role, wanted: m, reason: `${e.name} takes at most ${v} ${Ut(m)}.` });
+      r.push({ ref: u.id, role: u.role, wanted: m, reason: `${e.name} takes at most ${v} ${Lt(m)}.` });
       continue;
     }
     n.push(f);
@@ -1447,7 +1458,7 @@ function wr(e, t, o) {
     for (const m of e.combinations) {
       if (m.when.length === 0 || !m.when.every(c)) continue;
       const f = n.filter((b) => m.when.includes(b.input));
-      if (p && m.forbidsParams?.includes(p) && (o.prefer ?? "camera-parameter") === "camera-parameter" && po(e, t.camera)) {
+      if (p && m.forbidsParams?.includes(p) && (o.prefer ?? "camera-parameter") === "camera-parameter" && fo(e, t.camera)) {
         for (const b of f) a(b, `${m.text} The camera parameter was kept.`);
         continue;
       }
@@ -1476,7 +1487,7 @@ function wr(e, t, o) {
   }
   return { slots: n, dropped: r, notes: s };
 }
-function po(e, t) {
+function fo(e, t) {
   return e.camera.kind === "parameter" ? e.camera.values.find((o) => o.move === t)?.value : void 0;
 }
 const yr = {
@@ -1489,7 +1500,7 @@ const yr = {
   sourceVideo: "source video",
   audioToVideo: "driving audio",
   elements: "elements"
-}, Ut = (e) => yr[e];
+}, Lt = (e) => yr[e];
 function xr(e, t) {
   const o = /* @__PURE__ */ new Map(), { style: r, tokens: s } = e.prompting.addressing, n = (d) => s.find((l) => l.input === d)?.pattern, a = (d) => d.flatMap((l) => t.filter((p) => p.input === l)), c = (d, l) => {
     const p = n(l);
@@ -1504,14 +1515,14 @@ function kr(e, t, o) {
   return r.kind === "range" ? s = Math.min(r.max, Math.max(r.min, Math.round(t))) : s = r.values.reduce((n, a) => Math.abs(a - t) < Math.abs(n - t) ? a : n), s !== t && o.push(`Duration ${t} s is not offered; ${s} s is sent.`), s;
 }
 function $r(e, t, o = {}) {
-  const r = typeof e == "string" ? mo(e) : e, { slots: s, dropped: n, notes: a } = wr(r, t, o), c = xr(r, s), d = s.map((g) => ({
+  const r = typeof e == "string" ? po(e) : e, { slots: s, dropped: n, notes: a } = wr(r, t, o), c = xr(r, s), d = s.map((g) => ({
     ref: g.ref.id,
     role: g.ref.role,
     input: g.input,
     field: r.inputs[g.input].field,
     address: c.get(g) ?? null,
     ...g.convertedFrom ? { convertedFrom: g.convertedFrom } : {}
-  })), l = {}, p = po(r, t.camera), u = r.camera.kind === "parameter" ? r.camera.forbiddenWith.some((g) => d.some((y) => y.input === g)) : !0, m = d.some((g) => g.input === "referenceVideos" && g.role === "motion");
+  })), l = {}, p = fo(r, t.camera), u = r.camera.kind === "parameter" ? r.camera.forbiddenWith.some((g) => d.some((y) => y.input === g)) : !0, m = d.some((g) => g.input === "referenceVideos" && g.role === "motion");
   let f;
   if (t.camera === "guide") {
     const g = d.find((y) => y.input === "referenceVideos" && y.role === "motion");
@@ -1544,7 +1555,7 @@ function $r(e, t, o = {}) {
     notes: a
   };
 }
-class fo extends Error {
+class ho extends Error {
   constructor(t) {
     super(t), this.name = "FitError";
   }
@@ -1561,9 +1572,9 @@ function $e(e, t, o, r) {
     `${e} takes ${t} up to ${Math.round(r.maxBytes / 1048576)} MB; ${o.name} is ${(p / 1048576).toFixed(1)} MB.${u ? " Save it as a JPEG or at a smaller size." : ""}`
   ), s;
 }
-const Lt = (e) => e.reduce((t, o) => t === void 0 || o.info?.seconds === void 0 ? void 0 : t + o.info.seconds, 0);
-function ho(e, t, o, r, s = !1) {
-  const n = t.sharedSeconds?.max, a = Lt(o), c = Lt(r);
+const Ft = (e) => e.reduce((t, o) => t === void 0 || o.info?.seconds === void 0 ? void 0 : t + o.info.seconds, 0);
+function go(e, t, o, r, s = !1) {
+  const n = t.sharedSeconds?.max, a = Ft(o), c = Ft(r);
   if (n === void 0 || !r.length || a === void 0 || c === void 0 || a + c <= n) return { drop: !1 };
   const d = (l) => `${Math.round(l * 100) / 100} s`;
   return s ? {
@@ -1580,7 +1591,7 @@ function Sr(e, t) {
     !n && e.approach === "reference-video" && u(`${o} is a reference-video lane; pass the guide clip.`), n && (!e.referenceVideos && e.approach === "reference-video" ? u(`${o} takes no reference video.`) : (e.referenceVideos && s.push(...$e(o, "reference videos", n, e.referenceVideos)), r.referenceVideos.push(n))), c && (e.referenceImages ? (s.push(...$e(o, "reference images", c, e.referenceImages)), r.referenceImages.push(c)) : u(`${o} takes no reference image for the character.`)), d && (e.referenceImages ? (s.push(...$e(o, "reference images", d, e.referenceImages)), r.referenceImages.push(d)) : u(`${o} takes no reference image for the environment.`)), a && (e.startFrameWithReferences && e.frameImages ? r.frameImages.push({ media: a, frame: "first" }) : e.referenceImages ? (r.referenceImages.push(a), r.notes.push(
       `${o} refuses a start frame beside reference videos, so the first frame goes in as an image reference.`
     )) : u(`${o} cannot take the first frame with a reference video.`)), l && (e.referenceAudios ? (s.push(...$e(o, "reference audio", l, e.referenceAudios)), r.referenceAudios.push(l)) : u(`${o} takes no reference audio; drop --audio for this lane.`));
-    const m = ho(o, e, r.referenceVideos, r.referenceAudios, t.requireAudio);
+    const m = go(o, e, r.referenceVideos, r.referenceAudios, t.requireAudio);
     m.problem && u(m.problem), m.drop && (r.referenceAudios = [], r.notes.push(m.note)), p.length && u(`${o} is fed the whole clip; keyframes belong to the FLUX 3 Video lane.`);
   } else if (e.approach === "audio-first-frame")
     c && u(`${o} takes no character reference beside a guide; pass the still as --first-frame instead.`), d && u(`${o} takes one image only; pass the environment still as --first-frame instead.`), n && u(`${o} takes no reference video. Pass --audio and --first-frame instead of --guide.`), p.length && u(`${o} takes a first frame (and optionally a last), not keyframes.`), l ? e.drivingAudio ? (a || u(`${o} needs a reference image beside the audio; pass --first-frame.`), s.push(...$e(o, "audio", l, e.drivingAudio)), r.drivingAudio = l, a && (r.referenceImages.push(a), r.notes.push(
@@ -1592,7 +1603,7 @@ function Sr(e, t) {
       typeof m.frame == "number" && !e.frameImages?.indexPositions && u(`${o} only places frames first or last.`), r.frameImages.push(m);
     r.frameImages.length || u(`${o} needs --first-frame or keyframes.`);
   }
-  if (e.frameImages && r.frameImages.length > e.frameImages.max && u(`${o} takes at most ${e.frameImages.max} frame images; got ${r.frameImages.length}.`), e.referenceImages && r.referenceImages.length > e.referenceImages.max && u(`${o} takes at most ${e.referenceImages.max} reference images.`), s.length) throw new fo(s.join(`
+  if (e.frameImages && r.frameImages.length > e.frameImages.max && u(`${o} takes at most ${e.frameImages.max} frame images; got ${r.frameImages.length}.`), e.referenceImages && r.referenceImages.length > e.referenceImages.max && u(`${o} takes at most ${e.referenceImages.max} reference images.`), s.length) throw new ho(s.join(`
 `));
   return r;
 }
@@ -1735,7 +1746,7 @@ const ge = (e) => `https://runware.ai/docs/models/${e}/schema.json`, ne = { max:
   ],
   inputVideoUsdPerSecond: 0.13,
   schemaUrl: ge("minimax-h3")
-}, Pr = ["dolly_in", "dolly_out", "dolly_left", "dolly_right", "jib_up", "jib_down", "static", "focus_shift"], rt = {
+}, Pr = ["dolly_in", "dolly_out", "dolly_left", "dolly_right", "jib_up", "jib_down", "static", "focus_shift"], st = {
   key: "ltx-2.5",
   air: "lightricks:ltx@2.5-pro",
   slug: "lightricks-ltx-2-5-pro",
@@ -1758,20 +1769,20 @@ const ge = (e) => `https://runware.ai/docs/models/${e}/schema.json`, ne = { max:
     { usdPerSecond: 0.17, label: "1080p", resolution: "1080p" }
   ],
   schemaUrl: ge("lightricks-ltx-2-5-pro")
-}, Vr = {
-  ...rt,
+}, Ur = {
+  ...st,
   key: "ltx-2.5-fast",
   air: "lightricks:ltx@2.5-fast",
   slug: "lightricks-ltx-2-5-fast",
   name: "LTX-2.5 Fast",
-  caps: { ...rt.caps, drivingAudio: { max: 1, minSeconds: 2, maxSeconds: 20 } },
+  caps: { ...st.caps, drivingAudio: { max: 1, minSeconds: 2, maxSeconds: 20 } },
   duration: { kind: "enum", values: [6, 8, 10, 12, 14, 16, 18, 20], auto: !0 },
   rates: [
     { usdPerSecond: 0.09, label: "720p", resolution: "720p" },
     { usdPerSecond: 0.13, label: "1080p", resolution: "1080p" }
   ],
   schemaUrl: ge("lightricks-ltx-2-5-fast")
-}, Rr = {
+}, Vr = {
   key: "flux-3-video",
   air: "bfl:flux@3-video",
   slug: "bfl-flux-3-video",
@@ -1807,14 +1818,14 @@ const ge = (e) => `https://runware.ai/docs/models/${e}/schema.json`, ne = { max:
   duration: { kind: "range", min: 1, max: 30, auto: !1 },
   rates: [],
   schemaUrl: "https://runware.ai/docs/models-api/model-router"
-}, Ft = [Te, Ir, Er, Ar, rt, Vr, Rr, Tr];
-function pt(e) {
-  const t = Ft.find((o) => o.key === e || o.air === e || o.slug === e);
-  if (!t) throw new Error(`Unknown model "${e}". Use one of: ${Ft.map((o) => o.key).join(", ")}.`);
+}, Mt = [Te, Ir, Er, Ar, st, Ur, Vr, Tr];
+function ft(e) {
+  const t = Mt.find((o) => o.key === e || o.air === e || o.slug === e);
+  if (!t) throw new Error(`Unknown model "${e}". Use one of: ${Mt.map((o) => o.key).join(", ")}.`);
   return t;
 }
-const jr = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, Cr = (e, t) => `{{upload:${e}:${t.replace(/[^A-Za-z0-9._-]/g, "_").slice(0, 80)}}}`;
-function Ur() {
+const Rr = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, jr = (e, t) => `{{upload:${e}:${t.replace(/[^A-Za-z0-9._-]/g, "_").slice(0, 80)}}}`;
+function Cr() {
   return globalThis.crypto.randomUUID();
 }
 class A extends Error {
@@ -1849,8 +1860,8 @@ function Nr(e, t) {
   }
   return e.key === "h3" && (t.images ?? 0) > 5 && (s += 0.04 * ((t.images ?? 0) - 5), n += " + $0.04 per image beyond five"), { usd: Math.round(s * 1e4) / 1e4, basis: n };
 }
-function go(e, t = Ur()) {
-  const o = pt(e.model), r = e.prompt.trim();
+function bo(e, t = Cr()) {
+  const o = ft(e.model), r = e.prompt.trim();
   if (r.length < o.prompt.min || r.length > o.prompt.max)
     throw new A(`${o.name} takes a prompt of ${o.prompt.min}-${o.prompt.max} characters.`);
   if (o.key === "auto" && !(e.routing && e.routing.maxPrice > 0))
@@ -1868,7 +1879,7 @@ function go(e, t = Ur()) {
       keyframes: e.keyframes
     });
   } catch (h) {
-    throw h instanceof fo ? new A(h.message) : h;
+    throw h instanceof ho ? new A(h.message) : h;
   }
   const n = [], a = [], c = (h, g, y) => {
     if (a.push({
@@ -1876,13 +1887,13 @@ function go(e, t = Ur()) {
       src: h.displaySrc ?? h.name,
       label: h.name,
       ...y !== void 0 ? { frame: y } : {}
-    }), jr.test(h.ref) || /^https:\/\//.test(h.ref)) return h.ref;
+    }), Rr.test(h.ref) || /^https:\/\//.test(h.ref)) return h.ref;
     if (!/^data:[a-z]+\/[a-z0-9.+-]+;base64,/i.test(h.ref))
       throw new A(`${h.name}: media must be an https URL, a media UUID or a data URI.`);
-    const j = n.find((Q) => Q.media === h);
-    if (j) return j.placeholder;
-    const C = Cr(n.length + 1, h.name);
-    return n.push({ placeholder: C, media: h }), C;
+    const R = n.find((Q) => Q.media === h);
+    if (R) return R.placeholder;
+    const j = jr(n.length + 1, h.name);
+    return n.push({ placeholder: j, media: h }), j;
   }, d = {};
   s.frameImages.length && (d.frameImages = s.frameImages.map((h) => ({ image: c(h.media, "frameImage", h.frame), frame: h.frame }))), s.referenceImages.length && (d.referenceImages = s.referenceImages.map((h) => c(h, "referenceImage"))), s.referenceVideos.length && (d.referenceVideos = s.referenceVideos.map((h) => c(h, "referenceVideo"))), s.referenceAudios.length && (d.referenceAudios = s.referenceAudios.map((h) => c(h, "referenceAudio"))), s.drivingAudio && (d.audio = c(s.drivingAudio, "audio"));
   const l = {
@@ -1968,25 +1979,25 @@ function _r(e, t) {
     const d = Ze(e.inputs.audioToVideo.limits?.secondsEach, "s");
     return `Audio + first frame only: does not use the guide video. Takes the guide's audio${d ? ` (${d})` : ""} and exactly one image: frame 0, your character sheet or your environment image, not both. The clip runs as long as the audio.`;
   }
-  const o = e.inputs.referenceVideos.limits, r = [Ze(o?.secondsEach, "s"), o?.sidePx?.min ? `${o.sidePx.min}+ px a side` : null, Ze(o?.fps, "fps")].filter(Boolean).join(", "), s = pt(e.id).caps.sharedSeconds?.max, n = e.inputs.referenceAudios.supported ? `its audio as reference audio${s ? ` when clip and audio fit ${s} s together` : ""}` : "no audio input", a = e.inputs.referenceImages, c = a.supported ? `; up to ${a.maxCount ?? "several"} reference images beside it: character sheet${Qe(e, "image", 1)}, environment${Qe(e, "image", 2)}` : "; no reference images";
+  const o = e.inputs.referenceVideos.limits, r = [Ze(o?.secondsEach, "s"), o?.sidePx?.min ? `${o.sidePx.min}+ px a side` : null, Ze(o?.fps, "fps")].filter(Boolean).join(", "), s = ft(e.id).caps.sharedSeconds?.max, n = e.inputs.referenceAudios.supported ? `its audio as reference audio${s ? ` when clip and audio fit ${s} s together` : ""}` : "no audio input", a = e.inputs.referenceImages, c = a.supported ? `; up to ${a.maxCount ?? "several"} reference images beside it: character sheet${Qe(e, "image", 1)}, environment${Qe(e, "image", 2)}` : "; no reference images";
   return `The whole guide clip as a reference video${Qe(e, "video", 1)} (${r}); ${n}${c}.`;
 }
 function Br(e) {
   const t = e.sources.guides;
   return t.find((o) => /prompt/i.test(o.title)) ?? t[0] ?? { title: "Model page", url: e.sources.model };
 }
-function ft(e) {
+function ht(e) {
   if (!me.includes(e))
     throw new A(`The generate flow offers ${me.join(", ")}; "${e}" is not one of them.`);
-  const t = mo(e), o = t.inputs.referenceVideos.supported ? "guide-video" : "audio-first-frame";
+  const t = po(e), o = t.inputs.referenceVideos.supported ? "guide-video" : "audio-first-frame";
   return { key: e, name: t.name, use: o, line: _r(t, o), guide: Br(t) };
 }
-const bo = () => me.map(ft);
+const vo = () => me.map(ht);
 function zr(e, t, o) {
-  const r = ft(t), s = [], n = [];
+  const r = ht(t), s = [], n = [];
   if (r.use === "guide-video") {
     n.push({ id: "guide", kind: "video", role: "motion" }), o.hasCharacter && n.push({ id: "character", kind: "image", role: "character", replaces: "the figure in the guide" }), o.hasEnvironment && n.push({ id: "environment", kind: "image", role: "setting", replaces: "the guide's background" });
-    const c = o.hasAudio ? ho(r.name, pt(r.key).caps, [{ name: "guide", info: { seconds: o.seconds, hasAudio: o.audioInVideo } }], [{ name: "audio", info: { seconds: o.audioSeconds ?? o.seconds } }], o.requireAudio) : { drop: !1 };
+    const c = o.hasAudio ? go(r.name, ft(r.key).caps, [{ name: "guide", info: { seconds: o.seconds, hasAudio: o.audioInVideo } }], [{ name: "audio", info: { seconds: o.audioSeconds ?? o.seconds } }], o.requireAudio) : { drop: !1 };
     if (c.problem) throw new A(c.problem);
     c.drop ? s.push(c.note) : o.hasAudio && n.push({ id: "audio", kind: "audio", role: "soundtrack" });
   } else {
@@ -2006,7 +2017,7 @@ function zr(e, t, o) {
   }, notes: s };
 }
 function De(e, t, o) {
-  const r = ft(t), { shot: s, notes: n } = zr(e, t, o), a = $r(t, s, r.use === "audio-first-frame" ? { prefer: "inputs" } : {});
+  const r = ht(t), { shot: s, notes: n } = zr(e, t, o), a = $r(t, s, r.use === "audio-first-frame" ? { prefer: "inputs" } : {});
   return { model: r, composed: a, shot: s, notes: n };
 }
 const Gr = (e, t, o = Or) => o.map((r) => De(e, r, t));
@@ -2027,8 +2038,8 @@ function nn(e, t, o = {}, r = {}) {
     shot: a.shot
   };
 }
-const an = () => bo();
-function vo(e, t) {
+const an = () => vo();
+function wo(e, t) {
   const { guide: o, character: r, environment: s } = e, n = e.prompt?.trim() || void 0, a = e.shot ?? o.shot ?? (n ? { subject: n, action: "" } : void 0);
   if (!a || !a.subject.trim()) throw new A("Describe the shot (subject and action), or write a prompt.");
   const c = { seconds: o.seconds, hasAudio: !!o.audio, hasCharacter: !!r, hasEnvironment: !!s, audioInVideo: o.meta.audioInVideo === !0, audioSeconds: o.audio?.info?.seconds, requireAudio: e.requireAudio }, { model: d, composed: l, shot: p, notes: u } = De(a, e.model, c);
@@ -2042,7 +2053,7 @@ function vo(e, t) {
   typeof l.params.duration == "number" && (f.duration = l.params.duration);
   const v = l.params["settings.cameraMovement"];
   typeof v == "string" && (f.camera = v), e.resolution && (f.resolution = e.resolution), e.requireAudio && (f.requireAudio = !0);
-  const b = go(f, t);
+  const b = bo(f, t);
   return {
     plan: b,
     request: f,
@@ -2060,7 +2071,7 @@ function Kr(e) {
 const Wr = (e) => new Promise((t) => setTimeout(t, e));
 function Hr(e, t, o, r = "videoURL") {
   const s = o.filter((l) => l.taskUUID === e || !l.taskUUID);
-  if (s.length) return { state: "error", error: new se(200, s) };
+  if (s.length) return { state: "error", error: new oe(200, s) };
   const n = t.filter((l) => l.taskUUID === e), a = n.find((l) => l.status === "success" || typeof l[r] == "string");
   if (a && typeof a[r] == "string")
     return {
@@ -2079,7 +2090,7 @@ function Hr(e, t, o, r = "videoURL") {
     const l = c.error ?? {};
     return {
       state: "error",
-      error: new se(200, [{ code: l.code ?? "error", message: l.message ?? "Task failed.", taskUUID: e }])
+      error: new oe(200, [{ code: l.code ?? "error", message: l.message ?? "Task failed.", taskUUID: e }])
     };
   }
   const d = n.find((l) => l.status === "processing");
@@ -2099,7 +2110,7 @@ async function Xr(e, t, o = {}) {
     await r(c), c = Math.min(d, Math.round(c * 1.5));
   }
 }
-async function Jr(e, t, o, r, s) {
+async function qr(e, t, o, r, s) {
   if (r && r !== "auto") return r;
   if (t.modelId !== "auto") return t.modelId;
   try {
@@ -2109,14 +2120,14 @@ async function Jr(e, t, o, r, s) {
     return null;
   }
 }
-function qr(e) {
-  const t = new Fo({ getKey: e.getKey, fetch: e.fetch });
+function Jr(e) {
+  const t = new ot({ getKey: e.getKey, fetch: e.fetch });
   async function o(r, s, n, a) {
     const c = String(s.taskUUID), d = await Xr(t, c, {
       ...e.poll,
       signal: a.signal,
       onProgress: (p, u) => a.onProgress?.({ stage: "poll", message: p, progress: u })
-    }), l = await Jr(t, r, c, d.model, a.signal);
+    }), l = await qr(t, r, c, d.model, a.signal);
     return a.onProgress?.({ stage: "done", message: "done" }), {
       taskUUID: c,
       videoURL: d.videoURL,
@@ -2129,7 +2140,7 @@ function qr(e) {
   return {
     id: "runware-api",
     client: t,
-    plan: (r) => go(r),
+    plan: (r) => bo(r),
     async run(r, s = {}) {
       const n = Date.now(), a = /* @__PURE__ */ new Map();
       for (const p of r.uploads) {
@@ -2140,7 +2151,7 @@ function qr(e) {
       const c = Dr(r.task, a);
       s.onProgress?.({ stage: "submit", message: "submitting" });
       const { errors: d } = await t.post([c], s.signal), l = d.filter((p) => !p.taskUUID || p.taskUUID === c.taskUUID);
-      if (l.length) throw new se(400, l);
+      if (l.length) throw new oe(400, l);
       return o(r, c, n, s);
     },
     /** Polls an already-submitted task without sending it again. */
@@ -2157,35 +2168,35 @@ class T extends Error {
   taskUUID;
 }
 const Yr = /^[\x21-\x7e]{16,512}$/, Zr = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp" }, Qr = (e) => typeof e == "object" && e !== null && "manifest" in e && "video" in e, es = ["image/png", "image/jpeg", "image/webp"], ts = 30 * 1048576;
-async function st(e, t) {
+async function nt(e, t) {
   if (!e) return;
   const o = e instanceof Blob ? e : e.blob;
   if (!(o instanceof Blob)) throw new T("refused", `The ${t} reference must be an image Blob.`);
   if (!es.includes(o.type)) throw new T("refused", `The ${t} image must be PNG, JPEG or WebP; got ${o.type || "an unknown type"}.`);
   if (o.size > ts) throw new T("refused", `The ${t} image is over 30 MB.`);
   let s = ((e instanceof Blob ? e.name : e.name ?? e.blob.name) || t).split(/[\\/]/).pop();
-  lt(s) !== o.type && (s = `${s.replace(/\.[A-Za-z0-9]{1,5}$/, "")}.${Zr[o.type]}`);
+  ut(s) !== o.type && (s = `${s.replace(/\.[A-Za-z0-9]{1,5}$/, "")}.${Zr[o.type]}`);
   const n = e instanceof Blob ? void 0 : e.src;
   try {
-    return await or(nt(o, s), n && /^https?:\/\//.test(n) ? n : void 0);
+    return await or(at(o, s), n && /^https?:\/\//.test(n) ? n : void 0);
   } catch (a) {
     throw new T("refused", `The ${t} image: ${a.message}`);
   }
 }
-function nt(e, t) {
+function at(e, t) {
   return { name: t, size: e.size, bytes: async () => new Uint8Array(await e.arrayBuffer()) };
 }
-function wo(e) {
+function yo(e) {
   const t = typeof e[Symbol.iterator] == "function" || "length" in e ? Array.from(e) : [];
-  return t.length ? t.map((o, r) => nt(o, o.name ?? `file-${r}`)) : Object.entries(e).map(([o, r]) => nt(r, o));
+  return t.length ? t.map((o, r) => at(o, o.name ?? `file-${r}`)) : Object.entries(e).map(([o, r]) => at(r, o));
 }
 function os(e, t, o, r) {
   if (e instanceof T) return e;
   const s = r(e?.message ?? String(e)), n = o ? ` The task was already submitted and may still finish and be billed (taskUUID ${o}); do not resubmit.` : " Nothing was submitted.";
-  return t?.aborted || e?.name === "AbortError" || s.startsWith("Stopped polling") ? new T("aborted", `Stopped.${n}`, o) : s.startsWith("Still running after") ? new T("timeout", s, o) : e instanceof B ? new T("bad-bundle", s) : e instanceof A ? new T("refused", s) : e instanceof se && (e.status === 401 || e.status === 403 || e.errors.some((c) => /key|auth/i.test(c.code))) || /No Runware API key|does not look like a Runware API key/.test(s) ? new T("invalid-key", "The key was refused. Check it in the key panel; it is sent only to api.runware.ai.") : new T("provider", s, o);
+  return t?.aborted || e?.name === "AbortError" || s.startsWith("Stopped polling") ? new T("aborted", `Stopped.${n}`, o) : s.startsWith("Still running after") ? new T("timeout", s, o) : e instanceof B ? new T("bad-bundle", s) : e instanceof A ? new T("refused", s) : e instanceof oe && (e.status === 401 || e.status === 403 || e.errors.some((c) => /key|auth/i.test(c.code))) || /No Runware API key|does not look like a Runware API key/.test(s) ? new T("invalid-key", "The key was refused. Check it in the key panel; it is sent only to api.runware.ai.") : new T("provider", s, o);
 }
 async function rs(e) {
-  const t = e.key, o = typeof t == "function" ? t : typeof t == "string" ? () => t : () => t.getKey(), r = qr({
+  const t = e.key, o = typeof t == "function" ? t : typeof t == "string" ? () => t : () => t.getKey(), r = Jr({
     getKey: o,
     fetch: e.fetch,
     poll: { timeoutMs: 20 * 6e4, ...e.poll }
@@ -2197,7 +2208,7 @@ async function rs(e) {
     const c = o();
     if (!c || !Yr.test(c)) throw new T("invalid-key", "Connect a Runware API key first (16-512 characters, no spaces).");
     n({ stage: "plan", message: "reading the guide" });
-    const d = Qr(e.guide) ? e.guide : await ao(wo(e.guide)), l = await st(e.references?.character, "character"), p = await st(e.references?.environment, "environment"), u = vo({ guide: d, model: e.model, shot: e.shot, prompt: e.prompt, character: l, environment: p, resolution: e.resolution, requireAudio: e.requireAudio }, e.taskUUID), { plan: m } = u;
+    const d = Qr(e.guide) ? e.guide : await io(yo(e.guide)), l = await nt(e.references?.character, "character"), p = await nt(e.references?.environment, "environment"), u = wo({ guide: d, model: e.model, shot: e.shot, prompt: e.prompt, character: l, environment: p, resolution: e.resolution, requireAudio: e.requireAudio }, e.taskUUID), { plan: m } = u;
     if (m.estimate.usd === null) throw new T("no-estimate", `No price estimate for ${m.modelName}; it cannot be checked against maxPrice.`);
     if (m.estimate.usd > e.maxPrice)
       throw new T("over-price", `Estimated $${m.estimate.usd.toFixed(2)} (${m.estimate.basis}) is over your cap of $${e.maxPrice.toFixed(2)}.`);
@@ -2213,8 +2224,8 @@ async function rs(e) {
     if (e.signal?.aborted) throw new T("aborted", "Stopped. Nothing was submitted.");
     const v = await r.run(m, {
       signal: e.signal,
-      onProgress: (C) => {
-        (C.stage === "submit" || C.stage === "poll") && (a = String(m.task.taskUUID)), n(C);
+      onProgress: (j) => {
+        (j.stage === "submit" || j.stage === "poll") && (a = String(m.task.taskUUID)), n(j);
       }
     }), b = Co(e.laneId ?? "lane-1", m, u.request, v, v.videoURL);
     u.marker && (b.composed = u.marker, b.shot = u.shot);
@@ -2233,14 +2244,14 @@ async function rs(e) {
       taskUUID: v.taskUUID,
       duration: String(u.request.duration ?? "audio length"),
       resolution: jo(m.task),
-      inputs: m.inputsSent.map((C) => C.role).join("+"),
+      inputs: m.inputsSent.map((j) => j.role).join("+"),
       estimateUsd: m.estimate.usd,
       costUsd: v.costUsd,
       seconds: v.generationSeconds,
       output: v.videoURL,
       status: "ok (browser)"
-    }, j = [...u.notes];
-    return v.costUsd !== null && v.costUsd > e.maxPrice && j.push(`Reported cost $${v.costUsd} is over the cap of $${e.maxPrice}.`), n({ stage: "done", message: "done" }), {
+    }, R = [...u.notes];
+    return v.costUsd !== null && v.costUsd > e.maxPrice && R.push(`Reported cost $${v.costUsd} is over the cap of $${e.maxPrice}.`), n({ stage: "done", message: "done" }), {
       videoURL: v.videoURL,
       costUsd: v.costUsd,
       generationSeconds: v.generationSeconds,
@@ -2251,8 +2262,8 @@ async function rs(e) {
       lane: b,
       record: g,
       costRow: y,
-      costRowText: To(y),
-      notes: j,
+      costRowText: Ro(y),
+      notes: R,
       task: v.task
     };
   } catch (c) {
@@ -2338,12 +2349,12 @@ function ds(e, t, o) {
     e.note ? i("div", { class: "note" }, e.note) : null
   ), solo: r };
 }
-const Ve = "model-arena:runware-key";
+const Ue = "model-arena:runware-key";
 class cs {
   constructor(t = ls()) {
     this.storage = t;
     try {
-      this.key = this.storage?.getItem(Ve) ?? void 0;
+      this.key = this.storage?.getItem(Ue) ?? void 0;
     } catch {
       this.key = void 0;
     }
@@ -2354,14 +2365,14 @@ class cs {
   set(t, o = "memory") {
     this.key = t.trim() || void 0;
     try {
-      o === "session" && this.key ? this.storage?.setItem(Ve, this.key) : this.storage?.removeItem(Ve);
+      o === "session" && this.key ? this.storage?.setItem(Ue, this.key) : this.storage?.removeItem(Ue);
     } catch {
     }
   }
   clear() {
     this.key = void 0;
     try {
-      this.storage?.removeItem(Ve);
+      this.storage?.removeItem(Ue);
     } catch {
     }
   }
@@ -2376,7 +2387,7 @@ function ls() {
 const us = `
   --ma-bg: #18181b; --ma-card: #1f1f23; --ma-fg: #f4f4f5; --ma-muted: #a1a1aa;
   --ma-line: #3f3f46; --ma-input: #27272a; --ma-chip: #2e2e33;
-  --ma-accent: #e4e4e7; --ma-accent-fg: #18181b; --ma-warn: #fbbf24; --ma-ok: #86efac;`, Mt = `
+  --ma-accent: #e4e4e7; --ma-accent-fg: #18181b; --ma-warn: #fbbf24; --ma-ok: #86efac;`, Nt = `
   --ma-bg: #ffffff; --ma-card: #f7f7f8; --ma-fg: #18181b; --ma-muted: #52525b;
   --ma-line: #d4d4d8; --ma-input: #efeff1; --ma-chip: #e7e7ea;
   --ma-accent: #27272a; --ma-accent-fg: #ffffff; --ma-warn: #9a5800; --ma-ok: #166534;`, ms = `
@@ -2386,8 +2397,8 @@ const us = `
   /* css */
   `
 :host {${us}${ms} }
-:host([theme="light"]) {${Mt} }
-@media (prefers-color-scheme: light) { :host([theme="auto"]) {${Mt} } }
+:host([theme="light"]) {${Nt} }
+@media (prefers-color-scheme: light) { :host([theme="auto"]) {${Nt} } }
 `
 ), ps = [
   "--ma-bg",
@@ -2406,11 +2417,11 @@ const us = `
   "--ma-gap",
   "--ma-font",
   "--ma-mono"
-], fs = /^[\x21-\x7e]{16,512}$/, Nt = "https://runware.ai/";
-function Dt(e) {
+], fs = /^[\x21-\x7e]{16,512}$/, Dt = "https://runware.ai/";
+function Ot(e) {
   return e ? /\s/.test(e) ? "A key has no spaces or line breaks." : e.length < 16 ? "That is too short for an API key." : e.length > 512 ? "That is too long for an API key." : fs.test(e) ? null : "A key uses plain printable characters only." : "Paste your key first.";
 }
-const Ot = (
+const _t = (
   /* css */
   `
 ${_e}
@@ -2428,6 +2439,8 @@ button:focus-visible, input:focus-visible, a:focus-visible { outline: 2px solid 
 .err { font-size: 13px; color: var(--ma-warn); margin: 0; }
 .err:empty { display: none; }
 .state { font-weight: 600; }
+.balance { font: 13px var(--ma-mono); }
+.balance:empty { display: none; }
 .state::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; background: var(--ma-ok); }
 a { color: var(--ma-fg); }
 `
@@ -2437,13 +2450,34 @@ class hs extends HTMLElement {
   store;
   root;
   remembered = !1;
+  balanceUsd = null;
+  balanceNote = "";
+  asked = 0;
+  /** Test seam: the fetch the balance call uses. */
+  fetch;
   constructor() {
     super(), this.root = this.attachShadow({ mode: "open" }), this.store = new cs();
     const t = this.store.get();
-    t && Dt(t) && this.store.clear(), this.remembered = !!this.store.get();
+    t && Ot(t) && this.store.clear(), this.remembered = !!this.store.get();
   }
   connectedCallback() {
-    this.render();
+    this.render(), this.connected && this.balanceUsd === null && this.refreshBalance();
+  }
+  /** The balance last read from Runware, in USD; null until known. */
+  get balance() {
+    return this.balanceUsd;
+  }
+  /** Reads the balance again. Resolves to the number, or null when it cannot be read. */
+  async refreshBalance() {
+    const t = ++this.asked;
+    if (!this.connected) return null;
+    let o = null, r = "";
+    try {
+      o = await new ot({ getKey: this.getKey, fetch: this.fetch }).balance();
+    } catch (s) {
+      r = `Balance not available: ${new ot({ getKey: this.getKey }).redact(s instanceof Error ? s.message : "request failed")}`.slice(0, 200);
+    }
+    return t !== this.asked || !this.connected ? null : (this.balanceUsd = o, this.balanceNote = r, this.render(), this.dispatchEvent(new CustomEvent("arena-balance-change", { bubbles: !0, composed: !0, detail: { balance: o } })), o);
   }
   attributeChangedCallback() {
     this.isConnected && this.render();
@@ -2459,16 +2493,16 @@ class hs extends HTMLElement {
   }
   /** Connects a key typed or pasted elsewhere; returns the problem, or null. */
   connect(t, o = !1) {
-    const r = t.trim(), s = Dt(r);
+    const r = t.trim(), s = Ot(r);
     return s || (this.store.set(r, o ? "session" : "memory"), this.remembered = o, this.changed(), null);
   }
   changed() {
-    this.render(), this.dispatchEvent(new CustomEvent("arena-key-change", { bubbles: !0, composed: !0, detail: { connected: this.connected, remembered: this.remembered } }));
+    this.asked++, this.balanceUsd = null, this.balanceNote = "", this.render(), this.dispatchEvent(new CustomEvent("arena-key-change", { bubbles: !0, composed: !0, detail: { connected: this.connected, remembered: this.remembered } })), this.connected && this.refreshBalance();
   }
   signup() {
-    let t = Nt;
+    let t = Dt;
     try {
-      const o = new URL(this.getAttribute("signup-url") ?? Nt);
+      const o = new URL(this.getAttribute("signup-url") ?? Dt);
       o.protocol === "https:" && (t = o.href);
     } catch {
     }
@@ -2479,11 +2513,12 @@ class hs extends HTMLElement {
     if (this.connected) {
       const c = i("button", { type: "button", "data-action": "disconnect" }, "Disconnect");
       c.addEventListener("click", () => this.disconnect()), this.root.replaceChildren(
-        i("style", {}, Ot),
+        i("style", {}, _t),
         i(
           "div",
           { class: "panel", part: "panel", "data-state": "connected" },
           i("div", { class: "row" }, i("span", { class: "state" }, "Key connected"), i("span", { class: "note" }, this.remembered ? "remembered for this tab" : "held in memory until you leave"), c),
+          i("div", { class: "row" }, i("span", { class: "balance", "data-field": "balance" }, this.balanceUsd === null ? "" : `Balance ${this.balanceUsd.toFixed(2)} USD`), i("span", { class: "note", "data-field": "balance-note" }, this.balanceNote)),
           t
         )
       );
@@ -2509,26 +2544,26 @@ class hs extends HTMLElement {
       c.preventDefault();
       const d = this.connect(o.value, r.checked);
       d ? s.textContent = d : o.value = "";
-    }), this.root.replaceChildren(i("style", {}, Ot), a);
+    }), this.root.replaceChildren(i("style", {}, _t), a);
   }
 }
-function yo(e = "arena-key") {
+function xo(e = "arena-key") {
   customElements.get(e) || customElements.define(e, hs);
 }
-const at = [
+const it = [
   ["subject", "Subject", "Who or what moves"],
   ["environment", "Environment", "Where it happens"],
   ["action", "Action", "What it does along the path"],
   ["legend", "Colour legend", "e.g. The orange figure is the character"]
 ], gs = ["image/png", "image/jpeg", "image/webp"];
-function _t(e, t) {
+function Bt(e, t) {
   const o = i("input", { type: "file", accept: gs.join(","), "data-field": e }), r = i("span", { class: "row", "data-ref": e }), n = i("div", { class: "drop", "data-drop": e }, i("span", { class: "note" }, `${e === "character" ? "Character sheet (optional)" : "Environment image (optional)"}: drop an image or`), o, r);
   return n.addEventListener("dragover", (a) => (a.preventDefault(), n.classList.add("over"))), n.addEventListener("dragleave", () => n.classList.remove("over")), n.addEventListener("drop", (a) => {
     a.preventDefault(), n.classList.remove("over"), t(a.dataTransfer?.files[0]);
   }), o.addEventListener("change", () => t(o.files?.[0])), { node: n, input: o, shown: r };
 }
 function bs(e) {
-  const t = bo(), o = t.some((b) => b.key === e("model")) ? e("model") : t[0].key, r = t.map((b) => {
+  const t = vo(), o = t.some((b) => b.key === e("model")) ? e("model") : t[0].key, r = t.map((b) => {
     const h = i("input", { type: "radio", name: "model", value: b.key, "data-model": b.key });
     return h.checked = b.key === o, { m: b, r: h };
   }), s = i(
@@ -2549,7 +2584,7 @@ function bs(e) {
       )
     )
   ), n = {}, a = i("div", { class: "fields" });
-  for (const [b, h, g] of at)
+  for (const [b, h, g] of it)
     n[b] = i("input", { type: "text", maxlength: b === "legend" ? "300" : "500", placeholder: g, "data-field": b, value: e(b) ?? "" }), a.append(i("label", { class: "f" }, h, n[b]));
   const c = i("textarea", { maxlength: "5000", "data-field": "prompt", placeholder: "Leave empty to use the composed prompt" });
   c.value = e("prompt") ?? "";
@@ -2578,24 +2613,24 @@ function bs(e) {
     result: i("div", { "data-result": "" })
   };
 }
-const vs = /^[A-Za-z0-9._-]{1,255}$/, Bt = (e) => typeof e == "object" && e !== null && !Array.isArray(e), zt = (e) => typeof e == "string" && e.length > 0 && e.length <= 2048 && !/^(javascript|data):/i.test(e.trim());
+const vs = /^[A-Za-z0-9._-]{1,255}$/, zt = (e) => typeof e == "object" && e !== null && !Array.isArray(e), Gt = (e) => typeof e == "string" && e.length > 0 && e.length <= 2048 && !/^(javascript|data):/i.test(e.trim());
 function ws(e) {
-  if (!Bt(e)) throw new Error("preset must be an object");
-  if (!zt(e.bundle)) throw new Error("preset.bundle must be a bundle directory URL");
+  if (!zt(e)) throw new Error("preset must be an object");
+  if (!Gt(e.bundle)) throw new Error("preset.bundle must be a bundle directory URL");
   const t = { bundle: e.bundle };
   if (e.references !== void 0) {
-    if (!Bt(e.references)) throw new Error("preset.references must be an object");
+    if (!zt(e.references)) throw new Error("preset.references must be an object");
     t.references = {};
     for (const o of ["character", "environment"]) {
       const r = e.references[o];
       if (r !== void 0) {
-        if (!zt(r)) throw new Error(`preset.references.${o} must be an image URL`);
+        if (!Gt(r)) throw new Error(`preset.references.${o} must be an image URL`);
         t.references[o] = r;
       }
     }
   }
   if (e.shot !== void 0) {
-    const o = no(e.shot);
+    const o = ao(e.shot);
     if (!o) throw new Error("preset.shot needs a subject (and an action)");
     t.shot = o;
   }
@@ -2609,18 +2644,18 @@ function ws(e) {
   }
   return t;
 }
-async function it(e) {
+async function dt(e) {
   const t = await fetch(e);
   if (!t.ok) throw new Error(`${new URL(e).pathname.split("/").pop()}: HTTP ${t.status}`);
   return t.blob();
 }
-async function Gt(e) {
-  const t = e.endsWith("/") ? e : `${e}/`, o = JSON.parse(await (await it(new URL("bundle.json", t).href)).text()), r = { "bundle.json": new Blob([JSON.stringify(o)], { type: "application/json" }) }, s = /* @__PURE__ */ new Set([o.recipe, o.camera, o.firstFrameStyled]);
+async function Kt(e) {
+  const t = e.endsWith("/") ? e : `${e}/`, o = JSON.parse(await (await dt(new URL("bundle.json", t).href)).text()), r = { "bundle.json": new Blob([JSON.stringify(o)], { type: "application/json" }) }, s = /* @__PURE__ */ new Set([o.recipe, o.camera, o.firstFrameStyled]);
   for (const n of ["video", "audio", "firstFrame", "beats", "recipe", "meta", "camera"]) {
     const a = o[n];
     if (!(typeof a != "string" || !vs.test(a)))
       try {
-        r[a] = await it(new URL(a, t).href);
+        r[a] = await dt(new URL(a, t).href);
       } catch (c) {
         if (!s.has(a)) throw c;
       }
@@ -2628,13 +2663,13 @@ async function Gt(e) {
   return { files: r, dir: t };
 }
 async function ys(e) {
-  return { blob: await it(e), src: e, name: new URL(e).pathname.split("/").pop() || "reference.png" };
+  return { blob: await dt(e), src: e, name: new URL(e).pathname.split("/").pop() || "reference.png" };
 }
 function xs(e, t) {
   if (!e.guide) return null;
   const o = e.lanes.find((d) => d.shot || d.composed) ?? e.lanes[0];
   if (!o) return null;
-  const r = je.find((d) => d.air === o.model || d.id === o.model || d.id === o.composed?.model), s = r && me.includes(r.id) ? r.id : void 0;
+  const r = Re.find((d) => d.air === o.model || d.id === o.model || d.id === o.composed?.model), s = r && me.includes(r.id) ? r.id : void 0;
   if (!s) return null;
   const n = new URL(e.guide.video.src, t), a = { bundle: new URL(".", n).href, model: s }, c = o.shot ?? e.shot;
   if (c) {
@@ -2658,7 +2693,7 @@ function $s(e) {
   const t = e.composed.used.filter((o) => o.address).map((o) => `${o.address} = ${ks[o.ref] ?? o.ref}`);
   return t.length ? `Reference tags: ${t.join(", ")}` : "Reference tags: none; this model is not addressed by tags.";
 }
-function Kt(e, t = !1) {
+function Wt(e, t = !1) {
   const o = e.composed.dropped.map((s) => `${s.ref}: ${s.reason}`), r = [...e.notes, ...o];
   return i(
     "div",
@@ -2681,7 +2716,7 @@ function Ss(e) {
   if (!e.shot || !e.shot.subject.trim()) return i("div", { class: "preview" }, i("p", { class: "note" }, "Describe the subject to see the prompt each model gets."));
   let t;
   try {
-    t = Kt(De(e.shot, e.model, e.facts));
+    t = Wt(De(e.shot, e.model, e.facts));
   } catch (r) {
     t = i("p", { class: "err" }, r.message);
   }
@@ -2689,12 +2724,12 @@ function Ss(e) {
     "details",
     { class: "compare" },
     i("summary", {}, "Compare prompts"),
-    i("div", { class: "compare-grid" }, ...Gr(e.shot, e.facts).map((r) => Kt(r, !0)))
+    i("div", { class: "compare-grid" }, ...Gr(e.shot, e.facts).map((r) => Wt(r, !0)))
   );
   return i("div", { class: "preview" }, t, o);
 }
 const Is = 0.025;
-class Wt {
+class Ht {
   media = /* @__PURE__ */ new Map();
   generation = 0;
   frame;
@@ -2806,18 +2841,18 @@ class Wt {
     this.frame = this.raf(r);
   }
 }
-const Ht = /^[a-z0-9][a-z0-9-]{0,63}$/, dt = (e) => typeof e == "object" && e !== null && !Array.isArray(e), Es = (e) => dt(e) && Array.isArray(e.tabs);
+const Xt = /^[a-z0-9][a-z0-9-]{0,63}$/, ct = (e) => typeof e == "object" && e !== null && !Array.isArray(e), Es = (e) => ct(e) && Array.isArray(e.tabs);
 function As(e) {
-  if (!dt(e)) throw new w("set", "must be an object");
+  if (!ct(e)) throw new w("set", "must be an object");
   if (e.schemaVersion !== 1) throw new w("schemaVersion", "must be 1");
-  if (typeof e.id != "string" || !Ht.test(e.id)) throw new w("id", "must be a slug");
+  if (typeof e.id != "string" || !Xt.test(e.id)) throw new w("id", "must be a slug");
   if (typeof e.title != "string" || e.title.length < 1 || e.title.length > 200) throw new w("title", "must be 1-200 characters");
   if (!Array.isArray(e.tabs) || e.tabs.length < 1 || e.tabs.length > 8) throw new w("tabs", "must hold 1-8 tabs");
   const t = /* @__PURE__ */ new Set();
   return e.tabs.forEach((o, r) => {
     const s = `tabs[${r}]`;
-    if (!dt(o)) throw new w(s, "must be an object");
-    if (typeof o.id != "string" || !Ht.test(o.id)) throw new w(`${s}.id`, "must be a slug");
+    if (!ct(o)) throw new w(s, "must be an object");
+    if (typeof o.id != "string" || !Xt.test(o.id)) throw new w(`${s}.id`, "must be a slug");
     if (t.has(o.id)) throw new w(`${s}.id`, "tab ids must be distinct");
     if (t.add(o.id), typeof o.label != "string" || o.label.length < 1 || o.label.length > 40) throw new w(`${s}.label`, "must be 1-40 characters");
     if (o.record !== void 0) ce(o.record);
@@ -2913,7 +2948,7 @@ dd { margin: 0; overflow-wrap: anywhere; }
 .lane-prompt summary { cursor: pointer; font-size: 12px; color: var(--ma-muted); }
 .lane-prompt pre { margin: 4px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; font: 11px/1.5 var(--ma-mono); background: var(--ma-input); border-radius: 6px; padding: 6px; max-height: 200px; overflow: auto; }
 `
-), Xt = (
+), qt = (
   /* css */
   `
 ${_e}
@@ -2975,9 +3010,9 @@ ${Ps}
 `
 );
 function Ee(e) {
-  return je.find((t) => t.air === e.model || t.id === e.model);
+  return Re.find((t) => t.air === e.model || t.id === e.model);
 }
-function xo(e) {
+function ko(e) {
   const o = e.settings?.settings?.cameraMovement;
   return typeof o == "string" ? o : void 0;
 }
@@ -2986,11 +3021,11 @@ const Jt = [
   { id: "guide-video", title: "Guide video", text: "A reference video carries the move; the prompt names it." },
   { id: "prompt", title: "Prompt words", text: "The move is written into the prompt and nothing else." }
 ];
-function Vs(e) {
-  return xo(e) ? "parameter" : e.inputsSent.some((t) => t.role === "referenceVideo") ? "guide-video" : "prompt";
+function Us(e) {
+  return ko(e) ? "parameter" : e.inputsSent.some((t) => t.role === "referenceVideo") ? "guide-video" : "prompt";
 }
-function Rs(e, t = Ee(e)) {
-  const o = (f) => e.inputsSent.find((v) => v.role === f), r = e.inputsSent.find((f) => f.role === "frameImage" && (f.frame === void 0 || f.frame === "first" || f.frame === 0)), s = e.firstFrameVariant !== "C" ? o("referenceImage") : void 0, n = o("referenceVideo"), a = o("referenceAudio") ?? o("audio"), c = xo(e), d = (f) => f === !1 ? "cannot" : "not-sent", l = r ? { key: "firstFrame", label: "First frame", state: "sent", detail: "as the first frame" } : s ? { key: "firstFrame", label: "First frame", state: "sent", detail: "as a reference image" } : { key: "firstFrame", label: "First frame", state: d(t?.inputs.firstFrame.supported), detail: t?.inputs.firstFrame.supported === !1 ? "cannot take it" : "not sent" }, p = t ? t.inputs.referenceVideos.supported : void 0, u = t ? t.inputs.referenceAudios.supported || t.inputs.audioToVideo.supported : void 0, m = t ? t.camera.kind === "parameter" : void 0;
+function Vs(e, t = Ee(e)) {
+  const o = (f) => e.inputsSent.find((v) => v.role === f), r = e.inputsSent.find((f) => f.role === "frameImage" && (f.frame === void 0 || f.frame === "first" || f.frame === 0)), s = e.firstFrameVariant !== "C" ? o("referenceImage") : void 0, n = o("referenceVideo"), a = o("referenceAudio") ?? o("audio"), c = ko(e), d = (f) => f === !1 ? "cannot" : "not-sent", l = r ? { key: "firstFrame", label: "First frame", state: "sent", detail: "as the first frame" } : s ? { key: "firstFrame", label: "First frame", state: "sent", detail: "as a reference image" } : { key: "firstFrame", label: "First frame", state: d(t?.inputs.firstFrame.supported), detail: t?.inputs.firstFrame.supported === !1 ? "cannot take it" : "not sent" }, p = t ? t.inputs.referenceVideos.supported : void 0, u = t ? t.inputs.referenceAudios.supported || t.inputs.audioToVideo.supported : void 0, m = t ? t.camera.kind === "parameter" : void 0;
   return [
     l,
     n ? { key: "guideVideo", label: "Guide video", state: "sent", detail: "as a reference video" } : { key: "guideVideo", label: "Guide video", state: d(p), detail: p === !1 ? "cannot take it" : "not sent" },
@@ -2999,14 +3034,14 @@ function Rs(e, t = Ee(e)) {
     e.prompt ? { key: "prompt", label: "Prompt text", state: "sent", detail: c ? "no camera words" : "carries the move" } : { key: "prompt", label: "Prompt text", state: "not-sent", detail: "no prompt" }
   ];
 }
-function ko(e, t = Ee(e)) {
+function $o(e, t = Ee(e)) {
   if (!t || typeof e.durationSeconds != "number") return null;
   const o = e.inputsSent.some((d) => d.role === "referenceVideo" || d.role === "video"), r = t.pricing.rates.filter((d) => !d.mode.startsWith("draft")), s = r.filter((d) => d.mode === "any" || d.mode === (o ? "video-input" : "no-video-input")), n = s.length ? s : r;
   if (!n.length) return null;
   const a = Math.round(Math.min(...n.map((d) => d.usdPerSecond)) * e.durationSeconds * 1e3) / 1e3, c = o ? t.pricing.surcharges.find((d) => d.per === "input-video-second") : void 0;
   return c ? { usd: a, excludes: `${c.label} at $${c.usd}/s` } : { usd: a };
 }
-const qt = (e) => {
+const Yt = (e) => {
   const t = Math.floor(e / 60), o = e - t * 60;
   return `${t}:${o.toFixed(1).padStart(4, "0")}`;
 };
@@ -3024,7 +3059,7 @@ function Be(e, t = "Play all") {
   return {
     node: i("div", { class: "transport" }, o, r, n),
     update(a) {
-      o.textContent = a.playing ? "Pause" : t, r.max = String(a.duration || 0), s || (r.value = String(a.time)), n.textContent = `${qt(a.time)} / ${qt(a.duration)}`;
+      o.textContent = a.playing ? "Pause" : t, r.max = String(a.duration || 0), s || (r.value = String(a.time)), n.textContent = `${Yt(a.time)} / ${Yt(a.duration)}`;
     }
   };
 }
@@ -3035,31 +3070,31 @@ function pe(e, t, o, r) {
   const a = i("span");
   return s.append(i("div", { class: "playhead" }, a)), { node: s, video: n, bar: a };
 }
-const ze = (e) => e.duration ? `${Math.min(100, e.time / e.duration * 100)}%` : "0%", $o = {
+const ze = (e) => e.duration ? `${Math.min(100, e.time / e.duration * 100)}%` : "0%", So = {
   2: [["2-side", "Side by side"], ["2-stack", "Stacked"]],
   3: [["3-row", "Row of 3"], ["3-hero", "1 big + 2"]],
   4: [["4-grid", "2 × 2"], ["4-row", "Row of 4"]],
   5: [["5-3-2", "3 + 2"], ["5-hero", "1 big + 4"]]
 };
-function ht(e) {
+function gt(e) {
   if (e.costUsd !== null) return `${W(e.costUsd)} per clip`;
-  const t = ko(e, Ee(e));
+  const t = $o(e, Ee(e));
   return t ? `List price from ${W(t.usd)} per clip${t.excludes ? ` plus ${t.excludes}` : ""} (not run)` : "Cost not recorded";
 }
 function Ts(e) {
-  const t = e.costUsd === null ? ko(e, Ee(e)) : null, o = e.costUsd !== null ? W(e.costUsd) : t ? `from ${W(t.usd)}` : "$ —", r = e.generationSeconds !== null ? Oe(e.generationSeconds) : "— s";
+  const t = e.costUsd === null ? $o(e, Ee(e)) : null, o = e.costUsd !== null ? W(e.costUsd) : t ? `from ${W(t.usd)}` : "$ —", r = e.generationSeconds !== null ? Oe(e.generationSeconds) : "— s";
   return `${o} · ${r}`;
 }
-function gt(e) {
+function bt(e) {
   const t = typeof e.durationSeconds == "number" ? `${e.durationSeconds} s clip` : null, o = e.generationSeconds !== null ? `${Oe(e.generationSeconds)} to generate` : "generation time not recorded";
   return [t, o].filter(Boolean).join(" · ");
 }
-function So(e, t) {
-  const o = e.lanes.map((l) => l.id), r = Math.max(1, Math.min(5, o.length)), s = Math.min(r, Math.max(Math.min(2, r), t?.count ?? Math.min(3, r))), n = $o[s] ?? [["single", "Single"]], a = n.some(([l]) => l === t?.layout) ? t.layout : n[0][0], c = [], d = (t?.picks ?? []).filter((l) => o.includes(l));
+function Io(e, t) {
+  const o = e.lanes.map((l) => l.id), r = Math.max(1, Math.min(5, o.length)), s = Math.min(r, Math.max(Math.min(2, r), t?.count ?? Math.min(3, r))), n = So[s] ?? [["single", "Single"]], a = n.some(([l]) => l === t?.layout) ? t.layout : n[0][0], c = [], d = (t?.picks ?? []).filter((l) => o.includes(l));
   for (let l = 0; l < s; l++) c.push(d[l] ?? o.find((p) => !c.includes(p) && !d.includes(p)) ?? o[l % o.length]);
   return { count: s, layout: a, picks: c };
 }
-function Yt(e, t, o, r) {
+function Zt(e, t, o, r) {
   const s = i("div", { class: "seg", role: "group", "aria-label": e });
   for (const [n, a] of t) {
     const c = i("button", { type: "button", "aria-pressed": String(n === o) }, a);
@@ -3067,31 +3102,31 @@ function Yt(e, t, o, r) {
   }
   return s;
 }
-function js(e, t, o) {
+function Rs(e, t, o) {
   const { record: r, base: s } = e, n = Be(e.clock), a = i("div", { class: "stage", "data-layout": t.layout }), c = [], d = /* @__PURE__ */ new Map(), l = new Map(r.lanes.map((f) => [f.id, f])), p = [2, 3, 4, 5].filter((f) => f <= r.lanes.length), u = p.length > 0 ? [
-    Yt("How many models", p.map((f) => [String(f), `${f} models`]), String(t.count), (f) => o(So(r, { ...t, count: Number(f), layout: void 0 }))),
-    Yt("Layout", $o[t.count] ?? [], t.layout, (f) => o({ ...t, layout: f }))
+    Zt("How many models", p.map((f) => [String(f), `${f} models`]), String(t.count), (f) => o(Io(r, { ...t, count: Number(f), layout: void 0 }))),
+    Zt("Layout", So[t.count] ?? [], t.layout, (f) => o({ ...t, layout: f }))
   ] : [];
   t.picks.forEach((f, v) => {
-    const b = l.get(f), h = `tile-${v}`, g = b.label ?? b.modelName ?? b.model, y = b.output ? K(b.output.src, s) : null, j = pe(y, g, e.error, b.status === "placeholder" ? "Placeholder" : void 0);
-    j.video && (j.video.addEventListener("loadedmetadata", () => e.clock().loaded()), e.clock().add(h, j.video)), c.push(j.bar);
-    const C = i("select", { "aria-label": `Model for tile ${v + 1}` });
+    const b = l.get(f), h = `tile-${v}`, g = b.label ?? b.modelName ?? b.model, y = b.output ? K(b.output.src, s) : null, R = pe(y, g, e.error, b.status === "placeholder" ? "Placeholder" : void 0);
+    R.video && (R.video.addEventListener("loadedmetadata", () => e.clock().loaded()), e.clock().add(h, R.video)), c.push(R.bar);
+    const j = i("select", { "aria-label": `Model for tile ${v + 1}` });
     for (const H of r.lanes) {
-      const oe = i("option", { value: H.id }, H.label ?? H.modelName ?? H.model);
-      oe.selected = H.id === f, C.append(oe);
+      const re = i("option", { value: H.id }, H.label ?? H.modelName ?? H.model);
+      re.selected = H.id === f, j.append(re);
     }
-    C.addEventListener("change", () => o({ ...t, picks: t.picks.map((H, oe) => oe === v ? C.value : H) }));
+    j.addEventListener("change", () => o({ ...t, picks: t.picks.map((H, re) => re === v ? j.value : H) }));
     const Q = i("button", { class: "small solo", type: "button", "aria-pressed": "false" }, "Play alone");
     Q.addEventListener("click", () => {
       e.clock().solo(h);
-    }), j.video || (Q.disabled = !0), d.set(h, Q);
-    const be = i("span", { class: "meta", title: `${ht(b)} · ${gt(b)}` }, Ts(b));
+    }), R.video || (Q.disabled = !0), d.set(h, Q);
+    const be = i("span", { class: "meta", title: `${gt(b)} · ${bt(b)}` }, Ts(b));
     a.append(
       i(
         "figure",
         { class: `tile${r.preferredLane === b.id ? " preferred" : ""}`, "data-lane": b.id },
-        j.node,
-        i("figcaption", { class: "overlay" }, C, Q, be)
+        R.node,
+        i("figcaption", { class: "overlay" }, j, Q, be)
       )
     );
   });
@@ -3108,8 +3143,8 @@ function js(e, t, o) {
     }
   };
 }
-const Cs = (e) => e.model === "guide" || e.provider === "none";
-function Us(e) {
+const js = (e) => e.model === "guide" || e.provider === "none";
+function Cs(e) {
   const t = i("button", { class: "small", type: "button" }, "Copy prompt");
   return t.addEventListener("click", async () => {
     try {
@@ -3121,7 +3156,7 @@ function Us(e) {
   }), t;
 }
 function Ls(e, t) {
-  const { record: o, base: r } = e, s = o.lanes.filter((k) => !Cs(k));
+  const { record: o, base: r } = e, s = o.lanes.filter((k) => !js(k));
   let n = s.find((k) => k.id === t) ?? s[0];
   const a = Be(e.clock, "Play both"), c = o.guide ? K(o.guide.video.src, r) : null, d = pe(c, "Guide", e.error);
   d.video && (d.video.addEventListener("loadedmetadata", () => e.clock().loaded()), e.clock().add("guide-clip", d.video));
@@ -3134,36 +3169,36 @@ function Ls(e, t) {
   let v = i("span");
   const b = i("div", { class: "switcher", role: "group", "aria-label": "Model" }), h = /* @__PURE__ */ new Map();
   for (const k of s) {
-    const U = i("button", { type: "button", "aria-pressed": "false", "data-lane": k.id }, k.label ?? k.modelName ?? k.model);
-    U.addEventListener("click", () => H(k)), h.set(k.id, U), b.append(U);
+    const C = i("button", { type: "button", "aria-pressed": "false", "data-lane": k.id }, k.label ?? k.modelName ?? k.model);
+    C.addEventListener("click", () => H(k)), h.set(k.id, C), b.append(C);
   }
   const g = i("ol", { class: "modes", "aria-label": "Three ways a model is steered" }), y = new Map(
     Jt.map((k) => {
-      const U = i("li", { "data-mode": k.id }, i("strong", {}, k.title), i("span", {}, k.text));
-      return g.append(U), [k.id, U];
+      const C = i("li", { "data-mode": k.id }, i("strong", {}, k.title), i("span", {}, k.text));
+      return g.append(C), [k.id, C];
     })
-  ), j = i("ul", { class: "strip", "aria-label": "Inputs this model received" }), C = i("pre"), Q = i(
+  ), R = i("ul", { class: "strip", "aria-label": "Inputs this model received" }), j = i("pre"), Q = i(
     "div",
     { class: "composed" },
-    i("div", { class: "row spread" }, i("span", { class: "id" }, "Composed prompt"), Us(() => n?.prompt ?? "")),
-    C
+    i("div", { class: "row spread" }, i("span", { class: "id" }, "Composed prompt"), Cs(() => n?.prompt ?? "")),
+    j
   ), be = i("p", { class: "note" });
   function H(k) {
     n = k;
-    const U = e.clock(), Eo = U.state.time;
-    U.pause(), U.remove("output");
-    const Ao = k.output ? K(k.output.src, r) : null, Ge = k.label ?? k.modelName ?? k.model, ve = pe(Ao, Ge, e.error, k.status === "placeholder" ? "Placeholder clip" : void 0);
+    const C = e.clock(), Ao = C.state.time;
+    C.pause(), C.remove("output");
+    const Po = k.output ? K(k.output.src, r) : null, Ge = k.label ?? k.modelName ?? k.model, ve = pe(Po, Ge, e.error, k.status === "placeholder" ? "Placeholder clip" : void 0);
     ve.video && (ve.video.addEventListener("loadedmetadata", () => {
-      U.loaded(), U.seek(Eo);
-    }), U.add("output", ve.video)), p.replaceChildren(ve.node), v = ve.bar;
-    const Ke = Vs(k), Po = Jt.find((M) => M.id === Ke).title;
-    u.textContent = Ge, m.textContent = `Steered by: ${Po} · ${ht(k)} · ${gt(k)}`;
+      C.loaded(), C.seek(Ao);
+    }), C.add("output", ve.video)), p.replaceChildren(ve.node), v = ve.bar;
+    const Ke = Us(k), Uo = Jt.find((M) => M.id === Ke).title;
+    u.textContent = Ge, m.textContent = `Steered by: ${Uo} · ${gt(k)} · ${bt(k)}`;
     for (const [M, we] of h) we.setAttribute("aria-pressed", String(M === k.id));
     for (const [M, we] of y)
       we.classList.toggle("on", M === Ke), M === Ke ? we.setAttribute("aria-current", "true") : we.removeAttribute("aria-current");
     const Vo = Ee(k);
-    j.replaceChildren(
-      ...Rs(k, Vo).map(
+    R.replaceChildren(
+      ...Vs(k, Vo).map(
         (M) => i(
           "li",
           { class: `slot ${M.state}`, "data-slot": M.key, title: M.state === "cannot" ? `${Ge} cannot take this input` : M.detail },
@@ -3171,16 +3206,16 @@ function Ls(e, t) {
           i("span", {}, M.detail)
         )
       )
-    ), C.textContent = k.prompt || "(no prompt)", be.textContent = k.note ?? "", be.hidden = !k.note;
+    ), j.textContent = k.prompt || "(no prompt)", be.textContent = k.note ?? "", be.hidden = !k.note;
   }
   n && H(n);
-  const oe = s.length ? null : i("p", { class: "note" }, "This record has no model lanes to compare with the guide.");
+  const re = s.length ? null : i("p", { class: "note" }, "This record has no model lanes to compare with the guide.");
   return {
-    nodes: [i("div", { class: "pair" }, l, f), a.node, b, g, j, Q, be, ...oe ? [oe] : []],
+    nodes: [i("div", { class: "pair" }, l, f), a.node, b, g, R, Q, be, ...re ? [re] : []],
     update(k) {
       a.update(k);
-      const U = ze(k);
-      d.bar.style.width = U, v.style.width = U;
+      const C = ze(k);
+      d.bar.style.width = C, v.style.width = C;
     }
   };
 }
@@ -3218,7 +3253,7 @@ function Os(e) {
         "figure",
         { class: "side", "data-lane": g.id },
         y.node,
-        i("figcaption", {}, i("span", { class: "model" }, g.label ?? g.modelName ?? g.model), i("span", { class: "id" }, `${ht(g)} · ${gt(g)}`)),
+        i("figcaption", {}, i("span", { class: "model" }, g.label ?? g.modelName ?? g.model), i("span", { class: "id" }, `${gt(g)} · ${bt(g)}`)),
         i("details", { class: "lane-prompt" }, i("summary", {}, g.composed ? "Composed prompt" : "Prompt"), i("pre", {}, g.prompt || "(no prompt)"))
       )
     );
@@ -3234,7 +3269,7 @@ function Os(e) {
     update(g) {
       s.update(g);
       const y = ze(g);
-      n.forEach((j) => j.style.width = y);
+      n.forEach((R) => R.style.width = y);
     }
   };
 }
@@ -3265,7 +3300,7 @@ const et = () => typeof location > "u" ? "http://localhost/" : location.href;
 class Bs extends HTMLElement {
   static observedAttributes = ["src", "layout", "tab"];
   root;
-  clock = new Wt();
+  clock = new Ht();
   unsubscribe;
   current;
   set;
@@ -3349,13 +3384,13 @@ class Bs extends HTMLElement {
     this.teardown();
     const o = this.tabs();
     this.root.replaceChildren(
-      i("style", {}, Xt),
+      i("style", {}, qt),
       ...o ? [i("div", { class: "head" }, i("div", { class: "controls" }, o))] : [],
       i("div", { class: "body" }, i("p", { class: "note" }, t))
     );
   }
   teardown() {
-    this.unsubscribe?.(), this.clock.hide(), this.clock = new Wt();
+    this.unsubscribe?.(), this.clock.hide(), this.clock = new Ht();
   }
   tabs() {
     const t = this.set;
@@ -3379,7 +3414,7 @@ class Bs extends HTMLElement {
     this.teardown(), this.current = t;
     const o = this.getAttribute("layout") ?? "three-up", r = i("div", { class: "error", role: "status" }), s = { record: t, base: this.base, clock: () => this.clock, error: (p) => r.textContent = p };
     let n;
-    o === "arena" ? (this.arenaState = So(t, this.arenaState), n = js(s, this.arenaState, (p) => {
+    o === "arena" ? (this.arenaState = Io(t, this.arenaState), n = Rs(s, this.arenaState, (p) => {
       this.arenaState = p, this.render(t);
     })) : o === "inputs" ? n = Os(s) : n = o === "guidance" ? Ls(s, this.getAttribute("model")) : _s(s, o);
     const a = this.tabs(), c = [...a ? [a] : [], ...n.controls ?? []], d = i(
@@ -3388,12 +3423,12 @@ class Bs extends HTMLElement {
       i("div", { class: "title" }, i("h2", {}, t.title), i("span", { class: "meta" }, `${t.lanes.length} lanes`)),
       c.length ? i("div", { class: "controls" }, ...c) : null
     ), l = t.shot ? i("p", { class: "intent" }, i("span", { class: "id" }, "One shot description, composed per model: "), Oo(t.shot)) : null;
-    this.root.replaceChildren(i("style", {}, Xt), d, ...l ? [l] : [], r, i("div", { class: "body" }, ...n.nodes)), this.dataset.layout = o, this.unsubscribe = this.clock.subscribe((p) => {
+    this.root.replaceChildren(i("style", {}, qt), d, ...l ? [l] : [], r, i("div", { class: "body" }, ...n.nodes)), this.dataset.layout = o, this.unsubscribe = this.clock.subscribe((p) => {
       n.update(p), p.error && (r.textContent = p.error);
     });
   }
 }
-function bt(e = "model-arena") {
+function vt(e = "model-arena") {
   customElements.get(e) || customElements.define(e, Bs);
 }
 const zs = {
@@ -3431,7 +3466,7 @@ function Ws(e) {
   return t;
 }
 function Hs(e, t, o, r) {
-  bt();
+  vt();
   const s = document.createElement("model-arena");
   s.setAttribute("layout", "guidance"), s.setRecord(Gs(e.record, t), o);
   const n = i("a", { class: "btn", href: K(e.videoURL, o) ?? "#", download: "", target: "_blank", rel: "noopener noreferrer", "data-action": "download" }, "Download"), a = i("button", { type: "button", "data-action": "add" }, "Add to gallery"), c = i("span");
@@ -3449,7 +3484,7 @@ function Hs(e, t, o, r) {
     d
   );
 }
-const Xs = ps.map((e) => `${e}: inherit;`).join(" "), Io = (
+const Xs = ps.map((e) => `${e}: inherit;`).join(" "), Eo = (
   /* css */
   `
 ${_e}
@@ -3505,7 +3540,7 @@ pre { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font: 12px/1.5 
 model-arena, arena-key { ${Xs} }
 `
 ), ae = () => typeof location > "u" ? "http://localhost/" : location.href;
-class Js extends HTMLElement {
+class qs extends HTMLElement {
   static observedAttributes = ["guide-src", "preset"];
   /** A fake or wrapped fetch for the provider; the page's fetch otherwise. */
   fetch;
@@ -3561,13 +3596,13 @@ class Js extends HTMLElement {
     this.ui || this.build();
     const r = this.ui;
     try {
-      const s = ws(t), n = (d) => new URL(d, o).href, { files: a, dir: c } = await Gt(n(s.bundle));
+      const s = ws(t), n = (d) => new URL(d, o).href, { files: a, dir: c } = await Kt(n(s.bundle));
       await this.setGuide(a, c, !0);
       for (const d of ["character", "environment"]) {
         const l = s.references?.[d];
         await this.setRef(d, l ? await ys(n(l)) : void 0);
       }
-      if (s.shot) for (const [d] of at) r.fields[d].value = s.shot[d] ?? "";
+      if (s.shot) for (const [d] of it) r.fields[d].value = s.shot[d] ?? "";
       s.model && r.setModel(s.model), r.override.value = s.prompt ?? "", r.own.open = !!r.override.value, this.refresh();
     } catch (s) {
       this.fail(`Could not load the preset: ${s.message}`);
@@ -3584,7 +3619,7 @@ class Js extends HTMLElement {
   }
   async loadFrom(t) {
     try {
-      const { files: o, dir: r } = await Gt(new URL(t, ae()).href);
+      const { files: o, dir: r } = await Kt(new URL(t, ae()).href);
       this.pending = this.setGuide(o, r, !0), await this.pending;
     } catch (o) {
       this.fail(`Could not load the guide bundle: ${o.message}`);
@@ -3606,12 +3641,12 @@ class Js extends HTMLElement {
       const n = /* @__PURE__ */ new Map(), a = Array.isArray(t) || t.length !== void 0 ? Array.from(t) : null;
       if (a) for (const l of a) n.set(l.name.split(/[\\/]/).pop(), l);
       else for (const [l, p] of Object.entries(t)) n.set(l, p);
-      const c = await ao(wo(t), r ? { base: o } : {});
+      const c = await io(yo(t), r ? { base: o } : {});
       for (const [l, p] of this.urls) Object.values(this.refs).some((u) => u?.media.displaySrc === l) || URL.revokeObjectURL(p);
       this.urls = new Map([...n].filter(([l]) => !l.endsWith(".json")).map(([l, p]) => [l, URL.createObjectURL(p)]));
       for (const l of Object.values(this.refs)) l && this.urls.set(l.media.displaySrc ?? l.media.name, l.url);
       this.base = o, this.loaded = c;
-      for (const [l] of at) {
+      for (const [l] of it) {
         const p = c.shot?.[l];
         p && !s.fields[l].value && !this.getAttribute(l) && (s.fields[l].value = p);
       }
@@ -3626,7 +3661,7 @@ class Js extends HTMLElement {
     const r = this.slots[t], s = this.refs[t];
     if (s && URL.revokeObjectURL(s.url), delete this.refs[t], r.shown.replaceChildren(), o)
       try {
-        const n = await st(o, t), a = o instanceof Blob ? o : o.blob, c = URL.createObjectURL(a);
+        const n = await nt(o, t), a = o instanceof Blob ? o : o.blob, c = URL.createObjectURL(a);
         this.refs[t] = { input: o, media: n, url: c }, this.urls.set(n.displaySrc ?? n.name, c);
         const d = i("button", { type: "button", "data-action": `clear-${t}` }, "Remove");
         d.addEventListener("click", () => {
@@ -3653,7 +3688,7 @@ class Js extends HTMLElement {
     let r = "Load a guide bundle to see the estimate.";
     if (this.loaded)
       try {
-        const s = vo({ guide: this.loaded, model: t.model(), shot: this.shot() ?? void 0, prompt: t.override.value, character: this.refs.character?.media, environment: this.refs.environment?.media });
+        const s = wo({ guide: this.loaded, model: t.model(), shot: this.shot() ?? void 0, prompt: t.override.value, character: this.refs.character?.media, environment: this.refs.environment?.media });
         r = `Estimated ${W(s.plan.estimate.usd)} (${s.plan.estimate.basis}). Sends: ${s.plan.inputsSent.map((n) => `${n.role} ${n.label}`).join(", ")}.`;
       } catch (s) {
         r = s.message;
@@ -3712,10 +3747,10 @@ class Js extends HTMLElement {
   build() {
     const t = bs((r) => this.getAttribute(r));
     this.ui = t, this.slots = {
-      character: _t("character", (r) => {
+      character: Bt("character", (r) => {
         this.setRef("character", r);
       }),
-      environment: _t("environment", (r) => {
+      environment: Bt("environment", (r) => {
         this.setRef("environment", r);
       })
     }, t.bundleInput.addEventListener("change", () => t.bundleInput.files?.length && void (this.pending = this.setGuide(t.bundleInput.files, ae()))), t.run.addEventListener("click", () => {
@@ -3724,8 +3759,8 @@ class Js extends HTMLElement {
     for (const r of [...Object.values(t.fields), t.override]) r.addEventListener("input", () => this.refresh());
     for (const { r } of t.radios) r.addEventListener("change", () => this.refresh());
     const o = i("div");
-    this.keySource() || (yo(), this.ownKey = document.createElement("arena-key"), o.append(this.ownKey)), this.root.replaceChildren(
-      i("style", {}, Io),
+    this.keySource() || (xo(), this.ownKey = document.createElement("arena-key"), o.append(this.ownKey)), this.root.replaceChildren(
+      i("style", {}, Eo),
       i(
         "div",
         { class: "wrap" },
@@ -3746,10 +3781,10 @@ class Js extends HTMLElement {
     ), this.refresh();
   }
 }
-function qs(e = "arena-generate") {
-  customElements.get(e) || customElements.define(e, Js);
+function Js(e = "arena-generate") {
+  customElements.get(e) || customElements.define(e, qs);
 }
-const tt = () => typeof location > "u" ? "http://localhost/" : location.href, Zt = 50;
+const tt = () => typeof location > "u" ? "http://localhost/" : location.href, Qt = 50;
 function Ys(e) {
   return e ? [`${e.subject} ${e.action}`.trim(), e.environment, e.legend].filter(Boolean).join(" · ") : null;
 }
@@ -3765,7 +3800,7 @@ class Zs extends HTMLElement {
     super(), this.root = this.attachShadow({ mode: "open" });
   }
   connectedCallback() {
-    bt(), this.getAttribute("src") || this.render();
+    vt(), this.getAttribute("src") || this.render();
   }
   attributeChangedCallback(t, o, r) {
     r && r !== o && this.fetchList(r);
@@ -3775,7 +3810,7 @@ class Zs extends HTMLElement {
   }
   set records(t) {
     this.entries = [], this.skipped = [];
-    for (const o of Array.isArray(t) ? t.slice(0, Zt) : []) this.accept(o, tt());
+    for (const o of Array.isArray(t) ? t.slice(0, Qt) : []) this.accept(o, tt());
     this.index = 0, this.render();
   }
   /** Adds a record and shows it. Returns false when it does not validate. */
@@ -3800,7 +3835,7 @@ class Zs extends HTMLElement {
       if (!a) throw new Error("expected an array of records");
       const c = [];
       this.skipped = [];
-      for (const d of a.slice(0, Zt))
+      for (const d of a.slice(0, Qt))
         if (typeof d == "string") {
           const l = new URL(d, r).href, p = await fetch(l);
           if (!p.ok) {
@@ -3823,7 +3858,7 @@ class Zs extends HTMLElement {
     }
   }
   render(t) {
-    const o = i("style", {}, Io);
+    const o = i("style", {}, Eo);
     if (!this.entries.length) {
       this.root.replaceChildren(
         o,
@@ -3943,14 +3978,14 @@ class rn extends HTMLElement {
 function sn(e = "arena-player") {
   customElements.get(e) || customElements.define(e, rn);
 }
-bt();
-yo();
+vt();
+xo();
 sn();
-qs();
+Js();
 Qs();
 export {
   Zs as ArenaGallery,
-  Js as ArenaGenerate,
+  qs as ArenaGenerate,
   hs as ArenaKey,
   rn as ArenaPlayer,
   Or as COMPARE_MODEL_KEYS,
@@ -3960,17 +3995,17 @@ export {
   ps as TOKEN_NAMES,
   Gr as comparePrompts,
   nn as composePrompt,
-  wo as entriesOf,
+  yo as entriesOf,
   rs as generateFromGuide,
-  bo as guideModels,
-  Dt as keyProblem,
-  ao as loadGuideBundle,
+  vo as guideModels,
+  Ot as keyProblem,
+  io as loadGuideBundle,
   tn as needsSeek,
   an as offeredModels,
-  no as parseGuideShot,
+  ao as parseGuideShot,
   ws as parsePreset,
   ce as parseRecord,
-  vo as planGuideLane,
+  wo as planGuideLane,
   xs as presetFromRecord,
   De as previewPrompt
 };

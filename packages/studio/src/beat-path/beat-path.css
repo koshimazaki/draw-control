@@ -16,6 +16,8 @@ h1 { margin: 0; font-size: var(--text-lg); font-weight: var(--weight-semibold); 
 .sections a { color: var(--text-muted); text-decoration: none; padding: 2px 4px; border-radius: var(--radius-sm); }
 .sections a:hover, .sections a:focus-visible { color: var(--text); }
 .key-slot { margin-left: var(--s-1); }
+.balance { font-size: var(--text-sm); color: var(--text-muted); white-space: nowrap; padding: 0 var(--s-2); }
+.balance[hidden] { display: none; }
 @media (max-width: 1400px) { .tag { display: none; } }
 .page-section { max-width: 1240px; margin: 0 auto; padding: 56px var(--pad) 24px; scroll-margin-top: 0; }
 .page-section h2 { margin: 0 0 var(--s-2); font-size: 20px; font-weight: var(--weight-semibold); color: var(--text); text-transform: none; letter-spacing: 0; }

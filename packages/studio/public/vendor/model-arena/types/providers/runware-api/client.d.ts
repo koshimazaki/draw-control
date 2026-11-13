@@ -45,6 +45,11 @@ export declare class RunwareClient {
         mediaUUID: string;
         mediaURL: string;
     }>;
+    /**
+     * The account's current balance in USD. The same response lists the team and
+     * the API keys; only the number is read and nothing else is kept or returned.
+     */
+    balance(signal?: AbortSignal): Promise<number>;
     /** Reads back the stored request for a task; used to learn which model the router chose. */
     taskDetails(taskUUID: string, signal?: AbortSignal): Promise<Record<string, unknown> | undefined>;
 }
