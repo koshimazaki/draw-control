@@ -5,10 +5,11 @@
 import { rootAt } from "./root-travel";
 import type { Recipe } from "./recipe";
 import type { AudioDrive } from "./audio-drive";
+import { frozenBeat } from "./freeze";
 
 export type Subject = { x: number; z: number; /** facing, radians (0 = +Z) */ heading: number };
 
 export function subjectAt(recipe: Recipe, beat: number, drive?: AudioDrive): Subject {
-  const p = rootAt(recipe, beat, drive);
+  const p = rootAt(recipe, frozenBeat(recipe, beat), drive);
   return { x: p.x, z: p.z, heading: p.yaw * Math.PI / 180 };
 }

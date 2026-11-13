@@ -2,5 +2,9 @@
 # prompt: A paper boat drifts down a calm canal as the camera glides beside it and slowly circles; the orange figure is the boat, white marks its bow.
 # clip: 8 s · figure: glider · Beat Path
 landmarks: on seed 7
+shot subject: a paper boat
+shot environment: a calm canal between old houses
+shot action: drifts down the canal as the camera glides beside it and slowly circles
+shot legend: the orange figure is the character; grey blocks are placeholders for the environment
 beats 0-9   | action: walk on path (-7,-2) (-2,1) (3,0) (7,3) corners 1 | camera: follow side slow | shot: wide
 beats 9-17  | action: continue | camera: orbit 120 | shot: wide

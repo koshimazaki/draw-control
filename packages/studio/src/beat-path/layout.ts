@@ -1,19 +1,22 @@
 /** The Beat Path page: map on the left, the camera's view and the few global controls on the right, the track and its two lanes along the bottom. */
 import { CLIP_CHOICES } from "./script";
+import { APP_NAME } from "./name";
 
 const seg = (name: string, values: readonly (string | number)[], labels: Record<string, string>, tip = "") =>
   `<div class="seg" role="radiogroup" data-control="${name}"${tip ? ` aria-label="${tip}"` : ""}>${values.map(v => `<button type="button" role="radio" data-value="${v}">${labels[v]}</button>`).join("")}</div>`;
 
 export const LAYOUT = `
+<div class="editor" id="editor">
 <header class="top">
-  <div class="brand"><span class="mark" aria-hidden="true"></span><h1>Beat Path</h1></div>
-  <p class="tag muted">Draw a path, add music: the movement and the camera lock to the beat.</p>
+  <div class="brand"><span class="mark" aria-hidden="true"></span><h1>${APP_NAME}</h1></div>
+  <p class="tag muted">Draw a path, add music: movement and camera lock to the beat.</p>
+  <nav class="sections" aria-label="Sections"><a href="#editor">Editor</a><span aria-hidden="true">·</span><a href="#generate">Generate</a><span aria-hidden="true">·</span><a href="#gallery">Gallery</a></nav>
   <div class="top-right">
     <button type="button" id="examples" class="btn ghost" aria-haspopup="menu">Examples</button>
     <button type="button" id="pasteScript" class="btn ghost tip-below" data-tip="The page state is a shot script: paste one (or drop a .txt)">Paste script</button>
     <button type="button" id="copyScript" class="btn ghost tip-below" data-tip="Copy the shot script an agent, the CLI or the MCP server can replay">Copy script</button>
-    <a id="openStudio" class="btn ghost tip-below" href="./" data-tip="Saves this as the sequence “Beat Path” and opens the full studio">Full studio ↗</a>
-    <span class="credit muted" id="credit"></span>
+    <a id="openStudio" class="btn ghost tip-below" href="./" data-tip="Saves this as a sequence and opens the full studio">Full studio ↗</a>
+    <div class="key-slot" id="keySlot" data-tip="The key panel mounts here"><button type="button" class="btn outline" disabled>Connect Runware key</button></div>
   </div>
 </header>
 <main class="stage">
@@ -49,8 +52,14 @@ export const LAYOUT = `
         <span class="push-right"></span>
         <button type="button" id="exportGuide" class="btn primary">Export guide</button>
       </div>
-      <span class="lab">Prompt</span>
-      <div class="row prompt"><p id="prompt" class="prompt-text"></p><button type="button" id="copyPrompt" class="btn ghost">Copy</button></div>
+      <span class="lab">Shot</span>
+      <div class="row shot">
+        <input id="shotSubject" class="field" type="text" maxlength="300" placeholder="Subject" aria-label="Subject" />
+        <input id="shotEnvironment" class="field" type="text" maxlength="300" placeholder="Environment" aria-label="Environment" />
+        <input id="shotAction" class="field" type="text" maxlength="300" placeholder="Action" aria-label="Action" />
+      </div>
+      <span class="lab"></span>
+      <div class="row"><p id="shotLegend" class="legend-line muted"></p><button type="button" id="copyPrompt" class="btn ghost" data-tip="Copy subject, environment, action and the colour legend as one prompt">Copy prompt</button></div>
     </div>
   </section>
 </main>
@@ -70,6 +79,18 @@ export const LAYOUT = `
   </div>
   <div class="audio-info"><p class="track-row"><span id="trackName">No track</span><button type="button" id="removeTrack" class="link-btn" hidden data-tip="Play without music: a plain timed clip">Remove</button></p><button type="button" id="resetMarkers" class="link-btn" hidden>Reset markers</button><p class="legend muted"><i class="k"></i>kick <i class="s"></i>snare</p><p id="status" class="status muted" aria-live="polite"></p></div>
 </footer>
+</div>
+<section class="page-section" id="generate" aria-labelledby="generateTitle">
+  <h2 id="generateTitle">Generate</h2>
+  <p class="muted">Turn the guide into a video with a model. The generate panel mounts here (it reads the guide and its shot description from this page).</p>
+  <div class="placeholder" id="generateSlot"><span class="placeholder-mark" aria-hidden="true"></span><p><strong>Coming here:</strong> pick a model, check the prompt built from the shot description, generate. Until then, <em>Export guide</em> downloads the same bundle.</p></div>
+</section>
+<section class="page-section" id="gallery" aria-labelledby="galleryTitle">
+  <h2 id="galleryTitle">Gallery</h2>
+  <p class="muted">Generated clips next to their guides.</p>
+  <div class="placeholder" id="gallerySlot"><span class="placeholder-mark" aria-hidden="true"></span><p><strong>Coming here:</strong> a player for each clip with its guide, script and prompt.</p></div>
+</section>
+<footer class="site-foot"><span>${APP_NAME}</span><span class="muted" id="credit"></span></footer>
 <div class="menu" id="menu" role="menu" hidden></div>
 <div class="dialog" id="pasteDialog" hidden>
   <div class="panel" role="dialog" aria-label="Paste a shot script">

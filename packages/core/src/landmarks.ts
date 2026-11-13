@@ -13,6 +13,7 @@ import type { CameraPlan } from "./camera-rig";
 import { rand01 } from "./rng";
 import { recipeSeconds, type Recipe } from "./recipe";
 import { rootAt } from "./root-travel";
+import { frozenBeat } from "./freeze";
 
 export type LandmarkKind = "box" | "pillar" | "wall";
 /** A block on the ground: centre (x, z), footprint w × d, height h (metres), turned `yaw` radians. */
@@ -36,7 +37,7 @@ export function footprintDistance(b: Landmark, p: P): number {
 export function scenePaths(recipe: Recipe, plan: CameraPlan | null, drive?: AudioDrive): { subject: P[]; camera: P[] } {
   const frames = Math.ceil(recipeSeconds(recipe) * recipe.fps) + 1, subject: P[] = [], camera: P[] = [];
   for (let n = 0; n < frames; n += 2) {
-    const r = rootAt(recipe, beatAtSeconds(recipe.beatGrid, n / recipe.fps), drive);
+    const r = rootAt(recipe, frozenBeat(recipe, beatAtSeconds(recipe.beatGrid, n / recipe.fps)), drive);
     subject.push({ x: r.x, z: r.z });
     const c = plan?.samples[Math.min(plan.frames - 1, n)];
     if (c) camera.push({ x: c.position[0], z: c.position[2] });

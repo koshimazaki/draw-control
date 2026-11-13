@@ -117,7 +117,7 @@ export function startBeatPath(root: HTMLElement) {
     const hits = track ? [...onsetBeats(recipe, live()?.bands, "kick"), ...onsetBeats(recipe, live()?.bands, "snare")] : [];
     return [snapBeat(recipe, b, "beat"), ...hits].reduce((best, x) => (Math.abs(x - b) < Math.abs(best - b) ? x : best));
   }
-  const characterLane = lane<CharacterWord>("laneCharacter", "character", LABELS.character, ["glide", "hover", "spin", "jump"], "glide");
+  const characterLane = lane<CharacterWord>("laneCharacter", "character", LABELS.character, ["glide", "hover", "spin", "jump", "freeze"], "glide");
   const cameraLane = lane<CameraWord>("laneCamera", "cameraLane", LABELS.camera, ["behind", "side", "orbit", "top", "path", "push"]);
   const say = (text: string) => { $("status").textContent = text; };
   const ctx = () => (track ? { drive, bands: drive.bands } : {});

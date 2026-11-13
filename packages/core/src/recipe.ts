@@ -112,7 +112,12 @@ export type Recipe = {
   mutedHits?: number[];
   /** The glider's colours, "#rrggbb" (body: the pyramid, head: the sphere); the front marker stays white. Absent: orange. */
   figure?: { body: string; head: string };
+  /** The character holds still over these ranges (freeze.ts), mid-air if jumping; the camera keeps moving. */
+  freezes?: { fromBeat: number; toBeat: number }[];
+  /** The shot description that travels with the guide (a generator reads it from recipe.json). */
+  shot?: ShotDescription;
 };
+export type ShotDescription = { subject: string; environment: string; action: string; legend: string };
 export type RootShape = { corners: number; points: { x: number; z: number; y?: number }[] };
 
 export { RecipeError };
@@ -184,7 +189,7 @@ function validateMove(input: unknown, where: string, durationBeats: number): Mov
 /** Strict validation for agent-supplied JSON and imported recipes. Returns a fresh copy. */
 export function validateRecipe(input: unknown): Recipe {
   if (!isObject(input)) return fail("expected an object");
-  only(input, ["version", "fps", "durationBeats", "beatGrid", "character", "energy", "moves", "rootPath", "jumps", "audio", "camera", "reactive", "steps", "energyCurve", "envelope", "travelLock", "rootShape", "landmarks", "mutedHits", "figure"], "recipe");
+  only(input, ["version", "fps", "durationBeats", "beatGrid", "character", "energy", "moves", "rootPath", "jumps", "audio", "camera", "reactive", "steps", "energyCurve", "envelope", "travelLock", "rootShape", "landmarks", "mutedHits", "figure", "freezes", "shot"], "recipe");
   if (input.version !== RECIPE_VERSION) fail(`expected version ${RECIPE_VERSION}`);
   if (input.fps !== 24) fail("fps must be 24");
   if (!Number.isInteger(input.durationBeats) || !finite(input.durationBeats, 1, 512)) fail("durationBeats must be a whole number 1–512");
@@ -259,6 +264,24 @@ export function validateRecipe(input: unknown): Recipe {
     if (lock.lock) recipe.travelLock = lock;
   }
   if (input.rootShape !== undefined) recipe.rootShape = validateRootShape(input.rootShape);
+  if (input.freezes !== undefined) {
+    if (!Array.isArray(input.freezes) || input.freezes.length > 32) fail("freezes must be a list of up to 32 ranges");
+    let end = -Infinity;
+    const list = (input.freezes as unknown[]).map((f, i) => {
+      if (!isObject(f)) return fail(`freezes[${i}] must be an object`);
+      only(f, ["fromBeat", "toBeat"], `freezes[${i}]`);
+      if (!finite(f.fromBeat, 0, durationBeats) || !finite(f.toBeat, 0, durationBeats) || (f.toBeat as number) <= (f.fromBeat as number) || (f.fromBeat as number) < end) fail(`freezes[${i}] needs fromBeat < toBeat inside the recipe, in order`);
+      end = f.toBeat as number;
+      return { fromBeat: f.fromBeat as number, toBeat: f.toBeat as number };
+    });
+    if (list.length) recipe.freezes = list;
+  }
+  if (input.shot !== undefined) {
+    const sh = input.shot;
+    if (!isObject(sh)) return fail("shot must be an object");
+    only(sh, ["subject", "environment", "action", "legend"], "shot");
+    recipe.shot = { subject: text(sh.subject ?? "", 300, "shot.subject"), environment: text(sh.environment ?? "", 300, "shot.environment"), action: text(sh.action ?? "", 300, "shot.action"), legend: text(sh.legend ?? "", 300, "shot.legend") };
+  }
   if (input.figure !== undefined) {
     const fg = input.figure;
     if (!isObject(fg)) return fail("figure must be an object");

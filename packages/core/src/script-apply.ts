@@ -26,7 +26,7 @@ type Lock = { lock: LockTarget; strength?: number };
 type Hit = { accent: AccentKey; band: string; index: number };
 type Row = { from: number; to: number; line: number; action?: string; camera?: string; shot?: string };
 type Point = { x: number; z: number; y?: number };
-type Cam = { path?: Point[]; corners?: number; shoulder?: boolean; pace?: "slow" | "fast"; then?: Cam[]; modes: CameraMode[]; amount?: number; from?: number; to?: number; lock?: LockTarget; strength?: number; onHit?: "hold" | "punch"; punch?: number; at?: { band: string; index: number } };
+type Cam = { path?: Point[]; corners?: number; startSeconds?: number; shoulder?: boolean; pace?: "slow" | "fast"; then?: Cam[]; modes: CameraMode[]; amount?: number; from?: number; to?: number; lock?: LockTarget; strength?: number; onHit?: "hold" | "punch"; punch?: number; at?: { band: string; index: number } };
 
 const bad = (row: Row, msg: string): never => { throw new RecipeError(`script line ${row.line}: ${msg}`); };
 const number = (row: Row, t: string, what: string) => {
@@ -35,14 +35,16 @@ const number = (row: Row, t: string, what: string) => {
 };
 
 /** A settings line: `landmarks: on seed 7` or `landmarks: off` (not a row). */
-const SETTING = /^(landmarks|muted|figure)\s*:/i;
+const SETTING = /^(landmarks|muted|figure|shot (subject|environment|action|legend))\s*:/i;
 /** The script's settings lines; a script without one leaves the setting as it was. */
-export type ScriptSettings = { landmarks?: { on: boolean; seed?: number }; muted?: number[]; figure?: { body: string; head: string } };
+export type ScriptSettings = { landmarks?: { on: boolean; seed?: number }; muted?: number[]; figure?: { body: string; head: string }; shot?: Partial<Record<"subject" | "environment" | "action" | "legend", string>> };
 export function parseSettings(script: string): ScriptSettings {
   const out: ScriptSettings = {};
   script.split(/\r?\n/).forEach((raw, i) => {
     const text = raw.replace(/#.*$/, "").trim();
     if (!SETTING.test(text)) return;
+    const shotLine = /^shot (subject|environment|action|legend)\s*:\s*(.*)$/i.exec(raw.trim());
+    if (shotLine) { (out.shot ??= {})[shotLine[1].toLowerCase() as "subject"] = shotLine[2].trim(); return; }
     if (/^figure\s*:/i.test(text)) {
       const m = /^figure\s*:\s*body\s+(#[0-9a-f]{6})(?:\s+head\s+(#[0-9a-f]{6}))?\s*$/i.exec(text);
       if (!m) throw new RecipeError(`script line ${i + 1}: figure reads "figure: body #e8632a head #f2a35e"`);
@@ -62,17 +64,23 @@ export function parseSettings(script: string): ScriptSettings {
   return out;
 }
 
-export function parseRows(script: string): Row[] {
+export function parseRows(script: string, grid?: { bpm: number; offsetSeconds: number }): Row[] {
   if (typeof script !== "string" || script.length > 100_000) throw new RecipeError("script must be text up to 100 000 characters");
   const rows: Row[] = [];
   script.split(/\r?\n/).forEach((raw, i) => {
     const text = raw.replace(/#.*$/, "").trim();
     if (!text || SETTING.test(text)) return;
     const [head, ...cells] = text.split("|").map(c => c.trim());
-    const m = /^beats\s+(\d+(?:\.\d+)?)\s*[-–]\s*(\d+(?:\.\d+)?)$/i.exec(head);
+    const m = /^(?:beats|seconds)\s+(\d+(?:\.\d+)?)\s*[-–]\s*(\d+(?:\.\d+)?)s?$/i.exec(head);
     const row: Row = { from: 0, to: 0, line: i + 1 };
     if (!m) bad(row, `a row starts "beats A-B" (got ${JSON.stringify(head)})`);
     row.from = Number(m![1]); row.to = Number(m![2]);
+    // A row in seconds ("seconds 0-2 | …") is converted through the tempo when a grid is given.
+    if (/^seconds/i.test(head)) {
+      if (!grid) bad(row, "a row in seconds needs the recipe's tempo");
+      const toBeat = (t: number) => Math.round((t - grid!.offsetSeconds) * grid!.bpm / 60 * 1000) / 1000;
+      row.from = Math.max(0, toBeat(row.from)); row.to = toBeat(row.to);
+    }
     if (!(row.to > row.from)) bad(row, "the end beat must be after the start");
     if (rows.length && row.from < rows[rows.length - 1].to - 1e-6) bad(row, "rows must be in order and must not overlap");
     for (const cell of cells) {
@@ -127,7 +135,7 @@ function parseHit(row: Row, item: string): Hit {
   return { accent: m![1] as AccentKey, band: m![2], index: Number(m![3]) };
 }
 
-type Action = { kind: "continue" | "rest" | "move" | "glide"; move?: string; onPath?: boolean; points?: Point[]; corners?: number; lock?: Lock; hits: Hit[] };
+type Action = { kind: "continue" | "rest" | "move" | "glide" | "freeze"; move?: string; onPath?: boolean; points?: Point[]; corners?: number; lock?: Lock; hits: Hit[] };
 function parseAction(r: Recipe, row: Row): Action {
   const taken = takePoints(row, row.action ?? "continue"), shaped = takeCorners(row, taken.text), a = parseActionWords(r, row, shaped.text);
   if (taken.points) {
@@ -150,7 +158,7 @@ function parseActionWords(r: Recipe, row: Row, text: string): Action {
   const { words, lock } = takeLock(row, items[0].split(/\s+/));
   const onPath = words.length >= 3 && words.slice(-2).join(" ") === "on path";
   const word = (onPath ? words.slice(0, -2) : words).join(" ");
-  if (word === "continue" || word === "rest") return { kind: word, hits };
+  if (word === "continue" || word === "rest" || word === "freeze") return { kind: word, hits };
   if (word === "glide") { if (!onPath) bad(row, "glide needs a path: \"glide on path\""); return { kind: "glide", onPath, lock, hits }; }
   const rigged = r.character.kind === "rigged";
   const mapped = ACTION_WORDS[word]?.[rigged ? 0 : 1] ?? (actionVocabulary(r).includes(word) ? word : actionVocabulary(r).find(w => w.toLowerCase() === word));
@@ -183,6 +191,9 @@ function parseCamera(row: Row): Cam | "continue" {
 function parseCameraWords(row: Row, text: string, points: Point[] | undefined, corners: number | undefined): Cam {
   let words = text.split(/\s+/).filter(w => !FILLER.has(w));
   const cam: Cam = { modes: [] };
+  // "at 2s": the block starts at that time (the camera holds until then), as a spoken direction says it.
+  const atS = words.findIndex((w, i) => w === "at" && /^\d+(\.\d+)?s$/.test(words[i + 1] ?? ""));
+  if (atS >= 0) { cam.startSeconds = Number(words[atS + 1].slice(0, -1)); words = words.filter((_, i) => i !== atS && i !== atS + 1); }
   const paceAt = words.findIndex(w => w === "slow" || w === "even" || w === "fast");
   if (paceAt >= 0) { if (words[paceAt] !== "even") cam.pace = words[paceAt] as "slow" | "fast"; words = words.filter((_, i) => i !== paceAt); }
   const taken = { points }, shaped = { corners };
@@ -261,12 +272,14 @@ function retimePath(r: Recipe, from: number, to: number, glide: boolean): RootPo
 }
 
 export function applyScript(recipe: Recipe, args: { script: string }, ctx: { bands?: BandAnalysis; drive?: AudioDrive } = {}): Recipe {
-  const rows = parseRows(args.script), bands = ctx.bands ?? ctx.drive?.bands;
+  const rows = parseRows(args.script, recipe.beatGrid), bands = ctx.bands ?? ctx.drive?.bands;
+  const freezes: { fromBeat: number; toBeat: number }[] = [];
   if (rows[rows.length - 1].to > recipe.durationBeats + 1e-6) throw new RecipeError(`script runs to beat ${rows[rows.length - 1].to}, past the recipe's ${recipe.durationBeats} beats`);
   let r: Recipe = validateRecipe({ ...structuredClone(recipe), moves: [] });
   const settings = parseSettings(args.script);
   if (settings.muted) r = validateRecipe({ ...r, mutedHits: settings.muted });
   if (settings.figure) r = validateRecipe({ ...r, figure: settings.figure });
+  if (settings.shot) r = validateRecipe({ ...r, shot: { subject: "", environment: "", action: "", legend: "", ...r.shot, ...settings.shot } });
   if (settings.landmarks) r = validateRecipe({ ...r, landmarks: { seed: settings.landmarks.seed ?? recipe.landmarks?.seed ?? 7, on: settings.landmarks.on } });
   // Action track: blocks from rows, a block running on over `continue` rows.
   type Block = { from: number; to: number; action: Action };
@@ -275,12 +288,17 @@ export function applyScript(recipe: Recipe, args: { script: string }, ctx: { ban
   for (const row of rows) {
     const a = parseAction(r, row);
     const last = blocks[blocks.length - 1];
-    if (a.kind === "continue" && last && Math.abs(last.to - row.from) < 1e-6) last.to = row.to;
-    else blocks.push({ from: row.from, to: row.to, action: a.kind === "continue" ? { kind: "rest", hits: [] } : a });
+    // freeze: the block above carries on underneath, and the character holds still over the row.
+    if (a.kind === "freeze") freezes.push({ fromBeat: row.from, toBeat: row.to });
+    if ((a.kind === "continue" || a.kind === "freeze") && last && Math.abs(last.to - row.from) < 1e-6) last.to = row.to;
+    else blocks.push({ from: row.from, to: row.to, action: a.kind === "continue" || a.kind === "freeze" ? { kind: "rest", hits: [] } : a });
     for (const hit of a.hits) hits.push({ row, hit });
     const b = blocks[blocks.length - 1];
     if (b.action.onPath && b !== pathBlock) { if (pathBlock) bad(row, "one walk path: only one block can be \"on path\""); pathBlock = b; }
   }
+  const nextRecipe = structuredClone(r);
+  if (freezes.length) nextRecipe.freezes = freezes; else delete nextRecipe.freezes;
+  r = validateRecipe(nextRecipe);
   if (pathBlock) {
     const glide = pathBlock.action.kind === "glide";
     const pts = pathBlock.action.points;
@@ -345,9 +363,15 @@ export function applyScript(recipe: Recipe, args: { script: string }, ctx: { ban
   if (given.length) r = setCameraPath(r, { points: given[0].cam.path!, useMode: false, corners: given[0].cam.corners });
   else if (cams.some(b => b.cam.modes.includes("path")) && !r.camera?.path) bad(cams.find(b => b.cam.modes.includes("path"))!.row, "camera: path needs points: \"path (4,2,1.6) (0,2,1.6)\" (x, z, height in metres)");
   for (const b of cams) {
-    const { modes, at, path: _path, corners: _corners, then: _then, ...fields } = b.cam;
+    const { modes, at, path: _path, corners: _corners, then: _then, startSeconds, ...fields } = b.cam;
     void _path; void _corners; void _then;
     let start = b.from;
+    if (startSeconds !== undefined) {
+      start = Math.round((startSeconds - r.beatGrid.offsetSeconds) * r.beatGrid.bpm / 60 * 1000) / 1000;
+      if (!(start >= b.from - 1e-6 && start < b.to - 1e-6)) bad(b.row, `at ${startSeconds}s is outside the row's beats ${b.from}-${b.to}`);
+      r = setCameraModes(r, { modes, fromBeat: start, toBeat: b.to, fields: { ...fields, ...b.shot } });
+      continue;
+    }
     if (at) {
       start = resolveAnchor(r, bands, b.row, at.band, at.index);
       const nth = onsetBeats(r, bands, at.band).findIndex(x => Math.abs(x - start) < 1e-6);

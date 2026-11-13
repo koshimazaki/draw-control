@@ -23,6 +23,7 @@ import { rootAt } from "./root-travel";
 import { cornerPath, polylineSpline } from "./corners";
 import { guardFraming } from "./camera-guard";
 import { unmutedBands } from "./lock";
+import { frozenBeat } from "./freeze";
 
 /** Over the shoulder: turned this far (radians) from straight behind, this share closer, this much higher (metres). */
 export const SHOULDER = { angle: 0.38, closer: 0.45, higher: 0.35 } as const;
@@ -166,7 +167,7 @@ export function planCamera(recipe: Recipe, drive?: AudioDrive, frames = 0): Came
 
   // Follow height: the camera rises and aims with the subject's height (a figure in flight stays framed).
   if (config.followHeight) for (let n = 0; n < total; n++) {
-    const y = rootAt(recipe, beatAtSeconds(g, n * dt), drive).y;
+    const y = rootAt(recipe, frozenBeat(recipe, beatAtSeconds(g, n * dt)), drive).y;
     ch.height[n] += y; ch.aimY[n] += y;
   }
 
@@ -271,7 +272,7 @@ export function planCamera(recipe: Recipe, drive?: AudioDrive, frames = 0): Came
   // Beat Path: the camera never loses the subject (camera-guard.ts).
   if (config.keepInFrame) {
     const subject: Vec3[] = [];
-    for (let n = 0; n < total; n++) { const r = rootAt(recipe, beatAtSeconds(g, n * dt), drive); subject.push([r.x, r.y + SUBJECT_CENTRE, r.z]); }
+    for (let n = 0; n < total; n++) { const r = rootAt(recipe, frozenBeat(recipe, beatAtSeconds(g, n * dt)), drive); subject.push([r.x, r.y + SUBJECT_CENTRE, r.z]); }
     guardFraming(samples, subject);
   }
   for (let n = 1; n < total; n++) {

@@ -1,6 +1,9 @@
 /* Beat Path page layout: one screen, no scrolling; tokens and components only (ui/components.css, themes/). */
 :root { --top: 52px; --dock: 136px; --controls: 168px; --gap: 14px; --pad: 20px; }
-#app { display: grid; grid-template-rows: var(--top) minmax(0, 1fr) var(--dock); height: 100vh; }
+html, body { overflow: auto; }
+.editor { display: grid; grid-template-rows: var(--top) minmax(0, 1fr) var(--dock); height: 100vh; }
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
 
 .top { display: flex; align-items: center; gap: var(--s-4); padding: 0 var(--pad); border-bottom: 1px solid var(--border); }
 .brand { display: flex; align-items: center; gap: 9px; }
@@ -10,7 +13,23 @@ h1 { margin: 0; font-size: var(--text-lg); font-weight: var(--weight-semibold); 
 .tag { margin: 0; }
 .top-right { margin-left: auto; display: flex; align-items: center; gap: var(--s-1); }
 .top-right a { text-decoration: none; }
-.credit { font-size: var(--text-xs); margin-left: var(--s-2); }
+.sections { display: flex; gap: 6px; align-items: center; font-size: var(--text-sm); color: var(--text-muted); }
+.sections a { color: var(--text-muted); text-decoration: none; padding: 2px 4px; border-radius: var(--radius-sm); }
+.sections a:hover, .sections a:focus-visible { color: var(--text); }
+.key-slot { margin-left: var(--s-1); }
+@media (max-width: 1400px) { .tag { display: none; } }
+.page-section { max-width: 1240px; margin: 0 auto; padding: 56px var(--pad) 24px; scroll-margin-top: 0; }
+.page-section h2 { margin: 0 0 6px; font-size: 20px; font-weight: var(--weight-semibold); color: var(--text); text-transform: none; letter-spacing: 0; }
+.page-section > p { margin: 0 0 var(--s-4); }
+.placeholder { display: flex; gap: var(--s-4); align-items: center; min-height: 220px; padding: var(--s-6); border: 1px dashed var(--border-strong); border-radius: var(--radius-lg); background: var(--surface); }
+.placeholder p { margin: 0; max-width: 560px; color: var(--text-muted); }
+.placeholder strong { color: var(--text); font-weight: var(--weight-semibold); }
+.placeholder-mark { flex: none; width: 44px; height: 44px; border-radius: var(--radius-md); background: linear-gradient(135deg, var(--accent) 0 50%, var(--surface-2) 50%); opacity: .8; }
+.site-foot { display: flex; justify-content: space-between; max-width: 1240px; margin: 0 auto; padding: 32px var(--pad) 40px; font-size: var(--text-xs); color: var(--text-muted); }
+.field { height: var(--control-h); min-width: 0; flex: 1; padding: 0 var(--s-2); border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-sunk); color: var(--text); font-size: var(--text-sm); transition: border-color var(--dur-fast) var(--ease); }
+.field:hover { border-color: var(--border-strong); }
+.field:focus-visible { outline: 2px solid var(--ring); outline-offset: 0; }
+.legend-line { flex: 1; min-width: 0; margin: 0; font-size: var(--text-xs); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .stage { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--gap); padding: var(--gap) var(--pad) 0; min-height: 0; }
 .map-pane { position: relative; min-height: 0; overflow: hidden; background: var(--map-bg); }

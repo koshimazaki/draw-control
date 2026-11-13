@@ -1,6 +1,10 @@
 # Beat Path example: a dancer crosses and spins while the camera circles. Snare-locked.
 # prompt: A dancer in a red coat crosses a bare studio floor and spins on the last beats as the camera circles her; the orange figure is the dancer, white marks where she faces.
 # clip: 8 s · figure: glider · Beat Path
+shot subject: a dancer in a red coat
+shot environment: a bare studio floor
+shot action: crosses the floor and spins on the last beats as the camera circles her
+shot legend: the orange figure is the character; grey blocks are placeholders for the environment
 beats 0-9   | action: walk on path (-4,2) (0,0) (3,1.5) corners 0.5 lock snare 1 | camera: follow behind lock snare 1 punch 0.9m | shot: wide
 beats 9-11  | action: continue | camera: orbit 120 lock snare 1 punch 0.9m | shot: wide
 beats 11-17 | action: rest, spin @beat 14 | camera: continue

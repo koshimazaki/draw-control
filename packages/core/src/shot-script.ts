@@ -184,7 +184,7 @@ function cameraBlocks(r: Recipe): CameraBlock[] {
 export function printScript(r: Recipe, bands?: BandAnalysis): string {
   const actions = actionBlocks(r), cams = cameraBlocks(r);
   const cuts = new Set<number>([0, r.durationBeats]);
-  for (const b of [...actions, ...cams]) { cuts.add(Math.round(b.from * 1000) / 1000); cuts.add(Math.round(b.to * 1000) / 1000); }
+  for (const b of [...actions, ...cams, ...(r.freezes ?? []).map(f => ({ from: f.fromBeat, to: f.toBeat }))]) { cuts.add(Math.round(b.from * 1000) / 1000); cuts.add(Math.round(b.to * 1000) / 1000); }
   const edges = [...cuts].filter(b => b >= 0 && b <= r.durationBeats).sort((a, b) => a - b);
   const markers = r.reactive?.markers ?? [];
   const rows: string[][] = [];
@@ -196,6 +196,7 @@ export function printScript(r: Recipe, bands?: BandAnalysis): string {
       .map(h => `${h.m.accent} ${anchorFor(r, bands, h.beat, row)}`);
     // A rest that runs on reads "rest" again (the same thing as a new rest); other blocks read "continue".
     let action = !a ? "rest" : first || a.words === "rest" ? a.words : "continue";
+    if (r.freezes?.some(f => row.from >= f.fromBeat - 1e-6 && row.to <= f.toBeat + 1e-6)) action = "freeze";
     if (hits.length) action = action === "rest" ? hits.join(", ") : `${action}, ${hits.join(", ")}`;
     const cells = [`beats ${fmt(row.from)}-${fmt(row.to)}`, `action: ${action}`];
     if (r.camera) {
@@ -209,7 +210,8 @@ export function printScript(r: Recipe, bands?: BandAnalysis): string {
   // Columns line up, but a long cell (a path's points) does not pad every other row.
   const widths = rows.reduce((w, cells) => cells.map((c, k) => Math.max(w[k] ?? 0, Math.min(COLUMN_MAX, c.length))), [] as number[]);
   // Settings lines first: whether the landmark blocks are on (and their seed).
-  const settings = (r.landmarks ? `landmarks: ${r.landmarks.on ? `on seed ${r.landmarks.seed}` : "off"}\n` : "") + (r.mutedHits?.length ? `muted: ${r.mutedHits.map(fmt).join(" ")}\n` : "") + (r.figure ? `figure: body ${r.figure.body} head ${r.figure.head}\n` : "");
+  const settings = (r.landmarks ? `landmarks: ${r.landmarks.on ? `on seed ${r.landmarks.seed}` : "off"}\n` : "") + (r.mutedHits?.length ? `muted: ${r.mutedHits.map(fmt).join(" ")}\n` : "") + (r.figure ? `figure: body ${r.figure.body} head ${r.figure.head}\n` : "")
+    + (r.shot ? (["subject", "environment", "action", "legend"] as const).filter(k => r.shot![k]).map(k => `shot ${k}: ${r.shot![k]}\n`).join("") : "");
   return settings + rows.map(cells => cells.map((c, k) => (k < cells.length - 1 ? c.padEnd(widths[k]) : c)).join(" | ")).join("\n") + "\n";
 }
 

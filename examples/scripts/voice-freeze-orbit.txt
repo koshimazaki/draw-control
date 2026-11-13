@@ -1,0 +1,16 @@
+# Beat Path example: travel, over the shoulder, a jump with the camera rising above, a freeze mid-air while the camera orbits, the landing, a crane down, a dolly in.
+# Spoken: "the character runs; the camera goes over her shoulder; she jumps and the camera rises above;
+# she freezes mid-air while the camera circles her; she lands; the camera cranes down from high to low, then dollies in; she moves on."
+# prompt: A dancer leaps across a rooftop and hangs in the air as the camera circles her, then lands and runs on; the orange figure is the dancer, white marks her front.
+# clip: 8 s · figure: glider · Beat Path
+landmarks: on seed 7
+shot subject: a dancer in an orange jumpsuit (the orange figure; white marks her front)
+shot environment: a rooftop at dusk (the grey blocks are chimneys and vents)
+shot action: she runs, leaps, hangs frozen mid-air while the camera circles her, lands and runs on
+shot legend: the orange figure is the character; grey blocks are placeholders for the environment
+beats 0-4     | action: walk on path (-7,3) (-3,1) (1,0) (5,-1) (8,-3) corners 0.8 | camera: follow behind | shot: wide
+beats 4-7     | action: continue | camera: over shoulder | shot: wide
+beats 7-8.5   | action: continue | camera: go above | shot: top
+beats 8.5-10.5 | action: freeze, jump @beat 8.9 | camera: orbit 180 | shot: wide
+beats 10.5-13 | action: continue | camera: rise 6m to 1m | shot: wide
+beats 13-17   | action: continue | camera: dolly in 2m | shot: wide

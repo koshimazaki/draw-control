@@ -11,7 +11,7 @@
 // Recipe: the format, its validator and starting points (docs/recipe.md).
 export {
   RECIPE_VERSION, CHARACTER_KINDS, PROCEDURAL_KINDS, AMPLITUDE_MAX, SPEED_RANGE, RecipeError, validateRecipe, recipeSeconds, secondsPerBeat,
-  type Recipe, type RootShape, type Move, type Phase, type BeatGrid, type CharacterRef, type CharacterKind, type RootPoint, type Jump,
+  type Recipe, type RootShape, type ShotDescription, type Move, type Phase, type BeatGrid, type CharacterRef, type CharacterKind, type RootPoint, type Jump,
 } from "./recipe";
 export { DEFAULT_RECIPE, MOVE_KEYS, MOVE_LIBRARY, makeMove, type MoveKey } from "./moves";
 export { defaultRiggedRecipe } from "./examples";
@@ -25,6 +25,7 @@ export type { FrameState, ClipLayer, ActivePhase } from "./engine";
 export { POSES, JOINTS, mixPoses, scalePose, type Pose, type PoseName, type JointName, type Euler3 } from "./poses";
 export { rootAt, travelRange, travelStations } from "./root-travel";
 export { cornerPath, polylineSpline } from "./corners";
+export { frozenBeat, type Freeze } from "./freeze";
 export { placeLandmarks, footprintDistance, scenePaths, LANDMARKS, DEFAULT_LANDMARKS, type Landmark, type LandmarkKind } from "./landmarks";
 export { exportFrameCount } from "./bundle";
 

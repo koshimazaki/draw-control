@@ -8,7 +8,7 @@
 import { parseRows, parseSettings } from "@motion-studio/core";
 
 export type PathPt = { x: number; z: number; y?: number };
-export const CHARACTER_WORDS = ["glide", "hover", "spin", "jump"] as const;
+export const CHARACTER_WORDS = ["glide", "hover", "spin", "jump", "freeze"] as const;
 export type CharacterWord = (typeof CHARACTER_WORDS)[number];
 export const CAMERA_WORDS = ["behind", "side", "orbit", "top", "path", "push"] as const;
 export type CameraWord = (typeof CAMERA_WORDS)[number];
@@ -41,12 +41,14 @@ export type BeatPathState = {
   muted: number[];
   /** The figure's colours (body, head), "#rrggbb". */
   figure: { body: string; head: string };
+  /** The shot description that travels with the guide (the legend line is built from the figure's colours). */
+  shot: { subject: string; environment: string; action: string };
   /** A suggested prompt line (examples carry one); printed as a comment. */
   prompt?: string;
 };
 
 export const LABELS = {
-  character: { glide: "Glide", hover: "Hover", spin: "Spin", jump: "Jump" },
+  character: { glide: "Glide", hover: "Hover", spin: "Spin", jump: "Jump", freeze: "Freeze" },
   camera: { behind: "Follow behind", side: "Follow side", orbit: "Orbit", top: "Top", path: "My path", push: "Push in" },
   lock: { off: "Off", beat: "Beat", kick: "Kick", snare: "Snare" },
   hit: { move: "Keeps moving", hold: "Holds", punch: "Punches in" },
@@ -54,6 +56,20 @@ export const LABELS = {
 
 /** The figure's default colours: the guide's orange. */
 export const FIGURE_DEFAULT = { body: "#ff6a13", head: "#ff6a13" } as const;
+
+/** A plain colour name for a hex colour (for the legend a prompt can quote). */
+export function colourName(hex: string): string {
+  const [r, g, b] = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255), max = Math.max(r, g, b), min = Math.min(r, g, b), l = (max + min) / 2;
+  const sat = max === min ? 0 : (max - min) / (1 - Math.abs(2 * l - 1));
+  if (sat < 0.18) return l > 0.85 ? "white" : l < 0.18 ? "black" : "grey";
+  const h = max === r ? (60 * ((g - b) / (max - min)) + 360) % 360 : max === g ? 60 * ((b - r) / (max - min)) + 120 : 60 * ((r - g) / (max - min)) + 240;
+  return h < 15 || h >= 345 ? "red" : h < 42 ? "orange" : h < 66 ? "yellow" : h < 170 ? "green" : h < 200 ? "teal" : h < 255 ? "blue" : h < 290 ? "purple" : "pink";
+}
+/** The legend line: which colour is the character, what the grey blocks are. */
+export function legendFor(figure: { body: string; head: string }): string {
+  const body = colourName(figure.body), head = colourName(figure.head);
+  return `the ${body} figure${head !== body ? ` with the ${head} head` : ""} is the character; grey blocks are placeholders for the environment`;
+}
 
 /** Fixed amounts behind the camera words. */
 export const CAMERA_AMOUNTS = { orbitPerBeat: 15, pushTo: 2.6, punch: 0.9 } as const;
@@ -83,6 +99,10 @@ export function toScript(state: BeatPathState): string {
   lines.push(`landmarks: ${state.landmarks.on ? `on seed ${state.landmarks.seed}` : "off"}`);
   if (state.muted.length) lines.push(`muted: ${state.muted.map(f).join(" ")}`);
   if (state.figure.body !== FIGURE_DEFAULT.body || state.figure.head !== FIGURE_DEFAULT.head) lines.push(`figure: body ${state.figure.body} head ${state.figure.head}`);
+  if (state.shot.subject || state.shot.environment || state.shot.action) {
+    for (const k of ["subject", "environment", "action"] as const) if (state.shot[k]) lines.push(`shot ${k}: ${state.shot[k].replace(/[\r\n#]+/g, " ").trim()}`);
+    lines.push(`shot legend: ${legendFor(state.figure)}`);
+  }
   for (let i = 0; i < edges.length - 1; i++) {
     const from = edges[i], to = edges[i + 1];
     const c = state.character.find(b => b.from === from), k = state.cameraLane.find(b => b.from === from);
@@ -91,6 +111,7 @@ export function toScript(state: BeatPathState): string {
       const mid = Math.round((c.from + c.to)) / 2;
       if (c === glide && state.subject.length >= 2) action = `walk on path ${pts(state.subject)} corners ${f(state.subjectCorners)}${lock}`;
       else if (c.word === "spin" || c.word === "jump") action = `rest, ${c.word} @beat ${f(mid)}`;
+      else if (c.word === "freeze") action = "freeze";
       else action = "rest";
     }
     let camera = "continue", shot = "";
@@ -124,8 +145,8 @@ const pointsIn = (text: string): PathPt[] => [...text.matchAll(/\(([^)]*)\)/g)].
 const cornersIn = (text: string) => { const m = /corners\s+([\d.]+)/.exec(text); return m ? Math.max(0, Math.min(1, Number(m[1]))) : undefined; };
 
 /** Read a shot script into the page state (`base` gives what the script leaves out). */
-export function fromScript(text: string, base: BeatPathState): { state: BeatPathState; notes: string[] } {
-  const rows = parseRows(text), notes: string[] = [];
+export function fromScript(text: string, base: BeatPathState, grid: { bpm: number; offsetSeconds: number } = { bpm: 120, offsetSeconds: 0 }): { state: BeatPathState; notes: string[] } {
+  const rows = parseRows(text, grid), notes: string[] = [];
   const state: BeatPathState = { ...structuredClone(base), character: [], cameraLane: [], prompt: undefined };
   const prompt = /^#\s*prompt:\s*(.+)$/im.exec(text);
   if (prompt) state.prompt = prompt[1].trim();
@@ -134,6 +155,7 @@ export function fromScript(text: string, base: BeatPathState): { state: BeatPath
   const parsed = parseSettings(text), settings = parsed.landmarks;
   state.muted = parsed.muted ?? [];
   state.figure = parsed.figure ?? { ...FIGURE_DEFAULT };
+  state.shot = { subject: parsed.shot?.subject ?? "", environment: parsed.shot?.environment ?? "", action: parsed.shot?.action ?? "" };
   if (settings) state.landmarks = { on: settings.on, seed: settings.seed ?? state.landmarks.seed };
   let charSeen = false, camSeen = false, hitSeen = false, advanceSeen = false;
   const orbits: { index: number; degrees: number; line: number }[] = [];
@@ -157,7 +179,8 @@ export function fromScript(text: string, base: BeatPathState): { state: BeatPath
         const c = cornersIn(a);
         state.subjectCorners = c ?? 0;
         if (readLock(a, state.charLock)) charSeen = true;
-      } else if (/\bspin\s*@/.test(a)) word = "spin";
+      } else if (/^freeze\b/.test(a)) word = "freeze";
+      else if (/\bspin\s*@/.test(a)) word = "spin";
       else if (/\b(jump|kick)\s*@/.test(a)) word = "jump";
       else if (!/^(rest|idle)\b/.test(a)) notes.push(`line ${row.line}: "${a}" reads as hover`);
       state.character.push({ from: row.from, to: row.to, word });
@@ -233,7 +256,7 @@ export const BLANK_STATE: BeatPathState = {
   clip: 8, subject: [], subjectCorners: 0.5, camera: [], cameraCorners: 0.5,
   character: [{ from: 0, to: 17, word: "hover" }], cameraLane: [{ from: 0, to: 17, word: "behind" }],
   charLock: { lock: "kick", strength: 1 }, camLock: { lock: "kick", strength: 1, onHit: "hold", advance: false },
-  landmarks: { on: true, seed: 7 }, muted: [], figure: { body: "#ff6a13", head: "#ff6a13" },
+  landmarks: { on: true, seed: 7 }, muted: [], figure: { body: "#ff6a13", head: "#ff6a13" }, shot: { subject: "", environment: "", action: "" },
 };
 
 /** A camera path to start from when "My path" is picked with none drawn: a slow arc in front. */

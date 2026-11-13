@@ -12,7 +12,7 @@ import { DEFAULT_CAMERA_PATH, EXAMPLES, exampleState } from "./examples";
 import { removeAt, splitAt, type LaneView, type MenuField, type MenuItem } from "./lanes";
 import type { Page } from "./page";
 import { beatPathRecipe, exportRange } from "./recipe-map";
-import { HIT_CHOICES, LABELS, LOCK_CHOICES, fitLanes, fromScript, setWord, toScript, type BeatPathState, type Block, type CameraWord, type ClipChoice } from "./script";
+import { HIT_CHOICES, LABELS, LOCK_CHOICES, legendFor, fitLanes, fromScript, setWord, toScript, type BeatPathState, type Block, type CameraWord, type ClipChoice } from "./script";
 
 /** The lane word a typed phrase reads as (its colour and fallback). */
 function wordOf(phrase: string, fallback: CameraWord): CameraWord {
@@ -51,7 +51,11 @@ export function bindActions(p: Page) {
     input("corners").value = String(corners);
     $("cornersOut").textContent = corners.toFixed(2);
     $("hudLock").textContent = `figure ${s.charLock.lock === "off" ? "free" : s.charLock.lock} · camera ${s.camLock.lock === "off" ? "free" : s.camLock.lock}`;
-    $("prompt").textContent = s.prompt ?? "Pick an example for a suggested prompt, or write your own.";
+    for (const k of ["subject", "environment", "action"] as const) {
+      const el = input(`shot${k[0].toUpperCase()}${k.slice(1)}`);
+      if (document.activeElement !== el) el.value = s.shot[k];
+    }
+    $("shotLegend").textContent = `Legend: ${legendFor(s.figure)}.`;
     const pts = p.tool === "subject" ? s.subject : s.camera;
     const empty = $("mapEmpty");
     empty.hidden = pts.length >= 2;
@@ -143,7 +147,16 @@ export function bindActions(p: Page) {
   $("examples").onclick = () => p.menu.show($("examples"), "Examples", EXAMPLES.map((ex, i) => ({
     label: ex.label, run: () => { const s = exampleState(i); p.load(fitLanes(s, clipBeats(s.clip, p.info?.bpm ?? 120))); p.say(`Example: ${ex.label}`); },
   })));
-  $("copyPrompt").onclick = () => void copy(p.state.prompt ?? "", "Prompt copied");
+  // The shot description: three fields, stored in the recipe (recipe.json in the bundle) and the script.
+  for (const k of ["subject", "environment", "action"] as const) {
+    const el = input(`shot${k[0].toUpperCase()}${k.slice(1)}`);
+    el.oninput = () => p.update({ ...p.state, shot: { ...p.state.shot, [k]: el.value } }, false);
+    el.onchange = () => p.update({ ...p.state, shot: { ...p.state.shot, [k]: el.value } }, true);
+  }
+  $("copyPrompt").onclick = () => {
+    const s = p.state.shot, parts = [s.subject, s.environment, s.action].filter(Boolean);
+    void copy(`${parts.join(". ")}${parts.length ? ". " : ""}${legendFor(p.state.figure)}.`, "Prompt copied");
+  };
 
   // Scripts in and out
   const script = () => toScript(p.state);
@@ -154,7 +167,7 @@ export function bindActions(p: Page) {
   /** Read a script into the state; the reason when it cannot be applied. */
   function applyScript(text: string): string | null {
     try {
-      const { state, notes } = fromScript(text, p.state);
+      const { state, notes } = fromScript(text, p.state, p.recipe.beatGrid);
       const next = fitLanes(state, clipBeats(state.clip, p.info?.bpm ?? 120));
       beatPathRecipe(next, p.info, p.track && p.drive ? { drive: p.drive, bands: p.drive.bands } : {});
       p.load(next);

@@ -16,6 +16,7 @@ import { planReactive, type BarLevel, type ReactivePlan } from "./reactive";
 import { AMPLITUDE_MAX, type Recipe } from "./recipe";
 import { envelopeAt } from "./envelope";
 import { smoothNoise } from "./rng";
+import { frozenBeat } from "./freeze";
 
 /** Beats over which a tempo change cross-fades at a bar line. */
 const TEMPO_FADE_BEATS = 0.5;
@@ -92,13 +93,20 @@ export function humanisedPoseAt(recipe: Recipe, plan: ReactivePlan, seconds: num
  * character: pose angles on the procedural figures, clip amplitude on the rigged one).
  */
 export function frameAt(recipe: Recipe, frame: number, drive?: AudioDrive): FrameState {
-  const state = movedFrameAt(recipe, frame, drive);
+  const state = recipe.freezes?.length ? frozenFrameAt(recipe, frame, drive) : movedFrameAt(recipe, frame, drive);
   if (!recipe.envelope) return state;
   const env = envelopeAt(recipe.envelope, frame);
   state.envelope = env;
   if (recipe.character.kind === "rigged") state.amplitude = Math.min(AMPLITUDE_MAX, (state.amplitude ?? 1) * env);
   else state.pose = { ...scalePose(state.pose, env), rootY: state.pose.rootY * Math.min(1, env) };
   return state;
+}
+
+/** A freeze holds the character: it is evaluated at the frozen time, the frame keeps its real time. */
+function frozenFrameAt(recipe: Recipe, frame: number, drive?: AudioDrive): FrameState {
+  const g = recipe.beatGrid, beat = beatAtSeconds(g, frame / recipe.fps), held = frozenBeat(recipe, beat);
+  const state = movedFrameAt(recipe, (g.offsetSeconds + held * 60 / g.bpm) * recipe.fps, drive);
+  return { ...state, frame, seconds: frame / recipe.fps, beat };
 }
 
 function movedFrameAt(recipe: Recipe, frame: number, drive?: AudioDrive): FrameState {
