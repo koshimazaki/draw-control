@@ -100,9 +100,10 @@ export class Menu {
   constructor(private root: HTMLElement) {}
   get open() { return !!this.close; }
   hide() { this.close?.(); }
-  show(anchor: HTMLElement, title: string, items: MenuItem[], onClose: () => void = () => {}, field?: MenuField) {
+  show(anchor: HTMLElement, title: string, items: MenuItem[], onClose: () => void = () => {}, field?: MenuField, note?: string) {
     this.hide();
     this.root.replaceChildren(el("div", "menu-title", title));
+    if (note) this.root.appendChild(el("p", "menu-note", note));
     let input: HTMLInputElement | null = null;
     if (field) {
       const wrap = el("label", "menu-field"), err = el("p", "menu-error");
@@ -144,6 +145,7 @@ export class Menu {
     this.close = () => {
       window.removeEventListener("keydown", key, true);
       window.removeEventListener("pointerdown", outside, true);
+      if (this.root.contains(document.activeElement)) (document.activeElement as HTMLElement).blur();
       this.root.hidden = true;
       this.close = null;
       onClose();

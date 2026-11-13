@@ -8,7 +8,8 @@
 import { validateRecipe, type Recipe } from "./recipe";
 import { DEFAULT_LANDMARKS } from "./landmarks";
 
-export const BEAT_PATH_RIG = { distance: 7, height: 1.6, fov: 40, intensity: 0.25, orbitDegreesPerBeat: 0, startYaw: 0 } as const;
+// Intensity 0: no beat accents (small pushes on every beat read as a wobble in the camera's track); the locks carry the beat.
+export const BEAT_PATH_RIG = { distance: 7, height: 1.6, fov: 40, intensity: 0, orbitDegreesPerBeat: 0, startYaw: 0 } as const;
 export const GLIDER_CHARACTER = { kind: "glider", name: "Glider (pyramid and sphere)", licence: "MIT (motion-studio)" } as const;
 
 /** Whole beats a clip of `seconds` needs from beat 0 (with one spare frame). */

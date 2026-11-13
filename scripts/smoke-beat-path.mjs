@@ -42,16 +42,28 @@ export async function smokeBeatPath(browser, base, { fail, OUT, SHOTS }) {
 
   // Draw the subject's path with the mouse: a stroke from (-6, 4) through (0, -3) to (6, 3).
   await page.click('[data-control="tool"] [data-value="subject"]');
-  await page.click("#clearPath");
   const at = q => page.evaluate(q => window.__beatPath.mapPoint(q), q);
+  // A stray click with the pen not armed never draws, and a camera tool click never rewrites the camera lane.
+  const before = (await probe()).state;
+  await page.click('[data-control="tool"] [data-value="camera"]');
+  const empty = await at({ x: 8, z: 7 });
+  await page.mouse.click(empty.x, empty.y);
+  const after = (await probe()).state;
+  if (JSON.stringify(after.camera) !== JSON.stringify(before.camera) || JSON.stringify(after.cameraLane) !== JSON.stringify(before.cameraLane)) fail("a stray map click changed the camera path or lane");
+  await page.click('[data-control="tool"] [data-value="subject"]');
+  await page.click("#clearPath");
+  await page.click('[data-control="pen"] [data-value="draw"]');
   const stroke = [];
   for (let t = 0; t <= 1.0001; t += 0.05) stroke.push({ x: -6 + 12 * t, z: 4 - 14 * t + 13 * t * t });
   const first = await at(stroke[0]);
   await page.mouse.move(first.x, first.y); await page.mouse.down();
   for (const q of stroke.slice(1)) { const s = await at(q); await page.mouse.move(s.x, s.y, { steps: 3 }); }
   await page.mouse.up();
-  await page.click('[data-control="lock"] [data-value="kick"]');
+  // The character's lock chip: kick; the camera's own: snare.
+  await page.click("#chipCharacter"); await page.click('#menu button:has-text("Lock to kick")');
+  await page.click("#chipCamera"); await page.click('#menu button:has-text("Lock to snare")');
   p = await probe();
+  if (p.recipe.camera.segments.some(s => s.lock !== "snare") || (await probe()).state.charLock.lock !== "kick") fail("the lane lock chips did not set kick for the character and snare for the camera");
   const pts = p.recipe.rootShape?.points ?? [];
   console.log(`beat path: drawn path ${p.state.subject.length} points, from (${pts[0]?.x},${pts[0]?.z}) to (${pts.at(-1)?.x},${pts.at(-1)?.z}); lock ${p.recipe.travelLock?.lock}`);
   if (p.state.subject.length < 3 || Math.abs(pts[0].x + 6) > 0.3 || Math.abs(pts.at(-1).x - 6) > 0.3 || p.recipe.travelLock?.lock !== "kick") fail("drawing the path on the map did not set the walk path");
@@ -64,6 +76,33 @@ export async function smokeBeatPath(browser, base, { fail, OUT, SHOTS }) {
   await page.keyboard.press("ControlOrMeta+z");
   p = await probe();
   if (p.recipe.camera.segments.some(s => s.modes[0] === "orbit")) fail("undo did not take the orbit back");
+  // A typed camera phrase in the block's popover; invalid words show inline.
+  await page.click("#laneCamera .block >> nth=0");
+  await page.fill(".menu-field input", "swoop around");
+  await page.press(".menu-field input", "Enter");
+  const refusal = await page.textContent(".menu-error");
+  if (!/use one of/.test(refusal ?? "")) fail(`no inline refusal for an invalid phrase: ${refusal}`);
+  await page.fill(".menu-field input", "over shoulder then go above");
+  await page.press(".menu-field input", "Enter");
+  p = await probe();
+  console.log(`beat path: typed phrase → ${p.recipe.camera.segments.map(s => s.modes.join("+") + (s.shoulder ? " (shoulder)" : "")).join(" / ")}`);
+  if (!p.recipe.camera.segments.some(s => s.shoulder) || !p.recipe.camera.segments.some(s => s.modes[0] === "top")) fail("the typed phrase did not make an over-shoulder then top block");
+  // Delete removes the selected block; undo brings it back.
+  const blocks = p.state.cameraLane.length;
+  await page.click("#laneCamera .block >> nth=0"); await page.keyboard.press("Escape");
+  const selected = await page.evaluate(() => JSON.stringify(window.__beatPath.selection()));
+  await page.keyboard.press("Delete");
+  if ((await probe()).state.cameraLane.length !== blocks - 1) fail(`Delete did not remove the selected camera block (selection ${selected}, ${blocks} blocks)`);
+  await page.keyboard.press("ControlOrMeta+z");
+  // A click on a kick marker mutes it (skipped by the lock); Reset markers restores.
+  const kickAt = await page.evaluate(() => { const r = window.__beatPath.recipe(); return r.beatGrid.offsetSeconds + 2 * 60 / r.beatGrid.bpm; });
+  const box = await page.locator("#wave").boundingBox(), clip = await page.evaluate(() => ({ t0: window.__beatPath.recipe().beatGrid.offsetSeconds, len: window.__beatPath.state().clip }));
+  await page.mouse.click(box.x + (kickAt - clip.t0) / clip.len * box.width, box.y + 6);
+  const muted = (await probe()).recipe.mutedHits ?? [];
+  console.log(`beat path: muted hits ${JSON.stringify(muted)}`);
+  if (!muted.length) fail("clicking a kick marker did not mute it");
+  await page.click("#resetMarkers");
+  if ((await probe()).recipe.mutedHits) fail("Reset markers did not restore the hits");
 
   // Paste a script, read it back.
   await page.evaluate(() => window.navigator.clipboard?.writeText?.("").catch(() => {}));
@@ -100,6 +139,17 @@ export async function smokeBeatPath(browser, base, { fail, OUT, SHOTS }) {
   if (!ok || meta.frames !== 193 || meta.width !== 1280 || meta.character.kind !== "glider" || meta.schemaVersion !== "0.5.0" || !exported.landmarks?.on) fail("the Beat Path bundle is wrong");
   mkdirSync(`${OUT}beat-path/`, { recursive: true });
   for (const [k, v] of Object.entries(zip)) writeFileSync(`${OUT}beat-path/${k}`, v);
+
+  // The bundle in memory (for the Generate section), the sections below the editor.
+  const mem = await page.evaluate(async () => { const f = await window.beatPath.exportGuideInMemory(); return Object.fromEntries(Object.entries(f).map(([k, b]) => [k, b.size])); });
+  console.log(`beat path: in-memory bundle ${Object.keys(mem).sort().join(", ")}`);
+  if (!mem["guide.mp4"] || !mem["recipe.json"]) fail("exportGuideInMemory did not return the bundle's files");
+  for (const id of ["generate", "gallery"]) if (!(await page.isVisible(`#${id} h2`))) fail(`no ${id} section`);
+  // No track: a plain timed clip that still plays and exports.
+  await page.click("#removeTrack");
+  if ((await probe()).recipe.audio) fail("Remove did not take the track off");
+  await page.click("#demoTrack");
+  await page.waitForFunction(() => window.__beatPath.recipe().audio, null, { timeout: 30_000 });
 
   // Themes and sizes.
   await page.goto(`${base}/path.html?theme=runware`);

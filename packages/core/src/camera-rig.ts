@@ -26,7 +26,7 @@ import { unmutedBands } from "./lock";
 import { frozenBeat } from "./freeze";
 
 /** Over the shoulder: turned this far (radians) from straight behind, this share closer, this much higher (metres). */
-export const SHOULDER = { angle: 0.38, closer: 0.45, higher: 0.35 } as const;
+export const SHOULDER = { angle: 0.38, closer: 0.5, higher: 0.4, aside: 0.55 } as const;
 /** The subject's centre above its root, metres (the framing guard keeps this point in frame). */
 export const SUBJECT_CENTRE = 0.6;
 import { programCamera, type ProgrammedCamera } from "./camera-shots";
@@ -107,6 +107,7 @@ export function planCamera(recipe: Recipe, drive?: AudioDrive, frames = 0): Came
   const segAt = (beat: number) => config.segments.find(s => beat >= s.fromBeat && beat < s.toBeat);
   // Over the shoulder: the chase angle turned a little to one side, closer and a little higher (eased in and out).
   let shoulderW = segAt(0)?.shoulder ? 1 : 0;
+  const shoulderAt = new Float64Array(total);
   const yaw0 = config.startYaw * Math.PI / 180;
   const off0 = followOffset(startModes);
   if (off0 !== null) followYaw = s0.heading + off0 - SHOULDER.angle * shoulderW - yaw0;
@@ -123,6 +124,7 @@ export function planCamera(recipe: Recipe, drive?: AudioDrive, frames = 0): Came
     const segNow = segAt(beat), pace = segNow?.pace === "fast" ? 1.8 : segNow?.pace === "slow" ? 0.55 : 1;
     const k = speedFactor(config.intensity, e) * pace;
     shoulderW = slew(shoulderW, segNow?.shoulder ? 1 : 0, 1.5 * dt * pace);
+    shoulderAt[n] = shoulderW;
     const span = rangeSeconds(beat);
     if (n > 0) {
       // Orbit: yaw rate from the base speed and the energy, slew-limited.
@@ -234,7 +236,9 @@ export function planCamera(recipe: Recipe, drive?: AudioDrive, frames = 0): Came
     const yaw = ch.yaw[n];
     const ease = (w: number) => 0.5 - 0.5 * Math.cos(Math.PI * w);
     const tw = ease(topW), d = ch.distance[n] * (1 - 0.92 * tw);
-    const target: Vec3 = [ch.cx[n], ch.aimY[n] - 0.15 * tw, ch.cz[n]];
+    // Over the shoulder the aim sits a little to the side, so the subject is framed off centre past the shoulder.
+    const side = SHOULDER.aside * shoulderAt[n];
+    const target: Vec3 = [ch.cx[n] + Math.cos(yaw) * side, ch.aimY[n] - 0.15 * tw, ch.cz[n] - Math.sin(yaw) * side];
     let position: Vec3 = [ch.cx[n] + Math.sin(yaw) * d, ch.height[n] + tw * (ch.distance[n] * 1.35 + 0.6), ch.cz[n] + Math.cos(yaw) * d];
     if (prog.truck[n]) {
       // Truck: camera and aim slide sideways together (right of the view is (cos yaw, -sin yaw)).

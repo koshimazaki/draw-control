@@ -6,6 +6,7 @@
  */
 import { clipBeats } from "@motion-studio/core";
 import { exportBundle } from "../export/bundle";
+import { APP_NAME } from "./name";
 import { browserStore, saveSequence } from "../sequence-library";
 import { download } from "../shared/download";
 import { DEFAULT_CAMERA_PATH, EXAMPLES, exampleState } from "./examples";
@@ -13,6 +14,23 @@ import { removeAt, splitAt, type LaneView, type MenuField, type MenuItem } from 
 import type { Page } from "./page";
 import { beatPathRecipe, exportRange } from "./recipe-map";
 import { HIT_CHOICES, LABELS, LOCK_CHOICES, legendFor, fitLanes, fromScript, setWord, toScript, type BeatPathState, type Block, type CameraWord, type ClipChoice } from "./script";
+
+/** What each block's shape on the map is, said in its popover. */
+const CAMERA_NOTES: Record<CameraWord, string> = {
+  behind: "Follow behind: the camera trails the subject, turning with its heading; on the map its line is where the camera goes as the subject travels.",
+  side: "Follow side: the camera keeps level with the subject at its side, turning with it; the line is the camera's track beside the subject's.",
+  orbit: "Orbit: circles the subject, 15° a beat; the line shows where the camera ends up because the subject is moving while it circles.",
+  top: "Top: rises into a view from above (eased, not a cut) and follows from there.",
+  path: "My path: flies the camera path you drew (Camera path tool), always aiming at the subject.",
+  push: "Push in: moves in towards the subject to 2.6 m over the block, keeping its angle.",
+};
+const CHARACTER_NOTES = {
+  glide: "Glide: travels the subject path over the block (one glide per clip), facing along it; locked, it lands on each hit.",
+  hover: "Hover: stands still at the start or the end of its path.",
+  spin: "Spin: turns on the spot half way through the block.",
+  jump: "Jump: a hop that lands half way through the block.",
+  freeze: "Freeze: holds still, mid-air too, while the camera keeps moving; then carries on.",
+};
 
 /** The lane word a typed phrase reads as (its colour and fallback). */
 function wordOf(phrase: string, fallback: CameraWord): CameraWord {
@@ -25,7 +43,7 @@ function wordOf(phrase: string, fallback: CameraWord): CameraWord {
   return fallback;
 }
 
-export const STUDIO_SEQUENCE = "Beat Path";
+export const STUDIO_SEQUENCE = APP_NAME;
 const EXPORT = { width: 1280, height: 720 } as const;
 
 export function bindActions(p: Page) {
@@ -42,11 +60,11 @@ export function bindActions(p: Page) {
     input("landmarksExport").checked = s.landmarks.on;
     input("figureBody").value = s.figure.body; input("figureHead").value = s.figure.head;
     const chip = (id: string, l: { lock: string; strength: number }, extra = "") => {
-      $(id).textContent = l.lock === "off" ? "no lock" : `${l.lock} ${l.strength.toFixed(2)}${extra}`;
+      $(id).textContent = l.lock === "off" ? "no lock" : `${l.lock}${l.strength < 1 ? ` ${+l.strength.toFixed(2)}` : ""}${extra}`;
       $(id).classList.toggle("off", l.lock === "off");
     };
     chip("chipCharacterLock", s.charLock);
-    chip("chipCameraLock", s.camLock, s.camLock.lock === "off" ? "" : ` · ${s.camLock.advance ? "next on hit" : LABELS.hit[s.camLock.onHit].toLowerCase()}`);
+    chip("chipCameraLock", s.camLock, s.camLock.lock === "off" ? "" : ` · ${s.camLock.advance ? "next" : { move: "moves", hold: "holds", punch: "punches" }[s.camLock.onHit]}`);
     const corners = p.tool === "subject" ? s.subjectCorners : s.cameraCorners;
     input("corners").value = String(corners);
     $("cornersOut").textContent = corners.toFixed(2);
@@ -140,7 +158,8 @@ export function bindActions(p: Page) {
         return null;
       },
     };
-    p.menu.show((view.root.children[i] as HTMLElement) ?? anchor, `${key === "character" ? "Character" : "Camera"} · beats ${b.from}–${b.to}`, items, () => view.render(), field);
+    p.menu.show((view.root.children[i] as HTMLElement) ?? anchor, `${key === "character" ? "Character" : "Camera"} · beats ${b.from}–${b.to}`, items, () => view.render(), field,
+      key === "cameraLane" ? CAMERA_NOTES[b.word as CameraWord] : CHARACTER_NOTES[b.word as keyof typeof CHARACTER_NOTES]);
   }
 
   // Examples
@@ -186,6 +205,19 @@ export function bindActions(p: Page) {
   };
   $("pasteCancel").onclick = closeDialog;
   $("pasteApply").onclick = () => { const err = applyScript($<HTMLTextAreaElement>("pasteText").value); if (err) $("pasteError").textContent = err; else closeDialog(); };
+
+  /**
+   * The guide bundle in memory: every file as a Blob, the same content as the zip export
+   * (guide.mp4, frame0.png, audio.wav, beats.json, camera.json, recipe.json with the shot
+   * description, meta.json, bundle.json). For the Generate section; it does not download.
+   */
+  async function exportGuideInMemory(onProgress?: (done: number, total: number) => void): Promise<Record<string, Blob>> {
+    const recipe = p.recipe, range = exportRange(recipe, p.state.clip);
+    const result = await exportBundle({ recipe, range, viewport: p.viewport, ...EXPORT, audio: p.track?.buffer ?? null, drive: p.drive, onProgress });
+    const type = (name: string) => (name.endsWith(".mp4") ? "video/mp4" : name.endsWith(".png") ? "image/png" : name.endsWith(".wav") ? "audio/wav" : "application/json");
+    return Object.fromEntries(Object.entries(result.contents).map(([name, bytes]) => [name, new Blob([bytes as BlobPart], { type: type(name) })]));
+  }
+  (window as unknown as { beatPath: unknown }).beatPath = { exportGuideInMemory, script: () => toScript(p.state), recipe: () => p.recipe };
 
   // Export
   $("exportGuide").onclick = async () => {
@@ -268,7 +300,7 @@ export function bindActions(p: Page) {
     // Dev-only probe for the smoke script.
     (window as unknown as { __beatPath: unknown }).__beatPath = {
       recipe: () => p.recipe, state: () => structuredClone(p.state), script, mapPoint: (q: { x: number; z: number }) => p.map.clientAt(q),
-      playing: () => p.player.playing, head: () => p.head,
+      playing: () => p.player.playing, head: () => p.head, selection: () => p.selection,
     };
   }
   return { sync, openBlock };

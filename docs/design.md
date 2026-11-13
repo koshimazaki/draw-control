@@ -10,6 +10,8 @@ Lineage, in three lines:
 - **Colour, type and radius** of the `runware` theme from Runware's public site and docs CSS (values and sources below).
 - **New here**: the map (pen, corners, top and side views), the lane blocks and their menus, the beat HUD and the guide's colour coding.
 
+**Since 13 November the Runware theme is dark** (the site's own dark look), with the map as a light paper surface; the neutral theme stays the repo default and stays dark (the studio's palette): one set of tokens, two palettes, and a third small set (`--map-*`) for the map's surface so it can differ from the page.
+
 ## Files
 
 | File | What |
@@ -21,7 +23,32 @@ Lineage, in three lines:
 
 Switch: open `path.html?theme=runware`. The parameter sets `data-theme="runware"` on `<html>`; both theme files are bundled, the neutral one applies otherwise. The Runware theme adds the footer-style line "Built on Runware · unofficial demo" in the header; there is no Runware logo, wordmark or favicon anywhere.
 
-## Runware values and their sources
+## Runware dark theme (13 November): values and sources
+
+From `https://runware.ai/` `:root` custom properties (its dark site theme), read 12 and 13 November 2026.
+
+| Token here | Value | Source |
+| --- | --- | --- |
+| `--bg` | `#1a1a1a` | runware.ai `--background` |
+| `--surface`, `--popover` | `#1c1c1c` | `--card`, `--popover` |
+| `--surface-2` | `#252525` | `--rw-neutral-90` |
+| `--surface-sunk` | `#1b1b1b` | `--rw-black` / `--rw-neutral-100` |
+| `--surface-hover` | `#2e2e2e` | `--input` / `--rw-neutral-80` |
+| `--seg-on`, `--border` | `#393939` | `--rw-neutral-70` |
+| `--border-strong` | `#585858` | `--rw-neutral-50` |
+| `--text` | `#f2f2f2` | `--foreground` |
+| `--text-muted` | `#9a9a9a` | `--rw-neutral-30` |
+| `--accent`, `--accent-ink`, `--ring` | `#afff9f` | `--rw-green-base` (`--primary`, `--ring`) |
+| `--accent-hover` | `#90f77c` | `--rw-green-mid` |
+| `--on-accent` | `#1c1c1c` | `--primary-foreground` |
+| kick, snare, paths on the dark page | `oklch(82% .12 20 / 300 / 40 / 240)` | docs.runware.ai `--color-red`, `--color-violet`, `--color-orange`, `--color-sky` |
+| `--map-bg` (paper) | `#f2f2f2` | `--rw-neutral-5` (slightly greyer than white) |
+| map grid | `#e1e1e1`, `#c9c9c9`, axes `#9a9a9a`, labels `#6b6b6b` | `#c9c9c9` `--rw-neutral-20`, `#9a9a9a` `--rw-neutral-30`, `#6b6b6b` `--rw-neutral-40`; `#e1e1e1` between neutral-10 and -15 |
+| paths on the paper | `oklch(52% .12 40 / 240 / 20)` | docs `--color-orange-deep`, `--color-sky-deep`, `--color-red-deep` |
+
+Contrast on dark: body text `#f2f2f2` on `#1a1a1a` 15.5; muted `#9a9a9a` on `#1a1a1a` 6.2; text `#1c1c1c` on the green `#afff9f` 14.3. On the paper: labels `#6b6b6b` on `#f2f2f2` 4.8, deep path colours about 5.
+
+## Runware light values (12 November, superseded by the dark theme above)
 
 Read 12 November 2026 from `https://runware.ai/` (Next.js stylesheets `/_next/static/immutable/chunks/*.css`, the `:root` custom properties) and `https://docs.runware.ai/` (inline `--color-*` properties of its light and dark themes).
 

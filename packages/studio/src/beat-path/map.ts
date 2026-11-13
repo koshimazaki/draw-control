@@ -17,6 +17,10 @@ export type MapScene = {
   stations: { x: number; z: number; dx: number; dz: number }[];
   trail: { x: number; z: number }[] | null;
   landmarks: Landmark[];
+  /** The camera's track block by block (smoothed), labelled; the selected block bright, the others dim when one is selected. */
+  cameraSegments: { label: string; points: { x: number; z: number }[]; emphasis: "selected" | "dim" | "normal" }[];
+  /** Where the subject and the camera are on each beat, and the camera on each of its hits. */
+  subjectBeats: { x: number; z: number }[]; cameraBeats: { x: number; z: number }[]; cameraHits: { x: number; z: number }[];
 };
 export type MapHost = {
   tool(): Tool;
@@ -66,7 +70,7 @@ const r2 = (x: number) => Math.round(x * 100) / 100;
 export class MapView {
   private ctx: CanvasRenderingContext2D;
   private base = document.createElement("canvas");
-  private scene: MapScene = { floor: [], stations: [], trail: null, landmarks: [] };
+  private scene: MapScene = { floor: [], stations: [], trail: null, landmarks: [], cameraSegments: [], subjectBeats: [], cameraBeats: [], cameraHits: [] };
   private live: Live = {};
   private stroke: PathPt[] | null = null;
   private cancel: (() => void) | null = null;
@@ -87,7 +91,9 @@ export class MapView {
 
   /** Re-read the theme's colours. */
   retheme() {
-    for (const k of ["map-bg", "map-minor", "map-major", "map-axis", "map-text", "subject", "camera", "station", "text", "bg"]) this.colours[k] = token(`--${k}`);
+    for (const k of ["map-bg", "map-minor", "map-major", "map-axis", "map-text", "text", "bg"]) this.colours[k] = token(`--${k}`);
+    // The map has its own surface (a light paper in the Runware theme): its path colours are its own tokens.
+    for (const k of ["subject", "camera", "station"]) this.colours[k] = token(`--map-${k}`) || token(`--${k}`);
     this.resize();
   }
   /** Escape: cancel the stroke or drag in progress. */
@@ -254,8 +260,21 @@ export class MapView {
       g.beginPath(); pts.forEach(([x, y], k) => (k ? g.lineTo(x, y) : g.moveTo(x, y))); g.closePath(); g.stroke();
       if (b.kind === "pillar") { g.beginPath(); g.moveTo(pts[0][0], pts[0][1]); g.lineTo(pts[2][0], pts[2][1]); g.stroke(); }   // a tall block: crossed
     }
-    if (s.trail) this.line(g, s.trail.map(p => this.top(p)), C.camera, 1.6, 0.5);
+    // The camera's track, block by block: alternate solid and dashed, each labelled at its middle.
+    g.font = "10px system-ui, sans-serif";
+    s.cameraSegments.forEach((seg, k) => {
+      if (seg.points.length < 2) return;
+      const alpha = seg.emphasis === "selected" ? 1 : seg.emphasis === "dim" ? 0.25 : 0.7;
+      this.line(g, seg.points.map(p => this.top(p)), C.camera, seg.emphasis === "selected" ? 3 : 1.8, alpha, k % 2 ? [6, 4] : []);
+      const [x, y] = this.top(seg.points[Math.floor(seg.points.length / 2)]);
+      g.globalAlpha = Math.max(0.45, alpha); g.fillStyle = C.camera; g.fillText(seg.label, x + 6, y - 6); g.globalAlpha = 1;
+    });
     this.line(g, s.floor.map(p => this.top(p)), C.subject, 3.2);
+    // Beat ticks: a small dot on each beat along both tracks; the camera on each of its hits, a ring.
+    for (const [list, colour, r] of [[s.subjectBeats, C.subject, 2], [s.cameraBeats, C.camera, 1.8]] as const)
+      for (const p of list) { const [x, y] = this.top(p); g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fillStyle = colour; g.globalAlpha = 0.8; g.fill(); g.globalAlpha = 1; }
+    g.strokeStyle = C.station; g.lineWidth = 1.6;
+    for (const p of s.cameraHits) { const [x, y] = this.top(p); g.beginPath(); g.arc(x, y, 4.5, 0, Math.PI * 2); g.stroke(); }
     g.strokeStyle = C.station; g.lineWidth = 2.4; g.lineCap = "round";
     for (const st of s.stations) {
       const [x, y] = this.top(st), len = Math.hypot(st.dx, st.dz) || 1, nx = -st.dz / len * 7, ny = st.dx / len * 7;

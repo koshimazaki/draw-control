@@ -93,6 +93,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .menu .menu-field input:focus-visible { outline: 2px solid var(--ring); outline-offset: 0; }
 .menu .menu-error { margin: 0 var(--s-2) var(--s-1); max-width: 300px; font-size: var(--text-xs); color: var(--danger); white-space: normal; }
 .menu .menu-error[hidden] { display: none; }
+.menu .menu-note { margin: 0 var(--s-2) var(--s-1); max-width: 300px; font-size: var(--text-xs); line-height: 1.4; color: var(--text-muted); white-space: normal; }
 .menu .menu-title { padding: var(--s-1) var(--s-2); font-size: var(--text-xs); color: var(--text-muted); }
 @keyframes menu-in { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: none; } }
 

@@ -141,7 +141,7 @@ export function startBeatPath(root: HTMLElement) {
     glider.setColours(parseInt(state.figure.body.slice(1), 16), parseInt(state.figure.head.slice(1), 16));
     const landmarks = placeLandmarks(recipe, plan, live());
     viewport.setLandmarks(landmarks);
-    map.setScene({ floor, stations, trail, landmarks });
+    map.setScene({ floor, stations, trail, landmarks, ...cameraTrack(frames) });
     hits = [...stationBeats, ...plan.programmed.hits.flat()].map(b => secondsAtBeat(recipe.beatGrid, b)).sort((a, b) => a - b);
     const bands = live()?.bands, t0 = window0(), t1 = window1(), inClip = (t: number) => t >= t0 && t <= t1;
     const beats: number[] = [];
@@ -153,6 +153,25 @@ export function startBeatPath(root: HTMLElement) {
     actions.sync();
     head = Math.max(t0, Math.min(t1, head));
     dirty = true;
+  }
+  /** The camera's track per block (smoothed over a quarter second), beat ticks and its hits, for the map. */
+  function cameraTrack(frames: number) {
+    const g = recipe.beatGrid, fr = (b: number) => Math.max(0, Math.min(frames - 1, Math.round(secondsAtBeat(g, b) * 24)));
+    const pos = (n: number) => { const p = plan.samples[Math.max(0, Math.min(frames - 1, n))].position; return { x: p[0], z: p[2] }; };
+    const smooth = (n: number) => { let x = 0, z = 0, c = 0; for (let k = -6; k <= 6; k += 2) { const q = pos(n + k); x += q.x; z += q.z; c++; } return { x: x / c, z: z / c }; };
+    const sel = selection?.kind === "block" && selection.lane === "cameraLane" ? state.cameraLane[selection.index] : null;
+    const NAME: Record<string, string> = { chase: "Follow behind", side: "Follow side", orbit: "Orbit", top: "Top", path: "My path", pushIn: "Push in", pullOut: "Pull out", rise: "Crane", static: "Hold", fixed: "Tripod", lead: "Follow front", threeQuarter: "Three-quarter", truck: "Truck" };
+    const cameraSegments = (recipe.camera?.segments ?? []).map(sg => {
+      const points: { x: number; z: number }[] = [];
+      for (let n = fr(sg.fromBeat); n <= fr(sg.toBeat); n += 2) points.push(smooth(n));
+      const label = sg.shoulder ? "Over shoulder" : sg.modes.map(m => NAME[m] ?? m).join(" + ");
+      const emphasis = !sel ? "normal" as const : sg.fromBeat >= sel.from - 1e-6 && sg.toBeat <= sel.to + 1e-6 ? "selected" as const : "dim" as const;
+      return { label, points, emphasis };
+    });
+    const subjectBeats: { x: number; z: number }[] = [], cameraBeats: { x: number; z: number }[] = [];
+    for (let b = 0; b <= recipe.durationBeats; b++) { const r = frameAt(recipe, fr(b), live()).root; subjectBeats.push({ x: r.x, z: r.z }); cameraBeats.push(smooth(fr(b))); }
+    const cameraHits = plan.programmed.hits.flat().map(b => smooth(fr(b)));
+    return { cameraSegments, subjectBeats, cameraBeats, cameraHits };
   }
   let pending = 0;
   function schedule(now: boolean) {
@@ -232,7 +251,7 @@ export function startBeatPath(root: HTMLElement) {
     get pen() { return pen; },
     setPen(v: "edit" | "draw") { pen = v; actions.sync(); },
     get selection() { return selection; },
-    setSelection(v: typeof selection) { selection = v; map.refresh(); },
+    setSelection(v: typeof selection) { selection = v; rebuild(); },
     retheme() { map.retheme(); strip.retheme(); },
     /** A new example or script: rebuild and frame it on the map. */
     load(next: BeatPathState) { update(next); map.fit(); },

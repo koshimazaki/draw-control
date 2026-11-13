@@ -156,3 +156,22 @@ M render glide.json --audio drums.wav --out bundle-glide --start 0 --length 16 -
 
 Over MCP the same text goes to `apply_script`, then `render`. `npm run mcp-check` does exactly that against the real server over stdio (`node mcp/bin/motion-studio-mcp.mjs`, as an MCP client starts it): `analyse_audio`, `new_recipe`, `apply_script` with this file, `render` to `out/mcp-check/bundle/` in headless Chrome (about 3–5 s for 193 frames on this machine), and checks the bundle's files.
 
+## Worked example: voice to a Beat Path script, no page needed
+
+Spoken: *"The character runs; the camera goes over her shoulder; she jumps and the camera rises above; she freezes mid-air while the camera circles her; she lands; the camera cranes down from high to low, then dollies in; she moves on."* An agent writes [`examples/scripts/voice-freeze-orbit.txt`](../examples/scripts/voice-freeze-orbit.txt):
+
+```
+shot subject: a dancer in an orange jumpsuit (the orange figure; white marks her front)
+shot environment: a rooftop at dusk (the grey blocks are chimneys and vents)
+shot action: she runs, leaps, hangs frozen mid-air while the camera circles her, lands and runs on
+shot legend: the orange figure is the character; grey blocks are placeholders for the environment
+beats 0-4      | action: walk on path (-7,3) (-3,1) (1,0) (5,-1) (8,-3) corners 0.8 | camera: follow behind | shot: wide
+beats 4-7      | action: continue           | camera: over shoulder  | shot: wide
+beats 7-8.5    | action: continue           | camera: go above       | shot: top
+beats 8.5-10.5 | action: freeze, jump @beat 8.9 | camera: orbit 180 | shot: wide
+beats 10.5-13  | action: continue           | camera: rise 6m to 1m  | shot: wide
+beats 13-17    | action: continue           | camera: dolly in 2m    | shot: wide
+```
+
+Then, with the CLI: `motion-studio analyse track.wav --out a.json`, `motion-studio new --character glider --clip 8 --analysis a.json --out base.json`, `motion-studio script base.json examples/scripts/voice-freeze-orbit.txt --analysis a.json --out shot.json`, `motion-studio render shot.json --audio track.wav --out bundle`. Over MCP: `analyse_audio` (or `load_analysis`), `new_recipe { character: "glider", clip: 8 }`, `apply_script`, `render`. Both give the same recipe (`mcp/test/voice-freeze.test.ts`, which also checks the figure hangs in the air through the freeze, lands after it, and the camera circles meanwhile). `rise 6m to 1m` cranes down: rise takes descending heights. Commands for agents added with Beat Path: `setLandmarks`, `muteHit`, `resetMutedHits`, `setFigure`, `setShot`; the camera grammar (`over shoulder`, `above`, `slow|even|fast`, `then`, `at 2s`) and the settings lines are in [recipe.md](recipe.md#shot-script).
+

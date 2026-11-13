@@ -20,7 +20,9 @@ export type ExportOptions = {
   drive?: AudioDrive;
   onProgress?: (done: number, total: number) => void;
 };
-export type ExportResult = { zip: Uint8Array; frames: number; mp4Bytes: number; audioInVideo: boolean; codec: string; files: string[] };
+export type ExportResult = { zip: Uint8Array; frames: number; mp4Bytes: number; audioInVideo: boolean; codec: string; files: string[];
+  /** The bundle's files by name, the same bytes as in the zip (for in-memory use: a Generate panel). */
+  contents: Record<string, Uint8Array> };
 
 const json = (x: unknown) => strToU8(JSON.stringify(x, null, 2) + "\n");
 const pngBytes = (canvas: HTMLCanvasElement) => new Promise<Uint8Array>((resolve, reject) =>
@@ -73,5 +75,5 @@ export async function exportBundle(o: ExportOptions): Promise<ExportResult> {
   if (channels && o.audio) files[BUNDLE_FILES.audio] = encodeWav(channels, o.audio.sampleRate, startSeconds, seconds);
   // MP4, PNG and WAV gain little from deflate; store them.
   const zip = zipSync(Object.fromEntries(Object.entries(files).map(([k, v]) => [k, [v, { level: k.endsWith(".json") ? 6 : 0 }]])));
-  return { zip, frames, mp4Bytes: mp4.bytes.length, audioInVideo: mp4.audioInVideo, codec: mp4.codec, files: Object.keys(files) };
+  return { zip, frames, mp4Bytes: mp4.bytes.length, audioInVideo: mp4.audioInVideo, codec: mp4.codec, files: Object.keys(files), contents: files };
 }
