@@ -39,6 +39,12 @@ export interface GuideFacts {
     hasAudio: boolean;
     hasCharacter: boolean;
     hasEnvironment?: boolean;
+    /** Whether the guide video carries its own sound (meta.audioInVideo). */
+    audioInVideo?: boolean;
+    /** Seconds of the separate audio; the guide's length when not given. */
+    audioSeconds?: number;
+    /** Refuse instead of dropping the audio over a shared seconds cap. */
+    requireAudio?: boolean;
 }
 /** The composer's shot for one model: the guide's references, placed for how that model uses the guide. */
 export declare function shotFor(g: GuideShot, model: string, facts: GuideFacts): {
@@ -86,6 +92,7 @@ export declare function composePrompt(shot: GuideShot, model: string, references
 }, guide?: LoadedGuide | {
     seconds?: number;
     hasAudio?: boolean;
+    audioInVideo?: boolean;
 }): ComposedForHost;
 /** The offered models with their one-line notes and prompting-guide links. */
 export declare const offeredModels: () => GuideModel[];
@@ -99,6 +106,7 @@ export interface GuideLaneInput {
     character?: LaneMedia;
     environment?: LaneMedia;
     resolution?: string;
+    requireAudio?: boolean;
 }
 export interface GuideLanePlan {
     plan: LanePlan;

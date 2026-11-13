@@ -30,15 +30,21 @@ export interface ModelCaps {
     startFrameWithReferences: boolean;
     /** LTX-style audio drive: the audio plus one reference image. */
     drivingAudio?: MediaLimits;
+    /** A cap on reference video plus reference audio seconds together (H3: 15 s). */
+    sharedSeconds?: {
+        max: number;
+    };
 }
 export interface FitMedia {
     name: string;
+    /** `hasAudio`: whether a video already carries its own sound track. */
     info?: {
         width?: number;
         height?: number;
         seconds?: number;
         fps?: number | null;
         bytes?: number;
+        hasAudio?: boolean;
     };
 }
 export interface FitInput<M extends FitMedia> {
@@ -54,6 +60,8 @@ export interface FitInput<M extends FitMedia> {
         media: M;
         frame: number | "first" | "last";
     }[];
+    /** Refuse rather than drop the audio when a model's shared seconds cap is passed. */
+    requireAudio?: boolean;
 }
 export interface FitResult<M> {
     referenceVideos: M[];
@@ -71,4 +79,14 @@ export declare class FitError extends Error {
 }
 /** Problems with one file against one limit set, in plain words. */
 export declare function checkMedia(model: string, role: string, m: FitMedia, lim: MediaLimits): string[];
+/**
+ * The shared video + audio seconds rule. Over the cap, the separate audio is
+ * not sent and a note says so (the guide video carries the timing); only a
+ * caller that requires the audio gets a refusal instead.
+ */
+export declare function sharedSeconds(model: string, caps: ModelCaps, videos: FitMedia[], audios: FitMedia[], requireAudio?: boolean): {
+    drop: boolean;
+    note?: string;
+    problem?: string;
+};
 export declare function fitLane<M extends FitMedia>(caps: ModelCaps, input: FitInput<M>): FitResult<M>;

@@ -10,6 +10,11 @@ Lineage, in three lines:
 - **Colour, type and radius** of the `runware` theme from Runware's public site and docs CSS (values and sources below).
 - **New here**: the map (pen, corners, top and side views), the lane blocks and their menus, the beat HUD and the guide's colour coding.
 
+**Round 3 (13 November), where each part came from:**
+- *Positioning* from the owner's camera tool (camera-director, read only): a top bar with the wordmark left and the key on the right, the key as its own entry rather than a form on the page; a stage-and-prompt arrangement where the preview sits above the prompt card and the model and Generate share one toolbar row; bars stronger than beats in the timing grid. Not taken: its preset tab bar (this page has one view) and its modal-only key (the key panel mounts in the header).
+- *Colour, type and radius* from Runware's public CSS (the dark theme below).
+- *New here*: the preview and output side by side on one playhead with a divider, the reference drops beside the shot fields, Settings as one closed chevron, the lane lock chips, the scenery outlines on the map.
+
 **Since 13 November the Runware theme is dark** (the site's own dark look), with the map as a light paper surface; the neutral theme stays the repo default and stays dark (the studio's palette): one set of tokens, two palettes, and a third small set (`--map-*`) for the map's surface so it can differ from the page.
 
 ## Files

@@ -20,7 +20,7 @@ export const LAYOUT = `
   <div class="top-right">
     <a class="btn ghost" href="#gallery">Gallery</a>
     <a class="btn ghost oss tip-below" href="${REPO_URL}" target="_blank" rel="noopener" data-tip="Open source (${LICENCE}). Runs in your browser with your own Runware key">Get the code ↗</a>
-    <div class="key-slot" id="keySlot"><button type="button" class="btn outline key-placeholder tip-below" id="keyButton" data-tip="The key panel mounts here when it is installed (vendor/)"><span class="key-dot" aria-hidden="true"></span>Add your Runware API key</button></div>
+    <div class="key-slot" id="keySlot"><button type="button" class="btn outline key-placeholder tip-below" id="keyButton" data-tip="The key panel mounts here when it is installed (vendor/)"><span class="key-dot" aria-hidden="true"></span><span>Add your Runware API key</span></button></div>
   </div>
 </header>
 <main class="stage">

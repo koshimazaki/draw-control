@@ -1,6 +1,6 @@
 /* Beat Path page layout: one screen, no scrolling; tokens and components only (ui/components.css, themes/). */
 :root { --top: 52px; --dock: 136px; --controls: 128px; --gap: 14px; --pad: 20px; }
-html, body { overflow: auto; }
+html, body { height: auto; overflow: visible; }
 .editor { display: grid; grid-template-rows: var(--top) minmax(0, 1fr) var(--dock); height: 100vh; }
 html { scroll-behavior: smooth; }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
@@ -150,3 +150,10 @@ select:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
 .swatches { display: inline-flex; gap: 4px; }
 .swatches input { width: 26px; height: 26px; padding: 0; border: 1px solid var(--border); border-radius: var(--radius-sm); background: none; cursor: pointer; }
 .swatches input::-webkit-color-swatch-wrapper { padding: 2px; } .swatches input::-webkit-color-swatch { border: 0; border-radius: 3px; }
+.key-slot { position: relative; }
+.key-pop { position: absolute; right: 0; top: calc(100% + 8px); z-index: 45; width: 360px; padding: var(--s-2); box-shadow: var(--shadow-lg); background: var(--popover); }
+.key-pop[hidden] { display: none; }
+.key-placeholder.connected .key-dot { background: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 40%, transparent); }
+.key-placeholder:not(.connected) .key-dot { background: var(--text-muted); box-shadow: none; }
+.stage:has(.screens.split) .map-hint { display: none; }
+.add-gallery { position: absolute; left: 8px; bottom: 8px; height: 26px; }

@@ -232,6 +232,10 @@ A lean one-screen page, `packages/studio/path.html`, for a short demo: draw a pa
 
 Also: muted hits, sound off, no-track playback, per-lane locks (chips) with next move on each hit, typed camera phrases (over shoulder, above, pace, then, at Ns), freeze, rows in seconds, shot description, figure colours, pen modes (no stray drawing), Delete and Escape, snap to beats or frames, the per-block camera track with beat ticks and hit rings on the map, a calm rig (no beat accents), a dark Runware theme with a paper map, Generate and Gallery placeholder sections, `exportGuideInMemory()`, the name constant. Not built: per-step travel options (glide, arc, hop, drop per step), parameter handles on the camera segments (radius, angles, distances), sub-frame editing, deliberate pass-bys.
 
+### Beat Path round 3 (13 November, branch `feat/beat-path`)
+
+One screen: the example switcher (three examples, each its own figure shape, scenery, camera, generated music and shot description) and the key in the header; the map; the preview with the output beside it once there is one; shot fields, reference drops, model and Generate through the vendored Model Arena embed (`npm run vendor:arena`; a local fake provider in dev); Settings closed; the Gallery below; an open-source panel. Figure shapes under the `glider` kind (no schema change), banking in turns, nothing moving to the beat. Scenery presets (none, scatter, street, city) clear of both paths and the sight line, by command and script line. Static build of Beat Path alone (`npm run build:beat-path`, relative paths, the page as the site root) and `npm run static-check`. Removed from the page: script copy and paste and its file drop, the full-studio link, export as a primary button. The map's Side/Top and Subject/Camera switches redraw correctly (smoke-checked; the earlier fade did not reproduce on this branch). Not built: per-step travel options, handles on the camera segments, the scenery drawing tool.
+
 ### Cut line
 
 Everything above is the first milestone. **Below the line, not in the first milestone:**

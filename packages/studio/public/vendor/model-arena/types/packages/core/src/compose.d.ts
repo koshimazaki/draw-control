@@ -1,5 +1,10 @@
 import type { CameraMove, InputKind, ModelSpec } from "./specs/types.ts";
 export type ReferenceKind = "image" | "video" | "audio";
+/**
+ * The camera of a shot: a neutral move, or "guide" to take it from the guide
+ * video (its camera path and pacing) in each model's own reference wording.
+ */
+export type ShotCamera = CameraMove | "guide";
 /** What a reference is for, in neutral terms. */
 export type ReferenceRole = "first-frame" | "last-frame" | "keyframe" | "character" | "product" | "garment" | "style" | "setting" | "motion" | "source" | "soundtrack";
 export interface ShotReference {
@@ -27,7 +32,7 @@ export interface ShotDescription {
      * written beside the reference that carries the guide.
      */
     legend?: string;
-    camera: CameraMove;
+    camera: ShotCamera;
     references: ShotReference[];
     /** What the sound should be, in words. */
     audio?: string;
@@ -63,7 +68,7 @@ export interface DroppedInput {
 }
 export type CameraMode = "parameter" | "guide-video" | "prompt";
 export interface ComposedCamera {
-    move: CameraMove;
+    move: ShotCamera;
     mode: CameraMode;
     /** The parameter path and value, when mode is "parameter". */
     field?: string;

@@ -183,10 +183,18 @@ export function bindGenerate(p: Page) {
   void loadArena().then(m => {
     arena = m;
     if (m) {
+      // The key panel opens from the header button, in a small popover (the panel itself is a full form).
       key = document.createElement("arena-key") as ArenaKeyElement;
       key.setAttribute("signup-url", "https://runware.ai");
-      $("keySlot").replaceChildren(key);
-      key.addEventListener("arena-key-change", () => p.say(key!.connected ? "Runware key connected (kept in this tab only)" : "Runware key removed"));
+      const pop = document.createElement("div");
+      pop.className = "key-pop panel"; pop.hidden = true; pop.append(key);
+      $("keySlot").append(pop);
+      const button = $("keyButton"), label = () => { button.lastChild!.textContent = key!.connected ? "Runware key connected" : "Add your Runware API key"; button.classList.toggle("connected", key!.connected); };
+      button.onclick = () => { pop.hidden = !pop.hidden; };
+      window.addEventListener("pointerdown", e => { if (!pop.hidden && !$("keySlot").contains(e.target as Node)) pop.hidden = true; });
+      window.addEventListener("keydown", e => { if (e.key === "Escape") pop.hidden = true; });
+      key.addEventListener("arena-key-change", () => { label(); if (key!.connected) pop.hidden = true; p.say(key!.connected ? "Runware key connected (kept in this tab only)" : "Runware key removed"); });
+      label();
       $("arenaGallerySlot").replaceChildren(document.createElement("arena-gallery"));
     }
     sync();

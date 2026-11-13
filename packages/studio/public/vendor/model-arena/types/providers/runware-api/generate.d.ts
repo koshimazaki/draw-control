@@ -73,6 +73,8 @@ export interface GenerateOptions {
     fetch?: FetchLike;
     poll?: Omit<PollOptions, "signal" | "onProgress" | "urlField">;
     resolution?: string;
+    /** Refuse instead of sending the guide without its separate audio (MiniMax H3 over 15 s together). */
+    requireAudio?: boolean;
     laneId?: string;
     /** Fixes the task UUID (tests). */
     taskUUID?: string;

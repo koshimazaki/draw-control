@@ -22,6 +22,7 @@ export interface LaneMedia {
         seconds?: number;
         fps?: number | null;
         bytes?: number;
+        hasAudio?: boolean;
     };
 }
 export interface LaneRequest {
@@ -36,6 +37,8 @@ export interface LaneRequest {
     /** An environment still: a reference image after the character. */
     environment?: LaneMedia;
     audio?: LaneMedia;
+    /** Refuse instead of dropping the audio when video plus audio pass a model's shared cap (H3). */
+    requireAudio?: boolean;
     keyframes?: {
         media: LaneMedia;
         frame: number | "first" | "last";
