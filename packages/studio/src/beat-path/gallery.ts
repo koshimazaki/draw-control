@@ -86,7 +86,12 @@ function rowPlayer(row: HTMLElement, audioUrl: string | null) {
   const scrub = el("input", "scrub row-scrub") as HTMLInputElement;
   scrub.type = "range"; scrub.min = "0"; scrub.max = "1"; scrub.step = "0.0001"; scrub.value = "0"; scrub.setAttribute("aria-label", "Time in this row");
   scrub.oninput = () => { if (audio.duration) audio.currentTime = Number(scrub.value) * audio.duration; };
-  const tick = () => { if (audio.duration) { const f = audio.currentTime / audio.duration; scrub.value = String(f); scrub.style.setProperty("--pos", `${f * 100}%`); } for (const v of row.querySelectorAll("video")) { if (Math.abs(v.currentTime - audio.currentTime) > 0.08) v.currentTime = audio.currentTime; if (!audio.paused && v.paused) void v.play().catch(() => {}); if (audio.paused && !v.paused) v.pause(); } requestAnimationFrame(tick); };
+  // The loop ends with the row: a re-rendered gallery stops the old row's music and its frame loop.
+  let shown = false;
+  const tick = () => {
+    if (row.isConnected) shown = true;
+    else if (shown) { audio.pause(); audio.removeAttribute("src"); audio.load(); return; }
+    if (audio.duration) { const f = audio.currentTime / audio.duration; scrub.value = String(f); scrub.style.setProperty("--pos", `${f * 100}%`); } for (const v of row.querySelectorAll("video")) { if (Math.abs(v.currentTime - audio.currentTime) > 0.08) v.currentTime = audio.currentTime; if (!audio.paused && v.paused) void v.play().catch(() => {}); if (audio.paused && !v.paused) v.pause(); } requestAnimationFrame(tick); };
   requestAnimationFrame(tick);
   return { button, audio, scrub, setAudio: (url: string) => { audio.src = url; } };
 }
@@ -96,7 +101,14 @@ const video = (src: string) => { const v = el("video"); v.src = src; v.muted = t
 
 export function bindGallery(opts: { root: HTMLElement; load(slot: string): void; refs(slot: string): { character?: Blob; environment?: Blob } | undefined; runs(): Run[] }) {
   const media = new Map<number, Media>();
-  let queue = Promise.resolve();
+  const jobs = new Map<number, Promise<Media>>();
+  let queue: Promise<unknown> = Promise.resolve();
+  /** One render per example, ever: a row drawn again while its guide renders waits for the same job. */
+  const job = (i: number) => {
+    let j = jobs.get(i);
+    if (!j) { j = queue.then(() => renderGuide(i)).then(m => { media.set(i, m); return m; }); queue = j; jobs.set(i, j); }
+    return j;
+  };
 
   function exampleRow(i: number): HTMLElement {
     const ex = EXAMPLES[i], s = exampleState(i), row = el("article", "gallery-row panel"), t = EXAMPLE_TRACKS[ex.id];
@@ -124,9 +136,7 @@ export function bindGallery(opts: { root: HTMLElement; load(slot: string): void;
       const io = new IntersectionObserver(entries => {
         if (!entries.some(e => e.isIntersecting)) return;
         io.disconnect();
-        queue = queue.then(async () => {
-          const m = await renderGuide(i);
-          media.set(i, m);
+        void job(i).then(m => {
           guide.firstElementChild!.replaceWith(m ? video(m.guide) : el("div", "row-empty muted", "The guide renders in Chrome or Edge (WebCodecs)."));
           if (m) player.setAudio(m.audio);
         });

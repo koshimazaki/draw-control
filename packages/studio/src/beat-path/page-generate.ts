@@ -15,6 +15,7 @@ import type { Page } from "./page";
 import { exportRange } from "./recipe-map";
 import { legendFor } from "./script";
 import { bindGallery, type Run } from "./gallery";
+import { captureDrag } from "./drag";
 
 const EXPORT = { width: 1280, height: 720 } as const;
 const store = (() => { try { return window.sessionStorage; } catch { return null; } })();
@@ -64,12 +65,8 @@ export function bindGenerate(p: Page) {
   }
   const divider = $("divider");
   divider.addEventListener("pointerdown", e => {
-    divider.setPointerCapture(e.pointerId);
     const r = screens.getBoundingClientRect();
-    const move = (ev: PointerEvent) => { const f = (ev.clientX - r.left) / r.width; setSplit(swapped ? 1 - f : f); };
-    const up = () => { divider.removeEventListener("pointermove", move); divider.removeEventListener("pointerup", up); };
-    divider.addEventListener("pointermove", move);
-    divider.addEventListener("pointerup", up);
+    captureDrag(divider, e, ev => { const f = (ev.clientX - r.left) / r.width; setSplit(swapped ? 1 - f : f); });
   });
   divider.addEventListener("dblclick", () => setSplit(0.5));
   $("swapScreens").onclick = () => { swapped = !swapped; screens.classList.toggle("swapped", swapped); };
@@ -115,46 +112,64 @@ export function bindGenerate(p: Page) {
     $("costText").textContent = `Up to ${q.usd.toFixed(2)} USD on ${q.modelName} (limit ${MAX_PRICE} USD). It sends the guide video${(q.inputs?.length ?? 0) > 1 ? ", the reference images" : ""} and the prompt from your shot description.${fake && !key?.connected ? " Local preview: nothing is sent and nothing is charged." : ""}`;
     $("costDialog").hidden = false;
     $("costOk").focus();
-    const done = (v: boolean) => { $("costDialog").hidden = true; resolve(v); };
+    const esc = (e: KeyboardEvent) => { if (e.key === "Escape") { e.preventDefault(); done(false); } };
+    const done = (v: boolean) => { $("costDialog").hidden = true; window.removeEventListener("keydown", esc, true); resolve(v); };
+    window.addEventListener("keydown", esc, true);
     $("costOk").onclick = () => done(true);
     $("costCancel").onclick = () => done(false);
   });
 
-  $("runGenerate").onclick = async () => {
+  // One run at a time; while it runs the Generate button stops it. The run belongs to the example it
+  // started on: switching examples mid-run files the result there and never shows it on another.
+  let running: AbortController | null = null;
+  // The note and the progress bar are held here: a shown result replaces them in the output frame,
+  // and a second run looked them up by id and found nothing (it threw and left the button on Stop).
+  const bar = $("genProgress"), note = $("outputNote");
+  const runButton = $<HTMLButtonElement>("runGenerate");
+  const setRunning = (c: AbortController | null) => { running = c; runButton.textContent = c ? "Stop" : "Generate"; runButton.classList.toggle("running", !!c); };
+  runButton.onclick = async () => {
+    if (running) { running.abort(); p.say("Stopping…"); return; }
     if (p.busy) return;
     if (!arena) { p.say("Generate needs the Model Arena embed in vendor/ (npm run vendor:arena)."); return; }
     if (!key?.connected && !fake) { p.say("Add your Runware API key first (top right)."); return; }
-    p.busy = true;
-    const bar = $("genProgress"), note = $("outputNote"), fill = bar.firstElementChild as HTMLElement;
+    // An empty shot is refused by every model: say so before rendering the guide, and point at the field.
+    if (!p.state.shot.subject?.trim() && !p.state.shot.action?.trim()) { p.say("Describe the shot first: a subject or an action (the fields under the preview)."); $("shotSubject").focus(); return; }
+    const slot = p.slot, runModel = model, abort = new AbortController();
+    setRunning(abort);
+    const here = () => p.slot === slot;
+    const fill = bar.firstElementChild as HTMLElement;
     setOutputPane(true); $("addToGallery").hidden = true;
     bar.hidden = false; note.textContent = "Rendering the guide…"; fill.style.width = "0%";
     $("generateSlot").replaceChildren(note, bar);
     try {
-      const bundle = await exportGuideInMemory((d, t) => { fill.style.width = `${Math.round(d / t * 40)}%`; });
+      // The page is busy (playback paused) only while the guide renders in the shared viewport.
+      p.busy = true;
+      const bundle = await exportGuideInMemory((d, t) => { fill.style.width = `${Math.round(d / t * 40)}%`; }).finally(() => { p.busy = false; });
+      if (abort.signal.aborted) throw Object.assign(new Error("Stopped. Nothing was submitted."), { code: "aborted" });
       fakeResult = URL.createObjectURL(bundle.files["guide.mp4"]);
-      const r = refs.get(p.slot) ?? {};
+      const r = refs.get(slot) ?? {};
       const result = await arena.generateFromGuide({
-        guide: bundle.files, model, shot: shot(), references: { character: r.character, environment: r.environment }, maxPrice: MAX_PRICE,
+        guide: bundle.files, model: runModel, shot: shot(), signal: abort.signal, references: { character: r.character, environment: r.environment }, maxPrice: MAX_PRICE,
         key: key?.connected ? key : "local-preview-key-0000000000000000", confirm: confirmCost,
-        onProgress: (g: { stage: string; message: string; progress?: number }) => { note.textContent = g.message; fill.style.width = `${40 + Math.round((g.progress ?? ({ plan: 5, confirm: 10, upload: 30, submit: 40, poll: 60, done: 100 } as Record<string, number>)[g.stage] ?? 50) * 0.6)}%`; },
+        onProgress: (g: { stage: string; message: string; progress?: number }) => { if (!here()) return; note.textContent = g.message; fill.style.width = `${40 + Math.round((g.progress ?? ({ plan: 5, confirm: 10, upload: 30, submit: 40, poll: 60, done: 100 } as Record<string, number>)[g.stage] ?? 50) * 0.6)}%`; },
         ...(fake && !key?.connected ? { fetch: fakeFetch(() => fakeResult), poll: { initialDelayMs: 100, intervalMs: 100, maxIntervalMs: 200 } } : {}),
       });
-      outputs.set(p.slot, { url: result.videoURL, record: result.record, model, prompt: currentPrompt() });
-      showResult(result.videoURL);
-      if (fake && !key?.connected) player?.classList.add("fake");
-      p.say(`${labelOf(model)}: done${result.costUsd !== null ? `, ${result.costUsd.toFixed(2)} USD` : ""}${fake && !key?.connected ? " (local preview: the guide stands in for the result)" : ""}`);
+      outputs.set(slot, { url: result.videoURL, record: result.record, model: runModel, prompt: bundle.prompt });
+      if (here()) { showResult(result.videoURL); if (fake && !key?.connected) player?.classList.add("fake"); }
+      p.say(`${labelOf(runModel)}${here() ? "" : ` (${slot === "own" ? "Your own" : `Example ${Number(slot) + 1}`})`}: done${result.costUsd !== null ? `, ${result.costUsd.toFixed(2)} USD` : ""}${fake && !key?.connected ? " (local preview: the guide stands in for the result)" : ""}`);
       renderGallery();
     } catch (e) {
       const err = e as { code?: string; message: string };
       const plain = err.code ? ERROR_MESSAGES[err.code] ?? err.message : err.message;
       note.textContent = err.code === "refused" || err.code === "provider" ? `${plain}: ${err.message}` : plain;
       p.say(note.textContent);
-      if (!outputs.get(p.slot)) { bar.hidden = true; } else showResult(outputs.get(p.slot)!.url);
-    } finally { p.busy = false; bar.hidden = true; }
+      if (here()) { if (!outputs.get(slot)) { bar.hidden = true; } else showResult(outputs.get(slot)!.url); }
+    } finally { setRunning(null); bar.hidden = true; }
   };
   $("addToGallery").onclick = () => {
     const out = outputs.get(p.slot);
     if (!out) return;
+    if (runs.some(r => r.url === out.url && r.model === out.model)) { p.say("Already in the gallery below"); return; }
     runs.push({ slot: p.slot, model: out.model, modelName: labelOf(out.model), url: out.url, prompt: out.prompt });
     renderGallery();
     p.say("Added to the gallery below");
@@ -192,6 +207,7 @@ export function bindGenerate(p: Page) {
     onSlot(slot: string) {
       const r = refs.get(slot);
       thumb("thumbCharacter", r?.character); thumb("thumbEnvironment", r?.environment);
+      // A run in progress on another example keeps going; this example shows its own output (or none).
       showResult(outputs.get(slot)?.url ?? null);
       sync();
     },

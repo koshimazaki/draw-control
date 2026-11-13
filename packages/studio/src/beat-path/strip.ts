@@ -3,6 +3,7 @@
  * locked hits brighter, and the playhead. Click or drag to seek.
  */
 import type { Track } from "../audio";
+import { captureDrag } from "./drag";
 
 export type StripScene = {
   track: Track | null;
@@ -36,12 +37,8 @@ export class AudioStrip {
       // A click on a kick or snare marker switches it off (or back on); anywhere else seeks.
       const hit = this.markerAt(e);
       if (hit !== null) { toggle(hit); return; }
-      canvas.setPointerCapture(e.pointerId);
       seek(at(e));
-      const move = (ev: PointerEvent) => seek(at(ev));
-      const up = () => { canvas.removeEventListener("pointermove", move); canvas.removeEventListener("pointerup", up); };
-      canvas.addEventListener("pointermove", move);
-      canvas.addEventListener("pointerup", up);
+      captureDrag(canvas, e, ev => seek(at(ev)));
     });
     this.retheme();
   }

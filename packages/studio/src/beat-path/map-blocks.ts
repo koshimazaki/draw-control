@@ -8,6 +8,7 @@
  */
 import { footprintDistance, type Landmark } from "@motion-studio/core";
 import type { PathPt } from "./script";
+import { captureDrag } from "./drag";
 
 export type Box = { x: number; z: number; w: number; d: number; h: number; yaw?: number };
 export type BlockHost = {
@@ -43,7 +44,7 @@ export class BlockTool {
   private clipboard: Box | null = null;
   /** Where the pointer last was on the map (paste goes there). */
   pointer: PathPt = { x: 0, z: 0 };
-  constructor(private canvas: HTMLCanvasElement, private host: BlockHost) {}
+  constructor(private canvas: HTMLCanvasElement, readonly host: BlockHost) {}
 
   private local(e: PointerEvent): [number, number] { const r = this.canvas.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
 
@@ -76,16 +77,12 @@ export class BlockTool {
     }
     this.host.changed();
     const c = this.canvas;
-    c.setPointerCapture(e.pointerId);
     let last: Box[] | null = null;
     const move = (ev: PointerEvent) => { const w = fromScreen(...this.local(ev)); this.pointer = w; last = drag!(w); this.host.setBoxes(last, false); };
-    const up = () => {
-      c.removeEventListener("pointermove", move); c.removeEventListener("pointerup", up);
+    captureDrag(c, e, move, () => {
       if (last) this.commit(last);
       else if (this.selected === boxes.length) this.selected = -1;   // a click with Draw new and no drag adds nothing
-    };
-    c.addEventListener("pointermove", move);
-    c.addEventListener("pointerup", up);
+    });
     return true;
   }
 

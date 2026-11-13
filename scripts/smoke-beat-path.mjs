@@ -11,13 +11,14 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { unzipSync, strFromU8 } from "fflate";
 import { smokeBeatPathMap } from "./smoke-beat-path-map.mjs";
+import { smokeBeatPathHunt } from "./smoke-beat-path-hunt.mjs";
 
 
 export async function smokeBeatPath(browser, base, { fail, OUT, SHOTS }) {
   const page = await browser.newPage({ viewport: { width: 1280, height: 720 }, acceptDownloads: true });
   const errors = [];
   page.on("pageerror", e => errors.push(e.message));
-  page.on("console", m => { if (m.type() === "error") errors.push(m.text()); });
+  page.on("console", m => { if (m.type() === "error" || m.type() === "warning") errors.push(`${m.type()}: ${m.text()}`); });
   await page.goto(`${base}/path.html`);
   await page.waitForFunction(() => window.__beatPath?.recipe().audio?.name === "generated-straight-120.wav", null, { timeout: 30_000 })
     .catch(async e => {
@@ -39,7 +40,10 @@ export async function smokeBeatPath(browser, base, { fail, OUT, SHOTS }) {
 
   // Switching Side ↔ Top and Subject ↔ Camera keeps the drawn path on the map (no stale canvas).
   const orange = () => page.evaluate(() => {
-    const c = document.getElementById("map"), d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data;
+    // Read a copy (made for readback), so the test never trips the page canvas's readback warning.
+    const m = document.getElementById("map"), c = Object.assign(document.createElement("canvas"), { width: m.width, height: m.height });
+    const g = c.getContext("2d", { willReadFrequently: true }); g.drawImage(m, 0, 0);
+    const d = g.getImageData(0, 0, c.width, c.height).data;
     let n = 0; for (let i = 0; i < d.length; i += 16) if (d[i] > 200 && d[i + 1] > 90 && d[i + 1] < 180 && d[i + 2] < 110) n++; return n;
   });
   const orange0 = await orange();
@@ -248,6 +252,7 @@ export async function smokeBeatPath(browser, base, { fail, OUT, SHOTS }) {
   if (errors.length) fail(`Beat Path page errors: ${errors.join(" | ")}`);
   await page.close();
   await smokeBeatPathMap(browser, base, { fail, SHOTS });
+  await smokeBeatPathHunt(browser, base, { fail });
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

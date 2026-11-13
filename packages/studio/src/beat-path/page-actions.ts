@@ -13,6 +13,7 @@ import { removeAt, splitAt, type LaneView, type MenuField, type MenuItem } from 
 import type { Page } from "./page";
 import { beatPathRecipe, exportRange } from "./recipe-map";
 import { HIT_CHOICES, LABELS, LOCK_CHOICES, fitLanes, setWord, toScript, type BeatPathState, type Block, type CameraWord, type ClipChoice } from "./script";
+import { isTyping } from "./drag";
 
 /** What each block's shape on the map is, said in its popover. */
 const CAMERA_NOTES: Record<CameraWord, string> = {
@@ -228,8 +229,10 @@ export function bindActions(p: Page) {
     }
   });
   window.addEventListener("keydown", e => {
-    const typing = (e.target as HTMLElement).closest("input[type=text], textarea");
+    // Any text-like field (the shot fields, the box height, the API key's password field) keeps its own keys.
+    const typing = isTyping(e.target);
     if (e.key === "Escape") {
+      if (!$("costDialog").hidden) return;   // the cost dialog handles its own Escape
       if (p.map.busy) p.map.cancelStroke();
       else { p.setSelection(null); if (p.pen === "draw") p.setPen("edit"); }
       return;
@@ -275,6 +278,7 @@ export function bindActions(p: Page) {
     (window as unknown as { __beatPath: unknown }).__beatPath = {
       recipe: () => p.recipe, state: () => structuredClone(p.state), script, mapPoint: (q: { x: number; z: number }) => p.map.clientAt(q),
       playing: () => p.player.playing, head: () => p.head, selection: () => p.selection, mapInside: () => p.map.allInside(), shown: () => p.shown,
+      boxes: () => p.blocks.host.boxes(), boxSelected: () => p.blocks.selected, slot: () => p.slot, trackName: () => p.info?.name ?? null,
     };
   }
   return { sync, openBlock };

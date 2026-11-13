@@ -9,6 +9,7 @@
  */
 import { cornerPath, type Landmark } from "@motion-studio/core";
 import type { PathPt } from "./script";
+import { captureDrag } from "./drag";
 
 export type Tool = "subject" | "camera" | "blocks";
 /** A path tool (the blocks tool shows the subject's path in the side view). */
@@ -205,12 +206,9 @@ export class MapView {
   /** Pan by dragging (middle button, or the space bar held). */
   private panDrag(e: PointerEvent) {
     const c = this.canvas, start = this.local(e), from = { x: this.cx, z: this.cz };
-    c.setPointerCapture(e.pointerId);
     c.classList.add("panning");
     const move = (ev: PointerEvent) => { const [px, py] = this.local(ev); this.cx = from.x - (px - start[0]) / this.scale; this.cz = from.z - (py - start[1]) / this.scale; this.refresh(); };
-    const up = () => { c.removeEventListener("pointermove", move); c.removeEventListener("pointerup", up); if (!this.spaceHeld) c.classList.remove("panning"); };
-    c.addEventListener("pointermove", move);
-    c.addEventListener("pointerup", up);
+    captureDrag(c, e, move, () => { if (!this.spaceHeld) c.classList.remove("panning"); });
   }
 
   private down(e: PointerEvent) {
