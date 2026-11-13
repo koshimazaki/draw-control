@@ -191,7 +191,7 @@ export function bindGenerate(p: Page) {
       const pop = document.createElement("div");
       pop.className = "key-pop panel"; pop.hidden = true; pop.append(key);
       $("keySlot").append(pop);
-      const button = $("keyButton"), label = () => { button.lastChild!.textContent = key!.connected ? "Runware key connected" : "Add your Runware API key"; const b = $("balance"), known = key!.connected && typeof key!.balance === "number"; b.hidden = !known; b.textContent = known ? `Balance ${key!.balance!.toFixed(2)} USD` : ""; button.classList.toggle("connected", key!.connected); };
+      const button = $("keyButton"), label = () => { button.lastChild!.textContent = key!.connected ? "Runware key connected" : "Add your Runware API key"; const b = $("balance"), known = key!.connected && typeof key!.balance === "number"; b.hidden = !known; if (known) { const n = document.createElement("span"); n.className = "balance-amount"; n.textContent = `${key!.balance!.toFixed(2)} USD`; b.replaceChildren("Balance ", n); } else b.replaceChildren(); button.classList.toggle("connected", key!.connected); };
       button.onclick = () => { pop.hidden = !pop.hidden; };
       window.addEventListener("pointerdown", e => { if (!pop.hidden && !$("keySlot").contains(e.target as Node)) pop.hidden = true; });
       window.addEventListener("keydown", e => { if (e.key === "Escape") pop.hidden = true; });
