@@ -92,7 +92,7 @@ export const LAYOUT = `
         <button type="button" id="runGenerate" class="btn primary run-btn">${icon("zap", "i-run")}${icon("square", "i-stop")}<span class="btn-label">Generate</span></button>
         <details class="options" id="settings"><summary class="btn ghost">${icon("sliders")}Settings${icon("chevron-down", "chev")}</summary>
           <div class="options-body panel">
-            <div class="opt-row"><span class="lab">Clip</span>${seg("clip", CLIP_CHOICES, { 5: "5 s", 8: "8 s" }, "Clip length")}
+            <div class="opt-row"><span class="lab">Clip</span>${seg("clip", CLIP_CHOICES, { 5: "5 s", 8: "8 s", 10: "10 s" }, "Clip length")}
               <label class="toggle" data-tip="On: edges snap to beats and hits. Off: they move by single frames"><input id="snap" type="checkbox" checked /><span class="knob"></span>Snap</label></div>
             <div class="opt-row"><span class="lab">Locks</span><button type="button" class="btn outline" id="setCharLock">Character…</button><button type="button" class="btn outline" id="setCamLock">Camera…</button></div>
             <div class="opt-row"><span class="lab">Guide</span><label class="toggle"><input id="gridExport" type="checkbox" checked /><span class="knob"></span>Ground grid</label>
@@ -117,11 +117,12 @@ export const LAYOUT = `
     <button type="button" id="removeTrack" class="btn ghost" data-tip="Play without music: a plain timed clip">${icon("x")}No music</button>
   </div>
   <div class="timeline">
+    <label class="lane-lab overview-lab" data-tip="Where the clip starts in the track (seconds); snaps to the beat with Snap on"><input id="sliceStart" class="field num mono" type="number" min="0" step="0.01" aria-label="Clip start in the track, seconds" /></label><div class="overview-wrap"><canvas id="overview" tabindex="0" aria-label="The whole track: drag the bracketed window to choose the clip; arrow keys nudge it"></canvas></div>
     <span class="lane-lab">Music</span><div class="wave-wrap" id="waveWrap"><canvas id="wave"></canvas></div>
     <button type="button" class="chip" id="chipCharacter" aria-haspopup="menu" data-tip="The character's lock: what its travel lands on"><span class="chip-name">Character</span><span class="chip-lock" id="chipCharacterLock"></span></button><div class="lane" id="laneCharacter" role="list" aria-label="Character lane"></div>
     <button type="button" class="chip" id="chipCamera" aria-haspopup="menu" data-tip="The camera's lock: its own source, what it does on each hit"><span class="chip-name">Camera</span><span class="chip-lock" id="chipCameraLock"></span></button><div class="lane" id="laneCamera" role="list" aria-label="Camera lane"></div>
   </div>
-  <div class="audio-info"><p class="track-row"><span id="trackName">No track</span></p><button type="button" id="resetMarkers" class="link-act" hidden>Reset markers</button><p class="legend muted"><i class="k"></i>kick <i class="s"></i>snare</p><p id="status" class="status muted" aria-live="polite"></p></div>
+  <div class="audio-info"><p class="track-row"><span id="trackName">No track</span></p><button type="button" id="resetMarkers" class="link-act" hidden>Reset markers</button><p class="legend muted" role="radiogroup" aria-label="Kind of marker Alt-click adds"><button type="button" class="kind on" data-band="low" role="radio" data-tip="Kicks in the clip · Alt-click the strip to add one"><i class="k"></i>kick <b id="countLow">0</b></button><button type="button" class="kind" data-band="mid" role="radio" data-tip="Snares in the clip · Alt-click adds one when chosen"><i class="s"></i>snare <b id="countMid">0</b></button><button type="button" class="kind tip-end" data-band="high" role="radio" data-tip="Hats in the clip · Alt-click adds one when chosen"><i class="h"></i>hat <b id="countHigh">0</b></button></p><p id="status" class="status muted" aria-live="polite"></p></div>
 </footer>
 </div>
 <section class="page-section" id="gallery" aria-labelledby="galleryTitle">

@@ -23,6 +23,7 @@ import { MapView, type Tool, type View } from "./map";
 import { BlockTool } from "./map-blocks";
 import { FollowTool, type FollowSeg } from "./map-follow";
 import { bindActions } from "./page-actions";
+import { bindSlice } from "./page-slice";
 import { initPills } from "./ui/seg-pill";
 import { beatPathRecipe, type TrackInfo } from "./recipe-map";
 import { LABELS, fitLanes, isFollowWord, type BeatPathState, type CameraWord, type CharacterWord } from "./script";
@@ -131,7 +132,10 @@ export function startBeatPath(root: HTMLElement) {
   /** One clock for the page: the transport bar, the music strip and the play buttons all move it. */
   function seek(seconds: number) { head = Math.max(window0(), Math.min(window1(), seconds)); if (player.playing) player.play(track, head); dirty = true; }
   const strip = new AudioStrip($<HTMLCanvasElement>("wave"), seconds => seek(seconds),
-    seconds => toggleHit(seconds));
+    seconds => toggleHit(seconds), {
+      add: t => hooks.slice?.stripHooks.add(t), move: (i, t, final) => hooks.slice?.stripHooks.move(i, t, final), select: i => { hooks.slice?.stripHooks.select(i); dirty = true; rebuildSoon(); },
+    });
+  const rebuildSoon = () => schedule(false);
   /** Switch a kick or snare off for every lock, or back on (undoable, in the recipe and the script). */
   function toggleHit(seconds: number) {
     const t = Math.round(seconds * 1000) / 1000, on = state.muted.some(m => Math.abs(m - t) < 0.012);
@@ -191,12 +195,14 @@ export function startBeatPath(root: HTMLElement) {
     const bands = live()?.bands, t0 = window0(), t1 = window1(), inClip = (t: number) => t >= t0 && t <= t1;
     const beats: number[] = [];
     for (let b = 0; secondsAtBeat(recipe.beatGrid, b) <= t1; b++) beats.push(secondsAtBeat(recipe.beatGrid, b));
-    strip.setScene({ track, start: t0, end: t1, beats, kicks: (bands?.low ?? []).map(o => o.seconds).filter(inClip), snares: (bands?.mid ?? []).map(o => o.seconds).filter(inClip), locked: hits, muted: state.muted });
+    strip.setScene({ track, start: t0, end: t1, beats, kicks: (bands?.low ?? []).map(o => o.seconds).filter(inClip), snares: (bands?.mid ?? []).map(o => o.seconds).filter(inClip),
+      hats: (bands?.high ?? []).map(o => o.seconds).filter(inClip), added: state.markers ?? [], selected: hooks.slice?.selected ?? -1, locked: hits, muted: state.muted });
     $("resetMarkers").hidden = !state.muted.length;
     $("resetMarkers").textContent = `Reset markers (${state.muted.length})`;
     characterLane.render(); cameraLane.render();
     actions.sync();
     hooks.generate?.sync();
+    hooks.slice?.sync();
     head = Math.max(t0, Math.min(t1, head));
     dirty = true;
   }
@@ -239,6 +245,7 @@ export function startBeatPath(root: HTMLElement) {
     const cam = cameraAtSeconds(plan, seconds);
     map.setLive({ subject: { x: st.root.x, z: st.root.z, yaw: st.root.yawRadians }, camera: { x: cam.position[0], z: cam.position[2], tx: cam.target[0], tz: cam.target[2], fov: cam.fov } });
     strip.setHead(seconds);
+    hooks.slice?.overview.setHead(seconds);
     // The transport bar under the screens: position, time and beat.
     const t = seconds - window0(), total = state.clip;
     $<HTMLInputElement>("scrub").value = String(Math.max(0, Math.min(1, t / total)));
@@ -326,31 +333,37 @@ export function startBeatPath(root: HTMLElement) {
   }
   async function useFile(file: File) {
     strip.message = `Decoding ${file.name}…`;
-    strip.setScene({ track, start: window0(), end: window1(), beats: [], kicks: [], snares: [], locked: [], muted: [] });
-    try { await useTrack(await loadTrack(file), "unspecified"); }
+    strip.setScene({ track, start: window0(), end: window1(), beats: [], kicks: [], snares: [], hats: [], added: [], selected: -1, locked: [], muted: [] });
+    try {
+      const loaded = await loadTrack(file, stage => { strip.message = stage; strip.setScene({ track, start: window0(), end: window1(), beats: [], kicks: [], snares: [], hats: [], added: [], selected: -1, locked: [], muted: [] }); });
+      // A new track starts at its first beat, with no markers of its own (the old ones belong to the old track).
+      state = { ...state, slice: undefined, markers: undefined, muted: [] };
+      await useTrack(loaded, "unspecified");
+    }
     catch (e) { strip.message = ""; rebuild(); say(`Could not read the track: ${(e as Error).message}`); }
   }
 
   /** Bound after the page object exists (it needs the page); the rebuild reaches it through here. */
-  const hooks: { generate?: ReturnType<typeof bindGenerate> } = {};
+  const hooks: { generate?: ReturnType<typeof bindGenerate>; slice?: ReturnType<typeof bindSlice> } = {};
   const page = {
     $, map, menu, viewport, strip, player,
     get state() { return state; }, get recipe() { return recipe; }, get tool() { return tool; }, get view() { return view; },
     get track() { return track; }, get drive() { return live(); }, get info() { return info; }, get busy() { return busy; }, set busy(v: boolean) { busy = v; dirty = true; },
-    get head() { return head; }, get shown() { return shown; }, get slot() { return slot; }, get followSegs() { return followSegs; }, blocks, seek, removeTrack, totalBeats, window0, window1, update, undo, rebuild, setPlaying, switchSlot, useFile, say,
+    get head() { return head; }, get shown() { return shown; }, get slot() { return slot; }, get followSegs() { return followSegs; }, get slice() { return hooks.slice; }, blocks, seek, removeTrack, totalBeats, window0, window1, update, undo, rebuild, setPlaying, switchSlot, useFile, say,
     setTool(t: Tool) { tool = t; if (pen === "draw") map.startNew(); map.refresh(); actions.sync(); },
     setView(v: View) { view = v; map.refresh(); actions.sync(); },
     get pen() { return pen; },
     setPen(v: "edit" | "draw") { if (v === "draw" && pen !== "draw") map.startNew(); pen = v; actions.sync(); },
     get selection() { return selection; },
     setSelection(v: typeof selection) { selection = v; rebuild(); },
-    retheme() { map.retheme(); strip.retheme(); },
+    retheme() { map.retheme(); strip.retheme(); hooks.slice?.retheme(); },
     /** A new example or script: rebuild and frame it on the map. */
     load(next: BeatPathState) { update(next); map.fit(); },
   };
   const actions = bindActions(page);
   initPills(root);
   hooks.generate = bindGenerate(page);
+  hooks.slice = bindSlice(page);
   rebuild();
   map.fit();
   // First run: Example 1 with its own music, ready after one click on Play.

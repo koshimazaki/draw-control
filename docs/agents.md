@@ -204,3 +204,29 @@ What the script says, and what was added for it:
 - **New CLI command**: `groove` writes the examples' drum music (the page's own synth) so `analyse` has a file.
 
 Not expressible yet: a skateboard prop under the figure (the runner shape stands in); people passing by (the shot text asks the model for them).
+
+## Slicing a clip out of a longer track (round 9)
+
+A clip (5, 8 or 10 s) can start anywhere in a longer track. Beat 0 moves there: the beat grid's
+offset is the slice's start, so the hits the locks land on, the exported `audio.wav` and
+`beats.json` are the slice's. The tempo comes from the whole track; the start snaps to the
+nearest beat of the track's grid, so beat 0 falls on a beat of the music.
+
+```
+motion-studio analyse song.wav --out song.json                     # the whole track, analysed once
+motion-studio new --character glider --clip 10 --slice 61.4 --analysis song.json --out base.json   # snapped: 61.6
+motion-studio script base.json shot.txt --analysis song.json --out shot.json
+```
+
+In a script, the same as settings lines (times in track seconds, like `muted:`):
+
+```
+slice: 61.6s
+markers: kick 62.35 62.9 snare 63.1 hat 63.4
+```
+
+`markers:` adds hits by hand (kick = low band, snare = mid, hat = high); every lock lands on them
+as on detected hits (`recipe.addedHits`). Over MCP: `new_recipe {character: "glider", clip: 10, slice: 61.4}`,
+or the lines above in `apply_script`. In the page: drag the bracketed window on the track
+overview (arrow keys nudge it a beat), type the start beside it, Alt-click the music strip to
+add a marker of the kind chosen in the legend.

@@ -22,15 +22,15 @@ export type Block<W extends string> = { from: number; to: number; word: W; phras
 export const FOLLOW_WORDS = { behind: "chase", side: "side" } as const;
 export const isFollowWord = (w: string): w is keyof typeof FOLLOW_WORDS => w in FOLLOW_WORDS;
 const followTail = (word: keyof typeof FOLLOW_WORDS, f?: FollowOffset) => { const t = followWords(FOLLOW_WORDS[word], f); return t ? ` ${t}` : ""; };
-export const LOCK_CHOICES = ["off", "beat", "kick", "snare"] as const;
+export const LOCK_CHOICES = ["off", "beat", "kick", "snare", "hat"] as const;
 export type LockChoice = (typeof LOCK_CHOICES)[number];
 export const HIT_CHOICES = ["move", "hold", "punch"] as const;
 export type HitChoice = (typeof HIT_CHOICES)[number];
-export const CLIP_CHOICES = [5, 8] as const;
+export const CLIP_CHOICES = [5, 8, 10] as const;
 export type ClipChoice = (typeof CLIP_CHOICES)[number];
 
 export type BeatPathState = {
-  /** Clip length, seconds: 5 or 8 (121 or 193 frames at 24 fps). */
+  /** Clip length, seconds: 5, 8 or 10 (121, 193 or 241 frames at 24 fps). */
   clip: ClipChoice;
   subject: PathPt[];
   /** 0 sharp (straight segments, hard turns) to 1 round. */
@@ -47,6 +47,10 @@ export type BeatPathState = {
   landmarks: { on: boolean; seed: number };
   /** Hits switched off (onset seconds): skipped by every lock. */
   muted: number[];
+  /** Hits added by hand (track seconds) in a band: low kick, mid snare, high hat; every lock lands on them too. */
+  markers?: { band: "low" | "mid" | "high"; seconds: number }[];
+  /** Where the clip starts in a longer track (seconds; beat 0 sits there). Absent: the track's first beat. */
+  slice?: number;
   /** The figure's colours (body, head), "#rrggbb". */
   figure: { shape: "glider" | "car" | "flyer" | "runner"; body: string; head: string };
   /** The scenery around the path: none, the seeded scatter, a street of buildings, a city grid. */
@@ -66,7 +70,7 @@ export type BeatPathState = {
 export const LABELS = {
   character: { glide: "Glide", hover: "Hover", spin: "Spin", jump: "Jump", freeze: "Freeze" },
   camera: { behind: "Follow behind", side: "Follow side", orbit: "Orbit", top: "Top", path: "My path", push: "Push in" },
-  lock: { off: "Off", beat: "Beat", kick: "Kick", snare: "Snare" },
+  lock: { off: "Off", beat: "Beat", kick: "Kick", snare: "Snare", hat: "Hat" },
   hit: { move: "Keeps moving", hold: "Holds", punch: "Punches in" },
 } as const;
 
@@ -106,7 +110,7 @@ export function toScript(state: BeatPathState): string {
   const lock = cl.lock !== "off" ? ` lock ${cl.lock} ${f(cl.strength)}` : "";
   const camLock = kl.lock !== "off" && kl.onHit !== "move" ? ` lock ${kl.lock} ${f(kl.strength)} ${kl.onHit === "punch" ? `punch ${f(CAMERA_AMOUNTS.punch)}m` : "hold"}` : "";
   // Next move on each hit: every camera block after the first starts on the first hit of the camera's source in it.
-  const advance = kl.advance && (kl.lock === "kick" || kl.lock === "snare") ? ` @${kl.lock} 1` : "";
+  const advance = kl.advance && (kl.lock === "kick" || kl.lock === "snare" || kl.lock === "hat") ? ` @${kl.lock} 1` : "";
   const glide = state.character.find(b => b.word === "glide");
   let pathPrinted = false;
   const lines: string[] = [];
@@ -114,6 +118,11 @@ export function toScript(state: BeatPathState): string {
   if (state.track) lines.push(`# track: ${({ flyer: "straight", runner: "drive", car: "laidback" } as const)[state.track]}`);
   lines.push(`# clip: ${state.clip} s · figure: ${state.figure.shape} · Beat Path`);
   lines.push(`landmarks: ${state.landmarks.on ? `on seed ${state.landmarks.seed}` : "off"}`);
+  if (state.slice !== undefined) lines.push(`slice: ${f(state.slice)}s`);
+  if (state.markers?.length) {
+    const word = { low: "kick", mid: "snare", high: "hat" } as const;
+    lines.push(`markers: ${(["low", "mid", "high"] as const).map(b => state.markers!.filter(m => m.band === b)).filter(l => l.length).map(l => `${word[l[0].band]} ${l.map(m => f(m.seconds)).join(" ")}`).join(" ")}`);
+  }
   if (state.muted.length) lines.push(`muted: ${state.muted.map(f).join(" ")}`);
   if (state.figure.shape !== "glider" || state.figure.body !== FIGURE_DEFAULT.body || state.figure.head !== FIGURE_DEFAULT.head)
     lines.push(`figure: ${state.figure.shape !== "glider" ? `shape ${state.figure.shape} ` : ""}body ${state.figure.body} head ${state.figure.head}`);
@@ -171,9 +180,11 @@ export function fromScript(text: string, base: BeatPathState, grid: { bpm: numbe
   const prompt = /^#\s*prompt:\s*(.+)$/im.exec(text);
   if (prompt) state.prompt = prompt[1].trim();
   const clip = /^#\s*clip:\s*(\d+)/im.exec(text);
-  if (clip) state.clip = Number(clip[1]) <= 6 ? 5 : 8;
+  if (clip) state.clip = Number(clip[1]) <= 6 ? 5 : Number(clip[1]) <= 9 ? 8 : 10;
   const parsed = parseSettings(text), settings = parsed.landmarks;
   state.muted = parsed.muted ?? [];
+  state.markers = parsed.markers?.length ? parsed.markers : undefined;
+  state.slice = parsed.slice;
   state.figure = { shape: parsed.figure?.shape ?? "glider", body: parsed.figure?.body ?? FIGURE_DEFAULT.body, head: parsed.figure?.head ?? FIGURE_DEFAULT.head };
   state.scenery = parsed.scenery ?? (state.landmarks.on ? "scatter" : "none");
   state.sight = parsed.sight ?? "clear";
@@ -187,8 +198,7 @@ export function fromScript(text: string, base: BeatPathState, grid: { bpm: numbe
   const readLock = (cell: string, into: { lock: LockChoice; strength: number }) => {
     const m = /lock\s+(beat|kick|snare|hat)(?:\s+([\d.]+))?/.exec(cell);
     if (!m) return false;
-    if (m[1] === "hat") notes.push("hat locks become beat locks");
-    into.lock = m[1] === "hat" ? "beat" : (m[1] as LockChoice);
+    into.lock = m[1] as LockChoice;
     into.strength = m[2] !== undefined ? Number(m[2]) : 1;
     return true;
   };
@@ -229,10 +239,10 @@ export function fromScript(text: string, base: BeatPathState, grid: { bpm: numbe
     else if (/\b(shoulder)\b/.test(c)) word = "behind";
     else if (/^(go )?above\b/.test(c)) word = "top";
     if (readLock(c, state.camLock)) { state.camLock.onHit = /\bpunch\b/.test(c) ? "punch" : /\bhold\b/.test(c) ? "hold" : "move"; hitSeen = camSeen = true; }
-    const anchor = /@(kick|snare)\s+1\b/.exec(c);
+    const anchor = /@(kick|snare|hat)\s+1\b/.exec(c);
     if (anchor) { advanceSeen = true; if (!camSeen) state.camLock.lock = anchor[1] as LockChoice; }
     // Anything richer than a lane word stays as the block's phrase (lock words stripped: the lock is global).
-    const bare = c.replace(/\s*@(kick|snare)\s+1\b/, "").replace(/\s*\block\s+(beat|kick|snare|hat)(\s+[\d.]+)?(\s+(hold|punch(\s+[\d.]+m?)?))?\s*$/, "").trim();
+    const bare = c.replace(/\s*@(kick|snare|hat)\s+1\b/, "").replace(/\s*\block\s+(beat|kick|snare|hat)(\s+[\d.]+)?(\s+(hold|punch(\s+[\d.]+m?)?))?\s*$/, "").trim();
     // A follow word with its offset words stays a plain follow block (the offset rides on it).
     const followed = /^follow (behind|side)\s+(.+)$/.exec(bare);
     let follow: FollowOffset | undefined, followOk = false;

@@ -212,7 +212,9 @@ export function printScript(r: Recipe, bands?: BandAnalysis): string {
   // Columns line up, but a long cell (a path's points) does not pad every other row.
   const widths = rows.reduce((w, cells) => cells.map((c, k) => Math.max(w[k] ?? 0, Math.min(COLUMN_MAX, c.length))), [] as number[]);
   // Settings lines first: whether the landmark blocks are on (and their seed).
-  const settings = (r.scenery ? `scenery: ${r.scenery}${r.scenerySight === "passes" ? " sight passes" : ""}\n` : "")
+  const word = { low: "kick", mid: "snare", high: "hat" } as const;
+  const added = (["low", "mid", "high"] as const).map(b => (r.addedHits ?? []).filter(h => h.band === b)).filter(l => l.length).map(l => `${word[l[0].band]} ${l.map(h => fmt(h.seconds)).join(" ")}`).join(" ");
+  const settings = (r.slice !== undefined ? `slice: ${fmt(r.slice)}s\n` : "") + (added ? `markers: ${added}\n` : "") + (r.scenery ? `scenery: ${r.scenery}${r.scenerySight === "passes" ? " sight passes" : ""}\n` : "")
     + (r.sceneryBoxes ?? []).map(b => `box: ${[b.x, b.z, b.w, b.d, b.h, ...(b.yaw ? [b.yaw] : [])].map(fmt).join(" ")}\n`).join("") + (r.landmarks ? `landmarks: ${r.landmarks.on ? `on seed ${r.landmarks.seed}` : "off"}\n` : "") + (r.mutedHits?.length ? `muted: ${r.mutedHits.map(fmt).join(" ")}\n` : "") + (r.figure ? `figure: ${r.figure.shape ? `shape ${r.figure.shape} ` : ""}body ${r.figure.body} head ${r.figure.head}\n` : "")
     + (r.shot ? (["subject", "environment", "action", "legend"] as const).filter(k => r.shot![k]).map(k => `shot ${k}: ${r.shot![k]}\n`).join("") : "");
   return settings + rows.map(cells => cells.map((c, k) => (k < cells.length - 1 ? c.padEnd(widths[k]) : c)).join(" | ")).join("\n") + "\n";

@@ -15,7 +15,7 @@ import { DEFAULT_CAMERA, FOLLOW_MODES, SHOTS, type CameraMode, type FollowOffset
 import { parseFollowArgs } from "./follow-words";
 import { gaitSpeedFor, setCameraModes, setCameraPath, setRootPath, startCameraMove } from "./camera-edits";
 import { insertMove } from "./commands";
-import { LOCK_TARGETS, lockHits, unmutedBands, type LockTarget } from "./lock";
+import { LOCK_TARGETS, lockHits, hitBands, type LockTarget } from "./lock";
 import { makeMoveFor, onsetBeats, setMoveFields } from "./move-edits";
 import { addMarker } from "./performance-edits";
 import { DEFAULT_REACTIVE } from "./reactive-config";
@@ -36,9 +36,11 @@ const number = (row: Row, t: string, what: string) => {
 };
 
 /** A settings line: `landmarks: on seed 7` or `landmarks: off` (not a row). */
-const SETTING = /^(landmarks|muted|figure|scenery|box|shot (subject|environment|action|legend))\s*:/i;
+const SETTING = /^(landmarks|muted|markers|slice|figure|scenery|box|shot (subject|environment|action|legend))\s*:/i;
+/** The words for added hits in a "markers:" line, and their bands. */
+const MARKER_WORDS = { kick: "low", snare: "mid", hat: "high" } as const;
 /** The script's settings lines; a script without one leaves the setting as it was. */
-export type ScriptSettings = { boxes?: { x: number; z: number; w: number; d: number; h: number; yaw?: number }[]; sight?: "clear" | "passes"; landmarks?: { on: boolean; seed?: number }; muted?: number[]; figure?: { shape?: "car" | "flyer" | "runner"; body: string; head: string }; scenery?: "none" | "scatter" | "street" | "city"; shot?: Partial<Record<"subject" | "environment" | "action" | "legend", string>> };
+export type ScriptSettings = { slice?: number; markers?: { band: "low" | "mid" | "high"; seconds: number }[]; boxes?: { x: number; z: number; w: number; d: number; h: number; yaw?: number }[]; sight?: "clear" | "passes"; landmarks?: { on: boolean; seed?: number }; muted?: number[]; figure?: { shape?: "car" | "flyer" | "runner"; body: string; head: string }; scenery?: "none" | "scatter" | "street" | "city"; shot?: Partial<Record<"subject" | "environment" | "action" | "legend", string>> };
 export function parseSettings(script: string): ScriptSettings {
   const out: ScriptSettings = {};
   script.split(/\r?\n/).forEach((raw, i) => {
@@ -65,6 +67,26 @@ export function parseSettings(script: string): ScriptSettings {
       if (!m || (!m[1] && !m[2])) throw new RecipeError(`script line ${i + 1}: figure reads "figure: shape car body #e8632a head #f2a35e" (shape: glider, car, flyer, runner)`);
       const body = (m[2] ?? "#ff6a13").toLowerCase();
       out.figure = { ...(m[1] && m[1].toLowerCase() !== "glider" ? { shape: m[1].toLowerCase() as "car" } : {}), body, head: (m[3] ?? body).toLowerCase() };
+      return;
+    }
+    if (/^slice\s*:/i.test(text)) {
+      const m = /^slice\s*:\s*(\d+(?:\.\d+)?)\s*s?\s*$/i.exec(text);
+      if (!m) throw new RecipeError(`script line ${i + 1}: slice reads "slice: 42.5s" (where the clip starts in the track)`);
+      out.slice = Number(m[1]);
+      return;
+    }
+    if (/^markers\s*:/i.test(text)) {
+      // "markers: kick 3.2 snare 4.1 hat 5" (track seconds), hits added by hand.
+      const words = text.replace(/^markers\s*:/i, "").trim().split(/[\s,]+/).filter(Boolean).filter(w => w !== "none");
+      const list: { band: "low" | "mid" | "high"; seconds: number }[] = [];
+      let band: "low" | "mid" | "high" | null = null;
+      for (const w of words) {
+        if (w.toLowerCase() in MARKER_WORDS) { band = MARKER_WORDS[w.toLowerCase() as keyof typeof MARKER_WORDS]; continue; }
+        const t = Number(w.replace(/s$/, ""));
+        if (!band || !Number.isFinite(t) || t < 0) throw new RecipeError(`script line ${i + 1}: markers reads "markers: kick 3.2 3.7 snare 4.1 hat 5" (times in seconds after their kind)`);
+        list.push({ band, seconds: t });
+      }
+      out.markers = list;
       return;
     }
     if (/^muted\s*:/i.test(text)) {
@@ -293,12 +315,16 @@ function retimePath(r: Recipe, from: number, to: number, glide: boolean): RootPo
 }
 
 export function applyScript(recipe: Recipe, args: { script: string }, ctx: { bands?: BandAnalysis; drive?: AudioDrive } = {}): Recipe {
+  // A slice moves beat 0 to where the clip starts in the track, before any row (a row in seconds counts from there).
+  const sliceAt = parseSettings(args.script).slice;
+  if (sliceAt !== undefined) recipe = validateRecipe({ ...recipe, slice: sliceAt, beatGrid: { ...recipe.beatGrid, offsetSeconds: sliceAt } });
   const rows = parseRows(args.script, recipe.beatGrid), bands = ctx.bands ?? ctx.drive?.bands;
   const freezes: { fromBeat: number; toBeat: number }[] = [];
   if (rows[rows.length - 1].to > recipe.durationBeats + 1e-6) throw new RecipeError(`script runs to beat ${rows[rows.length - 1].to}, past the recipe's ${recipe.durationBeats} beats`);
   let r: Recipe = validateRecipe({ ...structuredClone(recipe), moves: [] });
   const settings = parseSettings(args.script);
   if (settings.muted) r = validateRecipe({ ...r, mutedHits: settings.muted });
+  if (settings.markers) r = validateRecipe({ ...r, addedHits: settings.markers });
   if (settings.figure) r = validateRecipe({ ...r, figure: settings.figure });
   if (settings.scenery) r = validateRecipe({ ...r, scenery: settings.scenery, ...(settings.sight ? { scenerySight: settings.sight } : {}) });
   if (settings.boxes) r = validateRecipe({ ...r, sceneryBoxes: settings.boxes });
@@ -371,7 +397,7 @@ export function applyScript(recipe: Recipe, args: { script: string }, ctx: { ban
     const b = cams[i], chain = b.cam.then;
     if (!chain?.length) continue;
     const list = [{ ...b.cam, then: undefined }, ...chain], len = (b.to - b.from) / list.length;
-    const hits = b.cam.lock ? lockHits(r.beatGrid, unmutedBands(bands, r.mutedHits), b.cam.lock, b.from, b.to) : [];
+    const hits = b.cam.lock ? lockHits(r.beatGrid, hitBands(bands, r), b.cam.lock, b.from, b.to) : [];
     const cuts = list.slice(1).map((_, k) => {
       const even = b.from + len * (k + 1), near = hits.filter(h => Math.abs(h - even) <= len * 0.25).sort((x, y) => Math.abs(x - even) - Math.abs(y - even))[0];
       return Math.round((near ?? even) * 1000) / 1000;

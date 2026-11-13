@@ -17,7 +17,7 @@
   --block-bg: #23262c; --block-border: #30343b; --block-hover: #2b2f36;
   --tooltip-bg: #e9eaec; --tooltip-text: #17181b; --scrim: rgba(8, 9, 11, .6); --danger: #ff7a8a; --warn: #ffd34d;
 
-  --subject: #ff8a3d; --camera: #6cc4ff; --kick: #ff5d73; --snare: #a594ff; --station: #ff5d73;
+  --subject: #ff8a3d; --camera: #6cc4ff; --kick: #ff5d73; --snare: #a594ff; --hat: #5fd4c4; --station: #ff5d73;
   --map-subject: #ff8a3d; --map-camera: #6cc4ff; --map-station: #ff5d73;
   --map-bg: #16181b; --map-minor: #202328; --map-major: #2b2f35; --map-axis: #3a3e45; --map-text: #6f747c;
   --wave: #4b5059; --wave-bg: #1a1c20; --beat-line: #24272c; --bar-line: #30343b; --playhead: #e9eaec; --played: rgba(233, 234, 236, .06);

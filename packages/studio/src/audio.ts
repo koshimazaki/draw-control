@@ -3,12 +3,34 @@ import { analyseSamples, waveformMinMax, type AudioFeatures } from "@motion-stud
 
 export type Track = { name: string; buffer: AudioBuffer; features: AudioFeatures; wave: ReturnType<typeof waveformMinMax> };
 
-export async function loadTrack(file: File): Promise<Track> {
+/** Decode and analyse a track; `stage` hears what it is doing. Long tracks analyse in a worker, so the page never freezes. */
+export async function loadTrack(file: File, stage: (text: string) => void = () => {}): Promise<Track> {
   if (file.size > 150 * 1024 * 1024) throw new Error("Keep the track below 150 MB.");
   const ctx = new AudioContext();
+  let buffer: AudioBuffer;
   try {
-    return trackFromBuffer(file.name, await ctx.decodeAudioData(await file.arrayBuffer()));
+    stage(`Decoding ${file.name}…`);
+    buffer = await ctx.decodeAudioData(await file.arrayBuffer());
   } finally { await ctx.close().catch(() => {}); }
+  const m = Math.floor(buffer.duration / 60), sec = Math.round(buffer.duration % 60);
+  stage(`Analysing ${file.name} (${m}:${String(sec).padStart(2, "0")}): kicks, snares, hats…`);
+  if (buffer.duration < 30 || typeof Worker === "undefined") return trackFromBuffer(file.name, buffer);
+  return analyseInWorker(file.name, buffer);
+}
+
+function analyseInWorker(name: string, buffer: AudioBuffer): Promise<Track> {
+  // Copies go to the worker (the buffer keeps its own data for playback).
+  const channels = Array.from({ length: buffer.numberOfChannels }, (_, i) => buffer.getChannelData(i).slice());
+  return new Promise((resolve, reject) => {
+    const worker = new Worker(new URL("./analyse-worker.ts", import.meta.url), { type: "module" });
+    worker.onmessage = (e: MessageEvent<{ features?: AudioFeatures; wave?: ReturnType<typeof waveformMinMax>; error?: string }>) => {
+      worker.terminate();
+      if (e.data.error || !e.data.features || !e.data.wave) reject(new Error(e.data.error ?? "the analysis failed"));
+      else resolve({ name, buffer, features: e.data.features, wave: e.data.wave });
+    };
+    worker.onerror = e => { worker.terminate(); reject(new Error(e.message || "the analysis worker failed")); };
+    worker.postMessage({ channels, sampleRate: buffer.sampleRate }, channels.map(c => c.buffer));
+  });
 }
 
 /** Analyse a decoded buffer into a track. */

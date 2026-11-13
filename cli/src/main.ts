@@ -2,7 +2,8 @@
  * motion-studio: the studio's edit commands from a terminal or an agent.
  *   analyse <audio> --out analysis.json
  *   groove <straight|drive|laidback> [--bars 9] --out track.wav   (the Beat Path examples' in-repo drum music)
- *   new [--character rigged|mannequin|block|stick|blob|glider] [--clip 5|8] [--analysis a.json] --out recipe.json
+ *   new [--character rigged|mannequin|block|stick|blob|glider] [--clip 5|8|10] [--slice 42.5] [--analysis a.json] --out recipe.json
+ *       (--slice: where a Beat Path clip starts in a longer track, seconds, snapped to its nearest beat)
  *   apply <recipe.json> <commands.json> [--analysis a.json] [--out next.json]
  *   set <recipe.json> <path> <value> [--out next.json]
  *   describe <recipe.json> [--analysis a.json] [--script]
@@ -18,6 +19,7 @@ import { basename } from "node:path";
 import {
   DEFAULT_RECIPE, GROOVES, PROCEDURAL_KINDS, beatPathBase, encodeWav, grooveTimes, synthDrums, applyCommands, commandHelp, defaultRiggedRecipe, describeRecipe, printScript, validateRecipe, type CommandContext, type MotionCommand, type Recipe,
 } from "../../packages/core/src/index.ts";
+import { sliceStart } from "../../packages/core/src/internal.ts";
 import { decodeAudioFile } from "./audio-file.ts";
 import { analyse, driveFrom, parseAnalysis, type AnalysisJson } from "./analysis.ts";
 
@@ -60,10 +62,14 @@ function output(recipe: Recipe, f: Flags, out: (s: string) => void) {
 const FIGURE_NAMES: Record<string, string> = { mannequin: "Procedural mannequin", block: "Block figure", stick: "Stick figure", blob: "Capsule figure" };
 
 /** Start a recipe: the rigged mannequin dancing (or a procedural figure), fitted to the analysed track. */
-export function newRecipe(character: string, analysis?: AnalysisJson, clip = 8): Recipe {
-  // The glider starts from the Beat Path base: a clip of `clip` seconds, the rig the page uses.
-  if (character === "glider") return beatPathBase({ seconds: clip, ...(analysis?.bpm ? { bpm: analysis.bpm, offsetSeconds: analysis.offsetSeconds } : {}),
-    ...(analysis ? { audio: { name: basename(analysis.source).replace(/[<>{}\\]/g, ""), licence: "unspecified" } } : {}) });
+export function newRecipe(character: string, analysis?: AnalysisJson, clip = 8, slice?: number): Recipe {
+  // The glider starts from the Beat Path base: a clip of `clip` seconds, the rig the page uses; a slice starts it later in the track.
+  if (character === "glider") {
+    const start = slice !== undefined && analysis?.bpm ? sliceStart(slice, { bpm: analysis.bpm, firstBeat: analysis.offsetSeconds, lengthSeconds: analysis.lengthSeconds }, clip) : undefined;
+    const base = beatPathBase({ seconds: clip, ...(analysis?.bpm ? { bpm: analysis.bpm, offsetSeconds: start ?? analysis.offsetSeconds } : {}),
+      ...(analysis ? { audio: { name: basename(analysis.source).replace(/[<>{}\\]/g, ""), licence: "unspecified" } } : {}) });
+    return start !== undefined ? validateRecipe({ ...base, slice: start }) : base;
+  }
   let r: Recipe = character === "rigged" ? defaultRiggedRecipe() : { ...structuredClone(DEFAULT_RECIPE), character: { kind: character as Recipe["character"]["kind"], name: FIGURE_NAMES[character] ?? "Procedural mannequin", licence: "MIT (motion-studio)" } };
   if (analysis) {
     const bpm = analysis.bpm ?? r.beatGrid.bpm, offset = analysis.bpm ? analysis.offsetSeconds : 0;
@@ -102,7 +108,9 @@ export async function main(argv: string[], out: (s: string) => void = s => conso
         if (!["rigged", ...PROCEDURAL_KINDS, "glider"].includes(character)) throw new Error(`--character must be rigged, ${PROCEDURAL_KINDS.join(", ")} or glider`);
         const clip = flagStr(flags, "clip") === undefined ? 8 : Number(flagStr(flags, "clip"));
         if (!(clip > 0 && clip <= 60)) throw new Error("--clip takes seconds, 5 or 8 for Beat Path");
-        output(newRecipe(character, contextFrom(flags).analysis, clip), flags, out);
+        const slice = flagStr(flags, "slice") === undefined ? undefined : Number(flagStr(flags, "slice"));
+        if (slice !== undefined && !(slice >= 0)) throw new Error("--slice takes seconds into the track");
+        output(newRecipe(character, contextFrom(flags).analysis, clip, slice), flags, out);
         return 0;
       }
       case "apply": {

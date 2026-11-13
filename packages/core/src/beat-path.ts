@@ -30,3 +30,20 @@ export function beatPathBase(opts: { seconds: number; bpm?: number; offsetSecond
     landmarks: { ...DEFAULT_LANDMARKS },
   });
 }
+
+/**
+ * Where a clip sliced from a longer track starts: `at` seconds, snapped to the nearest beat of
+ * the track's grid (its tempo and first beat) unless `snap` is false, and kept so the clip of
+ * `clip` seconds fits inside the track. The beat grid's offset is then this time, so the clip's
+ * beat 0 falls on a beat of the music (with snap off, wherever the slice starts).
+ */
+export function sliceStart(at: number, track: { bpm: number; firstBeat: number; lengthSeconds: number }, clip: number, snap = true): number {
+  const beat = 60 / track.bpm, last = Math.max(0, track.lengthSeconds - clip - 0.05);
+  let t = Math.max(0, Math.min(last, at));
+  if (snap) {
+    t = track.firstBeat + Math.round((t - track.firstBeat) / beat) * beat;
+    while (t > last + 1e-9) t -= beat;
+    while (t < 0) t += beat;
+  }
+  return Math.round(t * 1000) / 1000;
+}

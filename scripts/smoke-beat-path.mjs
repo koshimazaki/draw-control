@@ -14,6 +14,7 @@ import { smokeBeatPathMap } from "./smoke-beat-path-map.mjs";
 import { smokeBeatPathHunt } from "./smoke-beat-path-hunt.mjs";
 import { smokeBeatPathFollow } from "./smoke-beat-path-follow.mjs";
 import { smokeBeatPathParallel } from "./smoke-beat-path-parallel.mjs";
+import { smokeBeatPathSlice } from "./smoke-beat-path-slice.mjs";
 
 
 export async function smokeBeatPath(browser, base, { fail, OUT, SHOTS }) {
@@ -261,6 +262,7 @@ export async function smokeBeatPath(browser, base, { fail, OUT, SHOTS }) {
   await smokeBeatPathHunt(browser, base, { fail });
   await smokeBeatPathFollow(browser, base, { fail, SHOTS });
   await smokeBeatPathParallel(browser, base, { fail, SHOTS });
+  await smokeBeatPathSlice(browser, base, { fail, OUT, SHOTS });
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

@@ -266,6 +266,8 @@ export function bindActions(p: Page) {
       if (mod && k === "c" && p.blocks.copy()) { e.preventDefault(); p.say("Block copied: Cmd/Ctrl-V pastes it at the pointer"); return; }
     }
     if (p.tool === "blocks" && (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "v" && p.blocks.paste()) { e.preventDefault(); return; }
+    // Delete or Backspace removes your selected marker on the music strip first (undoable).
+    if ((e.key === "Delete" || e.key === "Backspace") && !(e.target as HTMLElement).closest("input") && p.slice?.removeSelected()) { e.preventDefault(); return; }
     // Delete or Backspace removes the selected lane block or path point (undoable).
     if ((e.key === "Delete" || e.key === "Backspace") && p.selection && !(e.target as HTMLElement).closest("input")) {
       e.preventDefault();

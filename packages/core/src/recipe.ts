@@ -17,6 +17,9 @@ export const RECIPE_VERSION = 2;
 export const AMPLITUDE_MAX = 3;
 export const SPEED_RANGE = [0.25, 4] as const;
 export const PREVIEW_FPS = [12, 18, 24, 30, 60] as const;
+/** A hit added by hand: its band (low = kick, mid = snare, high = hat) and its time in the track. */
+export type AddedHit = { band: "low" | "mid" | "high"; seconds: number };
+export const ADDED_BANDS: readonly AddedHit["band"][] = ["low", "mid", "high"];
 export type PreviewFps = (typeof PREVIEW_FPS)[number];
 /** Validated and exported, not yet rendered (reserved for facial expressions). */
 export const EXPRESSIONS = ["neutral", "smile", "surprised", "angry", "sad", "focused"] as const;
@@ -110,6 +113,13 @@ export type Recipe = {
   landmarks?: { seed: number; on: boolean };
   /** Hits switched off (onset times, seconds): skipped by every lock (lock.ts `unmutedBands`). Absent or empty: none. */
   mutedHits?: number[];
+  /** Hits added by hand (track seconds) in a band: low (kick), mid (snare), high (hat); every lock lands on them too (lock.ts `hitBands`). */
+  addedHits?: AddedHit[];
+  /**
+   * The clip's slice of a longer track: where beat 0 sits in the track, seconds (the beat grid's offset is set to it, so
+   * hits, the exported audio and beats.json are the slice). Absent: the track's first beat.
+   */
+  slice?: number;
   /** The glider's shape and colours, "#rrggbb" (body, head or cabin); the front marker stays white. Absent: the orange pyramid and sphere. */
   figure?: { shape?: FigureShape; body: string; head: string };
   /** The character holds still over these ranges (freeze.ts), mid-air if jumping; the camera keeps moving. */
@@ -198,7 +208,7 @@ function validateMove(input: unknown, where: string, durationBeats: number): Mov
 /** Strict validation for agent-supplied JSON and imported recipes. Returns a fresh copy. */
 export function validateRecipe(input: unknown): Recipe {
   if (!isObject(input)) return fail("expected an object");
-  only(input, ["version", "fps", "durationBeats", "beatGrid", "character", "energy", "moves", "rootPath", "jumps", "audio", "camera", "reactive", "steps", "energyCurve", "envelope", "travelLock", "rootShape", "landmarks", "mutedHits", "figure", "freezes", "shot", "scenery", "sceneryBoxes", "scenerySight"], "recipe");
+  only(input, ["version", "fps", "durationBeats", "beatGrid", "character", "energy", "moves", "rootPath", "jumps", "audio", "camera", "reactive", "steps", "energyCurve", "envelope", "travelLock", "rootShape", "landmarks", "mutedHits", "addedHits", "slice", "figure", "freezes", "shot", "scenery", "sceneryBoxes", "scenerySight"], "recipe");
   if (input.version !== RECIPE_VERSION) fail(`expected version ${RECIPE_VERSION}`);
   if (input.fps !== 24) fail("fps must be 24");
   if (!Number.isInteger(input.durationBeats) || !finite(input.durationBeats, 1, 512)) fail("durationBeats must be a whole number 1–512");
@@ -207,7 +217,8 @@ export function validateRecipe(input: unknown): Recipe {
   if (!isObject(g)) return fail("beatGrid is required");
   only(g, ["bpm", "offsetSeconds", "beatsPerBar", "source"], "beatGrid");
   if (!finite(g.bpm, 40, 240)) fail("beatGrid.bpm must be 40–240");
-  if (!finite(g.offsetSeconds, 0, 60)) fail("beatGrid.offsetSeconds must be 0–60");
+  // Up to an hour: a clip sliced from a long track puts beat 0 that far in (recipe.slice).
+  if (!finite(g.offsetSeconds, 0, 3600)) fail("beatGrid.offsetSeconds must be 0–3600");
   if (!Number.isInteger(g.beatsPerBar) || !finite(g.beatsPerBar, 1, 16)) fail("beatGrid.beatsPerBar must be 1–16");
   if (g.source !== "manual" && g.source !== "analysis") fail("beatGrid.source must be manual or analysis");
   const c = input.character;
@@ -322,6 +333,24 @@ export function validateRecipe(input: unknown): Recipe {
     if (!Array.isArray(input.mutedHits) || input.mutedHits.length > 512 || input.mutedHits.some(t => !finite(t, 0, 3600))) fail("mutedHits must be up to 512 times, 0–3600 s");
     const list = [...new Set((input.mutedHits as number[]).map(t => Math.round(t * 1000) / 1000))].sort((a, b) => a - b);
     if (list.length) recipe.mutedHits = list;
+  }
+  if (input.addedHits !== undefined) {
+    const list = input.addedHits;
+    if (!Array.isArray(list) || list.length > 512) fail("addedHits must be up to 512 hits");
+    const out: AddedHit[] = [];
+    for (const [i, h] of (list as unknown[]).entries()) {
+      if (!isObject(h)) return fail(`addedHits[${i}] must be an object`);
+      only(h, ["band", "seconds"], `addedHits[${i}]`);
+      if (!ADDED_BANDS.includes(h.band as AddedHit["band"])) fail(`addedHits[${i}].band must be low, mid or high`);
+      if (!finite(h.seconds, 0, 3600)) fail(`addedHits[${i}].seconds must be 0–3600`);
+      out.push({ band: h.band as AddedHit["band"], seconds: Math.round((h.seconds as number) * 1000) / 1000 });
+    }
+    out.sort((a, b) => a.seconds - b.seconds);
+    if (out.length) recipe.addedHits = out;
+  }
+  if (input.slice !== undefined) {
+    if (!finite(input.slice, 0, 3600)) fail("slice must be 0–3600 s");
+    recipe.slice = Math.round((input.slice as number) * 1000) / 1000;
   }
   if (input.landmarks !== undefined) {
     const l = input.landmarks;

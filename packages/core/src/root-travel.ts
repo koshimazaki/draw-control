@@ -7,7 +7,7 @@
  * when the figure is where, never where it starts or ends.
  */
 import type { AudioDrive } from "./audio-drive";
-import { DEFAULT_LOCK_STRENGTH, lockHits, stationProgress, unmutedBands } from "./lock";
+import { DEFAULT_LOCK_STRENGTH, lockHits, stationProgress, hitBands } from "./lock";
 import type { Recipe, RootPoint } from "./recipe";
 
 const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
@@ -41,7 +41,7 @@ export function travelRange(points: readonly RootPoint[]): { from: number; to: n
 export function travelStations(recipe: Recipe, drive?: AudioDrive): number[] {
   const lock = recipe.travelLock, range = travelRange(recipe.rootPath);
   if (!lock?.lock || !range) return [];
-  return lockHits(recipe.beatGrid, unmutedBands(drive?.bands, recipe.mutedHits), lock.lock, range.from, range.to);
+  return lockHits(recipe.beatGrid, hitBands(drive?.bands, recipe), lock.lock, range.from, range.to);
 }
 
 /** The root at a beat, after the travel lock. */

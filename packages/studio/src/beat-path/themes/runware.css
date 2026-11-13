@@ -33,7 +33,7 @@
   --tooltip-bg: #f2f2f2; --tooltip-text: #1c1c1c; --scrim: rgb(0 0 0 / .6); --danger: oklch(82% .12 20); --warn: #ffff7d;
 
   /* the path colours: light on the dark page, deep on the paper map */
-  --subject: oklch(80% .13 45); --camera: oklch(80% .11 235); --kick: oklch(76% .15 20); --snare: oklch(76% .13 300); --station: oklch(76% .15 20);
+  --subject: oklch(80% .13 45); --camera: oklch(80% .11 235); --kick: oklch(76% .15 20); --snare: oklch(76% .13 300); --hat: oklch(80% .1 185); --station: oklch(76% .15 20);
   --map-subject: oklch(55% .15 45); --map-camera: oklch(50% .13 245); --map-station: oklch(52% .16 20);
   --map-bg: #f2f2f2; --map-minor: #e4e4e4; --map-major: #cfcfcf; --map-axis: #9a9a9a; --map-text: #5c5c5c;
   --wave: #6b6b6b; --wave-bg: #1c1c1c; --beat-line: #292929; --bar-line: #454545; --playhead: #f2f2f2; --played: rgb(242 242 242 / .06);

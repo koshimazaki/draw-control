@@ -61,6 +61,23 @@ export function lockHits(grid: BeatGrid, bands: BandAnalysis | undefined, target
  * anchors (@kick 2) still count every onset. Cached per bands object and list.
  */
 const mutedCache = new WeakMap<BandAnalysis, { key: string; bands: BandAnalysis }>();
+/**
+ * The hits every lock lands on: the analysed bands without the muted ones, with the hits added
+ * by hand (recipe.addedHits) merged in, each band in time order.
+ */
+export function hitBands(bands: BandAnalysis | undefined, recipe: { mutedHits?: readonly number[]; addedHits?: readonly { band: "low" | "mid" | "high"; seconds: number }[] }): BandAnalysis | undefined {
+  const base = unmutedBands(bands, recipe.mutedHits), added = recipe.addedHits;
+  if (!added?.length) return base;
+  const b: BandAnalysis = base ?? { low: [], mid: [], high: [], peaks: [] } as unknown as BandAnalysis;
+  const key = `${(recipe.mutedHits ?? []).join(",")}|${added.map(h => h.band + h.seconds).join(",")}`, hit = addedCache.get(b);
+  if (hit?.key === key) return hit.bands;
+  const merge = (band: "low" | "mid" | "high") => [...b[band], ...added.filter(h => h.band === band).map(h => ({ seconds: h.seconds, strength: 1 }))].sort((x, y) => x.seconds - y.seconds);
+  const out = { ...b, low: merge("low"), mid: merge("mid"), high: merge("high") };
+  addedCache.set(b, { key, bands: out });
+  return out;
+}
+const addedCache = new WeakMap<object, { key: string; bands: BandAnalysis }>();
+
 export function unmutedBands(bands: BandAnalysis | undefined, muted: readonly number[] | undefined): BandAnalysis | undefined {
   if (!bands || !muted?.length) return bands;
   const key = muted.join(","), hit = mutedCache.get(bands);

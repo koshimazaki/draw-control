@@ -22,7 +22,7 @@ import { subjectAt } from "./subject";
 import { rootAt } from "./root-travel";
 import { cornerPath, polylineSpline } from "./corners";
 import { guardFraming } from "./camera-guard";
-import { unmutedBands } from "./lock";
+import { hitBands } from "./lock";
 import { frozenBeat } from "./freeze";
 
 /** Over the shoulder: turned this far (radians) from straight behind, this share closer, this much higher (metres). */
@@ -96,7 +96,7 @@ export function planCamera(recipe: Recipe, drive?: AudioDrive, frames = 0): Came
   // The subject per frame, computed once (the follow loop and the path pacing both read it).
   const seen = new Map<number, ReturnType<typeof subjectAt>>();
   const subject = (n: number) => { let s = seen.get(n); if (!s) { s = subjectAt(recipe, beatAtSeconds(g, n * dt), drive); seen.set(n, s); } return s; };
-  const prog = programCamera(config, g, unmutedBands(drive?.bands, recipe.mutedHits), total, fps);
+  const prog = programCamera(config, g, hitBands(drive?.bands, recipe), total, fps);
   const d0 = config.distance, dMin = d0 * 0.55, dMax = d0 * 1.7;
   const hMin = 0.3, hMax = config.height + RISE_METRES + 1;
   // State: base yaw (follow), orbit yaw, dolly, crane, aim, centre.
