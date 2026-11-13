@@ -87,12 +87,24 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 /* Segmented control */
 /* Segmented control: a 1 px bordered container; the selected segment is the accent fill with dark text. */
-.seg { display: inline-flex; padding: 2px; gap: 2px; background: transparent; border: 1px solid var(--border); border-radius: var(--radius-md); }
+.seg { position: relative; display: inline-flex; padding: 2px; gap: 2px; background: transparent; border: 1px solid var(--border); border-radius: var(--radius-md); }
 .seg button { height: calc(var(--control-h) - 6px); padding: 0 var(--s-3); border: 0; border-radius: calc(var(--radius-md) - 2px); background: transparent;
   color: var(--text); cursor: pointer; white-space: nowrap; user-select: none; transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease); }
-.seg button:hover { color: var(--text); background: var(--surface-hover); }
-.seg button.on { background: var(--accent); color: var(--on-accent); font-weight: var(--weight-medium); }
-.seg button.on:hover { background: var(--accent-hover); }
+.seg button:hover { background: var(--surface-hover); }
+/* Round 8: tools, views, pens, clip and model show the selected one as accent text over a quiet neutral pill;
+   the example switcher (.seg-fill) keeps an accent pill. One pill per control slides between choices (ui/seg-pill.ts). */
+.seg button { position: relative; z-index: 1; }
+.seg button.on { color: var(--accent-ink); font-weight: var(--weight-medium); }
+.seg.has-pill button.on, .seg.has-pill button.on:hover { background: transparent; }
+.seg:not(.has-pill) button.on { background: var(--seg-on); }
+.seg-pill { position: absolute; z-index: 0; top: 2px; bottom: 2px; left: 0; width: var(--pill-w, 0); transform: translateX(var(--pill-x, 0)); border-radius: calc(var(--radius-md) - 2px);
+  background: var(--seg-on); opacity: 0; pointer-events: none; }
+.seg.has-pill > .seg-pill { opacity: 1; }
+.seg.pill-ready > .seg-pill { transition: transform 180ms var(--ease), width 180ms var(--ease), opacity var(--dur-fast) var(--ease); }
+.seg-fill > .seg-pill { background: var(--accent); }
+.seg-fill button.on { color: var(--on-accent); }
+.seg-fill:not(.has-pill) button.on { background: var(--accent); }
+@media (prefers-reduced-motion: reduce) { .seg.pill-ready > .seg-pill { transition: none; } }
 .seg button:active { transform: translateY(1px); }
 .seg button:focus-visible { outline-offset: -2px; }
 .seg.off { opacity: .45; pointer-events: none; }

@@ -23,6 +23,7 @@ import { MapView, type Tool, type View } from "./map";
 import { BlockTool } from "./map-blocks";
 import { FollowTool, type FollowSeg } from "./map-follow";
 import { bindActions } from "./page-actions";
+import { initPills } from "./ui/seg-pill";
 import { beatPathRecipe, type TrackInfo } from "./recipe-map";
 import { LABELS, fitLanes, isFollowWord, type BeatPathState, type CameraWord, type CharacterWord } from "./script";
 import { AudioStrip } from "./strip";
@@ -348,6 +349,7 @@ export function startBeatPath(root: HTMLElement) {
     load(next: BeatPathState) { update(next); map.fit(); },
   };
   const actions = bindActions(page);
+  initPills(root);
   hooks.generate = bindGenerate(page);
   rebuild();
   map.fit();

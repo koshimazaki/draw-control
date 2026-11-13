@@ -17,17 +17,24 @@ Lineage, in three lines:
 
 **Since 13 November the Runware theme is dark** (the site's own dark look), with the map as a light paper surface; the neutral theme stays the repo default and stays dark (the studio's palette): one set of tokens, two palettes, and a third small set (`--map-*`) for the map's surface so it can differ from the page.
 
+## Round 8 (13 November): selection corrections
+
+- **Generate** is a normal primary button sized to its label (bolt + "Generate"); the model choice and Settings sit beside it.
+- **Segmented controls** for tools, views, pens, clip length and the model show the selected one as **accent text** (the header balance's lime) over a **quiet neutral pill** (`--seg-on`); no accent fill. The **example switcher** (`.seg-fill`) keeps an accent pill with dark text.
+- **One sliding pill** per segmented control (`ui/seg-pill.ts`): an element under the selected button, moved by CSS (`transform`, 180 ms on the page's easing; none under `prefers-reduced-motion`). It follows class changes on the buttons and the control's size, so every control, including the follow Left / Right, gets it without its own code.
+- Map: camera block labels move further out or to the other side so no two overlap; the tool row keeps one line from 1280 px (10 px side padding per segment, the map at least 500 px wide).
+
 ## Round 7 (13 November): components after Runware's dashboard
 
 The component set follows Runware's dashboard as a complement to it (dark, panels a shade lighter than the page, 1 px `#333` borders, 6–8 px radius on controls, 12 px on cards). **This replaces round 5's "lime on Generate only": the accent marks whatever is selected.** The neutral theme keeps its own accent (yellow) through the same tokens.
 
 | Component | Class | Treatment | Used for |
 | --- | --- | --- | --- |
-| Primary button | `.btn.primary` | accent fill, near-black text, medium weight, a line icon at the left | Generate (fills its row, a bolt; a stop square while running), the cost dialog's Generate |
+| Primary button | `.btn.primary` | accent fill, near-black text, medium weight, a line icon at the left | Generate (sized to its label since round 8, a bolt; a stop square while running), the cost dialog's Generate |
 | Secondary button | `.btn`, `.btn.outline` | panel fill or none, 1 px border, white text, icon left | Your track, Download guide, lock buttons, Cancel |
 | Ghost button | `.btn.ghost` | no border, white text, icon left; disabled grey | Gallery, Get the code, Settings, No music, Clear, zoom |
 | Link that acts | `.link-act` | accent text and an arrow | Load into the editor, Reset markers |
-| Segmented control | `.seg` | 1 px bordered container; selected = accent fill, dark text | examples, Subject/Camera/Blocks, Top/Side, Edit/Draw new, 5 s/8 s, the model, Left/Right |
+| Segmented control | `.seg` | 1 px bordered container; selected = accent text on a quiet pill (round 8; the example switcher an accent pill) | examples, Subject/Camera/Blocks, Top/Side, Edit/Draw new, 5 s/8 s, the model, Left/Right |
 | Toggle | `.toggle` | on = accent pill, "ON" in small dark capitals, a dark knob | Snap, Ground grid, Pass in front |
 | Selected item | `.is-selected`, `.menu button.on`, `.block.open`, `.chip[aria-expanded=true]` | accent text, 1 px accent outline with a faint glow, a tinted fill (`--sel-bg`, `--sel-glow`) | the chosen menu item, the lane block whose menu is open, the open lock chip |
 | Badge / tag | `.badge`, `.badge.tag` | mono capitals in a 1 px grey outline; a tag in the accent on a tint | the figure shape in each gallery row |

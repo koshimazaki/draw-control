@@ -334,13 +334,23 @@ export class MapView {
     });
     // The camera's track, block by block: alternate solid and dashed, each labelled at its middle.
     g.font = `500 11px ${C.sans}`;
+    const placed: { x0: number; x1: number; y0: number; y1: number }[] = [];
     s.cameraSegments.forEach((seg, k) => {
       if (seg.points.length < 2) return;
       const alpha = seg.emphasis === "selected" ? 1 : seg.emphasis === "dim" ? 0.25 : 0.7;
       this.line(g, seg.points.map(p => this.top(p)), C.camera, seg.emphasis === "selected" ? 3 : 1.8, alpha, k % 2 ? [6, 4] : []);
       // The label sits off the track along its normal, with a short leader, so it never covers a marker.
       const m = Math.floor(seg.points.length / 2), [x, y] = this.top(seg.points[m]), [x2, y2] = this.top(seg.points[Math.min(seg.points.length - 1, m + 1)]);
-      const len = Math.hypot(x2 - x, y2 - y) || 1, nx = -(y2 - y) / len, ny = (x2 - x) / len, lx = x + nx * 22, ly = y + ny * 22;
+      const len = Math.hypot(x2 - x, y2 - y) || 1;
+      let nx = -(y2 - y) / len, ny = (x2 - x) / len, lx = x + nx * 22, ly = y + ny * 22;
+      // Labels never overlap: try further out along the normal, then the other side, until the box is free.
+      const tw = g.measureText(seg.label).width + 6;
+      const box = (ax: number, ay: number, right: boolean) => ({ x0: right ? ax - tw : ax - 3, x1: right ? ax + 3 : ax + tw, y0: ay - 9, y1: ay + 6 });
+      for (const [k2, d] of [[1, 22], [1, 38], [-1, 22], [-1, 38], [1, 54], [-1, 54]] as const) {
+        const cx = x + nx * k2 * d, cy = y + ny * k2 * d, b = box(cx, cy, nx * k2 < 0);
+        if (!placed.some(q => b.x0 < q.x1 && b.x1 > q.x0 && b.y0 < q.y1 && b.y1 > q.y0)) { lx = cx; ly = cy; if (k2 < 0) { nx = -nx; ny = -ny; } break; }
+      }
+      placed.push(box(lx, ly, nx < 0));
       g.globalAlpha = Math.max(0.45, alpha);
       g.strokeStyle = C.camera; g.lineWidth = 1; g.beginPath(); g.moveTo(x + nx * 5, y + ny * 5); g.lineTo(lx - nx * 3, ly - ny * 3); g.stroke();
       this.label(g, seg.label, lx + (nx < 0 ? -2 : 2), ly + 4, C.camera, nx < 0 ? "right" : "left"); g.globalAlpha = 1;

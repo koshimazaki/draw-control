@@ -34,11 +34,13 @@ h1 { margin: 0; font-size: var(--text-lg); font-weight: var(--weight-semibold); 
 .field::placeholder { color: var(--text-dim); }
 .legend-line { flex: 1; min-width: 0; margin: 0; font-size: var(--text-xs); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: help; }
 
-.stage { --map-min: 360px; display: grid; grid-template-columns: minmax(var(--map-min), 1fr) auto; gap: var(--gap); padding: var(--gap) var(--pad) 0; min-height: 0; }
+.stage { --map-min: 500px; display: grid; grid-template-columns: minmax(var(--map-min), 1fr) auto; gap: var(--gap); padding: var(--gap) var(--pad) 0; min-height: 0; }
 /* The map pane: its toolbar and its footer are real rows around the canvas, so they never sit over it or vanish when it narrows. */
 .map-pane { position: relative; min-height: 0; overflow: hidden; background: var(--map-bg); display: grid; grid-template-rows: auto minmax(0, 1fr) auto; }
 .map-bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2); padding: var(--s-2); background: var(--surface); }
 .map-bar.map-tools { border-bottom: 1px solid var(--border); }
+/* The tool row stays one line from 1280 px: a little less side padding per segment (the hit height is unchanged). */
+.map-bar.map-tools .seg button { padding: 0 10px; }
 /* The footer keeps one height whatever it shows (the hint clamps to two lines), so selecting a block
    (which swaps Corners for Height) never resizes the map under the pointer mid-drag. */
 .map-foot { border-top: 1px solid var(--border); flex-wrap: nowrap; height: 48px; }
@@ -96,8 +98,8 @@ h1 { margin: 0; font-size: var(--text-lg); font-weight: var(--weight-semibold); 
 .drop-thumb .icon { width: 14px; height: 14px; }
 .drop-thumb.set .icon { display: none; }
 .drop-thumb.set { box-shadow: 0 0 0 1px var(--border-strong); }
-/* Generate fills its row (the form's foot), a bolt at the left; while it runs a stop square instead. */
-.run-btn { flex: 1; min-width: 120px; }
+/* Generate: sized to its label, a bolt at the left; while it runs a stop square instead. */
+.run-btn { flex: none; }
 .run-btn .i-stop, .run-btn.running .i-run { display: none; }
 .run-btn.running .i-stop { display: block; }
 .options { position: relative; margin-left: auto; }

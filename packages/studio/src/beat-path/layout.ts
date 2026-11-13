@@ -12,7 +12,7 @@ import { PLAY_GLYPH } from "./ui/glyph";
 import { icon } from "./ui/icons";
 
 const seg = (name: string, values: readonly (string | number)[], labels: Record<string, string>, tip = "") =>
-  `<div class="seg" role="radiogroup" data-control="${name}"${tip ? ` aria-label="${tip}"` : ""}>${values.map(v => `<button type="button" role="radio" data-value="${v}">${labels[v]}</button>`).join("")}</div>`;
+  `<div class="seg${name === "example" ? " seg-fill" : ""}" role="radiogroup" data-control="${name}"${tip ? ` aria-label="${tip}"` : ""}>${values.map(v => `<button type="button" role="radio" data-value="${v}">${labels[v]}</button>`).join("")}</div>`;
 
 /** The header mark: the favicon's drawing (a curved path, two beat ticks, a dot travelling it). */
 const MARK = `<svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><rect x="0.5" y="0.5" width="31" height="31" rx="7.5" fill="#1a1a1a" stroke="#454545"/><path d="M6 23C11 8 21 26 26 9" fill="none" stroke="#afff9f" stroke-width="2.6" stroke-linecap="round"/><path d="M12.2 13.2v6.6M19.6 13.6v6.6" stroke="#afff9f" stroke-width="2" stroke-linecap="round" opacity=".85"/><circle cx="26" cy="9" r="3.4" fill="#afff9f" stroke="#1a1a1a" stroke-width="1.4"/></svg>`;
