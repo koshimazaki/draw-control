@@ -239,7 +239,8 @@ export function bindActions(p: Page) {
   };
   input("trackFile").onchange = () => { const f = input("trackFile").files?.[0]; if (f) void p.useFile(f); };
   const wrap = $("waveWrap");
-  window.addEventListener("dragover", e => { e.preventDefault(); wrap.classList.add("drop"); });
+  // A file from the desktop lights the music strip (an image dragged inside the page goes to the reference drops instead).
+  window.addEventListener("dragover", e => { e.preventDefault(); if ([...(e.dataTransfer?.types ?? [])].includes("Files")) wrap.classList.add("drop"); });
   window.addEventListener("dragleave", e => { if (!e.relatedTarget) wrap.classList.remove("drop"); });
   window.addEventListener("drop", e => {
     e.preventDefault();
@@ -250,7 +251,9 @@ export function bindActions(p: Page) {
   });
   window.addEventListener("keydown", e => {
     // Any text-like field (the shot fields, the box height, the API key's password field) keeps its own keys.
-    const typing = isTyping(e.target);
+    // The key panel's fields live in a shadow root: read the real target, not the host it is retargeted to.
+    const target = (e.composedPath()[0] ?? e.target) as HTMLElement;
+    const typing = isTyping(target);
     if (e.key === "Escape") {
       if (!$("costDialog").hidden) return;   // the cost dialog handles its own Escape
       if (p.map.busy) p.map.cancelStroke();
@@ -259,7 +262,7 @@ export function bindActions(p: Page) {
     }
     if (typing) return;
     // The Blocks tool: Delete removes the selected block, Cmd/Ctrl-D duplicates, -C and -V copy and paste at the pointer.
-    if (p.tool === "blocks" && p.blocks.selected >= 0 && !(e.target as HTMLElement).closest("input")) {
+    if (p.tool === "blocks" && p.blocks.selected >= 0 && !target.closest("input")) {
       const mod = e.metaKey || e.ctrlKey, k = e.key.toLowerCase();
       if ((e.key === "Delete" || e.key === "Backspace") && p.blocks.remove()) { e.preventDefault(); return; }
       if (mod && k === "d" && p.blocks.duplicate()) { e.preventDefault(); return; }
@@ -267,9 +270,9 @@ export function bindActions(p: Page) {
     }
     if (p.tool === "blocks" && (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "v" && p.blocks.paste()) { e.preventDefault(); return; }
     // Delete or Backspace removes your selected marker on the music strip first (undoable).
-    if ((e.key === "Delete" || e.key === "Backspace") && !(e.target as HTMLElement).closest("input") && p.slice?.removeSelected()) { e.preventDefault(); return; }
+    if ((e.key === "Delete" || e.key === "Backspace") && !target.closest("input") && p.slice?.removeSelected()) { e.preventDefault(); return; }
     // Delete or Backspace removes the selected lane block or path point (undoable).
-    if ((e.key === "Delete" || e.key === "Backspace") && p.selection && !(e.target as HTMLElement).closest("input")) {
+    if ((e.key === "Delete" || e.key === "Backspace") && p.selection && !target.closest("input")) {
       e.preventDefault();
       const sel = p.selection, s = p.state;
       if (sel.kind === "point") {
@@ -286,13 +289,13 @@ export function bindActions(p: Page) {
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z") { e.preventDefault(); p.undo(e.shiftKey); return; }
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "y") { e.preventDefault(); p.undo(true); return; }
     // Arrows step one frame when paused, Shift one beat.
-    if ((e.key === "ArrowLeft" || e.key === "ArrowRight") && !p.player.playing && !(e.target as HTMLElement).closest("input, select")) {
+    if ((e.key === "ArrowLeft" || e.key === "ArrowRight") && !p.player.playing && !target.closest("input, select")) {
       e.preventDefault();
       const dir = e.key === "ArrowRight" ? 1 : -1, step = e.shiftKey ? 60 / p.recipe.beatGrid.bpm : 1 / 24;
       p.seek(Math.round((p.head + dir * step) * 24) / 24);
       return;
     }
-    if (e.code === "Space" && !p.map.hovering && !(e.target as HTMLElement).closest("button, [role=listitem], input, select")) { e.preventDefault(); p.setPlaying(!p.player.playing); }
+    if (e.code === "Space" && !p.map.hovering && !target.closest("button, [role=listitem], input, select")) { e.preventDefault(); p.setPlaying(!p.player.playing); }
   });
 
   if (import.meta.env.DEV) {

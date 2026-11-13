@@ -201,6 +201,13 @@ export class Viewport {
   }
 
   /** Camera for the export at its own aspect ratio, matching the current view. */
+  /** The preview as an image, now: drawn and copied in one go (the WebGL buffer is read before it is presented). */
+  grabFrame(): Promise<Blob | null> {
+    this.redraw();
+    const c = Object.assign(document.createElement("canvas"), { width: this.canvas.width, height: this.canvas.height });
+    c.getContext("2d")!.drawImage(this.canvas, 0, 0);
+    return new Promise(r => c.toBlob(b => r(b), "image/png"));
+  }
   exportCamera(aspect: number) { return this.view === "top" ? cameraFor("top", aspect) : cameraFor(this.view, aspect, this.orbitCam); }
 
   private aspect() { return Math.max(1, this.canvas.clientWidth) / Math.max(1, this.canvas.clientHeight); }

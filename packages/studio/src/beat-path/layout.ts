@@ -83,8 +83,8 @@ export const LAYOUT = `
         <input id="shotAction" class="field" type="text" maxlength="300" placeholder="Action" aria-label="Action" />
       </div>
       <div class="row">
-        <label class="drop" id="dropCharacter" data-tip="A character sheet the model follows"><input type="file" accept="image/*" id="refCharacter" /><span class="drop-thumb" id="thumbCharacter">${icon("image")}</span><span>Character</span></label>
-        <label class="drop" id="dropEnvironment" data-tip="An environment image the model follows"><input type="file" accept="image/*" id="refEnvironment" /><span class="drop-thumb" id="thumbEnvironment">${icon("image")}</span><span>Environment</span></label>
+        <label class="drop" id="dropCharacter" data-tip="A character sheet the model follows"><input type="file" accept="image/*" id="refCharacter" /><span class="drop-thumb" id="thumbCharacter">${icon("image")}</span><span>Character</span><button type="button" class="drop-clear" id="clearCharacter" hidden aria-label="Clear the character image">${icon("x")}</button></label>
+        <label class="drop" id="dropEnvironment" data-tip="An environment image the model follows"><input type="file" accept="image/*" id="refEnvironment" /><span class="drop-thumb" id="thumbEnvironment">${icon("image")}</span><span>Environment</span><button type="button" class="drop-clear" id="clearEnvironment" hidden aria-label="Clear the environment image">${icon("x")}</button></label>
         <p id="shotLegend" class="legend-line muted"></p>
       </div>
       <div class="row">

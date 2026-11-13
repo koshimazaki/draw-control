@@ -20,6 +20,8 @@ import { legendFor } from "./script";
 import { EXAMPLE_TRACKS } from "./tracks";
 import { PLAY_GLYPH } from "./ui/glyph";
 import { icon } from "./ui/icons";
+import type { Ref } from "./ref-store";
+import { readableVideo, videoFrame, type RefGetter } from "./page-refs";
 
 export type Run = { slot: string; model: string; modelName: string; url: string; prompt: string };
 type Media = { guide: string; audio: string } | null;
@@ -101,7 +103,20 @@ function rowPlayer(row: HTMLElement, audioUrl: string | null) {
 const tile = (label: string, content: HTMLElement | string) => { const t = el("figure", "row-tile"); const cap = el("figcaption", "", label); const body = typeof content === "string" ? el("div", "row-empty muted", content) : content; t.append(body, cap); return t; };
 const video = (src: string) => { const v = el("video"); v.src = src; v.muted = true; v.playsInline = true; v.loop = true; return v; };
 
-export function bindGallery(opts: { root: HTMLElement; load(slot: string): void; refs(slot: string): { character?: Blob; environment?: Blob } | undefined; runs(): Run[] }) {
+export function bindGallery(opts: {
+  root: HTMLElement; load(slot: string): void; refs(slot: string): { character?: Ref; environment?: Ref } | undefined; runs(): Run[];
+  /** Give an image's box the "Use as reference" control (page-refs.ts). */
+  attach?(host: HTMLElement, get: RefGetter, what: string): void;
+}) {
+  /** A video tile's current frame as a reference (the page's own blob URLs only). */
+  const frameOf = (v: HTMLVideoElement, of: "guide" | "result"): RefGetter => async () => {
+    const blob = readableVideo(v.currentSrc || v.src) ? await videoFrame(v) : null;
+    return blob ? { blob, source: { kind: "frame", of, seconds: v.currentTime } } : null;
+  };
+  /** An image or video in a box that carries the "Use as reference" control. */
+  const box = (media: HTMLElement, get: RefGetter, what: string) => { const b = el("div", "row-media"); b.append(media); opts.attach?.(b, get, what); return b; };
+  const guideBox = (src: string) => { const v = video(src); return box(v, frameOf(v, "guide"), "this frame of the guide"); };
+  const runBox = (src: string) => { const v = video(src); return box(v, frameOf(v, "result"), "this frame of the clip"); };
   const media = new Map<number, Media>();
   const jobs = new Map<number, Promise<Media>>();
   let queue: Promise<unknown> = Promise.resolve();
@@ -120,11 +135,12 @@ export function bindGallery(opts: { root: HTMLElement; load(slot: string): void;
     head.append(player.button, el("h3", "", `Example ${i + 1}: ${ex.label}`), badge, el("span", "muted", t.name), open);
     const strip = el("div", "row-strip");
     strip.append(tile("Path", thumbnail(i)));
-    const guide = tile("Guide", media.get(i) ? video(media.get(i)!.guide) : "Rendering the guide…");
+    const guide = tile("Guide", media.get(i) ? guideBox(media.get(i)!.guide) : "Rendering the guide…");
     strip.append(guide);
     const r = opts.refs(String(i));
     for (const [k, label] of [["character", "Character"], ["environment", "Environment"]] as const) {
-      const img = r?.[k] ? Object.assign(el("img"), { src: URL.createObjectURL(r[k]!), alt: label }) : null;
+      // The reference's own URL (the store releases it when the image is replaced or cleared).
+      const ref = r?.[k], img = ref ? box(Object.assign(el("img"), { src: ref.url, alt: label }), async () => ({ blob: ref.blob, source: { kind: "gallery", label: `Example ${i + 1}, ${label.toLowerCase()}` } }), `this ${label.toLowerCase()} image`) : null;
       strip.append(tile(label, img ?? "No image"));
     }
     const text = el("div", "row-text clamp");
@@ -132,7 +148,7 @@ export function bindGallery(opts: { root: HTMLElement; load(slot: string): void;
     text.title = "Click to expand"; text.onclick = () => text.classList.toggle("clamp");
     strip.append(tile("Shot", text));
     const runs = opts.runs().filter(x => x.slot === String(i));
-    for (const m of MODELS) { const run = runs.find(x => x.model === m.id); strip.append(tile(m.label, run ? video(run.url) : "No clip yet")); }
+    for (const m of MODELS) { const run = runs.find(x => x.model === m.id); strip.append(tile(m.label, run ? runBox(run.url) : "No clip yet")); }
     row.append(head, strip, player.scrub);
     if (!media.has(i)) {
       // Render the guide when the row first comes into view, one row at a time.
@@ -140,7 +156,7 @@ export function bindGallery(opts: { root: HTMLElement; load(slot: string): void;
         if (!entries.some(e => e.isIntersecting)) return;
         io.disconnect();
         void job(i).then(m => {
-          guide.firstElementChild!.replaceWith(m ? video(m.guide) : el("div", "row-empty muted", "The guide renders in Chrome or Edge (WebCodecs)."));
+          guide.firstElementChild!.replaceWith(m ? guideBox(m.guide) : el("div", "row-empty muted", "The guide renders in Chrome or Edge (WebCodecs)."));
           if (m) player.setAudio(m.audio);
         });
       });
@@ -155,7 +171,7 @@ export function bindGallery(opts: { root: HTMLElement; load(slot: string): void;
     const row = el("article", "gallery-row panel"), player = rowPlayer(row, null);
     const head = el("header", "row-head"); head.append(player.button, el("h3", "", "Your runs"), el("span", "muted", `${runs.length} added this session`));
     const strip = el("div", "row-strip");
-    for (const run of runs) strip.append(tile(`${run.modelName} · Example ${run.slot === "own" ? "yours" : Number(run.slot) + 1}`, video(run.url)));
+    for (const run of runs) strip.append(tile(`${run.modelName} · Example ${run.slot === "own" ? "yours" : Number(run.slot) + 1}`, runBox(run.url)));
     row.append(head, strip, player.scrub);
     return row;
   }

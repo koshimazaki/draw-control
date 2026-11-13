@@ -16,6 +16,8 @@ import { exportRange } from "./recipe-map";
 import { legendFor } from "./script";
 import { bindGallery, type Run } from "./gallery";
 import { captureDrag } from "./drag";
+import { RefStore } from "./ref-store";
+import { bindRefs, readableVideo, videoFrame } from "./page-refs";
 
 const EXPORT = { width: 1280, height: 720 } as const;
 const store = (() => { try { return window.sessionStorage; } catch { return null; } })();
@@ -23,7 +25,7 @@ type Player = HTMLElement & { currentTime: number; play(): void; pause(): void }
 
 export function bindGenerate(p: Page) {
   const { $ } = p;
-  const refs = new Map<string, References>(), outputs = new Map<string, { url: string; record: unknown; model: string; prompt: string }>();
+  const refStore = new RefStore(), outputs = new Map<string, { url: string; record: unknown; model: string; prompt: string }>();
   let model: ModelId = MODELS[0].id, swapped = false, arena: ArenaModule | null = null, key: ArenaKeyElement | null = null;
   let player: Player | null = null, fakeResult = "";
   const fake = import.meta.env.DEV || new URLSearchParams(location.search).has("fake");
@@ -34,7 +36,7 @@ export function bindGenerate(p: Page) {
   /** The shot for a model: the three fields and the legend built from the figure's colours. */
   const shot = () => ({ ...p.state.shot, legend: legendFor(p.state.figure) });
   const currentPrompt = () => arena
-    ? arena.composePrompt(shot(), model, { character: !!refs.get(p.slot)?.character, environment: !!refs.get(p.slot)?.environment }, { seconds: p.state.clip, hasAudio: !!p.track }).prompt
+    ? arena.composePrompt(shot(), model, { character: !!refStore.get(p.slot, "character"), environment: !!refStore.get(p.slot, "environment") }, { seconds: p.state.clip, hasAudio: !!p.track }).prompt
     : composePrompt(p.state.shot, legendFor(p.state.figure));
 
   /** The guide bundle in memory: every file as a Blob (the same content as the zip), the references, the shot and the prompt. */
@@ -43,7 +45,7 @@ export function bindGenerate(p: Page) {
     const result = await exportBundle({ recipe, range, viewport: p.viewport, ...EXPORT, audio: p.track?.buffer ?? null, drive: p.drive, onProgress });
     const type = (name: string) => (name.endsWith(".mp4") ? "video/mp4" : name.endsWith(".png") ? "image/png" : name.endsWith(".wav") ? "audio/wav" : "application/json");
     const files = Object.fromEntries(Object.entries(result.contents).map(([name, bytes]) => [name, new Blob([bytes as BlobPart], { type: type(name) })]));
-    return { files, references: { ...refs.get(p.slot) }, shot: recipe.shot ?? null, prompt: currentPrompt() };
+    return { files, references: refStore.blobs(p.slot) as References, shot: recipe.shot ?? null, prompt: currentPrompt() };
   }
   (window as unknown as { beatPath: unknown }).beatPath = { exportGuideInMemory, prompt: currentPrompt };
 
@@ -62,6 +64,8 @@ export function bindGenerate(p: Page) {
     player.className = "output-video";
     player.setAttribute("src", url);
     $("generateSlot").replaceChildren(player);
+    // A remote result (another origin, served without CORS) would taint a canvas, so its frames cannot be taken: no control for it.
+    refUi.showControl($("screenOutput"), readableVideo(url));
   }
   const divider = $("divider");
   divider.addEventListener("pointerdown", e => {
@@ -82,18 +86,20 @@ export function bindGenerate(p: Page) {
   };
   requestAnimationFrame(follow);
 
-  // References: per example, never in the recipe or the script.
-  const thumb = (id: string, blob?: Blob) => { const el = $(id); el.style.backgroundImage = blob ? `url(${URL.createObjectURL(blob)})` : ""; el.classList.toggle("set", !!blob); };
-  for (const [k, input, th] of [["character", "refCharacter", "thumbCharacter"], ["environment", "refEnvironment", "thumbEnvironment"]] as const) {
-    $<HTMLInputElement>(input).onchange = () => {
-      const file = $<HTMLInputElement>(input).files?.[0];
-      if (!file || !file.type.startsWith("image/")) return;
-      refs.set(p.slot, { ...refs.get(p.slot), [k]: file });
-      thumb(th, file);
-      sync();
-      p.say(`${k === "character" ? "Character sheet" : "Environment"}: ${file.name}`);
-    };
-  }
+  // References: per example, never in the recipe or the script (ref-store.ts, page-refs.ts). Any image in the page can become one.
+  const refUi = bindRefs(p, refStore, () => { sync(); renderGallery(); });
+  const head = () => Math.max(0, p.head - p.window0());
+  refUi.attach($("screenPreview"), async () => { const blob = await p.viewport.grabFrame(); return blob ? { blob, source: { kind: "frame", of: "preview", seconds: head() } } : null; }, "this frame of the preview");
+  refUi.attach($("screenOutput"), async () => {
+    const v = resultVideo();
+    const blob = v && readableVideo(v.currentSrc || v.src) ? await videoFrame(v) : null;
+    return blob ? { blob, source: { kind: "frame", of: "result", seconds: head() } } : null;
+  }, "this frame of the result");
+  /** The result's video element (inside the player's shadow root when the embed draws it). */
+  const resultVideo = (): HTMLVideoElement | null => {
+    const el = $("generateSlot").firstElementChild as (HTMLElement & { video?: HTMLVideoElement }) | null;
+    return !el ? null : el instanceof HTMLVideoElement ? el : el.video ?? el.shadowRoot?.querySelector("video") ?? null;
+  };
 
   // Model choice and the prompt it will get.
   const labelOf = (id: string) => arena?.offeredModels().find(m => m.key === id)?.name ?? MODELS.find(m => m.id === id)?.label ?? id;
@@ -147,7 +153,7 @@ export function bindGenerate(p: Page) {
       const bundle = await exportGuideInMemory((d, t) => { fill.style.width = `${Math.round(d / t * 40)}%`; }).finally(() => { p.busy = false; });
       if (abort.signal.aborted) throw Object.assign(new Error("Stopped. Nothing was submitted."), { code: "aborted" });
       fakeResult = URL.createObjectURL(bundle.files["guide.mp4"]);
-      const r = refs.get(slot) ?? {};
+      const r = refStore.blobs(slot);
       const result = await arena.generateFromGuide({
         guide: bundle.files, model: runModel, shot: shot(), signal: abort.signal, references: { character: r.character, environment: r.environment }, maxPrice: MAX_PRICE,
         key: key?.connected ? key : "local-preview-key-0000000000000000", confirm: confirmCost,
@@ -178,7 +184,8 @@ export function bindGenerate(p: Page) {
 
   // The Gallery: one row per example (path, guide, references, shot, outputs per model), then the visitor's runs.
   const runs: Run[] = [];
-  const gallery = bindGallery({ root: $("gallerySlot"), load: slot => void p.switchSlot(slot), refs: slot => refs.get(slot), runs: () => runs });
+  const gallery = bindGallery({ root: $("gallerySlot"), load: slot => void p.switchSlot(slot), refs: slot => ({ character: refStore.get(slot, "character"), environment: refStore.get(slot, "environment") }), runs: () => runs,
+    attach: (host, get, what) => refUi.attach(host, get, what) });
   const renderGallery = () => gallery.render();
 
   // The embed: the key panel in the header, the model names, the gallery element.
@@ -207,8 +214,7 @@ export function bindGenerate(p: Page) {
     exportGuideInMemory, sync,
     /** A new slot: its references, its output (if any). */
     onSlot(slot: string) {
-      const r = refs.get(slot);
-      thumb("thumbCharacter", r?.character); thumb("thumbEnvironment", r?.environment);
+      refUi.sync();
       // A run in progress on another example keeps going; this example shows its own output (or none).
       showResult(outputs.get(slot)?.url ?? null);
       sync();
