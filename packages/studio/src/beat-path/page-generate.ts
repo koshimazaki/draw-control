@@ -222,10 +222,9 @@ export function bindGenerate(p: Page) {
   bindHistory({
     $, log: runLog, key: () => (key?.connected ? key.getKey() ?? null : null), say: t => p.say(t),
     live: e => !!running && e.kind === "video" && e.at >= runStarted,
-    show: e => {
-      if (!e.url) return;
-      outputs.set(e.slot, { url: e.url, record: null, model: e.model, prompt: "" });
-      if (p.slot === e.slot) showResult(e.url); else void p.switchSlot(e.slot);
+    show: (e, url) => {
+      outputs.set(e.slot, { url, record: null, model: e.model, prompt: "" });
+      if (p.slot === e.slot) showResult(url); else void p.switchSlot(e.slot);
       p.say(`${e.model}: shown from Runs`);
     },
   });

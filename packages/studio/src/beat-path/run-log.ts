@@ -22,6 +22,9 @@ export type RunEntry = {
   error?: string;
   /** Made by the local preview (nothing was sent): kept for the list, never asked for again. */
   local?: boolean;
+  /** Its file is kept in this browser (run-assets.ts); false: it could not be copied (saveError says why). */
+  saved?: boolean;
+  saveError?: string;
 };
 type FetchLike = (url: string, init: { body: string; [k: string]: unknown }) => Promise<{ ok: boolean; status: number; json(): Promise<unknown>; clone?(): { json(): Promise<unknown> } }>;
 type Storage = Pick<globalThis.Storage, "getItem" | "setItem">;

@@ -319,3 +319,5 @@ select:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
 .text-spinner { font-family: var(--font-mono); color: var(--accent-ink); line-height: 1; }
 .text-spinner[hidden] { display: none; }
 .image-pop .note-row { justify-content: flex-start; font-size: var(--text-xs); }
+.run-kept { color: var(--text-dim); }
+.run-kept.on { color: var(--accent-ink); }
