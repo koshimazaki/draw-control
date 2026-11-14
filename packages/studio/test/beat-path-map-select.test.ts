@@ -1,6 +1,6 @@
 /** Picking several path points on the map and moving them as one (map-select.ts). */
 import { describe, expect, it } from "vitest";
-import { nearLine, pointsInRect, raisePoints, shiftPoints } from "../src/beat-path/map-select";
+import { insertAt, nearLine, pointsInRect, raisePoints, shiftPoints } from "../src/beat-path/map-select";
 
 const path = [{ x: -6, z: 3 }, { x: -2, z: -1, y: 1 }, { x: 2, z: 1.5 }, { x: 6, z: -1 }];
 describe("Map: a group of path points", () => {
@@ -32,5 +32,11 @@ describe("Map: a group of path points", () => {
     const up = raisePoints(path, [0, 1], 1.5, 0, 3);
     expect(up.slice(0, 2).map(p => p.y)).toEqual([1.5, 2.5]);
     expect(raisePoints(path, [1], -5, 0, 3)[1].y).toBeUndefined();
+  });
+  it("a click on the line adds a point after the start of the nearest segment", () => {
+    const screen: [number, number][] = [[0, 0], [100, 0], [100, 100], [200, 100]];
+    expect(insertAt(screen, 50, 3)).toBe(1);
+    expect(insertAt(screen, 97, 60)).toBe(2);
+    expect(insertAt(screen, 160, 104)).toBe(3);
   });
 });

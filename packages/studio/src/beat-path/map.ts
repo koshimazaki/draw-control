@@ -10,7 +10,7 @@
 import { cornerPath, type Landmark } from "@motion-studio/core";
 import type { PathPt } from "./script";
 import { captureDrag } from "./drag";
-import { nearLine, pointsInRect, raisePoints, shiftPoints, simplifyPen, type Rect } from "./map-select";
+import { insertAt, nearLine, pointsInRect, raisePoints, shiftPoints, simplifyPen, type Rect } from "./map-select";
 export { simplifyPen } from "./map-select";
 
 export type Tool = "subject" | "camera" | "blocks";
@@ -243,10 +243,23 @@ export class MapView {
       if (view === "top" && this.host.pen() === "edit" && original.length) {
         const drawn = (tool === "camera" ? cornerPath(original, this.host.corners(tool)) : this.scene.floor.length > 1 ? this.scene.floor : original).map(p => this.top(p));
         if (nearLine(drawn, ...start, 7) || nearLine(original.map(p => this.top(p)), ...start, 7)) {
-          const all = original.map((_, k) => k);
-          this.setGroup(tool, all); this.host.select({ tool, index: 0 });
-          this.host.hint?.("The whole path is picked: drag to move it · arrow keys nudge it · Esc lets go");
-          ({ move, up, revert } = this.groupDrag(tool, view, all, start, original));
+          if (e.altKey || original.length < 2 || original.length >= MAX_POINTS * 2) {
+            // Alt on the line (or a path that cannot take another point): the whole path moves.
+            const all = original.map((_, k) => k);
+            this.setGroup(tool, all); this.host.select({ tool, index: 0 });
+            this.host.hint?.(original.length >= MAX_POINTS * 2 && !e.altKey ? "The path has its most points: the whole path moves · double-click a point to remove it" : "The whole path is picked: drag to move it · arrow keys nudge it · Esc lets go");
+            ({ move, up, revert } = this.groupDrag(tool, view, all, start, original));
+          } else {
+            // A click on the line adds a point there (between its neighbours) and drags it: bend that part only.
+            const k = insertAt(original.map(p => this.top(p)), ...start), q = this.clamp(this.fromTop(...start)), a = original[k - 1], b = original[k];
+            const y = ((a.y ?? 0) + (b.y ?? 0)) / 2, added: PathPt = { x: r2(q.x), z: r2(q.z), ...(y > 0 ? { y: r2(y) } : {}) };
+            const withPoint = [...original.slice(0, k), added, ...original.slice(k)];
+            this.host.change(tool, withPoint, false);
+            this.setGroup(tool, [k]); this.host.select({ tool, index: k });
+            this.host.hint?.("Point added: drag it to bend that part · Alt-drag the line moves the whole path · double-click a point removes it");
+            ({ move, up } = this.groupDrag(tool, view, [k], start, withPoint));
+            revert = () => this.host.change(tool, original, true);
+          }
         } else {
           const keep = e.shiftKey ? this.picked() : [];
           let boxed = false;

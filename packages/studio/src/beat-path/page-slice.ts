@@ -5,7 +5,7 @@
  * is page state (`slice`, `markers`), so undo and the shot script cover it. Split from page.ts.
  */
 import type { AudioDrive, Recipe } from "@motion-studio/core";
-import { sliceStart } from "@motion-studio/core/internal";
+import { sensitiveBands, sliceStart } from "@motion-studio/core/internal";
 import type { Track } from "../audio";
 import { TrackOverview } from "./overview";
 import type { TrackInfo } from "./recipe-map";
@@ -105,10 +105,18 @@ export function bindSlice(p: Page) {
     if (on) overview.setWindow(p.window0(), p.state.clip);
     const field = $<HTMLInputElement>("sliceStart");
     if (document.activeElement !== field) field.value = p.window0().toFixed(2);
-    const bands = p.drive?.bands, t0 = p.window0(), t1 = p.window1(), muted = p.state.muted;
+    const bands = sensitiveBands(p.drive?.bands, p.state.sensitivity), t0 = p.window0(), t1 = p.window1(), muted = p.state.muted;
     const count = (band: Band) => (bands?.[band] ?? []).filter(o => o.seconds >= t0 && o.seconds <= t1 && !muted.some(m => Math.abs(m - o.seconds) < 0.012)).length
       + markers().filter(m => m.band === band && m.seconds >= t0 && m.seconds <= t1).length;
     $("countLow").textContent = String(count("low")); $("countMid").textContent = String(count("mid")); $("countHigh").textContent = String(count("high"));
+    const sens = Math.round((p.state.sensitivity ?? 1) * 100), field2 = $<HTMLInputElement>("sensitivity");
+    if (document.activeElement !== field2) field2.value = String(sens);
+    $("sensitivityOut").textContent = `${sens}%`;
   }
+  // Hit sensitivity: the counts and the strip follow the drag; the whole drag is one undo step.
+  const sensInput = $<HTMLInputElement>("sensitivity");
+  const setSens = (final: boolean) => { const v = Number(sensInput.value) / 100; p.update({ ...p.state, sensitivity: v >= 1 ? undefined : v }, final); };
+  sensInput.addEventListener("input", () => setSens(false));
+  sensInput.addEventListener("change", () => { setSens(true); p.say(`Sensitivity ${sensInput.value}%: the locks land on ${$("countLow").textContent} kicks, ${$("countMid").textContent} snares, ${$("countHigh").textContent} hats in the clip`); });
   return { overview, stripHooks, removeSelected, sync, get selected() { return selected; }, retheme: () => overview.retheme() };
 }

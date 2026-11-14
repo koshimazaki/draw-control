@@ -49,4 +49,10 @@ describe("Beat Path clip length", () => {
     expect([...html.matchAll(/data-value="(\d+)"/g)].map(m => Number(m[1]))).toEqual([5, 8, 10, 15, 20, 30]);
     expect(html).toContain('min="3" max="30" step="1"');
   });
+  it("hit sensitivity round-trips through the script", () => {
+    const s = { ...exampleState(0), sensitivity: 0.4 }, printed = toScript(s);
+    expect(printed).toMatch(/^sensitivity: 0\.4$/m);
+    expect(fromScript(printed, BLANK_STATE).state.sensitivity).toBe(0.4);
+    expect(toScript(exampleState(0))).not.toMatch(/sensitivity:/);
+  });
 });

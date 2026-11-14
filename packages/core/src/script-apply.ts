@@ -36,11 +36,11 @@ const number = (row: Row, t: string, what: string) => {
 };
 
 /** A settings line: `landmarks: on seed 7` or `landmarks: off` (not a row). */
-const SETTING = /^(landmarks|muted|markers|slice|figure|scenery|box|shot (subject|environment|action|legend))\s*:/i;
+const SETTING = /^(landmarks|muted|sensitivity|markers|slice|figure|scenery|box|shot (subject|environment|action|legend))\s*:/i;
 /** The words for added hits in a "markers:" line, and their bands. */
 const MARKER_WORDS = { kick: "low", snare: "mid", hat: "high" } as const;
 /** The script's settings lines; a script without one leaves the setting as it was. */
-export type ScriptSettings = { slice?: number; markers?: { band: "low" | "mid" | "high"; seconds: number }[]; boxes?: { x: number; z: number; w: number; d: number; h: number; yaw?: number }[]; sight?: "clear" | "passes"; landmarks?: { on: boolean; seed?: number }; muted?: number[]; figure?: { shape?: "car" | "flyer" | "runner"; body: string; head: string }; scenery?: "none" | "scatter" | "street" | "city"; shot?: Partial<Record<"subject" | "environment" | "action" | "legend", string>> };
+export type ScriptSettings = { slice?: number; markers?: { band: "low" | "mid" | "high"; seconds: number }[]; boxes?: { x: number; z: number; w: number; d: number; h: number; yaw?: number }[]; sight?: "clear" | "passes"; landmarks?: { on: boolean; seed?: number }; muted?: number[]; sensitivity?: number; figure?: { shape?: "car" | "flyer" | "runner"; body: string; head: string }; scenery?: "none" | "scatter" | "street" | "city"; shot?: Partial<Record<"subject" | "environment" | "action" | "legend", string>> };
 export function parseSettings(script: string): ScriptSettings {
   const out: ScriptSettings = {};
   script.split(/\r?\n/).forEach((raw, i) => {
@@ -87,6 +87,13 @@ export function parseSettings(script: string): ScriptSettings {
         list.push({ band, seconds: t });
       }
       out.markers = list;
+      return;
+    }
+    if (/^sensitivity\s*:/i.test(text)) {
+      const v = Number(text.replace(/^sensitivity\s*:/i, "").trim().replace(/%$/, ""));
+      const s = /%\s*$/.test(text) ? v / 100 : v;
+      if (!Number.isFinite(s) || s < 0 || s > 1) throw new RecipeError(`script line ${i + 1}: sensitivity reads "sensitivity: 0.4" (0 keeps only the strongest hits, 1 every hit) or "sensitivity: 40%"`);
+      out.sensitivity = s;
       return;
     }
     if (/^muted\s*:/i.test(text)) {
@@ -324,6 +331,7 @@ export function applyScript(recipe: Recipe, args: { script: string }, ctx: { ban
   let r: Recipe = validateRecipe({ ...structuredClone(recipe), moves: [] });
   const settings = parseSettings(args.script);
   if (settings.muted) r = validateRecipe({ ...r, mutedHits: settings.muted });
+  if (settings.sensitivity !== undefined) r = validateRecipe({ ...r, hitSensitivity: settings.sensitivity });
   if (settings.markers) r = validateRecipe({ ...r, addedHits: settings.markers });
   if (settings.figure) r = validateRecipe({ ...r, figure: settings.figure });
   if (settings.scenery) r = validateRecipe({ ...r, scenery: settings.scenery, ...(settings.sight ? { scenerySight: settings.sight } : {}) });

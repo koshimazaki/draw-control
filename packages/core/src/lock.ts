@@ -11,7 +11,7 @@
  * - `pulseBeat`: a clip or a move's phases speed up into each hit and slow after it,
  *   keeping their length in beats (identity on every hit), so the average speed is normal.
  */
-import { bandOnsets, type BandAnalysis } from "./audio-bands";
+import { bandOnsets, type BandAnalysis, type BandOnset } from "./audio-bands";
 import { beatAtSeconds } from "./beats";
 import { fail, num } from "./validate";
 import type { BeatGrid } from "./recipe";
@@ -65,8 +65,8 @@ const mutedCache = new WeakMap<BandAnalysis, { key: string; bands: BandAnalysis 
  * The hits every lock lands on: the analysed bands without the muted ones, with the hits added
  * by hand (recipe.addedHits) merged in, each band in time order.
  */
-export function hitBands(bands: BandAnalysis | undefined, recipe: { mutedHits?: readonly number[]; addedHits?: readonly { band: "low" | "mid" | "high"; seconds: number }[] }): BandAnalysis | undefined {
-  const base = unmutedBands(bands, recipe.mutedHits), added = recipe.addedHits;
+export function hitBands(bands: BandAnalysis | undefined, recipe: { mutedHits?: readonly number[]; addedHits?: readonly { band: "low" | "mid" | "high"; seconds: number }[]; hitSensitivity?: number }): BandAnalysis | undefined {
+  const base = unmutedBands(sensitiveBands(bands, recipe.hitSensitivity), recipe.mutedHits), added = recipe.addedHits;
   if (!added?.length) return base;
   const b: BandAnalysis = base ?? { low: [], mid: [], high: [], peaks: [] } as unknown as BandAnalysis;
   const key = `${(recipe.mutedHits ?? []).join(",")}|${added.map(h => h.band + h.seconds).join(",")}`, hit = addedCache.get(b);
@@ -77,6 +77,31 @@ export function hitBands(bands: BandAnalysis | undefined, recipe: { mutedHits?: 
   return out;
 }
 const addedCache = new WeakMap<object, { key: string; bands: BandAnalysis }>();
+
+/**
+ * The detected hits at a sensitivity (0–1; 1 or absent keeps every hit). Lower keeps fewer and
+ * stronger: a hit weaker than (1 − s) × 0.8 of its band's strongest hit is dropped (a band never
+ * empties), and within a band
+ * two hits closer than (1 − s) × 0.45 s keep only the stronger, so a fast arpeggio collapses to its
+ * accents. Hand-added markers are never filtered (hitBands merges them after). Peaks are untouched.
+ */
+export function sensitiveBands(bands: BandAnalysis | undefined, sensitivity: number | undefined): BandAnalysis | undefined {
+  if (!bands || sensitivity === undefined || sensitivity >= 1) return bands;
+  const s = Math.max(0, Math.min(1, sensitivity)), hit = sensitiveCache.get(bands);
+  if (hit?.key === s) return hit.bands;
+  const gap = (1 - s) * 0.45;
+  // The floor is relative to the band's own strongest hit, so a band never empties (its accents stay).
+  const thin = (list: readonly BandOnset[]) => {
+    const kept: BandOnset[] = [], floor = (1 - s) * 0.8 * Math.max(0, ...list.map(o => o.strength));
+    for (const o of [...list].filter(o => o.strength >= floor).sort((a, b) => b.strength - a.strength || a.seconds - b.seconds))
+      if (!kept.some(k => Math.abs(k.seconds - o.seconds) < gap)) kept.push(o);
+    return kept.sort((a, b) => a.seconds - b.seconds);
+  };
+  const out = { ...bands, low: thin(bands.low), mid: thin(bands.mid), high: thin(bands.high) };
+  sensitiveCache.set(bands, { key: s, bands: out });
+  return out;
+}
+const sensitiveCache = new WeakMap<BandAnalysis, { key: number; bands: BandAnalysis }>();
 
 export function unmutedBands(bands: BandAnalysis | undefined, muted: readonly number[] | undefined): BandAnalysis | undefined {
   if (!bands || !muted?.length) return bands;

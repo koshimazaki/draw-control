@@ -321,3 +321,7 @@ select:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
 .image-pop .note-row { justify-content: flex-start; font-size: var(--text-xs); }
 .run-kept { color: var(--text-dim); }
 .run-kept.on { color: var(--accent-ink); }
+/* Hit sensitivity beside the counts */
+.audio-info .sens { display: flex; align-items: center; gap: var(--s-2); color: var(--text-muted); font-size: var(--text-xs); }
+.audio-info .sens input[type="range"] { flex: 1; min-width: 60px; max-width: 140px; accent-color: var(--accent); }
+.audio-info .sens output { min-width: 3.2em; color: var(--text); }

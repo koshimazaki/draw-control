@@ -113,6 +113,8 @@ export type Recipe = {
   landmarks?: { seed: number; on: boolean };
   /** Hits switched off (onset times, seconds): skipped by every lock (lock.ts `unmutedBands`). Absent or empty: none. */
   mutedHits?: number[];
+  /** How many detected hits the locks land on, 0–1 (lock.ts `sensitiveBands`): lower keeps fewer, stronger, more spaced hits. Absent: every hit (1). */
+  hitSensitivity?: number;
   /** Hits added by hand (track seconds) in a band: low (kick), mid (snare), high (hat); every lock lands on them too (lock.ts `hitBands`). */
   addedHits?: AddedHit[];
   /**
@@ -208,7 +210,7 @@ function validateMove(input: unknown, where: string, durationBeats: number): Mov
 /** Strict validation for agent-supplied JSON and imported recipes. Returns a fresh copy. */
 export function validateRecipe(input: unknown): Recipe {
   if (!isObject(input)) return fail("expected an object");
-  only(input, ["version", "fps", "durationBeats", "beatGrid", "character", "energy", "moves", "rootPath", "jumps", "audio", "camera", "reactive", "steps", "energyCurve", "envelope", "travelLock", "rootShape", "landmarks", "mutedHits", "addedHits", "slice", "figure", "freezes", "shot", "scenery", "sceneryBoxes", "scenerySight"], "recipe");
+  only(input, ["version", "fps", "durationBeats", "beatGrid", "character", "energy", "moves", "rootPath", "jumps", "audio", "camera", "reactive", "steps", "energyCurve", "envelope", "travelLock", "rootShape", "landmarks", "mutedHits", "hitSensitivity", "addedHits", "slice", "figure", "freezes", "shot", "scenery", "sceneryBoxes", "scenerySight"], "recipe");
   if (input.version !== RECIPE_VERSION) fail(`expected version ${RECIPE_VERSION}`);
   if (input.fps !== 24) fail("fps must be 24");
   if (!Number.isInteger(input.durationBeats) || !finite(input.durationBeats, 1, 512)) fail("durationBeats must be a whole number 1–512");
@@ -328,6 +330,11 @@ export function validateRecipe(input: unknown): Recipe {
     for (const k of ["body", "head"] as const) if (typeof fg[k] !== "string" || !/^#[0-9a-f]{6}$/i.test(fg[k] as string)) fail(`figure.${k} must be a colour "#rrggbb"`);
     if (fg.shape !== undefined && !FIGURE_SHAPES.includes(fg.shape as FigureShape)) fail(`figure.shape must be one of ${FIGURE_SHAPES.join(", ")}`);
     recipe.figure = { ...(fg.shape !== undefined && fg.shape !== "glider" ? { shape: fg.shape as FigureShape } : {}), body: (fg.body as string).toLowerCase(), head: (fg.head as string).toLowerCase() };
+  }
+  if (input.hitSensitivity !== undefined) {
+    if (!finite(input.hitSensitivity, 0, 1)) fail("hitSensitivity must be 0–1");
+    const v = Math.round((input.hitSensitivity as number) * 100) / 100;
+    if (v < 1) recipe.hitSensitivity = v;
   }
   if (input.mutedHits !== undefined) {
     if (!Array.isArray(input.mutedHits) || input.mutedHits.length > 512 || input.mutedHits.some(t => !finite(t, 0, 3600))) fail("mutedHits must be up to 512 times, 0–3600 s");
