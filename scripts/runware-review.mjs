@@ -35,6 +35,11 @@ const PRICES = {
   "google:gemini@3-flash": [1, 3],
   // Documented on their model pages (runware.ai/docs/models/<id>) with the OpenAI-compatible
   // chat endpoint as the example, but absent from the catalog index and with no task schema.
+  "openai:gpt@6.1-sol": [2, 10],
+  "openai:gpt@6-astra": [10, 50],
+  "openai:gpt@6-sol": [2, 10],
+  "openai:gpt@6.1-terra": [1, 5],
+  "openai:gpt@6-luna": [0.1, 0.5],
   "zai:glm@5.3": [1.2, 4],
   "zai:glm@5.3-flash": [0.15, 0.5],
   "zai:glm@5.2": [0.8, 2.55],
@@ -45,7 +50,7 @@ const PRICES = {
 };
 // These go through /v1/chat/completions, the route their pages document; the rest use the
 // native task API, which also reports the charged cost.
-const CHAT_ONLY = new Set(["zai:glm@5.3", "zai:glm@5.3-flash", "zai:glm@5.2", "moonshotai:kimi@k3.1-pro", "moonshotai:kimi@k3", "deepseek:v4@pro", "deepseek:v4.1@flash"]);
+const CHAT_ONLY = new Set(["openai:gpt@6.1-sol", "openai:gpt@6-astra", "openai:gpt@6-sol", "openai:gpt@6.1-terra", "openai:gpt@6-luna", "zai:glm@5.3", "zai:glm@5.3-flash", "zai:glm@5.2", "moonshotai:kimi@k3.1-pro", "moonshotai:kimi@k3", "deepseek:v4@pro", "deepseek:v4.1@flash"]);
 const API = "https://api.runware.ai/v1";
 const MAX_DIFF = 400_000; // characters, about 115k tokens
 const repo = resolve(dirname(fileURLToPath(import.meta.url)), "..");

@@ -2,7 +2,7 @@
 # __NODE__ and __REPO__ with this machine's Node and repository paths.
 # The key is read from RUNWARE_API_KEY in the environment, never stored here.
 model:
-  default: zai:glm@5.3
+  default: openai:gpt@6.1-sol
   provider: custom:runware
 providers:
   runware:
@@ -10,11 +10,16 @@ providers:
     api: https://api.runware.ai/v1
     key_env: RUNWARE_API_KEY
     transport: chat_completions
-    default_model: zai:glm@5.3
+    default_model: openai:gpt@6.1-sol
     # Every live Runware text model with tool calling (catalog index, 14 Nov 2026), then the
-    # newer ones documented only on their model pages (GLM-5.2/5.3, Kimi K3/K3.1 Pro, DeepSeek V4).
+    # newer ones documented only on their model pages (GPT-6 Sol/Astra/Terra/Luna, GLM-5.2/5.3, Kimi, DeepSeek V4).
     # Switch with /model custom:runware:<AIR>; prices are in skills/runware-hermes.
     models:
+      openai:gpt@6.1-sol: {}
+      openai:gpt@6-astra: {}
+      openai:gpt@6-sol: {}
+      openai:gpt@6.1-terra: {}
+      openai:gpt@6-luna: {}
       zai:glm@5.3: {}
       zai:glm@5.3-flash: {}
       zai:glm@5.2: {}

@@ -30,10 +30,15 @@ npm run review -- --model openai:gpt@5.5 --out review.md
 
 ## Pick the reviewer
 
-USD per 1M tokens, input / output, read 14 Nov 2026. The first seven are documented on their model pages (`runware.ai/docs/models/<id>`) with the OpenAI-compatible chat endpoint, but are missing from the catalog index (`index.json`) and have no task schema, so the script sends them through `/v1/chat/completions`. **None of them has been run from here yet:** the first real call is the check.
+USD per 1M tokens, input / output (up to 272K context for the GPT-6 family), read 14 Nov 2026. The first twelve are documented on their model pages (`runware.ai/docs/models/<id>`) with the OpenAI-compatible chat endpoint, but are missing from the catalog index (`index.json`) and have no task schema, so the script sends them through `/v1/chat/completions`. **None of them has been run from here yet:** the first real call is the check.
 
 | AIR | Model | In / out | Use it for |
 | --- | --- | --- | --- |
+| `openai:gpt@6.1-sol` | GPT-6.1 Sol | 2 / 10 | OpenAI's coding and agent reasoning model |
+| `openai:gpt@6-astra` | GPT-6 Astra | 10 / 50 | OpenAI's frontier model: the hardest reviews, design passes |
+| `openai:gpt@6-sol` | GPT-6 Sol | 2 / 10 | The earlier Sol; 6.1 costs the same |
+| `openai:gpt@6.1-terra` | GPT-6.1 Terra | 1 / 5 | Fast, visual reasoning (screenshots) |
+| `openai:gpt@6-luna` | GPT-6 Luna | 0.10 / 0.50 | Near-free, high-volume checks |
 | `zai:glm@5.3` | GLM-5.3 (default) | 1.20 / 4.00 | Coding and agent work, 1M context |
 | `zai:glm@5.3-flash` | GLM-5.3 Flash | 0.15 / 0.50 | A near-free first pass |
 | `zai:glm@5.2` | GLM-5.2 | 0.80 / 2.55 | Function calling, 128K output |
@@ -49,7 +54,7 @@ USD per 1M tokens, input / output, read 14 Nov 2026. The first seven are documen
 | `google:gemini@3.1-pro` | Gemini 3.1 Pro | 2-4 / 12-18 | Long context with strong reasoning |
 | `anthropic:claude@opus-4.8` | Claude Opus 4.8 | 5 / 25 | A Claude read when the author was not Claude |
 
-Not on Runware: OpenAI's Codex-only models (Sol, Astra). Two more DeepSeek builds (`deepseek:v4@flash`, `deepseek:v4.1@flash-1017`) have pages too; pass `--price` for them. Add a model with `--price IN/OUT` from its Runware page; the script refuses a model it has no price for.
+The default reviewer is GLM-5.3 because the Hermes profile thinks with GPT-6.1 Sol: a review from another family catches what the author's family misses. Two more DeepSeek builds (`deepseek:v4@flash`, `deepseek:v4.1@flash-1017`) have pages too; pass `--price` for them. Add a model with `--price IN/OUT` from its Runware page; the script refuses a model it has no price for.
 
 `--thinking low|medium|high` sets the model's reasoning level where its schema has one. Thinking tokens bill as output, so raise `--max-tokens` with it.
 

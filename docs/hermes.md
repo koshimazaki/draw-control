@@ -7,7 +7,7 @@ summary: Run Beat Path from Hermes Agent, open source, with Runware as both the 
 
 [Hermes Agent](https://github.com/NousResearch/hermes-agent) (Nous Research, MIT) is an open-source agent. The `beat-path` profile runs it entirely on one Runware key:
 
-- **It thinks with a Runware text model.** Runware's chat endpoint is OpenAI-compatible (`https://api.runware.ai/v1`), so Hermes uses it as a named custom provider. The default is GLM-5.3 (`zai:glm@5.3`). `/model` lists 23 Runware text models with tool calling: GLM-5.1 to 5.3, Kimi K3 and K3.1 Pro, DeepSeek V4, GPT-5.4/5.5, Claude, Gemini, Grok 4.3 and MiniMax M3. If GLM-5.3 fails, `/model custom:runware:openai:gpt@5.4-mini` is in the catalog index and the safest fallback.
+- **It thinks with a Runware text model.** Runware's chat endpoint is OpenAI-compatible (`https://api.runware.ai/v1`), so Hermes uses it as a named custom provider. The default is GPT-6.1 Sol (`openai:gpt@6.1-sol`, 2 / 10 USD per 1M tokens). `/model` lists 28 Runware text models: GPT-6 Astra, Sol, Terra and Luna, GLM-5.1 to 5.3, Kimi K3 and K3.1 Pro, DeepSeek V4, GPT-5.4/5.5, Claude, Gemini, Grok 4.3 and MiniMax M3. If GPT-6.1 Sol fails, `/model custom:runware:openai:gpt@5.4-mini` is in the catalog index and the safest fallback.
 - **It edits the shot through the motion-studio MCP server:** shot scripts, describe, undo and render. All of these are local and free.
 - **It makes images and video through Runware's own MCP server** (`@runware/mcp`, pinned). That server is marked `untrusted`, so every paid call stops for approval, and a chat is capped at 10 USD.
 
