@@ -8,7 +8,7 @@ import { isPoseName, type PoseName } from "./poses";
 import { validateCamera, type CameraConfig } from "./camera";
 import { validateReactive, type ReactiveConfig } from "./reactive-config";
 import { validateEnergyCurve, validateSteps, type EnergyCurve, type StepLane } from "./performance-config";
-import { RecipeError, fail, finite, isObject, only, text } from "./validate";
+import { RecipeError, fail, finite, isObject, oneLine, only, text } from "./validate";
 import { validateEnvelope, type Envelope } from "./envelope";
 import { validateLock, type BeatLock } from "./lock";
 
@@ -321,7 +321,9 @@ export function validateRecipe(input: unknown): Recipe {
     const sh = input.shot;
     if (!isObject(sh)) return fail("shot must be an object");
     only(sh, ["subject", "environment", "action", "legend"], "shot");
-    recipe.shot = { subject: text(sh.subject ?? "", 300, "shot.subject"), environment: text(sh.environment ?? "", 300, "shot.environment"), action: text(sh.action ?? "", 300, "shot.action"), legend: text(sh.legend ?? "", 300, "shot.legend") };
+    // Single-line fields (one script line each): a typed or pasted line break becomes a space.
+    const field = (k: "subject" | "environment" | "action" | "legend") => oneLine(text(sh[k] ?? "", 300, `shot.${k}`));
+    recipe.shot = { subject: field("subject"), environment: field("environment"), action: field("action"), legend: field("legend") };
   }
   if (input.figure !== undefined) {
     const fg = input.figure;

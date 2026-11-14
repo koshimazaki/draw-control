@@ -64,7 +64,8 @@ export function restorePhase(recipe: Recipe, drive: AudioDrive | undefined, args
 export function deleteStep(recipe: Recipe, drive: AudioDrive | undefined, args: { division: StepDivision; index: number; mode: GapMode }): Recipe {
   const values = currentSteps(recipe, drive, args.division);
   const i = args.index;
-  if (i < 0 || i >= values.length) return recipe;
+  // A one-step lane has no neighbour to close up to or hold from: nothing to do.
+  if (i < 0 || i >= values.length || values.length < 2) return recipe;
   if (args.mode === "close") { values.splice(i, 1); values.push(values[values.length - 1]); }
   else values[i] = values[i - 1] ?? values[i + 1] ?? values[i];
   return validateRecipe({ ...clone(recipe), steps: { division: args.division, amplitude: values } });

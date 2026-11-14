@@ -26,6 +26,7 @@ import { AMPLITUDE_MAX, type Recipe } from "./recipe";
 import { smoothNoise } from "./rng";
 import type { AccentKey } from "./accents";
 import { syncAt } from "./bone-sync";
+import { effectiveDrive } from "./energy-curve";
 import { MIN_BLEND_FRAMES, SWITCH_FRAMES, blendBeatsOf, gaitOffsets, layeredWeights, playedBoundaries } from "./transitions";
 
 const TEMPO_FADE_BEATS = 0.5;
@@ -46,20 +47,7 @@ export const clipSpan = (beatSeconds: number): AccentSpanFn => (key: AccentKey) 
 export type ScheduledHit = Hit & { accent: ClipAccent; boundaries: number[]; /** held phase indices */ holds?: number[]; /** hit harder, 0–1 */ impact?: number };
 export type ClipPlan = { levels: number[]; hits: ScheduledHit[]; drive?: AudioDrive; /** cycle offset per move (gait foot matching) */ offsets: number[] };
 
-/** The drive with the recipe's hand-edited energy curve, when it has one. */
-export function effectiveDrive(recipe: Recipe, drive?: AudioDrive): AudioDrive | undefined {
-  const curve = recipe.energyCurve;
-  if (!curve) return drive;
-  const fps = recipe.fps, frames = Math.max(drive?.energy.length ?? 0, Math.ceil(curve.values.length / curve.rate * fps) + 1);
-  const energy = new Float32Array(frames);
-  for (let n = 0; n < frames; n++) {
-    const x = Math.min(curve.values.length - 1, n / fps * curve.rate), i = Math.floor(x), f = x - i;
-    energy[n] = curve.values[i] + ((curve.values[Math.min(curve.values.length - 1, i + 1)]) - curve.values[i]) * f;
-  }
-  const out: AudioDrive = { fps, energy, onsets: drive?.onsets ?? [], source: drive?.source ?? "flat" };
-  if (drive?.low) out.low = drive.low;
-  return out;
-}
+export { effectiveDrive } from "./energy-curve";
 
 /** How strongly energy drives tempo and amplitude (the config amounts times the master drive). */
 export const tempoAmount = (cfg: Recipe["reactive"]) => cfg ? Math.min(1.5, cfg.speed * (cfg.drive ?? 1)) : 0;
