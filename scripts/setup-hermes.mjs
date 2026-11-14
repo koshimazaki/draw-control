@@ -21,7 +21,7 @@ const dry = process.argv.includes("--dry");
 // The distribution as Hermes expects it: SOUL.md, config.yaml, distribution.yaml and skills/.
 const stage = mkdtempSync(join(tmpdir(), "beat-path-profile-"));
 cpSync(join(repo, "hermes", name), stage, { recursive: true });
-for (const skill of ["beat-path", "runware-hermes"]) cpSync(join(repo, "skills", skill), join(stage, "skills", skill), { recursive: true });
+for (const skill of ["beat-path", "runware-hermes", "runware-review"]) cpSync(join(repo, "skills", skill), join(stage, "skills", skill), { recursive: true });
 if (dry) { console.log(`Staged ${name} at ${stage} (not installed).`); process.exit(0); }
 
 const home = process.env.HERMES_HOME ?? join(homedir(), ".hermes");

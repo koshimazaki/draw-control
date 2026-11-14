@@ -25,6 +25,8 @@
     "smoke": "node scripts/smoke.mjs",
     "mcp-check": "node scripts/mcp-check.mjs",
     "hermes:setup": "node scripts/setup-hermes.mjs",
+    "hermes": "node scripts/hermes-run.mjs",
+    "review": "node scripts/runware-review.mjs",
     "examples": "node scripts/examples.mjs",
     "peek": "node scripts/peek.mjs",
     "mixamo-check": "node scripts/mixamo-check.mjs",

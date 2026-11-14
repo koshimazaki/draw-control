@@ -19,6 +19,7 @@ Skills follow the open Agent Skills format (`SKILL.md` with `name` and `descript
 
 - [`skills/beat-path`](skills/beat-path/SKILL.md): draw and edit a Beat Path shot through the MCP server or the CLI, then render the guide.
 - [`skills/runware-hermes`](skills/runware-hermes/SKILL.md): run Hermes on Runware, with text models, images and video on one key.
+- [`skills/runware-review`](skills/runware-review/SKILL.md): a second-opinion code review from another model family on Runware (`npm run review`), and quick GPT Image sketches.
 
 ## Rules
 
