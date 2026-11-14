@@ -22,6 +22,7 @@ import { PLAY_GLYPH } from "./ui/glyph";
 import { icon } from "./ui/icons";
 import type { Ref } from "./ref-store";
 import { readableVideo, videoFrame, type RefGetter } from "./page-refs";
+import { applyStep, followStep, playLocal } from "./result-sync";
 
 /** A run added to the gallery: a clip (video), or a still made for a reference (image, with its cost and the drop it was for). */
 export type Run = { slot: string; model: string; modelName: string; url: string; prompt: string; kind?: "video" | "image"; costUsd?: number | null; for?: "character" | "environment"; blob?: Blob | null };
@@ -96,13 +97,13 @@ function rowPlayer(row: HTMLElement, audioUrl: string | null) {
   const tick = () => {
     if (row.isConnected) shown = true;
     else if (shown) { audio.pause(); audio.removeAttribute("src"); audio.load(); return; }
-    if (audio.duration) { const f = audio.currentTime / audio.duration; scrub.value = String(f); scrub.style.setProperty("--pos", `${f * 100}%`); } for (const v of row.querySelectorAll("video")) { if (Math.abs(v.currentTime - audio.currentTime) > 0.08) v.currentTime = audio.currentTime; if (!audio.paused && v.paused) void v.play().catch(() => {}); if (audio.paused && !v.paused) v.pause(); } requestAnimationFrame(tick); };
+    if (audio.duration) { const f = audio.currentTime / audio.duration; scrub.value = String(f); scrub.style.setProperty("--pos", `${f * 100}%`); } for (const v of row.querySelectorAll("video")) { if (v.readyState >= 1) applyStep(v, followStep({ time: v.currentTime, paused: v.paused, duration: v.duration }, { time: audio.currentTime, playing: !audio.paused })); } requestAnimationFrame(tick); };
   requestAnimationFrame(tick);
   return { button, audio, scrub, setAudio: (url: string) => { audio.src = url; } };
 }
 
 const tile = (label: string, content: HTMLElement | string) => { const t = el("figure", "row-tile"); const cap = el("figcaption", "", label); const body = typeof content === "string" ? el("div", "row-empty muted", content) : content; t.append(body, cap); return t; };
-const video = (src: string) => { const v = el("video"); v.src = src; v.muted = true; v.playsInline = true; v.loop = true; return v; };
+const video = (src: string) => { const v = el("video"); v.muted = true; v.playsInline = true; v.loop = true; playLocal(v, src); return v; };
 
 export function bindGallery(opts: {
   root: HTMLElement; load(slot: string): void; refs(slot: string): { character?: Ref; environment?: Ref } | undefined; runs(): Run[];

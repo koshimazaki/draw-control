@@ -23,6 +23,7 @@ import { captureDrag } from "./drag";
 import { RefStore } from "./ref-store";
 import { bindRefs, readableVideo, videoFrame } from "./page-refs";
 import { bindImages } from "./page-image";
+import { applyStep, followStep, playLocal } from "./result-sync";
 
 const EXPORT = { width: 1280, height: 720 } as const;
 const store = (() => { try { return window.sessionStorage; } catch { return null; } })();
@@ -75,6 +76,9 @@ export function bindGenerate(p: Page) {
     player.className = "output-video";
     player.setAttribute("src", url);
     $("generateSlot").replaceChildren(player);
+    // Played from a copy in this tab, not streamed from the provider's link (result-sync.ts).
+    const v = resultVideo();
+    if (v) playLocal(v, url);
     // A remote result (another origin, served without CORS) would taint a canvas, so its frames cannot be taken: no control for it.
     refUi.showControl($("screenOutput"), readableVideo(url));
   }
@@ -86,13 +90,12 @@ export function bindGenerate(p: Page) {
   divider.addEventListener("dblclick", () => setSplit(0.5));
   $("swapScreens").onclick = () => { swapped = !swapped; screens.classList.toggle("swapped", swapped); };
 
-  // The result follows the page's clock: its time set every frame (the embed's player matches it within a frame).
+  // The result follows the page's clock: it plays while the page plays and is put back only when it
+  // drifts; paused, it shows the page's frame. Driven on the video itself (the embed's player
+  // would seek on every frame while its video is paused).
   const follow = () => {
-    if (player && !$("screenOutput").hidden) {
-      const t = Math.max(0, p.head - p.window0());
-      if (arena) player.currentTime = t;
-      else if (Math.abs(player.currentTime - t) > 0.08) player.currentTime = t;
-    }
+    const v = player && !$("screenOutput").hidden ? resultVideo() : null;
+    if (v && v.readyState >= 1) applyStep(v, followStep({ time: v.currentTime, paused: v.paused, duration: v.duration }, { time: Math.max(0, p.head - p.window0()), playing: p.playing }));
     requestAnimationFrame(follow);
   };
   requestAnimationFrame(follow);
