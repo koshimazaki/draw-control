@@ -217,9 +217,14 @@ export async function smokeBeatPath(browser, base, { fail, OUT, SHOTS }) {
   if (await page.isHidden("#divider")) fail("no divider between the preview and the output");
   // The transport bar under the screens: play and pause from it; scrub to the middle while paused, and the
   // preview, the output player and the music playhead agree within a frame; a click on the video toggles play twice.
+  // The result plays with the page (not scrubbed by a seek on every frame): count its seeks while playing.
+  await page.evaluate(() => { const v = document.querySelector("#generateSlot arena-player").video; window.__seeks = 0; v.addEventListener("seeking", () => { window.__seeks++; }); });
   await page.click("#barPlay");
-  await page.waitForTimeout(700);
+  await page.waitForTimeout(1500);
   if (!(await probe()).playing) fail("the transport bar did not start playback");
+  const out = await page.evaluate(() => { const v = document.querySelector("#generateSlot arena-player").video; return { paused: v.paused, seeks: window.__seeks, src: v.currentSrc.slice(0, 5) }; });
+  console.log(`beat path: output while playing 1.5 s: paused ${out.paused}, seeks ${out.seeks}, source ${out.src}…`);
+  if (out.paused || out.seeks > 3) fail(`the output does not play with the page (paused ${out.paused}, ${out.seeks} seeks in 1.5 s)`);
   await page.click("#barPlay");
   if ((await probe()).playing) fail("the transport bar did not pause");
   await page.evaluate(() => { const s = document.getElementById("scrub"); s.value = "0.5"; s.dispatchEvent(new window.Event("input", { bubbles: true })); });
