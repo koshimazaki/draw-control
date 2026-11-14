@@ -24,6 +24,7 @@
     "check": "npm run typecheck && npm run lint && npm test",
     "smoke": "node scripts/smoke.mjs",
     "mcp-check": "node scripts/mcp-check.mjs",
+    "hermes:setup": "node scripts/setup-hermes.mjs",
     "examples": "node scripts/examples.mjs",
     "peek": "node scripts/peek.mjs",
     "mixamo-check": "node scripts/mixamo-check.mjs",
