@@ -12,7 +12,9 @@ import { DEFAULT_CAMERA_PATH } from "./examples";
 import { removeAt, splitAt, type LaneView, type MenuField, type MenuItem } from "./lanes";
 import type { Page } from "./page";
 import { beatPathRecipe, exportRange } from "./recipe-map";
-import { HIT_CHOICES, LABELS, LOCK_CHOICES, fitLanes, setWord, toScript, type BeatPathState, type Block, type CameraWord, type ClipChoice } from "./script";
+import { HIT_CHOICES, LABELS, LOCK_CHOICES, clampClip, clipLabel, fitLanes, setWord, toScript, type BeatPathState, type Block, type CameraWord } from "./script";
+import { bindFader, setFader } from "./ui/fader";
+import { dragHasImage } from "./page-refs";
 import { isTyping } from "./drag";
 import { bindFollowFields, followProbe, parallelStreet } from "./page-follow";
 
@@ -57,7 +59,7 @@ export function bindActions(p: Page) {
       const on = b.dataset.value === String(value);
       b.classList.toggle("on", on); b.setAttribute("aria-checked", String(on));
     });
-    pick("tool", p.tool); pick("view", p.view); pick("clip", s.clip); pick("pen", p.pen); pick("example", p.slot);
+    pick("tool", p.tool); pick("view", p.view); pick("pen", p.pen); pick("example", p.slot);
     $<HTMLSelectElement>("scenery").value = s.scenery;
     input("sightPasses").checked = s.sight === "passes";
     $<HTMLSelectElement>("figureShape").value = s.figure.shape;
@@ -101,13 +103,17 @@ export function bindActions(p: Page) {
   document.querySelectorAll<HTMLElement>("[data-control]").forEach(group => group.addEventListener("click", e => {
     const v = (e.target as HTMLElement).closest("button")?.dataset.value;
     if (!v) return;
-    const s = p.state, name = group.dataset.control;
+    const name = group.dataset.control;
     if (name === "tool") return p.setTool(v as "subject" | "camera");
     if (name === "view") return p.setView(v as "top" | "side");
     if (name === "pen") return p.setPen(v as "edit" | "draw");
     if (name === "example") return void p.switchSlot(v);
-    if (name === "clip") { const clip = Number(v) as ClipChoice; p.update(fitLanes({ ...s, clip }, clipBeats(clip, p.info?.bpm ?? 120))); }
   }));
+  // Clip length: the fader's readout follows the drag; the lanes refit when it settles (one undo step).
+  bindFader($("clipFader"), v => { setFader($("clipFader"), v); $("clipOut").textContent = clipLabel(v); }, v => {
+    const clip = clampClip(v);
+    if (clip !== p.state.clip) p.update(fitLanes({ ...p.state, clip }, clipBeats(clip, p.info?.bpm ?? 120)));
+  });
   // Lane lock chips: each lane's own source and strength; the camera's also what it does on each hit.
   const lockMenu = (lane: "charLock" | "camLock", anchor?: HTMLElement) => {
     const l = p.state[lane], set = (patch: Partial<BeatPathState["camLock"]>) => p.update({ ...p.state, [lane]: { ...p.state[lane], ...patch } });
@@ -124,6 +130,12 @@ export function bindActions(p: Page) {
   $("setCamLock").onclick = () => lockMenu("camLock", $("setCamLock"));
   $("chipCharacter").onclick = () => lockMenu("charLock");
   $("chipCamera").onclick = () => lockMenu("camLock");
+  // Settings closes on a click anywhere outside it (its own lock menus, opened from inside, count as inside).
+  const settings = $<HTMLDetailsElement>("settings");
+  document.addEventListener("pointerdown", e => {
+    const t = e.target as Node;
+    if (settings.open && !settings.contains(t) && !$("menu").contains(t)) settings.open = false;
+  });
   const corners = (final: boolean) => { const c = Number(input("corners").value); p.update({ ...p.state, ...(p.tool === "camera" ? { cameraCorners: c } : { subjectCorners: c }) }, final); };
   input("boxHeight").onchange = () => p.blocks.setHeight(Number(input("boxHeight").value));
   $("zoomIn").onclick = () => p.map.zoomBy(0.8);
@@ -239,8 +251,8 @@ export function bindActions(p: Page) {
   };
   input("trackFile").onchange = () => { const f = input("trackFile").files?.[0]; if (f) void p.useFile(f); };
   const wrap = $("waveWrap");
-  // A file from the desktop lights the music strip (an image dragged inside the page goes to the reference drops instead).
-  window.addEventListener("dragover", e => { e.preventDefault(); if ([...(e.dataTransfer?.types ?? [])].includes("Files")) wrap.classList.add("drop"); });
+  // A file from the desktop lights the music strip; an image lights the reference drops instead (page-refs.ts).
+  window.addEventListener("dragover", e => { e.preventDefault(); if ([...(e.dataTransfer?.types ?? [])].includes("Files") && !dragHasImage(e.dataTransfer)) wrap.classList.add("drop"); });
   window.addEventListener("dragleave", e => { if (!e.relatedTarget) wrap.classList.remove("drop"); });
   window.addEventListener("drop", e => {
     e.preventDefault();
@@ -257,7 +269,7 @@ export function bindActions(p: Page) {
     if (e.key === "Escape") {
       if (!$("costDialog").hidden) return;   // the cost dialog handles its own Escape
       if (p.map.busy) p.map.cancelStroke();
-      else { p.setSelection(null); if (p.pen === "draw") p.setPen("edit"); }
+      else { p.map.clearGroup(); p.setSelection(null); if (p.pen === "draw") p.setPen("edit"); }
       return;
     }
     if (typing) return;
@@ -271,6 +283,22 @@ export function bindActions(p: Page) {
     if (p.tool === "blocks" && (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "v" && p.blocks.paste()) { e.preventDefault(); return; }
     // Delete or Backspace removes your selected marker on the music strip first (undoable).
     if ((e.key === "Delete" || e.key === "Backspace") && !target.closest("input") && p.slice?.removeSelected()) { e.preventDefault(); return; }
+    // Path points picked together (a box, the whole path, Shift-clicks): ⌘A picks every point, arrows nudge them, Delete removes them.
+    const pathTool = p.tool === "subject" || p.tool === "camera", inField = !!target.closest("input, select");
+    if (pathTool && !inField && (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "a" && p.map.selectAll()) { e.preventDefault(); p.say(`Every ${p.tool} point picked: drag one, or use the arrow keys, to move the whole path`); return; }
+    const picked = pathTool ? p.map.picked() : [];
+    if (picked.length && !inField && e.key.startsWith("Arrow") && (p.map.hovering || picked.length > 1)) {
+      const step = e.shiftKey ? 1 : 0.1, d = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }[e.key];
+      if (d && p.map.nudge(d[0], d[1])) { e.preventDefault(); return; }
+    }
+    if (picked.length > 1 && !inField && (e.key === "Delete" || e.key === "Backspace")) {
+      e.preventDefault();
+      const key = p.tool === "subject" ? "subject" : "camera", gone = new Set(picked);
+      p.update({ ...p.state, [key]: p.state[key].filter((_, k) => !gone.has(k)) });
+      p.map.clearGroup(); p.setSelection(null);
+      p.say(`${picked.length} points removed`);
+      return;
+    }
     // Delete or Backspace removes the selected lane block or path point (undoable).
     if ((e.key === "Delete" || e.key === "Backspace") && p.selection && !target.closest("input")) {
       e.preventDefault();

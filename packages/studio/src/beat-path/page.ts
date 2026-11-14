@@ -134,6 +134,7 @@ export function startBeatPath(root: HTMLElement) {
   const strip = new AudioStrip($<HTMLCanvasElement>("wave"), seconds => seek(seconds),
     seconds => toggleHit(seconds), {
       add: t => hooks.slice?.stripHooks.add(t), move: (i, t, final) => hooks.slice?.stripHooks.move(i, t, final), select: i => { hooks.slice?.stripHooks.select(i); dirty = true; rebuildSoon(); },
+      detach: (t, band) => hooks.slice?.stripHooks.detach(t, band) ?? -1,
     });
   const rebuildSoon = () => schedule(false);
   /** Switch a kick or snare off for every lock, or back on (undoable, in the recipe and the script). */

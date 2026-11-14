@@ -2,8 +2,9 @@
  * The audio strip: the clip's waveform (the slice of the track), its beat grid, three tick
  * rows for the analysed hits (kick low, snare mid, hat high), the locked hits brighter, your
  * own markers hollow, and the playhead. Click or drag to seek; a click on a detected hit mutes
- * it; Alt-click adds a marker of the chosen kind; drag your marker to move it (select it and
- * Delete removes it).
+ * it, and dragging one moves it (the hit is switched off where it was detected and a marker of
+ * its kind lands where it is dropped, one undo step); Alt-click adds a marker of the chosen
+ * kind; drag your marker to move it (select it and Delete removes it).
  */
 import type { Track } from "../audio";
 import { captureDrag } from "./drag";
@@ -25,6 +26,13 @@ export type StripScene = {
   muted: number[];
 };
 
+type Band = "low" | "mid" | "high";
+/** What the strip asks of the page for your own markers; `detach` turns a detected hit into a marker of its band (returns its index). */
+export type StripMarkers = {
+  add(seconds: number): void; move(index: number, seconds: number, final: boolean): void; select(index: number): void;
+  detach(seconds: number, band: Band): number;
+};
+
 export class AudioStrip {
   private ctx: CanvasRenderingContext2D;
   private base = document.createElement("canvas");
@@ -36,11 +44,11 @@ export class AudioStrip {
   private head = 0;
 
   constructor(readonly canvas: HTMLCanvasElement, seek: (seconds: number) => void, toggle: (seconds: number) => void = () => {},
-    private markers: { add(seconds: number): void; move(index: number, seconds: number, final: boolean): void; select(index: number): void } = { add() {}, move() {}, select() {} }) {
+    private markers: StripMarkers = { add() {}, move() {}, select() {}, detach: () => -1 }) {
     this.ctx = canvas.getContext("2d")!;
     new ResizeObserver(() => this.resize()).observe(canvas);
     const at = (e: PointerEvent) => { const r = canvas.getBoundingClientRect(), s = this.scene; return s.start + Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * (s.end - s.start); };
-    canvas.addEventListener("pointermove", e => { if (!e.buttons) canvas.style.cursor = this.addedAt(e) >= 0 ? "grab" : e.altKey ? "copy" : this.markerAt(e) === null ? "pointer" : "cell"; });
+    canvas.addEventListener("pointermove", e => { if (!e.buttons) canvas.style.cursor = this.addedAt(e) >= 0 || this.markerAt(e) ? "grab" : e.altKey ? "copy" : "pointer"; });
     canvas.addEventListener("pointerdown", e => {
       // Alt-click adds your own marker; your marker drags; a click on a detected hit switches it off (or back on); anywhere else seeks.
       if (e.altKey) { this.markers.add(at(e)); return; }
@@ -52,8 +60,18 @@ export class AudioStrip {
         return;
       }
       this.markers.select(-1);
+      // A detected hit: a click switches it off or on; a drag past a few pixels moves it (off here, a marker of its kind there).
       const hit = this.markerAt(e);
-      if (hit !== null) { toggle(hit); return; }
+      if (hit) {
+        const x0 = e.clientX;
+        let index = -1;
+        captureDrag(canvas, e, ev => {
+          if (index < 0 && Math.abs(ev.clientX - x0) < 4) return;
+          if (index < 0) index = this.markers.detach(hit.seconds, hit.band);
+          if (index >= 0) this.markers.move(index, at(ev), false);
+        }, ev => { if (index >= 0) this.markers.move(index, at(ev), true); else toggle(hit.seconds); });
+        return;
+      }
       seek(at(e));
       captureDrag(canvas, e, ev => seek(at(ev)));
     });
@@ -78,11 +96,15 @@ export class AudioStrip {
     this.draw();
   }
 
-  /** The detected hit under the pointer (seconds), or null. */
-  private markerAt(e: PointerEvent): number | null {
-    const r = this.canvas.getBoundingClientRect(), px = e.clientX - r.left;
-    let best: number | null = null, bd = 5;
-    for (const t of [...this.scene.kicks, ...this.scene.snares, ...this.scene.hats]) { const d = Math.abs(this.x(t) - px); if (d < bd) { bd = d; best = t; } }
+  /** The detected hit under the pointer (its time and band), or null: only hits in the row under the pointer (kick top, snare middle, hat bottom). */
+  private markerAt(e: PointerEvent): { seconds: number; band: Band } | null {
+    const r = this.canvas.getBoundingClientRect(), px = e.clientX - r.left, fy = (e.clientY - r.top) / r.height, s = this.scene;
+    let best: { seconds: number; band: Band } | null = null, bd = 5;
+    for (const [band, list] of [["low", s.kicks], ["mid", s.snares], ["high", s.hats]] as const) {
+      const [a, b] = AudioStrip.ROWS[band];
+      if (fy < a || fy > b) continue;
+      for (const t of list) { const d = Math.abs(this.x(t) - px); if (d < bd) { bd = d; best = { seconds: t, band }; } }
+    }
     return best;
   }
   /** Your own marker under the pointer (index), or -1. */

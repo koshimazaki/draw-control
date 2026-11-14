@@ -78,6 +78,15 @@ export function bindSlice(p: Page) {
       if (final) { const m = list[index]; setMarkers(list, false); selected = markers().findIndex(x => x.band === m.band && x.seconds === m.seconds); }
     },
     select(index: number) { selected = index; },
+    /** A detected hit dragged off its place: switched off there, a marker of its band in its place (the drag then moves it; the whole drag is one undo step). */
+    detach(seconds: number, band: Band) {
+      const t = r3(seconds), s = p.state;
+      const muted = s.muted.some(m => Math.abs(m - t) < 0.012) ? s.muted : [...s.muted, t].sort((x, y) => x - y);
+      const list = [...markers(), { band, seconds: t }].sort((x, y) => x.seconds - y.seconds);
+      p.update({ ...s, muted, markers: list }, false);
+      selected = list.findIndex(m => m.band === band && m.seconds === t);
+      return selected;
+    },
   };
   /** Delete removes the selected marker (true when it did). */
   function removeSelected(): boolean {

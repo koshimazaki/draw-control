@@ -26,12 +26,16 @@ export const LOCK_CHOICES = ["off", "beat", "kick", "snare", "hat"] as const;
 export type LockChoice = (typeof LOCK_CHOICES)[number];
 export const HIT_CHOICES = ["move", "hold", "punch"] as const;
 export type HitChoice = (typeof HIT_CHOICES)[number];
-export const CLIP_CHOICES = [5, 8, 10] as const;
-export type ClipChoice = (typeof CLIP_CHOICES)[number];
+/** Clip length in whole seconds, as the video models take it: 3 to 30, marked at 5, 8, 10, 15, 20 and 30. */
+export const CLIP_SECONDS = { min: 3, max: 30, marks: [5, 8, 10, 15, 20, 30] } as const;
+/** Any typed or scripted length to a clip the page offers: whole seconds, 3 to 30. */
+/** The clip's readout: seconds only (frames depend on the model's output rate; the guide itself renders at 24 fps). */
+export const clipLabel = (seconds: number) => `${seconds} s`;
+export const clampClip = (seconds: number) => Number.isFinite(seconds) ? Math.max(CLIP_SECONDS.min, Math.min(CLIP_SECONDS.max, Math.round(seconds))) : 8;
 
 export type BeatPathState = {
-  /** Clip length, seconds: 5, 8 or 10 (121, 193 or 241 frames at 24 fps). */
-  clip: ClipChoice;
+  /** Clip length, whole seconds 3 to 30 (24 fps plus one frame: 121 frames for 5 s, 721 for 30 s). */
+  clip: number;
   subject: PathPt[];
   /** 0 sharp (straight segments, hard turns) to 1 round. */
   subjectCorners: number;
@@ -180,7 +184,10 @@ export function fromScript(text: string, base: BeatPathState, grid: { bpm: numbe
   const prompt = /^#\s*prompt:\s*(.+)$/im.exec(text);
   if (prompt) state.prompt = prompt[1].trim();
   const clip = /^#\s*clip:\s*(\d+)/im.exec(text);
-  if (clip) state.clip = Number(clip[1]) <= 6 ? 5 : Number(clip[1]) <= 9 ? 8 : 10;
+  if (clip) {
+    state.clip = clampClip(Number(clip[1]));
+    if (state.clip !== Number(clip[1])) notes.push(`clip ${clip[1]} s → ${state.clip} s (the page takes ${CLIP_SECONDS.min} to ${CLIP_SECONDS.max} s)`);
+  }
   const parsed = parseSettings(text), settings = parsed.landmarks;
   state.muted = parsed.muted ?? [];
   state.markers = parsed.markers?.length ? parsed.markers : undefined;

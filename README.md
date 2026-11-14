@@ -4,7 +4,7 @@ A browser studio where a neutral figure moves to your music, beat by beat, under
 You (or an agent, by command or by a plain-text shot script) edit the moves and the camera on a timeline.
 The result exports as a guide clip, with its beats and camera path, for video models to follow.
 
-Status: working studio, CLI and MCP server, 11 November 2026. What is not done is [at the end](#not-done). Detail: [PRD](docs/PRD.md) · [plan and current state](docs/plan.md) · [agents: CLI and MCP](docs/agents.md) · [recipe and shot script format](docs/recipe.md).
+Status: working studio, CLI and MCP server, 11 November 2026. What is not done is [at the end](#not-done). Detail: [PRD](docs/PRD.md) · [plan and current state](docs/plan.md) · [agents: CLI and MCP](docs/agents.md) · [recipe and shot script format](docs/recipe.md) · [video models: length and frame rate](docs/models.md).
 
 ## Beat Path (start here)
 

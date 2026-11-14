@@ -5,6 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { RefStore, sourceLabel } from "../src/beat-path/ref-store";
+import { dragHasImage, isImageFile } from "../src/beat-path/page-refs";
 
 function store() {
   const live = new Set<string>(), revoked: string[] = [];
@@ -40,5 +41,25 @@ describe("reference store", () => {
     expect(sourceLabel({ kind: "frame", of: "preview", seconds: 3.24 })).toBe("frame of the preview at 3.2 s");
     expect(sourceLabel({ kind: "frame", of: "result", seconds: 1 })).toBe("frame of the result at 1.0 s");
     expect(sourceLabel({ kind: "generated", model: "FLUX", prompt: "a red car" })).toBe("generated with FLUX: a red car");
+  });
+});
+
+describe("Images dropped from the desktop", () => {
+  const file = (name: string, type: string) => new File(["x"], name, { type });
+  it("reads an image by its type, or by its name when the desktop sends no type; HEIC and non-images are refused", () => {
+    expect(isImageFile(file("hero.png", "image/png"))).toBe(true);
+    expect(isImageFile(file("street.webp", ""))).toBe(true);
+    expect(isImageFile(file("photo.JPEG", ""))).toBe(true);
+    expect(isImageFile(file("IMG_0001.HEIC", "image/heic"))).toBe(false);
+    expect(isImageFile(file("IMG_0001.heic", ""))).toBe(false);
+    expect(isImageFile(file("beat.wav", "audio/wav"))).toBe(false);
+    expect(isImageFile(file("notes.txt", ""))).toBe(false);
+  });
+  it("a drag carrying an image file lights the reference drops; a track or a page drag does not", () => {
+    const dt = (items: { kind: string; type: string }[]) => ({ items }) as unknown as DataTransfer;
+    expect(dragHasImage(dt([{ kind: "file", type: "image/png" }]))).toBe(true);
+    expect(dragHasImage(dt([{ kind: "file", type: "audio/wav" }]))).toBe(false);
+    expect(dragHasImage(dt([{ kind: "string", type: "application/x-beat-path-ref" }]))).toBe(false);
+    expect(dragHasImage(null)).toBe(false);
   });
 });

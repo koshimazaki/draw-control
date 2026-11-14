@@ -120,6 +120,35 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .slider output { min-width: 34px; color: var(--text); font-family: var(--font-mono); font-size: var(--text-xs); }
 .slider.off { opacity: .45; }
 
+/* Fader: a ruler under a range input (ui/fader.ts). The scale is inset by half the thumb so ticks sit under its centre. */
+.fader { --thumb-w: 14px; position: relative; flex: 1 1 220px; min-width: 200px; }
+.fader input[type="range"] { -webkit-appearance: none; appearance: none; display: block; width: 100%; height: 18px; margin: 0; background: transparent; cursor: pointer; }
+.fader input[type="range"]::-webkit-slider-runnable-track { height: 4px; border-radius: 2px;
+  background: linear-gradient(to right, var(--accent) var(--fill, 0%), var(--track) var(--fill, 0%)); }
+.fader input[type="range"]::-moz-range-track { height: 4px; border-radius: 2px; background: var(--track); }
+.fader input[type="range"]::-moz-range-progress { height: 4px; border-radius: 2px; background: var(--accent); }
+.fader input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: var(--thumb-w); height: var(--thumb-w); margin-top: -5px; border-radius: 50%;
+  background: var(--thumb); border: 2px solid var(--surface); box-shadow: 0 0 0 1px var(--border-strong); transition: transform var(--dur-fast) var(--ease); }
+.fader input[type="range"]::-moz-range-thumb { width: 10px; height: 10px; border-radius: 50%; background: var(--thumb); border: 2px solid var(--surface); box-shadow: 0 0 0 1px var(--border-strong); }
+.fader input[type="range"]:hover::-webkit-slider-thumb { transform: scale(1.12); }
+.fader input[type="range"]:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; border-radius: var(--radius-sm); }
+.fader-scale, .fader-marks { position: relative; margin: 0 calc(var(--thumb-w) / 2); }
+.fader-scale { height: 9px; }
+.fader-scale i { position: absolute; top: 0; width: 1px; height: 4px; background: var(--border-strong); transform: translateX(-50%); }
+.fader-scale i.major { height: 9px; background: var(--text-muted); }
+/* Past the reach: what the chosen model cannot take, hatched. */
+.fader-reach { position: absolute; top: -2px; bottom: 0; left: var(--reach, 100%); right: 0; border-radius: 2px;
+  background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--text-dim) 30%, transparent) 0 2px, transparent 2px 5px); }
+.fader-marks { height: 15px; }
+.fader-marks button { position: absolute; top: 1px; transform: translateX(-50%); padding: 0 3px; border: 0; border-radius: var(--radius-sm); background: none; cursor: pointer;
+  color: var(--text-dim); font: var(--text-xs)/1.2 var(--font-mono); font-variant-numeric: tabular-nums; }
+.fader-marks button:hover { color: var(--text); }
+.fader-marks button.on { color: var(--accent-ink); }
+.fader-marks button.out { opacity: .45; }
+.fader.over input[type="range"]::-webkit-slider-runnable-track { background: linear-gradient(to right, var(--accent) var(--reach), var(--warn) var(--reach) var(--fill, 0%), var(--track) var(--fill, 0%)); }
+.fader-out { min-width: 36px; text-align: right; color: var(--text); font: var(--text-xs) var(--font-mono); font-variant-numeric: tabular-nums; }
+.fader-out.over { color: var(--warn); }
+
 /* Toggle */
 .toggle { display: inline-flex; align-items: center; gap: var(--s-2); cursor: pointer; user-select: none; color: var(--text-muted); font-size: var(--text-sm); }
 .toggle input { position: absolute; opacity: 0; width: 0; height: 0; }
