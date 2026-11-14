@@ -5,11 +5,11 @@
  * is page state (`slice`, `markers`), so undo and the shot script cover it. Split from page.ts.
  */
 import type { AudioDrive, Recipe } from "@motion-studio/core";
-import { sensitiveBands, sliceStart } from "@motion-studio/core/internal";
+import { clipBeats, sensitiveBands, sliceStart } from "@motion-studio/core/internal";
 import type { Track } from "../audio";
 import { TrackOverview } from "./overview";
 import type { TrackInfo } from "./recipe-map";
-import type { BeatPathState } from "./script";
+import { clampClip, fitLanes, type BeatPathState } from "./script";
 
 type Band = "low" | "mid" | "high";
 type Page = {
@@ -34,6 +34,7 @@ export function bindSlice(p: Page) {
   let kind: Band = "low", selected = -1;
   const overview = new TrackOverview($<HTMLCanvasElement>("overview"), {
     move: (at, final) => moveTo(at, final),
+    resize: (edge, at, final) => resizeTo(edge, at, final),
     nudge: dir => {
       const info = p.info;
       if (!info) return;
@@ -49,6 +50,19 @@ export function bindSlice(p: Page) {
     p.update({ ...p.state, slice: start }, final);
     p.seek(start);
     if (final) p.say(`Clip from ${start.toFixed(2)} s to ${(start + p.state.clip).toFixed(2)} s of the track${snap() ? " (on the beat)" : ""}`);
+  }
+  /** A bracket dragged: the clip's length in whole seconds (3–30, inside the track), the other end held; the lanes refit. */
+  function resizeTo(edge: "start" | "end", at: number, final: boolean) {
+    const info = p.info;
+    if (!info) return;
+    const start0 = p.window0(), end0 = start0 + p.state.clip, room = (from: number) => Math.floor(info.lengthSeconds - from - 0.05);
+    let start = start0, clip: number;
+    if (edge === "end") clip = Math.min(room(start0), clampClip(at - start0));
+    else { clip = clampClip(end0 - at); start = sliceFor(Math.max(0, end0 - clip), info, clip, snap()); clip = Math.min(clip, room(start)); }
+    if (clip < 3) return;
+    if (clip === p.state.clip && start === p.window0() && !final) return;
+    p.update(fitLanes({ ...p.state, clip, slice: start }, clipBeats(clip, info.bpm)), final);
+    if (final) p.say(`Clip ${clip} s, from ${start.toFixed(2)} s to ${(start + clip).toFixed(2)} s of the track · the lanes fit it`);
   }
   $<HTMLInputElement>("sliceStart").onchange = () => { const v = Number($<HTMLInputElement>("sliceStart").value); if (Number.isFinite(v)) moveTo(v, true); };
 

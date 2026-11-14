@@ -27,9 +27,10 @@ export async function smokeBeatPathSlice(browser, base, { fail, OUT, SHOTS }) {
   if (!(await page.locator("#overview").isVisible())) { fail("the track overview does not show for a track longer than the clip"); await page.close(); return; }
   const state = () => page.evaluate(() => window.__beatPath.state());
   const grid = () => page.evaluate(() => window.__beatPath.recipe().beatGrid);
-  // Drag the window from its start to about a third of the way along.
+  // Drag the window by its middle to about a third of the way along (its brackets resize it instead).
   const box = await page.locator("#overview").boundingBox();
-  const startX = box.x + 3, y = box.y + box.height / 2;
+  const s0 = await state(), len0 = await page.evaluate(() => window.__beatPath.trackLength?.() ?? null);
+  const startX = box.x + ((s0.slice ?? 0) + s0.clip / 2) / (len0 ?? 180) * box.width, y = box.y + box.height / 2;
   await page.mouse.move(startX, y); await page.mouse.down(); await page.mouse.move(box.x + box.width / 3, y, { steps: 8 }); await page.mouse.up();
   let s = await state(), g = await grid();
   const beat = 60 / g.bpm, phase = (x) => Math.abs(((x - 0.1) / beat) - Math.round((x - 0.1) / beat));
@@ -56,6 +57,15 @@ export async function smokeBeatPathSlice(browser, base, { fail, OUT, SHOTS }) {
   await page.setViewportSize({ width: 1440, height: 900 }); await page.waitForTimeout(300);
   await page.screenshot({ path: `${SHOTS}beat-path-slice-1440.png` });
   await page.setViewportSize({ width: 1280, height: 720 }); await page.waitForTimeout(200);
+  // The window's right bracket drags like a loop region: a longer clip in whole seconds, the start held.
+  {
+    const b = await page.locator("#overview").boundingBox(), st = await state(), L = await page.evaluate(() => window.__beatPath.trackLength());
+    const x1 = b.x + (st.slice + st.clip) / L * b.width, yy = b.y + b.height / 2;
+    await page.mouse.move(x1 - 0.5, yy); await page.mouse.down(); await page.mouse.move(x1 + 4 / L * b.width, yy, { steps: 6 }); await page.mouse.up();
+    const after = await state();
+    console.log(`beat path slice: bracket drag ${st.clip} s → ${after.clip} s (start ${st.slice} → ${after.slice})`);
+    if (!(after.clip > st.clip && Number.isInteger(after.clip)) || Math.abs(after.slice - st.slice) > 1e-6) fail(`dragging the right bracket did not lengthen the clip in whole seconds, start held (${st.clip} → ${after.clip}, ${st.slice} → ${after.slice})`);
+  }
   // Export in memory: the audio is the slice, beats.json starts on a beat.
   const out = await page.evaluate(async () => {
     const b = await window.beatPath.exportGuideInMemory();

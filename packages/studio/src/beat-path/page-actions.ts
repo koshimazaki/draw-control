@@ -5,7 +5,9 @@
  * Delete removes the selection, Escape cancels a stroke or clears it). Split from page.ts.
  * The shot script is the engine's format (CLI, MCP, examples/scripts); nothing about it shows here.
  */
-import { clipBeats } from "@motion-studio/core";
+import { beatAtSeconds, clipBeats } from "@motion-studio/core";
+import { hitBands, lockHits } from "@motion-studio/core/internal";
+import { blockAt, everyBeats, movesOnHits, parseMoves, splitBlockAt } from "./lane-cuts";
 import { exportBundle } from "../export/bundle";
 import { download } from "../shared/download";
 import { DEFAULT_CAMERA_PATH } from "./examples";
@@ -188,7 +190,15 @@ export function bindActions(p: Page) {
         p.say(`Parallel street: Follow side, ${side}, ${follow.distance} m out, Pass in front on · drag the line or type the numbers to adjust`);
       },
     });
+    // Cuts on the beat: at the playhead (snapped like an edge), at every hit of the lane's lock (after Sensitivity), every 1, 2 or 4 beats.
+    const lock = (key === "cameraLane" ? p.state.camLock : p.state.charLock).lock, hitLock = lock === "kick" || lock === "snare" || lock === "hat";
+    const hits = hitLock ? laneHits(lock, b.from, b.to) : [], atHead = p.snapLane(headBeat());
     items.push("-",
+      { label: `Split at the playhead, beat ${+atHead.toFixed(2)} (S)`, disabled: !splitBlockAt(blocks, i, [atHead]), run: () => set(splitBlockAt(blocks, i, [atHead])) },
+      { label: hitLock ? `Split on every ${lock} (${hits.length})` : "Split on every hit (lock this lane to kick, snare or hat)", disabled: !hitLock || !splitBlockAt(blocks, i, hits), run: () => set(splitBlockAt(blocks, i, hits)) },
+      ...[1, 2, 4].map(n => ({ label: `Split every ${n} beat${n > 1 ? "s" : ""}${n === 4 ? " (a bar)" : ""}`, disabled: !splitBlockAt(blocks, i, everyBeats(b.from, b.to, n)), run: () => set(splitBlockAt(blocks, i, everyBeats(b.from, b.to, n))) })),
+      ...(key === "cameraLane" ? [{ label: "Moves on hits… (cut the whole lane on each hit, moves cycling)", run: () => setTimeout(() => movesMenu(anchor), 0) }] : []),
+      "-",
       { label: `Split at beat ${Math.round(beat * 2) / 2}`, disabled: !splitAt(blocks, i, beat), run: () => set(splitAt(blocks, i, beat)) },
       { label: "Remove (the block before takes its beats)", disabled: blocks.length < 2, run: () => set(removeAt(blocks, i)) });
     p.setSelection({ kind: "block", lane: key, index: i });
@@ -209,6 +219,55 @@ export function bindActions(p: Page) {
     p.menu.show((view.root.children[i] as HTMLElement) ?? anchor, `${key === "character" ? "Character" : "Camera"} · beats ${b.from}–${b.to}`, items, () => view.render(), field,
       key === "cameraLane" ? CAMERA_NOTES[b.word as CameraWord] : CHARACTER_NOTES[b.word as keyof typeof CHARACTER_NOTES]);
   }
+
+  /** The playhead in beats. */
+  const headBeat = () => beatAtSeconds(p.recipe.beatGrid, p.head);
+  /** The hits of a lock source inside a range (beats), after Sensitivity, switched-off hits and your markers. */
+  const laneHits = (lock: "kick" | "snare" | "hat", from: number, to: number) => p.drive ? lockHits(p.recipe.beatGrid, hitBands(p.drive.bands, p.recipe), lock, from, to) : [];
+  /** Moves on hits: the whole Camera lane cut at each hit of its lock (snare when it has none), the typed moves given out in order, cycling. */
+  let lastMoves = "orbit, top, push in, my path";
+  function movesMenu(anchor: HTMLElement) {
+    const cl = p.state.camLock, lock = cl.lock === "kick" || cl.lock === "hat" ? cl.lock : "snare", total = p.totalBeats();
+    p.menu.show(anchor, `Moves on hits · every ${lock}`, [], () => {}, {
+      label: "Moves, in order (they repeat)", value: lastMoves, placeholder: "orbit, top, push in, my path",
+      apply: text => {
+        const parsed = parseMoves(text);
+        if ("error" in parsed) return parsed.error;
+        const hits = laneHits(lock, 0, total);
+        if (!hits.length) return `No ${lock} hits in the clip: add a track, or raise Sensitivity`;
+        lastMoves = text;
+        const lane = movesOnHits(total, hits, parsed.words), extra: Partial<BeatPathState> = {};
+        if (parsed.words.includes("path") && p.state.camera.length < 2) extra.camera = DEFAULT_CAMERA_PATH.map(q => ({ ...q }));
+        p.update({ ...p.state, ...extra, cameraLane: lane, camLock: { ...cl, lock, advance: false } });
+        p.say(`Camera lane cut on every ${lock}: ${lane.length} blocks, ${parsed.words.length} moves cycling · each block's menu still edits it`);
+        return null;
+      },
+    }, `The lane is cut at each ${lock} (after Sensitivity; blocks at least a beat), then the moves are given out in order.`);
+  }
+
+  // Timeline zoom: the music strip and both lanes stretch together (1×–8×), centred on the playhead; it follows the playhead while playing.
+  const ZOOMS = [1, 2, 4, 8], scroller = $("tlScroll"), timeline = scroller.closest<HTMLElement>(".timeline")!;
+  let zoom = 1;
+  const headFraction = () => Math.max(0, Math.min(1, (p.head - p.window0()) / Math.max(0.001, p.state.clip)));
+  function setZoom(z: number) {
+    zoom = Math.max(ZOOMS[0], Math.min(ZOOMS[ZOOMS.length - 1], z));
+    timeline.style.setProperty("--zoom", String(zoom));
+    $<HTMLButtonElement>("zoomOut").disabled = zoom === ZOOMS[0]; $<HTMLButtonElement>("zoomIn").disabled = zoom === ZOOMS[ZOOMS.length - 1];
+    requestAnimationFrame(() => { scroller.scrollLeft = headFraction() * scroller.scrollWidth - scroller.clientWidth / 2; });
+    p.say(zoom === 1 ? "Timeline: the whole clip" : `Timeline ${zoom}× · scroll sideways to move along it`);
+  }
+  const step = (dir: 1 | -1) => setZoom(ZOOMS[Math.max(0, Math.min(ZOOMS.length - 1, ZOOMS.indexOf(zoom) + dir))]);
+  $("zoomIn").onclick = () => step(1); $("zoomOut").onclick = () => step(-1);
+  scroller.addEventListener("wheel", e => { if (e.ctrlKey || e.metaKey) { e.preventDefault(); step(e.deltaY < 0 ? 1 : -1); } }, { passive: false });
+  $<HTMLButtonElement>("zoomOut").disabled = true;
+  const followHead = () => {
+    if (zoom > 1 && p.player.playing) {
+      const x = headFraction() * scroller.scrollWidth, v0 = scroller.scrollLeft, v1 = v0 + scroller.clientWidth;
+      if (x < v0 + scroller.clientWidth * 0.1 || x > v1 - scroller.clientWidth * 0.1) scroller.scrollLeft = x - scroller.clientWidth * 0.25;
+    }
+    requestAnimationFrame(followHead);
+  };
+  requestAnimationFrame(followHead);
 
   // The shot description: three fields, stored in the recipe (recipe.json in the bundle) and the script.
   for (const k of ["subject", "environment", "action"] as const) {
@@ -314,6 +373,16 @@ export function bindActions(p: Page) {
       p.setSelection(null);
       return;
     }
+    // S splits the block under the playhead (the selected block's lane, else the Camera lane), snapped like an edge drag.
+    if (e.key.toLowerCase() === "s" && !e.metaKey && !e.ctrlKey && !e.altKey && !inField && p.tool !== "blocks") {
+      const key = p.selection?.kind === "block" ? p.selection.lane : "cameraLane", blocks = p.state[key] as Block<string>[], beat = headBeat(), i = blockAt(blocks, beat);
+      const cut = p.snapLane(beat), next = i >= 0 ? splitBlockAt(blocks, i, [cut]) : null;
+      e.preventDefault();
+      if (!next) { p.say("No split here: each part needs at least a beat (zoom in and move the playhead)"); return; }
+      p.update({ ...p.state, [key]: next });
+      p.say(`${key === "cameraLane" ? "Camera" : "Character"} lane split at beat ${+cut.toFixed(2)} · click the new block to pick its move`);
+      return;
+    }
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z") { e.preventDefault(); p.undo(e.shiftKey); return; }
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "y") { e.preventDefault(); p.undo(true); return; }
     // Arrows step one frame when paused, Shift one beat.
@@ -331,7 +400,7 @@ export function bindActions(p: Page) {
     (window as unknown as { __beatPath: unknown }).__beatPath = {
       recipe: () => p.recipe, state: () => structuredClone(p.state), script, mapPoint: (q: { x: number; z: number }) => p.map.clientAt(q),
       playing: () => p.player.playing, head: () => p.head, selection: () => p.selection, mapInside: () => p.map.allInside(), shown: () => p.shown,
-      boxes: () => p.blocks.host.boxes(), boxSelected: () => p.blocks.selected, slot: () => p.slot, trackName: () => p.info?.name ?? null,
+      boxes: () => p.blocks.host.boxes(), boxSelected: () => p.blocks.selected, slot: () => p.slot, trackName: () => p.info?.name ?? null, trackLength: () => p.info?.lengthSeconds ?? null,
       followSegs: () => p.followSegs.map(s => ({ block: s.block, word: s.word, points: s.points, anchors: s.anchors })),
       followProbe: (k: number) => followProbe(p.recipe, p.drive, p.state.cameraLane[k]),
     };

@@ -325,3 +325,13 @@ select:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
 .audio-info .sens { display: flex; align-items: center; gap: var(--s-2); color: var(--text-muted); font-size: var(--text-xs); }
 .audio-info .sens input[type="range"] { flex: 1; min-width: 60px; max-width: 140px; accent-color: var(--accent); }
 .audio-info .sens output { min-width: 3.2em; color: var(--text); }
+
+/* Timeline zoom: the music strip and both lanes scroll together, stretched by --zoom (page-actions.ts) */
+.tl-scroll { grid-column: 2; grid-row: span 3; align-self: stretch; min-width: 0; overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; }
+.tl-inner { width: calc(100% * var(--zoom, 1)); height: 100%; display: grid; grid-template-rows: 44px var(--lane-h) var(--lane-h); row-gap: var(--s-1); align-items: center; }
+.tl-inner .wave-wrap { height: 100%; }
+.tl-lab { display: flex; align-items: center; justify-content: flex-end; gap: var(--s-1); }
+.zoom-btns { display: inline-flex; gap: 2px; }
+.zoom-btn { width: 18px; height: 18px; padding: 0; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text-muted); font: var(--weight-medium) 12px/1 var(--font-mono); cursor: pointer; }
+.zoom-btn:hover:not(:disabled) { color: var(--text); border-color: var(--border-strong); }
+.zoom-btn:disabled { opacity: .4; cursor: default; }

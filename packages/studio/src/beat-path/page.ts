@@ -225,8 +225,10 @@ export function startBeatPath(root: HTMLElement) {
       // A plain follow block's line can be dragged: its frames carry where the subject is and which way it faces.
       const block = state.cameraLane.findIndex(b => sg.fromBeat >= b.from - 1e-6 && sg.toBeat <= b.to + 1e-6);
       const b = state.cameraLane[block], editable = !!b && isFollowWord(b.word) && !b.phrase;
+      // With more than one block, each stretch carries its block's number (a sliced path shows which part plays when).
+      const numbered = state.cameraLane.length > 1 && block >= 0 ? `${block + 1} · ${label}` : label;
       if (editable) followSegs.push({ block, word: b.word as "behind" | "side", points, anchors: frames.map(n => { const r = frameAt(recipe, n, live()).root; return { x: r.x, z: r.z, heading: r.yawRadians }; }) });
-      return { label, points, emphasis, editable };
+      return { label: numbered, points, emphasis, editable };
     });
     const subjectBeats: { x: number; z: number }[] = [], cameraBeats: { x: number; z: number }[] = [];
     for (let b = 0; b <= recipe.durationBeats; b++) { const r = frameAt(recipe, fr(b), live()).root; subjectBeats.push({ x: r.x, z: r.z }); cameraBeats.push(smooth(fr(b))); }
@@ -351,7 +353,7 @@ export function startBeatPath(root: HTMLElement) {
     $, map, menu, viewport, strip, player,
     get state() { return state; }, get recipe() { return recipe; }, get tool() { return tool; }, get view() { return view; },
     get track() { return track; }, get drive() { return live(); }, get info() { return info; }, get busy() { return busy; }, set busy(v: boolean) { busy = v; dirty = true; },
-    get head() { return head; }, get shown() { return shown; }, get slot() { return slot; }, get followSegs() { return followSegs; }, get slice() { return hooks.slice; }, blocks, seek, removeTrack, totalBeats, window0, window1, update, undo, rebuild, setPlaying, switchSlot, useFile, say,
+    get head() { return head; }, get shown() { return shown; }, get slot() { return slot; }, get followSegs() { return followSegs; }, get slice() { return hooks.slice; }, blocks, snapLane, seek, removeTrack, totalBeats, window0, window1, update, undo, rebuild, setPlaying, switchSlot, useFile, say,
     setTool(t: Tool) { tool = t; if (pen === "draw") map.startNew(); map.refresh(); actions.sync(); },
     setView(v: View) { view = v; map.refresh(); actions.sync(); },
     get pen() { return pen; },
