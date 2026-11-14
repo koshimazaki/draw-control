@@ -19,15 +19,16 @@ Skills follow the open Agent Skills format (`SKILL.md` with `name` and `descript
 
 - [`skills/beat-path`](skills/beat-path/SKILL.md): draw and edit a Beat Path shot through the MCP server or the CLI, then render the guide.
 - [`skills/runware-hermes`](skills/runware-hermes/SKILL.md): run Hermes on Runware, with text models, images and video on one key.
-- [`skills/runware-review`](skills/runware-review/SKILL.md): a second-opinion code review from another model family on Runware (`npm run review`), and quick GPT Image sketches.
+- [`skills/runware-review`](skills/runware-review/SKILL.md): a second-opinion code review from another model family on Runware (`npm run review`: sends the diff and this file, paid, asks first), and quick GPT Image sketches.
 
 ## Rules
 
-- **No paid run without the owner's yes.** Rendering a guide is free. A video or image generation spends Runware credits: name the model, the length and the price first. Real runs are logged in [docs/costs.md](docs/costs.md).
+- **No paid run without the owner's yes.** Rendering a guide is free. A video or image generation spends Runware credits: name the model, the length and the price first. A paid review (`npm run review`) is the same: dry-run it, say the ceiling, and pass `--yes` only after the owner said yes. Real runs are logged in [docs/costs.md](docs/costs.md).
+- **The tools do not enforce all of that.** In Hermes, the chat model's own tokens have no limit; the Runware MCP server's `spend_limit` counts declared estimates per chat and asks again past it, it does not cap the bill; and a terminal command such as `npm run review -- --yes` runs without a Hermes prompt. Exactly what each guard does is in [docs/hermes.md](docs/hermes.md#what-guards-the-spend).
 - **Work in a git worktree.** The owner's `npm run dev` reloads the page on any file change, and a reload loses a generation in progress.
 - **Checks before and after:** `npm run check` (typecheck, lint, tests) and `node scripts/smoke-beat-path.mjs`.
 - **Keep files near 500 lines.** Extract a helper rather than grow one file.
-- **Keys and secrets** stay in the environment (`RUNWARE_API_KEY`) or the page's key panel: never in a file, a log or a commit.
+- **Keys and secrets** stay in the environment (`RUNWARE_API_KEY`), the macOS Keychain (item `runware-api-key`, read by `npm run hermes` and `npm run review` when the variable is unset) or the page's key panel: never in a file, a log or a commit. In Hermes the key is in the terminal tool's environment, so any command run there can use it.
 
 ## Map
 
