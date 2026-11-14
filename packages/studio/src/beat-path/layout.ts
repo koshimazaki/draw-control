@@ -5,7 +5,8 @@
  * reference drops, the model and Generate, and Settings (closed); the music strip and the
  * two lanes along the bottom. The Gallery is below, reached by scrolling.
  */
-import { CLIP_CHOICES } from "./script";
+import { CLIP_SECONDS } from "./script";
+import { faderHTML } from "./ui/fader";
 import { APP_NAME, REPO_URL, LICENCE } from "./name";
 import { MODELS } from "./generate";
 import { PLAY_GLYPH } from "./ui/glyph";
@@ -25,6 +26,8 @@ export const LAYOUT = `
   <div class="top-right">
     <a class="btn ghost" href="#gallery">${icon("gallery")}Gallery</a>
     <a class="btn ghost oss tip-below" href="${REPO_URL}" target="_blank" rel="noopener" data-tip="Open source (${LICENCE}). Runs in your browser with your own Runware key">${icon("code")}Get the code${icon("arrow-up-right", "trail")}</a>
+    <div class="runs-slot"><button type="button" class="btn ghost tip-below" id="runsButton" aria-haspopup="true" data-tip="Every generation from this browser, with its task id: a reload never loses one">${icon("history")}Runs<b class="runs-count" id="runsCount"></b></button>
+      <div class="runs-pop panel" id="runsPop" hidden><div class="runs-title">Runs <span class="muted">· kept in this browser</span></div><div id="runsList" class="runs-list"></div></div></div>
     <span class="balance tip-below" id="balance" hidden data-tip="Your Runware balance, read with your key"></span>
     <div class="key-slot" id="keySlot"><button type="button" class="btn outline key-placeholder tip-below tip-end" id="keyButton" data-tip="The key panel mounts here when it is installed (vendor/)">${icon("key")}<span class="key-dot" aria-hidden="true"></span><span>Add your Runware API key</span></button></div>
   </div>
@@ -94,9 +97,10 @@ export const LAYOUT = `
         <button type="button" id="runGenerate" class="btn primary run-btn">${icon("zap", "i-run")}${icon("square", "i-stop")}<span class="btn-label">Generate</span></button>
         <details class="options" id="settings"><summary class="btn ghost">${icon("sliders")}Settings${icon("chevron-down", "chev")}</summary>
           <div class="options-body panel">
-            <div class="opt-row"><span class="lab">Clip</span>${seg("clip", CLIP_CHOICES, { 5: "5 s", 8: "8 s", 10: "10 s" }, "Clip length")}
+            <div class="opt-row clip-row"><span class="lab">Clip</span>${faderHTML({ id: "clip", ...CLIP_SECONDS, label: "Clip length, seconds", unit: "s" })}<output id="clipOut" class="fader-out" for="clip"></output></div>
+            <p id="clipNote" class="opt-note" hidden></p>
+            <div class="opt-row"><span class="lab">Locks</span><button type="button" class="btn outline" id="setCharLock">Character…</button><button type="button" class="btn outline" id="setCamLock">Camera…</button>
               <label class="toggle" data-tip="On: edges snap to beats and hits. Off: they move by single frames"><input id="snap" type="checkbox" checked /><span class="knob"></span>Snap</label></div>
-            <div class="opt-row"><span class="lab">Locks</span><button type="button" class="btn outline" id="setCharLock">Character…</button><button type="button" class="btn outline" id="setCamLock">Camera…</button></div>
             <div class="opt-row"><span class="lab">Guide</span><label class="toggle"><input id="gridExport" type="checkbox" checked /><span class="knob"></span>Ground grid</label>
               <label class="toggle" data-tip="On: blocks may pass between the camera and the subject (briefly, within the caps). Off: the line of sight stays clear"><input id="sightPasses" type="checkbox" /><span class="knob"></span>Pass in front</label>
               <label class="pick">Scenery <select id="scenery"><option value="none">None</option><option value="scatter">Scatter</option><option value="street">Street</option><option value="city">City</option></select></label></div>

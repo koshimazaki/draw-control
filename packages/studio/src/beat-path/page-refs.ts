@@ -24,6 +24,12 @@ const KINDS: { kind: RefKind; drop: string; thumb: string; input: string; clear:
   { kind: "environment", drop: "dropEnvironment", thumb: "thumbEnvironment", input: "refEnvironment", clear: "clearEnvironment", label: "Environment" },
 ];
 
+/** An image file the page can read: by its type, or by its name when the desktop sends none (HEIC is left out: browsers cannot draw it). */
+export const isImageFile = (f: File) => f.type ? f.type.startsWith("image/") && !/hei[cf]/.test(f.type) : /\.(png|jpe?g|webp|gif|avif|bmp)$/i.test(f.name);
+/** During a drag from the desktop only the items' types can be read: does it carry an image? */
+export const dragHasImage = (dt: DataTransfer | null) => [...(dt?.items ?? [])].some(i => i.kind === "file" && i.type.startsWith("image/"));
+const HEIC = (files: File[]) => files.some(f => /hei[cf]/i.test(f.type) || /\.hei[cf]$/i.test(f.name));
+
 /** A still of a playing or paused video at its current time (null if the browser cannot read it). */
 export async function videoFrame(video: HTMLVideoElement): Promise<Blob | null> {
   // A video not drawn yet (below the fold, just re-rendered) gets up to three seconds to load its first frame.
@@ -80,12 +86,14 @@ export function bindRefs(p: Page, store: RefStore, changed: () => void) {
     host.addEventListener("dragend", () => document.body.classList.remove("ref-dragging"));
   }
 
+  const take = (k: (typeof KINDS)[number], file: File) => { store.set(p.slot, k.kind, file, { kind: "upload", name: file.name }); p.say(`${k.label}: ${file.name}`); };
+  const unreadable = (files: File[]) => p.say(HEIC(files) ? "HEIC images cannot be read in the browser: export it as JPEG or PNG first" : "That file is not an image the page can read (PNG, JPEG, WebP, GIF, AVIF)");
   for (const k of KINDS) {
     const drop = $(k.drop), input = $<HTMLInputElement>(k.input);
     input.onchange = () => {
-      const file = input.files?.[0];
+      const files = [...(input.files ?? [])], file = files.find(isImageFile);
       input.value = "";
-      if (file && file.type.startsWith("image/")) { store.set(p.slot, k.kind, file, { kind: "upload", name: file.name }); p.say(`${k.label}: ${file.name}`); }
+      if (file) take(k, file); else if (files.length) unreadable(files);
     };
     // A drop takes an image dragged from the page or a file from the desktop; it lights up while anything is dragged over it.
     drop.addEventListener("dragover", e => {
@@ -94,20 +102,33 @@ export function bindRefs(p: Page, store: RefStore, changed: () => void) {
       e.preventDefault(); e.stopPropagation();
       drop.classList.add("target");
     });
-    drop.addEventListener("dragleave", () => drop.classList.remove("target"));
+    // Moving over the drop's own thumbnail or label is not leaving it.
+    drop.addEventListener("dragleave", e => { if (!drop.contains(e.relatedTarget as Node | null)) drop.classList.remove("target"); });
     drop.addEventListener("drop", e => {
       drop.classList.remove("target");
-      const id = e.dataTransfer?.getData(DRAG_TYPE), file = [...(e.dataTransfer?.files ?? [])].find(f => f.type.startsWith("image/"));
-      if (!id && !file) return;
+      const id = e.dataTransfer?.getData(DRAG_TYPE), files = [...(e.dataTransfer?.files ?? [])], file = files.find(isImageFile);
+      if (!id && !files.length) return;
       e.preventDefault(); e.stopPropagation();
       document.body.classList.remove("ref-dragging");
       if (id && getters.has(id)) void use(k.kind, getters.get(id)!);
-      else if (file) { store.set(p.slot, k.kind, file, { kind: "upload", name: file.name }); p.say(`${k.label}: ${file.name}`); }
+      else if (file) take(k, file);
+      else unreadable(files);
     });
     $(k.clear).addEventListener("click", e => { e.preventDefault(); e.stopPropagation(); store.clear(p.slot, k.kind); p.say(`${k.label} reference cleared`); });
     // A filled drop's own image drags onto the other drop.
     attachDrag($(k.thumb), async () => { const r = store.get(p.slot, k.kind); return r ? { blob: r.blob ?? r.url, source: r.source } : null; });
   }
+  // An image from the desktop lights both drops while it is over the page; dropped anywhere else, a menu asks which one it is.
+  window.addEventListener("dragover", e => { if (dragHasImage(e.dataTransfer)) document.body.classList.add("ref-dragging"); });
+  window.addEventListener("dragleave", e => { if (!e.relatedTarget) document.body.classList.remove("ref-dragging"); });
+  window.addEventListener("dragend", () => document.body.classList.remove("ref-dragging"));
+  window.addEventListener("drop", e => {
+    document.body.classList.remove("ref-dragging");
+    const files = [...(e.dataTransfer?.files ?? [])], file = files.find(isImageFile);
+    if (!file) { if (HEIC(files)) unreadable(files); return; }
+    e.preventDefault();
+    p.menu.show($(KINDS[0].drop), `Use ${file.name} as`, KINDS.map(k => ({ label: k.label, run: () => take(k, file) })));
+  });
   function attachDrag(el: HTMLElement, get: RefGetter) {
     const id = `r${nextId++}`;
     getters.set(id, get);
@@ -123,7 +144,7 @@ export function bindRefs(p: Page, store: RefStore, changed: () => void) {
       thumb.style.backgroundImage = r ? `url(${r.url})` : "";
       thumb.classList.toggle("set", !!r);
       $(k.clear).hidden = !r;
-      drop.dataset.tip = r ? `${k.label}: ${sourceLabel(r.source)}` : `${k.label === "Character" ? "A character sheet" : "An environment image"} the model follows · drop an image or use one from the page`;
+      drop.dataset.tip = r ? `${k.label}: ${sourceLabel(r.source)}` : `${k.label === "Character" ? "A character sheet" : "An environment image"} the model follows · drop an image here or anywhere on the page, or use one from the page`;
     }
   }
   store.onChange(slot => { if (slot === p.slot) sync(); changed(); });

@@ -1,7 +1,7 @@
 /**
  * The Beat Path base recipe: what a Beat Path shot script is applied to (the page, the CLI's
  * `new --character glider --clip 8` and the MCP server's `new_recipe { character: "glider" }`
- * all start here, so the same script gives the same recipe everywhere). A clip of 5 or 8
+ * all start here, so the same script gives the same recipe everywhere). A clip of 3 to 30
  * seconds from beat 0, the glider, and a camera rig framed like the "wide" shot that rises
  * and aims with the figure's height. No moves and no paths: the script brings those.
  */

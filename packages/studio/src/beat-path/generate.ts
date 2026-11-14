@@ -5,13 +5,24 @@
  * shot description. What a model receives is only the guide video, the reference images and
  * the shot description: nothing from the script (coordinates, lock words, amounts).
  */
-/** The models offered (the embed's model keys); names come from the embed's offeredModels() when it is installed. */
+/**
+ * The models offered (the embed's model keys); names come from the embed's offeredModels() when it is installed.
+ * `seconds`: the whole-second lengths each takes (the embed's spec: duration and its guide-video cap).
+ */
 export const MODELS = [
-  { id: "kling-4", label: "Kling 4.0" },
-  { id: "seedance-2.5", label: "Seedance 2.5" },
-  { id: "h3", label: "MiniMax H3" },
+  { id: "kling-4", label: "Kling 4.0", seconds: { min: 3, max: 30 } },
+  { id: "seedance-2.5", label: "Seedance 2.5", seconds: { min: 4, max: 30 } },
+  { id: "h3", label: "MiniMax H3", seconds: { min: 4, max: 15 } },
 ] as const;
 export type ModelId = (typeof MODELS)[number]["id"];
+
+/** Why `model` cannot take a clip of `clip` seconds (with the models that can), or null when it can. */
+export function clipRefusal(model: ModelId, clip: number): string | null {
+  const m = MODELS.find(x => x.id === model)!, { min, max } = m.seconds;
+  if (clip >= min && clip <= max) return null;
+  const others = MODELS.filter(x => x.id !== model && clip >= x.seconds.min && clip <= x.seconds.max).map(x => x.label);
+  return `${m.label} takes ${min} to ${max} s; this clip is ${clip} s. Set the clip to ${clip > max ? max : min} s in Settings${others.length ? `, or pick ${others.join(" or ")}` : ""}.`;
+}
 
 /** The most one generation may cost, USD: an estimate above it is refused before anything is sent. */
 export const MAX_PRICE = 3;

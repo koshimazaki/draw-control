@@ -25,5 +25,5 @@ export function beatPathRecipe(state: BeatPathState, track: TrackInfo | null, ct
   return r;
 }
 
-/** The exported range: the clip from beat 0, 121 frames for 5 s and 193 for 8 s. */
+/** The exported range: the clip from beat 0, 121 frames for 5 s, 193 for 8 s, 721 for 30 s. */
 export const exportRange = (recipe: Recipe, clip: number) => resolveExportRange(recipe, { unit: "beats", start: 0, length: clip * recipe.beatGrid.bpm / 60 });

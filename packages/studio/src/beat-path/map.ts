@@ -10,6 +10,8 @@
 import { cornerPath, type Landmark } from "@motion-studio/core";
 import type { PathPt } from "./script";
 import { captureDrag } from "./drag";
+import { nearLine, pointsInRect, raisePoints, shiftPoints, simplifyPen, type Rect } from "./map-select";
+export { simplifyPen } from "./map-select";
 
 export type Tool = "subject" | "camera" | "blocks";
 /** A path tool (the blocks tool shows the subject's path in the side view). */
@@ -53,28 +55,6 @@ const HALF = 9, LIMIT = 60, MAX_POINTS = 8, HIT_PX = 12;
 const HEIGHT = { subject: [0, 3], camera: [0.2, 6] } as const;
 const DEFAULT_Y = { subject: 0, camera: 2 } as const;
 
-/** Ramer–Douglas–Peucker on the floor, the tolerance raised until at most `max` points are left. */
-export function simplifyPen(points: PathPt[], max = MAX_POINTS): PathPt[] {
-  if (points.length <= 2) return points;
-  const off = (p: PathPt, a: PathPt, b: PathPt) => {
-    const dx = b.x - a.x, dz = b.z - a.z, L = dx * dx + dz * dz, t = L ? Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.z - a.z) * dz) / L)) : 0;
-    return Math.hypot(p.x - a.x - t * dx, p.z - a.z - t * dz);
-  };
-  for (let tol = 0.15; ; tol *= 1.5) {
-    const keep = new Uint8Array(points.length);
-    keep[0] = keep[points.length - 1] = 1;
-    const stack: [number, number][] = [[0, points.length - 1]];
-    while (stack.length) {
-      const [a, b] = stack.pop()!;
-      let worst = -1, wd = tol;
-      for (let i = a + 1; i < b; i++) { const d = off(points[i], points[a], points[b]); if (d > wd) { wd = d; worst = i; } }
-      if (worst >= 0) { keep[worst] = 1; stack.push([a, worst], [worst, b]); }
-    }
-    const out = points.filter((_, i) => keep[i]);
-    if (out.length <= max) return out;
-  }
-}
-
 const token = (name: string) => getComputedStyle(document.documentElement).getPropertyValue(name).trim() || "#888";
 const r2 = (x: number) => Math.round(x * 100) / 100;
 
@@ -89,6 +69,9 @@ export class MapView {
   /** The top view's centre and half extent (metres): set by `fit`, steady while drawing. */
   private cx = 0; private cz = 0; private half = HALF;
   private colours: Record<string, string> = {};
+  /** Points picked together (a box, the whole path, Shift-clicks, ⌘A) on `groupTool`'s path; they move as one. */
+  private group = new Set<number>(); private groupTool: Tool | null = null;
+  private marquee: Rect | null = null;
 
   constructor(readonly canvas: HTMLCanvasElement, private host: MapHost) {
     this.ctx = canvas.getContext("2d")!;
@@ -140,6 +123,19 @@ export class MapView {
   }
   private boxCorners(): PathPt[] {
     return this.scene.landmarks.flatMap(b => { const c = Math.cos(b.yaw), sn = Math.sin(b.yaw); return [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([u, v]) => ({ x: b.x + c * u * b.w / 2 - sn * v * b.d / 2, z: b.z + sn * u * b.w / 2 + c * v * b.d / 2 })); });
+  }
+  /** The picked points of the active path (more than one: a group that moves together). */
+  picked(): number[] { const t = this.host.tool(), n = this.host.points(t).length; return this.groupTool === t ? [...this.group].filter(i => i < n).sort((a, b) => a - b) : []; }
+  private setGroup(tool: Tool, list: Iterable<number>) { this.group = new Set(list); this.groupTool = tool; }
+  /** ⌘A: every point of the active path. */
+  selectAll() { const t = this.host.tool(), n = this.host.points(t).length; if (!n) return false; this.setGroup(t, Array.from({ length: n }, (_, i) => i)); this.host.select({ tool: t, index: 0 }); this.refresh(); return true; }
+  clearGroup() { this.group.clear(); this.groupTool = null; this.refresh(); }
+  /** Arrow keys: move the picked points on the floor by (dx, dz) metres (one undo step each). */
+  nudge(dx: number, dz: number) {
+    const t = this.host.tool(), g = this.picked();
+    if (!g.length || this.host.view() !== "top") return false;
+    this.host.change(t, shiftPoints(this.host.points(t), g, dx, dz, LIMIT), true);
+    return true;
   }
   /** Escape: cancel the stroke or drag in progress. */
   cancelStroke() { this.cancel?.(); }
@@ -230,22 +226,44 @@ export class MapView {
     const start = this.local(e), original = this.host.points(tool).map(p => ({ ...p }));
     let move: (ev: PointerEvent) => void, up: (ev: PointerEvent) => void, revert: () => void;
     if (i >= 0) {
-      const pts = original.map(p => ({ ...p }));
+      // Shift-click adds a point to the group (or takes it out); a drag moves the group it belongs to, else the point alone.
+      if (e.shiftKey && this.host.pen() === "edit") {
+        const g = new Set(this.picked()); if (!g.size) { const sel = this.host.selected(); if (sel?.tool === tool) g.add(sel.index); }
+        if (g.has(i)) g.delete(i); else g.add(i);
+        this.setGroup(tool, g); this.host.select({ tool, index: i }); this.refresh(); return;
+      }
+      const picked = this.picked(), group = picked.length > 1 && picked.includes(i) ? picked : [i];
+      if (group.length === 1) this.setGroup(tool, group);
       this.host.select({ tool, index: i });
-      c.classList.add("dragging");
-      move = ev => {
-        const [px, py] = this.local(ev);
-        if (view === "top") { const q = this.clamp(this.fromTop(px, py)); pts[i] = { ...pts[i], x: r2(q.x), z: r2(q.z) }; }
-        else { const [lo, hi] = HEIGHT[pathOf(tool)], y = r2(Math.max(lo, Math.min(hi, this.sideFrame().yAt(py)))); pts[i] = { ...pts[i], ...(y > 0 ? { y } : { y: undefined }) }; if (pts[i].y === undefined) delete pts[i].y; }
-        this.host.change(tool, pts.map(p => ({ ...p })), false);
-      };
-      up = () => this.host.change(tool, pts, true);
-      revert = () => this.host.change(tool, original, true);
+      ({ move, up, revert } = this.groupDrag(tool, view, group, start, original));
     } else {
       // A follow block's line drags its offset (it stays a follow); Draw new still draws over it.
       if (tool === "camera" && view === "top" && this.host.pen() === "edit" && this.host.followDown?.(e, p => this.top(p), (x, y) => this.fromTop(x, y))) return;
-      // Only an armed pen draws; otherwise a click on empty ground just clears the selection.
-      if (view !== "top" || this.host.pen() !== "draw") { this.host.select(null); this.host.hint?.(view === "top" ? "Press Draw new to draw a path (Edit only moves points)" : ""); this.refresh(); return; }
+      // Edit: the path's line picks the whole path and drags it; empty ground draws a box that picks the points inside.
+      if (view === "top" && this.host.pen() === "edit" && original.length) {
+        const drawn = (tool === "camera" ? cornerPath(original, this.host.corners(tool)) : this.scene.floor.length > 1 ? this.scene.floor : original).map(p => this.top(p));
+        if (nearLine(drawn, ...start, 7) || nearLine(original.map(p => this.top(p)), ...start, 7)) {
+          const all = original.map((_, k) => k);
+          this.setGroup(tool, all); this.host.select({ tool, index: 0 });
+          this.host.hint?.("The whole path is picked: drag to move it · arrow keys nudge it · Esc lets go");
+          ({ move, up, revert } = this.groupDrag(tool, view, all, start, original));
+        } else {
+          const keep = e.shiftKey ? this.picked() : [];
+          let boxed = false;
+          move = ev => { const [px, py] = this.local(ev); if (!boxed && Math.hypot(px - start[0], py - start[1]) < 5) return; boxed = true; this.marquee = { x0: start[0], y0: start[1], x1: px, y1: py }; this.draw(); };
+          up = () => {
+            const r = this.marquee; this.marquee = null;
+            if (!boxed || !r) { this.group.clear(); this.groupTool = null; this.host.select(null); this.host.hint?.("Drag a box to pick points · drag the path's line to move it all · Draw new draws a path"); this.refresh(); return; }
+            const inside = new Set([...keep, ...pointsInRect(original.map(p => this.top(p)), r)]);
+            this.setGroup(tool, inside);
+            this.host.select(inside.size ? { tool, index: Math.min(...inside) } : null);
+            this.host.hint?.(inside.size ? `${inside.size} point${inside.size > 1 ? "s" : ""} picked: drag one to move them together · arrow keys nudge` : "No points in the box");
+            this.refresh();
+          };
+          revert = () => { this.marquee = null; this.draw(); };
+        }
+      } else if (view !== "top" || this.host.pen() !== "draw") { this.host.select(null); this.host.hint?.(view === "top" ? "Press Draw new to draw a path (Edit only moves points)" : ""); this.refresh(); return; }
+      else {
       const y = original.at(-1)?.y ?? (DEFAULT_Y[pathOf(tool)] || undefined);
       // Draw new starts a new path: the first click after arming it does not add to the old one.
       const base = this.fresh ? [] : original;
@@ -272,6 +290,7 @@ export class MapView {
         this.draw();
       };
       revert = () => { this.stroke = null; this.draw(); };
+      }
     }
     c.setPointerCapture(e.pointerId);
     const onMove = (ev: PointerEvent) => move(ev);
@@ -288,6 +307,23 @@ export class MapView {
     c.addEventListener("pointercancel", onCancel);
   }
 
+  /** Drag a group of points by the pointer's offset: on the floor in the top view, up and down in the side view. */
+  private groupDrag(tool: Tool, view: View, group: number[], start: [number, number], original: PathPt[]) {
+    const c = this.canvas, from = this.fromTop(...start), y0 = view === "top" ? 0 : this.sideFrame().yAt(start[1]), [lo, hi] = HEIGHT[pathOf(tool)];
+    let pts = original.map(p => ({ ...p }));
+    c.classList.add("dragging");
+    return {
+      move: (ev: PointerEvent) => {
+        const [px, py] = this.local(ev);
+        if (view === "top") { const q = this.fromTop(px, py); pts = shiftPoints(original, group, q.x - from.x, q.z - from.z, LIMIT); }
+        else pts = raisePoints(original, group, this.sideFrame().yAt(py) - y0, lo, hi);
+        this.host.change(tool, pts.map(p => ({ ...p })), false);
+      },
+      up: () => this.host.change(tool, pts, true),
+      revert: () => this.host.change(tool, original, true),
+    };
+  }
+
   private line(g: CanvasRenderingContext2D, pts: [number, number][], colour: string, width: number, alpha = 1, dash: number[] = []) {
     if (pts.length < 2) return;
     g.save();
@@ -300,7 +336,7 @@ export class MapView {
   private handles(g: CanvasRenderingContext2D, pts: [number, number][], colour: string, active: boolean, tool: Tool = this.host.tool()) {
     const sel = this.host.selected();
     for (const [k, [x, y]] of pts.entries()) {
-      if (active && sel?.tool === tool && sel.index === k) { g.beginPath(); g.arc(x, y, 10, 0, Math.PI * 2); g.strokeStyle = colour; g.lineWidth = 2; g.stroke(); }
+      if (active && ((sel?.tool === tool && sel.index === k) || (this.groupTool === tool && this.group.has(k)))) { g.beginPath(); g.arc(x, y, 10, 0, Math.PI * 2); g.strokeStyle = colour; g.lineWidth = 2; g.stroke(); }
       g.beginPath(); g.arc(x, y, active ? 5.5 : 3, 0, Math.PI * 2);
       g.fillStyle = active ? colour : this.colours["map-bg"]; g.fill();
       g.lineWidth = active ? 2 : 1.4; g.strokeStyle = active ? this.colours["map-bg"] : colour; g.stroke();
@@ -461,5 +497,10 @@ export class MapView {
       g.closePath(); g.fill(); g.stroke();
     }
     if (this.stroke) this.line(g, this.stroke.map(p => this.top(p)), this.host.tool() === "camera" ? C.camera : C.subject, 2.5, 0.9, [6, 5]);
+    if (this.marquee) {
+      const m = this.marquee, colour = this.host.tool() === "camera" ? C.camera : C.subject;
+      g.save(); g.fillStyle = colour; g.globalAlpha = 0.08; g.fillRect(m.x0, m.y0, m.x1 - m.x0, m.y1 - m.y0);
+      g.globalAlpha = 0.9; g.strokeStyle = colour; g.lineWidth = 1; g.setLineDash([4, 3]); g.strokeRect(m.x0, m.y0, m.x1 - m.x0, m.y1 - m.y0); g.restore();
+    }
   }
 }

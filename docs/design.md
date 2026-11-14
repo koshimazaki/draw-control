@@ -20,7 +20,8 @@ Lineage, in three lines:
 ## Round 8 (13 November): selection corrections
 
 - **Generate** is a normal primary button sized to its label (bolt + "Generate"); the model choice and Settings sit beside it.
-- **Segmented controls** for tools, views, pens, clip length and the model show the selected one as **accent text** (the header balance's lime) over a **quiet neutral pill** (`--seg-on`); no accent fill. The **example switcher** (`.seg-fill`) keeps an accent pill with dark text.
+- **Segmented controls** for tools, views, pens and the model show the selected one as **accent text** (the header balance's lime) over a **quiet neutral pill** (`--seg-on`); no accent fill. The **example switcher** (`.seg-fill`) keeps an accent pill with dark text.
+- **Ruler fader** (`ui/fader.ts`, `.fader`) for the clip length, after Genobi's TickFader: a range input over a scale with one tick per second (3 to 30 s), taller ticks and labelled jump buttons at 5, 8, 10, 15, 20 and 30, the readout in seconds only (frames depend on each model's output rate; the guide itself renders at 24 fps; [models.md](models.md)). Past the chosen model's longest clip the scale is hatched; a clip beyond it turns the readout and the note under it `--warn`, and Generate stops before rendering the guide.
 - **One sliding pill** per segmented control (`ui/seg-pill.ts`): an element under the selected button, moved by CSS (`transform`, 180 ms on the page's easing; none under `prefers-reduced-motion`). It follows class changes on the buttons and the control's size, so every control, including the follow Left / Right, gets it without its own code.
 - Map: camera block labels move further out or to the other side so no two overlap; the tool row keeps one line from 1280 px (10 px side padding per segment, the map at least 500 px wide).
 

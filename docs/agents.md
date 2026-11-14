@@ -207,7 +207,7 @@ Not expressible yet: a skateboard prop under the figure (the runner shape stands
 
 ## Slicing a clip out of a longer track (round 9)
 
-A clip (5, 8 or 10 s) can start anywhere in a longer track. Beat 0 moves there: the beat grid's
+A clip (whole seconds, 3 to 30 s) can start anywhere in a longer track. Beat 0 moves there: the beat grid's
 offset is the slice's start, so the hits the locks land on, the exported `audio.wav` and
 `beats.json` are the slice's. The tempo comes from the whole track; the start snaps to the
 nearest beat of the track's grid, so beat 0 falls on a beat of the music.

@@ -107,7 +107,7 @@ export async function main(argv: string[], out: (s: string) => void = s => conso
         const character = flagStr(flags, "character") ?? "rigged";
         if (!["rigged", ...PROCEDURAL_KINDS, "glider"].includes(character)) throw new Error(`--character must be rigged, ${PROCEDURAL_KINDS.join(", ")} or glider`);
         const clip = flagStr(flags, "clip") === undefined ? 8 : Number(flagStr(flags, "clip"));
-        if (!(clip > 0 && clip <= 60)) throw new Error("--clip takes seconds, 5 or 8 for Beat Path");
+        if (!(clip > 0 && clip <= 60)) throw new Error("--clip takes seconds (Beat Path: whole seconds, 3 to 30)");
         const slice = flagStr(flags, "slice") === undefined ? undefined : Number(flagStr(flags, "slice"));
         if (slice !== undefined && !(slice >= 0)) throw new Error("--slice takes seconds into the track");
         output(newRecipe(character, contextFrom(flags).analysis, clip, slice), flags, out);

@@ -10,10 +10,14 @@
  */
 import { exportBundle } from "../export/bundle";
 import { ARENA_THEME, fakeFetch, loadArena, type ArenaKeyElement, type ArenaModule } from "./arena";
-import { composePrompt, ERROR_MESSAGES, MAX_PRICE, MODELS, type ModelId, type References } from "./generate";
+import { clipRefusal, composePrompt, ERROR_MESSAGES, MAX_PRICE, MODELS, type ModelId, type References } from "./generate";
 import type { Page } from "./page";
 import { exportRange } from "./recipe-map";
-import { legendFor } from "./script";
+import { clipLabel, legendFor } from "./script";
+import { setFader } from "./ui/fader";
+import { RunLog, loggingFetch } from "./run-log";
+import { bindHistory } from "./page-history";
+import { textSpinner } from "./ui/spinner";
 import { bindGallery, type Run } from "./gallery";
 import { captureDrag } from "./drag";
 import { RefStore } from "./ref-store";
@@ -22,11 +26,17 @@ import { bindImages } from "./page-image";
 
 const EXPORT = { width: 1280, height: 720 } as const;
 const store = (() => { try { return window.sessionStorage; } catch { return null; } })();
+const lasting = (() => { try { return window.localStorage; } catch { return null; } })();
 type Player = HTMLElement & { currentTime: number; play(): void; pause(): void };
 
 export function bindGenerate(p: Page) {
   const { $ } = p;
   const refStore = new RefStore(), outputs = new Map<string, { url: string; record: unknown; model: string; prompt: string }>();
+  // Every fetch handed to the embed is wrapped: the run log writes each task id down before it is sent.
+  type Fetch = Parameters<typeof loggingFetch>[0];
+  const runLog = new RunLog(lasting);
+  const logged = (inner: Fetch | null, name: string, local: boolean, slot: string) =>
+    loggingFetch(inner ?? ((u, i) => globalThis.fetch(u, i as RequestInit) as ReturnType<Fetch>), runLog, () => ({ slot, model: name, ...(local ? { local: true } : {}) }));
   let model: ModelId = MODELS[0].id, swapped = false, arena: ArenaModule | null = null, key: ArenaKeyElement | null = null;
   let player: Player | null = null, fakeResult = "";
   const fake = import.meta.env.DEV || new URLSearchParams(location.search).has("fake");
@@ -105,6 +115,11 @@ export function bindGenerate(p: Page) {
   // Model choice and the prompt it will get.
   const labelOf = (id: string) => arena?.offeredModels().find(m => m.key === id)?.name ?? MODELS.find(m => m.id === id)?.label ?? id;
   function sync() {
+    // The clip fader: hatched past what this model takes, and a note when the clip is beyond it.
+    const reach = MODELS.find(m => m.id === model)!.seconds.max, refusal = clipRefusal(model, p.state.clip);
+    setFader($("clipFader"), p.state.clip, reach);
+    $("clipOut").textContent = clipLabel(p.state.clip); $("clipOut").classList.toggle("over", !!refusal);
+    $("clipNote").textContent = refusal ?? ""; $("clipNote").hidden = !refusal;
     document.querySelectorAll<HTMLButtonElement>('[data-control="model"] button').forEach(b => { b.classList.toggle("on", b.dataset.value === model); b.textContent = labelOf(b.dataset.value!); });
     $("shotLegend").textContent = currentPrompt();
     $("shotLegend").title = `The prompt this model gets:\n\n${$("shotLegend").textContent}`;
@@ -131,10 +146,11 @@ export function bindGenerate(p: Page) {
 
   // One run at a time; while it runs the Generate button stops it. The run belongs to the example it
   // started on: switching examples mid-run files the result there and never shows it on another.
-  let running: AbortController | null = null;
+  let running: AbortController | null = null, runStarted = 0;
   // The note and the progress bar are held here: a shown result replaces them in the output frame,
   // and a second run looked them up by id and found nothing (it threw and left the button on Stop).
-  const bar = $("genProgress"), note = $("outputNote");
+  const bar = $("genProgress"), note = $("outputNote"), spin = textSpinner(), noteRow = document.createElement("div");
+  noteRow.className = "note-row"; noteRow.append(spin.el, note);
   const runButton = $<HTMLButtonElement>("runGenerate");
   const setRunning = (c: AbortController | null) => { running = c; runButton.querySelector(".btn-label")!.textContent = c ? "Stop" : "Generate"; runButton.classList.toggle("running", !!c); };
   runButton.onclick = async () => {
@@ -144,13 +160,18 @@ export function bindGenerate(p: Page) {
     if (!key?.connected && !fake) { p.say("Add your Runware API key first (top right)."); return; }
     // An empty shot is refused by every model: say so before rendering the guide, and point at the field.
     if (!p.state.shot.subject?.trim() && !p.state.shot.action?.trim()) { p.say("Describe the shot first: a subject or an action (the fields under the preview)."); $("shotSubject").focus(); return; }
+    // A clip longer (or shorter) than the model takes is refused before the guide renders or anything is sent.
+    const refusal = clipRefusal(model, p.state.clip);
+    if (refusal) { p.say(refusal); return; }
     const slot = p.slot, runModel = model, abort = new AbortController();
+    runStarted = Date.now();
     setRunning(abort);
     const here = () => p.slot === slot;
     const fill = bar.firstElementChild as HTMLElement;
     setOutputPane(true); $("addToGallery").hidden = true;
     bar.hidden = false; note.textContent = "Rendering the guide…"; fill.style.width = "0%";
-    $("generateSlot").replaceChildren(note, bar);
+    $("generateSlot").replaceChildren(noteRow, bar);
+    spin.start();
     try {
       // The page is busy (playback paused) only while the guide renders in the shared viewport.
       p.busy = true;
@@ -162,7 +183,8 @@ export function bindGenerate(p: Page) {
         guide: bundle.files, model: runModel, shot: shot(), signal: abort.signal, references: { character: r.character, environment: r.environment }, maxPrice: MAX_PRICE,
         key: key?.connected ? key : "local-preview-key-0000000000000000", confirm: confirmCost,
         onProgress: (g: { stage: string; message: string; progress?: number }) => { if (!here()) return; note.textContent = g.message; fill.style.width = `${40 + Math.round((g.progress ?? ({ plan: 5, confirm: 10, upload: 30, submit: 40, poll: 60, done: 100 } as Record<string, number>)[g.stage] ?? 50) * 0.6)}%`; },
-        ...(fake && !key?.connected ? { fetch: fakeFetch(() => fakeResult), poll: { initialDelayMs: 100, intervalMs: 100, maxIntervalMs: 200 } } : {}),
+        fetch: logged(fake && !key?.connected ? fakeFetch(() => fakeResult) : null, labelOf(runModel), fake && !key?.connected, slot),
+        ...(fake && !key?.connected ? { poll: { initialDelayMs: 100, intervalMs: 100, maxIntervalMs: 200 } } : {}),
       });
       outputs.set(slot, { url: result.videoURL, record: result.record, model: runModel, prompt: bundle.prompt });
       if (here()) { showResult(result.videoURL); if (fake && !key?.connected) player?.classList.add("fake"); }
@@ -175,7 +197,7 @@ export function bindGenerate(p: Page) {
       note.textContent = err.code === "refused" || err.code === "provider" ? `${plain}: ${err.message}` : plain;
       p.say(note.textContent);
       if (here()) { if (!outputs.get(slot)) { bar.hidden = true; } else showResult(outputs.get(slot)!.url); }
-    } finally { setRunning(null); bar.hidden = true; }
+    } finally { setRunning(null); bar.hidden = true; spin.stop(); }
   };
   $("addToGallery").onclick = () => {
     const out = outputs.get(p.slot);
@@ -194,6 +216,18 @@ export function bindGenerate(p: Page) {
   bindImages({
     $, slot: () => p.slot, shot: () => p.state.shot, arena: () => arena, key: () => key, fake, ask, store: refStore, runs, renderGallery: () => renderGallery(),
     fakeFetch: image => fakeFetch(() => fakeResult, image), setExtra: f => refUi.setExtra(f), say: t => p.say(t),
+    logged: (inner, name, local) => logged(inner as Fetch | null, name, local, p.slot),
+  });
+  // Runs: every generation's task id and result, kept in this browser so a reload never loses one (run-log.ts, page-history.ts).
+  bindHistory({
+    $, log: runLog, key: () => (key?.connected ? key.getKey() ?? null : null), say: t => p.say(t),
+    live: e => !!running && e.kind === "video" && e.at >= runStarted,
+    show: e => {
+      if (!e.url) return;
+      outputs.set(e.slot, { url: e.url, record: null, model: e.model, prompt: "" });
+      if (p.slot === e.slot) showResult(e.url); else void p.switchSlot(e.slot);
+      p.say(`${e.model}: shown from Runs`);
+    },
   });
   const renderGallery = () => gallery.render();
 
