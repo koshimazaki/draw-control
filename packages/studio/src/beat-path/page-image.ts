@@ -14,7 +14,7 @@ import { blocker, chooseFamily, composeInput, imageCostText, initialState, model
 import { sourceLabel, type RefKind, type RefSource, type RefStore } from "./ref-store";
 import type { ArenaKeyElement, ArenaModule, CostQuestion, ImageFamilyInfo } from "./arena";
 import type { Run } from "./gallery";
-import { ERROR_MESSAGES } from "./generate";
+import { runErrorText, type RunError } from "./generate";
 
 type Deps = {
   $: <T extends HTMLElement = HTMLElement>(id: string) => T;
@@ -188,9 +188,8 @@ export function bindImages(d: Deps) {
       if (d.key()?.connected) void d.key()!.refreshBalance?.();
       running = null; spin.stop(); close();
     } catch (e) {
-      const err = e as { code?: string; message: string };
-      const plain = err.code === "over-price" ? `The estimate is above the ${IMAGE_MAX_PRICE.toFixed(2)} USD limit for an image, so nothing was sent.` : err.code ? ERROR_MESSAGES[err.code] ?? err.message : err.message;
-      note.textContent = err.code === "refused" || err.code === "provider" ? `${plain}: ${err.message}` : plain;
+      // Stopped or timed out after the task was submitted: it may still be billed and lands in Runs (generate.ts).
+      note.textContent = runErrorText(e as RunError, { "over-price": `The estimate is above the ${IMAGE_MAX_PRICE.toFixed(2)} USD limit for an image, so nothing was sent.` });
       d.say(note.textContent);
     } finally {
       running = null; runLabel.textContent = "Generate"; spin.stop(); render();

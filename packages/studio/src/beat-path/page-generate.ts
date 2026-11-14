@@ -10,7 +10,7 @@
  */
 import { exportBundle } from "../export/bundle";
 import { ARENA_THEME, fakeFetch, loadArena, type ArenaKeyElement, type ArenaModule } from "./arena";
-import { clipRefusal, composePrompt, ERROR_MESSAGES, MAX_PRICE, MODELS, type ModelId, type References } from "./generate";
+import { clipRefusal, composePrompt, runErrorText, MAX_PRICE, MODELS, type ModelId, type References, type RunError } from "./generate";
 import type { Page } from "./page";
 import { exportRange } from "./recipe-map";
 import { clipLabel, legendFor } from "./script";
@@ -195,9 +195,8 @@ export function bindGenerate(p: Page) {
       renderGallery();
       if (key?.connected) void key.refreshBalance?.();
     } catch (e) {
-      const err = e as { code?: string; message: string };
-      const plain = err.code ? ERROR_MESSAGES[err.code] ?? err.message : err.message;
-      note.textContent = err.code === "refused" || err.code === "provider" ? `${plain}: ${err.message}` : plain;
+      // Stopped or timed out after the task was submitted: it may still be billed and lands in Runs (generate.ts).
+      note.textContent = runErrorText(e as RunError);
       p.say(note.textContent);
       if (here()) { if (!outputs.get(slot)) { bar.hidden = true; } else showResult(outputs.get(slot)!.url); }
     } finally { setRunning(null); bar.hidden = true; spin.stop(); }
