@@ -1,7 +1,8 @@
 /**
  * The track overview: the whole track's waveform (analysed once) with the clip's window
  * between two accent brackets, exactly the clip's length; outside the window is dimmed. Drag
- * the window to move it; arrow keys nudge it (a beat with snap on, a frame with it off). The
+ * the window to move it, or either bracket to change the clip's length like a loop region (whole
+ * seconds, the other end held); arrow keys nudge it (a beat with snap on, a frame with it off). The
  * page snaps and clamps (core `sliceStart`); this only draws and reports where it was asked to go.
  */
 import type { Track } from "../audio";
@@ -12,6 +13,8 @@ export type OverviewHost = {
   move(seconds: number, final: boolean): void;
   /** One nudge: -1 or +1 (a beat, or a frame with snap off). */
   nudge(direction: -1 | 1): void;
+  /** A bracket dragged to `seconds`: the clip's start (end held) or its end (start held); the page rounds the length to whole seconds. */
+  resize(edge: "start" | "end", seconds: number, final: boolean): void;
 };
 
 export class TrackOverview {
@@ -30,12 +33,26 @@ export class TrackOverview {
       if (!this.track || e.button !== 0) return;
       e.preventDefault();
       canvas.focus();
-      // Grab inside the window keeps the grab point; a click outside centres the window there.
+      // A bracket (within 6 px) resizes the window like a loop region; inside it moves; a click outside centres it there.
+      const r = canvas.getBoundingClientRect(), px = e.clientX - r.left, k = r.width / this.length(), grip = this.grip(k);
+      const edge = Math.abs(px - this.start * k) <= grip ? "start" : Math.abs(px - (this.start + this.clip) * k) <= grip ? "end" : null;
+      if (edge) {
+        canvas.classList.add("dragging");
+        let lastT = at(e);
+        captureDrag(canvas, e, ev => { lastT = at(ev); this.host.resize(edge, lastT, false); }, () => { canvas.classList.remove("dragging"); this.host.resize(edge, lastT, true); });
+        return;
+      }
       const t0 = at(e), inside = t0 >= this.start && t0 <= this.start + this.clip, grab = inside ? t0 - this.start : this.clip / 2;
       if (!inside) this.host.move(t0 - grab, false);
       canvas.classList.add("dragging");
       let last = t0 - grab;
       captureDrag(canvas, e, ev => { last = at(ev) - grab; this.host.move(last, false); }, () => { canvas.classList.remove("dragging"); this.host.move(last, true); });
+    });
+    canvas.addEventListener("pointermove", e => {
+      if (e.buttons || !this.track) return;
+      const r = canvas.getBoundingClientRect(), px = e.clientX - r.left, k = r.width / this.length();
+      const grip = this.grip(k);
+      canvas.style.cursor = Math.abs(px - this.start * k) <= grip || Math.abs(px - (this.start + this.clip) * k) <= grip ? "ew-resize" : "";
     });
     canvas.addEventListener("keydown", e => {
       if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
@@ -51,6 +68,8 @@ export class TrackOverview {
     this.resize();
   }
 
+  /** The brackets' grab zone (px): 6, smaller on a narrow window so its middle still moves it. */
+  private grip(k: number) { return Math.max(2, Math.min(6, this.clip * k / 5)); }
   private length() { return this.track?.buffer.duration ?? 1; }
   setTrack(track: Track | null) { this.track = track; this.paintBase(); this.draw(); }
   setWindow(start: number, clip: number) { this.start = start; this.clip = clip; this.draw(); }
