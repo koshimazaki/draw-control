@@ -25,6 +25,17 @@ export function nearLine(line: readonly [number, number][], px: number, py: numb
   return false;
 }
 
+/** Where a point clicked on the line goes: the index after the start of the nearest segment of the control polygon (1…n−1). */
+export function insertAt(pts: readonly [number, number][], px: number, py: number): number {
+  let best = 1, bd = Infinity;
+  for (let i = 1; i < pts.length; i++) {
+    const [ax, ay] = pts[i - 1], [bx, by] = pts[i], dx = bx - ax, dy = by - ay, L = dx * dx + dy * dy;
+    const t = L ? Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / L)) : 0, d = Math.hypot(px - ax - t * dx, py - ay - t * dy);
+    if (d < bd) { bd = d; best = i; }
+  }
+  return best;
+}
+
 const r2 = (x: number) => Math.round(x * 100) / 100;
 /** The points with those in `group` moved on the floor by (dx, dz) metres, kept inside ±limit. */
 export function shiftPoints(pts: readonly PathPt[], group: readonly number[], dx: number, dz: number, limit: number): PathPt[] {

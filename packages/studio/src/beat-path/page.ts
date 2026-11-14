@@ -9,6 +9,7 @@ import {
   beatAtSeconds, buildDrive, placeLandmarks, onsetBeats, cameraAtSeconds, clipBeats, flatDrive, frameAt, planCamera, secondsAtBeat, snapBeat, travelStations,
   type AudioDrive, type CameraPlan, type Recipe,
 } from "@motion-studio/core";
+import { sensitiveBands } from "@motion-studio/core/internal";
 import { Player, loadTrack, trackFromSamples, type Track } from "../audio";
 import { createGlider } from "../characters/glider";
 import { GROOVES, grooveTimes, synthDrums } from "@motion-studio/core";
@@ -193,7 +194,7 @@ export function startBeatPath(root: HTMLElement) {
     lastLandmarks = landmarks; lastFloor = floor;
     map.setScene({ floor, stations, trail, landmarks, ...cameraTrack(frames) });
     hits = [...stationBeats, ...plan.programmed.hits.flat()].map(b => secondsAtBeat(recipe.beatGrid, b)).sort((a, b) => a - b);
-    const bands = live()?.bands, t0 = window0(), t1 = window1(), inClip = (t: number) => t >= t0 && t <= t1;
+    const bands = sensitiveBands(live()?.bands, state.sensitivity), t0 = window0(), t1 = window1(), inClip = (t: number) => t >= t0 && t <= t1;
     const beats: number[] = [];
     for (let b = 0; secondsAtBeat(recipe.beatGrid, b) <= t1; b++) beats.push(secondsAtBeat(recipe.beatGrid, b));
     strip.setScene({ track, start: t0, end: t1, beats, kicks: (bands?.low ?? []).map(o => o.seconds).filter(inClip), snares: (bands?.mid ?? []).map(o => o.seconds).filter(inClip),

@@ -49,6 +49,8 @@ export type BeatPathState = {
   camLock: { lock: LockChoice; strength: number; onHit: HitChoice; advance: boolean };
   /** Landmark blocks around the scene (on by default; seed places them). */
   landmarks: { on: boolean; seed: number };
+  /** How many detected hits the locks land on, 0–1 (absent: every hit); lower keeps fewer, stronger, spaced ones. */
+  sensitivity?: number;
   /** Hits switched off (onset seconds): skipped by every lock. */
   muted: number[];
   /** Hits added by hand (track seconds) in a band: low kick, mid snare, high hat; every lock lands on them too. */
@@ -127,6 +129,7 @@ export function toScript(state: BeatPathState): string {
     const word = { low: "kick", mid: "snare", high: "hat" } as const;
     lines.push(`markers: ${(["low", "mid", "high"] as const).map(b => state.markers!.filter(m => m.band === b)).filter(l => l.length).map(l => `${word[l[0].band]} ${l.map(m => f(m.seconds)).join(" ")}`).join(" ")}`);
   }
+  if (state.sensitivity !== undefined && state.sensitivity < 1) lines.push(`sensitivity: ${f(state.sensitivity)}`);
   if (state.muted.length) lines.push(`muted: ${state.muted.map(f).join(" ")}`);
   if (state.figure.shape !== "glider" || state.figure.body !== FIGURE_DEFAULT.body || state.figure.head !== FIGURE_DEFAULT.head)
     lines.push(`figure: ${state.figure.shape !== "glider" ? `shape ${state.figure.shape} ` : ""}body ${state.figure.body} head ${state.figure.head}`);
@@ -190,6 +193,7 @@ export function fromScript(text: string, base: BeatPathState, grid: { bpm: numbe
   }
   const parsed = parseSettings(text), settings = parsed.landmarks;
   state.muted = parsed.muted ?? [];
+  state.sensitivity = parsed.sensitivity !== undefined && parsed.sensitivity < 1 ? Math.round(parsed.sensitivity * 100) / 100 : undefined;
   state.markers = parsed.markers?.length ? parsed.markers : undefined;
   state.slice = parsed.slice;
   state.figure = { shape: parsed.figure?.shape ?? "glider", body: parsed.figure?.body ?? FIGURE_DEFAULT.body, head: parsed.figure?.head ?? FIGURE_DEFAULT.head };
