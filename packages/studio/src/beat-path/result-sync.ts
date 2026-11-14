@@ -18,9 +18,12 @@ export type FollowStep = { play?: true; pause?: true; seek?: number };
 
 /** What to do to the clip this frame, given its time and state and the page's. */
 export function followStep(clip: { time: number; paused: boolean; duration: number }, page: { time: number; playing: boolean }): FollowStep {
-  const d = clip.duration, target = Math.max(0, Number.isFinite(d) && d > 0 ? Math.min(page.time, d) : page.time);
+  const d = clip.duration, bounded = Number.isFinite(d) && d > 0, target = Math.max(0, bounded ? Math.min(page.time, d) : page.time);
   const off = Math.abs(clip.time - target), step: FollowStep = {};
-  if (page.playing) {
+  // Past the clip's end (a result shorter than the page's clip): its last frame is held until the page
+  // loops. play() on an ended clip restarts it from 0, so it would flicker between its first and last frame.
+  const past = bounded && page.time >= d - STILL;
+  if (page.playing && !past) {
     if (clip.paused) { step.play = true; if (off > STILL) step.seek = target; }
     else if (off > DRIFT) step.seek = target;
   } else {

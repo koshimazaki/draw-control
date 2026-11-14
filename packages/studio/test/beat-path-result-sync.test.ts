@@ -27,6 +27,19 @@ describe("followStep", () => {
   it("holds the last frame past the clip's end", () => {
     expect(followStep(clip(8, true, 8), { time: 9, playing: false })).toEqual({});
   });
+  it("holds the last frame while the page plays on past a shorter clip (never restarts an ended clip)", () => {
+    // The clip has ended (paused at its end) and the page's clip is longer: nothing to do, above all no play().
+    expect(followStep(clip(8, true, 8), { time: 8.6, playing: true })).toEqual({});
+    // Still playing as the page passes its end: stopped on the last frame.
+    expect(followStep(clip(7.5, false, 8), { time: 8.2, playing: true })).toEqual({ pause: true, seek: 8 });
+    // A whole tail of frames: no play and no seek once it is held.
+    let t = 8, paused = true, acts = 0;
+    for (let i = 0; i < 60; i++) { const s = followStep(clip(t, paused, 8), { time: 8 + i / 60, playing: true }); if (s.play || s.seek !== undefined) acts++; if (s.seek !== undefined) t = s.seek; if (s.play) paused = false; }
+    expect(acts).toBe(0);
+  });
+  it("starts again from the page's time when the page loops back", () => {
+    expect(followStep(clip(8, true, 8), { time: 0.02, playing: true })).toEqual({ play: true, seek: 0.02 });
+  });
 });
 
 describe("localCopy", () => {
