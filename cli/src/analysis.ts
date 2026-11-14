@@ -35,8 +35,11 @@ export function analyse(decoded: Decoded, source: string): AnalysisJson {
   };
 }
 
-export function parseAnalysis(text: string): AnalysisJson {
-  const a = JSON.parse(text) as AnalysisJson;
+export function parseAnalysis(text: string): AnalysisJson { return checkAnalysis(JSON.parse(text)); }
+
+/** An already-parsed analysis.json, checked. */
+export function checkAnalysis(json: unknown): AnalysisJson {
+  const a = json as AnalysisJson;
   if (!a || a.version !== ANALYSIS_VERSION || !Array.isArray(a.rms) || !a.bands) throw new Error(`not a motion-studio analysis.json (version ${ANALYSIS_VERSION})`);
   return a;
 }
