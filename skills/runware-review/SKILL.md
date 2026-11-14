@@ -21,7 +21,7 @@ npm run review -- --dry                              # size and price ceiling; s
 npm run review                                       # this branch against origin/main, on GLM-5.3
 npm run review -- --range HEAD~1..HEAD               # one commit
 npm run review -- --staged --focus "the key handling"
-npm run review -- --model openai:gpt@5.5 --out review.md
+npm run review -- --model kimi --out review.md          # short names: sol astra terra luna glm kimi deepseek opus gemini grok mini
 ```
 
 - **Always dry-run first.** It prints the input size and a price ceiling (all input plus the full output allowance). A run whose ceiling is over `--max-usd` (default 0.50 USD) refuses to start.

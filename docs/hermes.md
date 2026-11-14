@@ -25,12 +25,25 @@ Or `export RUNWARE_API_KEY=...` in your shell and run `hermes -p beat-path`. Eit
 
 The setup uses Hermes's own `profile install`, so other profiles are untouched. It also copies the three skills into the profile and points the MCP server at this checkout. It makes no model call. `npm run hermes:setup -- --dry` only stages the files.
 
+## Choose the model
+
+The profile starts on GPT-6.1 Sol. Every Runware model in the profile is one switch away, by its full ID or a short name:
+
+| Where | How |
+| --- | --- |
+| At launch | `npm run hermes -- -m astra` or `hermes -p beat-path -m kimi` |
+| In a chat | `/model glm` (the session), `/model astra --global` (also the default from now on) |
+| One turn only | `/model astra --once`: one hard question on Astra, then back to Sol |
+| Any Runware ID | `/model custom:runware:<AIR>`, e.g. `custom:runware:deepseek:v4.1@flash` |
+
+Short names: `sol` (GPT-6.1 Sol), `astra` (GPT-6 Astra), `terra` (GPT-6.1 Terra), `luna` (GPT-6 Luna), `glm` (GLM-5.3), `kimi` (Kimi K3.1 Pro), `deepseek` (DeepSeek-V4-Pro), `opus` (Claude Opus 4.8), `gemini` (Gemini 3.1 Pro), `grok` (Grok 4.3), `mini` (GPT-5.4 Mini). `npm run review -- --model <name>` takes the same names. Prices are in [`skills/runware-hermes`](../skills/runware-hermes/SKILL.md).
+
 ## Things to ask it
 
 - "Open example 3, make the car a lorry with a trailer, and keep the camera swinging round it on the snare." The agent edits the shot description, describes the shot back and renders the guide.
 - "Draw a path that weaves between the towers, and move the camera to the top on every fourth snare." The agent writes the paths in metres and cuts the Camera lane on the snares.
 - "Make a character reference: a courier in a plain brown uniform, three views." The agent reads the price through Runware's MCP and waits for your yes before it runs.
-- "Review this branch with GLM-5.1, then check its findings." The agent dry-runs `npm run review`, says the ceiling, runs it after your yes, and checks each finding against the code ([`skills/runware-review`](../skills/runware-review/SKILL.md)).
+- "Review this branch with GLM-5.3, then check its findings." The agent dry-runs `npm run review`, says the ceiling, runs it after your yes, and checks each finding against the code ([`skills/runware-review`](../skills/runware-review/SKILL.md)).
 - "Sketch how the Moves lane could look with GPT Image." One image through Runware's MCP, priced first.
 
 ## What is verified

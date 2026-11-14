@@ -51,6 +51,8 @@ const PRICES = {
 // These go through /v1/chat/completions, the route their pages document; the rest use the
 // native task API, which also reports the charged cost.
 const CHAT_ONLY = new Set(["openai:gpt@6.1-sol", "openai:gpt@6-astra", "openai:gpt@6-sol", "openai:gpt@6.1-terra", "openai:gpt@6-luna", "zai:glm@5.3", "zai:glm@5.3-flash", "zai:glm@5.2", "moonshotai:kimi@k3.1-pro", "moonshotai:kimi@k3", "deepseek:v4@pro", "deepseek:v4.1@flash"]);
+// The same short names as the Hermes profile's model_aliases.
+export const ALIASES = { sol: "openai:gpt@6.1-sol", astra: "openai:gpt@6-astra", terra: "openai:gpt@6.1-terra", luna: "openai:gpt@6-luna", glm: "zai:glm@5.3", kimi: "moonshotai:kimi@k3.1-pro", deepseek: "deepseek:v4@pro", opus: "anthropic:claude@opus-4.8", gemini: "google:gemini@3.1-pro", grok: "xai:grok@4.3", mini: "openai:gpt@5.4-mini" };
 const API = "https://api.runware.ai/v1";
 const MAX_DIFF = 400_000; // characters, about 115k tokens
 const repo = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -59,7 +61,7 @@ export function parseArgs(argv) {
   const o = { model: "zai:glm@5.3", range: "origin/main...HEAD", staged: false, dry: false, maxUsd: 0.5, maxTokens: 8000, focus: "", out: "", price: null, thinking: "" };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i], next = () => { const v = argv[++i]; if (v === undefined) throw new Error(`${a} needs a value`); return v; };
-    if (a === "--model") o.model = next();
+    if (a === "--model") { const v = next(); o.model = ALIASES[v] ?? v; }
     else if (a === "--range") o.range = next();
     else if (a === "--staged") o.staged = true;
     else if (a === "--dry") o.dry = true;
