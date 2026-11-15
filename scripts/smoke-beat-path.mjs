@@ -173,8 +173,9 @@ export async function smokeBeatPath(browser, base, { fail, OUT, SHOTS }) {
   // The example switcher: each example brings its own figure shape and music; edits stay with their example.
   const edited = (await probe()).state.subject;
   await page.click('[data-control="example"] [data-value="1"]');
-  await page.waitForFunction(() => window.__beatPath.recipe().figure?.shape === "runner" && window.__beatPath.recipe().beatGrid.bpm > 130, null, { timeout: 30_000 });
+  await page.waitForFunction(() => window.__beatPath.recipe().figure?.shape === "runner" && window.__beatPath.recipe().beatGrid.bpm === 174, null, { timeout: 30_000 });
   await page.screenshot({ path: `${SHOTS}beat-path-example-2.png` });
+  await smokeExample2(page, fail);
   await page.click('[data-control="example"] [data-value="2"]');
   await page.waitForFunction(() => window.__beatPath.recipe().figure?.shape === "car" && window.__beatPath.recipe().beatGrid.bpm < 110, null, { timeout: 30_000 });
   await page.screenshot({ path: `${SHOTS}beat-path-example-3.png` });
@@ -195,7 +196,7 @@ export async function smokeBeatPath(browser, base, { fail, OUT, SHOTS }) {
   await page.click('[data-control="example"] [data-value="0"]');
   await page.waitForFunction(() => window.__beatPath.recipe().figure?.shape === "flyer" && window.__beatPath.recipe().camera?.startYaw === 145 && window.__beatPath.recipe().beatGrid.bpm === 107.5, null, { timeout: 30_000 });
   p = await probe();
-  console.log(`draw control: examples switch: runner 140, car 100, drone 100, back to flyer on its file (${p.recipe.beatGrid.bpm} BPM), edits kept ${JSON.stringify(p.state.subject) === JSON.stringify(edited)}`);
+  console.log(`draw control: examples switch: runner 174 on its file, car 100, drone 100, back to flyer on its file (${p.recipe.beatGrid.bpm} BPM), edits kept ${JSON.stringify(p.state.subject) === JSON.stringify(edited)}`);
   if (JSON.stringify(p.state.subject) !== JSON.stringify(edited)) fail("switching examples lost the edits of Example 1");
   // Scenery: the Settings chevron, scenery none and back to city.
   await page.click("#settings summary");
@@ -265,10 +266,10 @@ export async function smokeBeatPath(browser, base, { fail, OUT, SHOTS }) {
   if (!playingAfterOne || (await probe()).playing) fail("clicking the video did not toggle play twice");
   await page.screenshot({ path: `${SHOTS}beat-path-generated.png` });
   if (!(await page.isVisible("#gallery h2"))) fail("no gallery section");
-  // Export and Slice in the track panel: the music inside the clip window as a WAV, then as the track itself. On Example 2,
-  // whose music is longer than its clip (Example 1's loop is shorter than its 14 s clip: smokeExample1 checks that case).
-  await page.click('[data-control="example"] [data-value="1"]');
-  await page.waitForFunction(() => window.__beatPath.trackName() === "generated-drive-140.wav", null, { timeout: 30_000 });
+  // Export and Slice in the track panel: the music inside the clip window as a WAV, then as the track itself. On Example 3,
+  // whose music is longer than its clip (Examples 1 and 2 play files shorter than their clips: smokeExample1 and smokeExample2 check that case).
+  await page.click('[data-control="example"] [data-value="2"]');
+  await page.waitForFunction(() => window.__beatPath.trackName() === "generated-laidback-100.wav", null, { timeout: 30_000 });
   await smokeTrackActions(page, fail, SHOTS);
   // No track: a plain timed clip that still plays and exports.
   await page.click("#removeTrack");
@@ -334,6 +335,44 @@ async function smokeTrackActions(page, fail, SHOTS) {
   const back = await look();
   console.log(`draw control track: loaded back ${back.length.toFixed(3)} s at ${back.bpm} BPM`);
   if (Math.abs(back.length - before.clip) > 1 / 24 || Math.abs(back.bpm - before.bpm) > 0.5) fail(`the exported WAV did not load back alike (${back.length} s, ${back.bpm} BPM vs ${before.clip} s, ${before.bpm} BPM)`);
+}
+
+/** Example 2's frame 0 camera in the CLI render (out/ex2/final/camera.json, track[0].position): beside the subject at shoe height. */
+const EX2_CLI_FRAME0 = [-24, 0.3, -2.5];
+
+/**
+ * Example 2: one street guide for any subject, on the owner's 11.04 s drum and bass loop under a 12 s clip. The recipe builds
+ * on the file's given grid (174 BPM, beat 0 at 0 s), the three camera blocks start on the first kick and the snares at beats 9
+ * and 21 with no stations, the lane edges stay where the script put them, frame 0 is the CLI render's, the one hop lands on
+ * the kick at 6.636 s while the travel runs on, and the music plays.
+ */
+async function smokeExample2(page, fail) {
+  await page.waitForFunction(() => window.__beatPath.trackName() === "drum-n-bass.mp3", null, { timeout: 30_000 }).catch(() => {});
+  const ex2 = await page.evaluate(() => ({ r: window.__beatPath.recipe(), s: window.__beatPath.state(), cam0: window.__beatPath.cameraAt(0), length: window.__beatPath.trackLength(), track: window.__beatPath.trackName() }));
+  const ranges = ex2.r.camera.segments.map(s => s.modes.join("+")).join(" "), edges = ex2.s.cameraLane.map(b => b.from).concat(ex2.s.cameraLane.at(-1).to);
+  const locks = ex2.r.camera.segments.filter(s => s.lock).length;
+  const off = Math.max(...ex2.cam0.position.map((v, i) => Math.abs(v - EX2_CLI_FRAME0[i])));
+  console.log(`draw control: Example 2 builds: ranges ${ranges}; edges ${edges.join(" ")}; camera locks ${locks}, travel lock ${JSON.stringify(ex2.r.travelLock ?? null)}; ${ex2.r.beatGrid.bpm} BPM, beat 0 at ${ex2.r.beatGrid.offsetSeconds} s; frame 0 camera at ${ex2.cam0.position.map(v => v.toFixed(2)).join(", ")} (CLI ${EX2_CLI_FRAME0.join(", ")}, off ${off.toFixed(3)} m); track ${ex2.track} ${ex2.length?.toFixed(3)} s, clip ${ex2.s.clip} s`);
+  if (ex2.track !== "drum-n-bass.mp3") fail(`Example 2 did not load its music file (${ex2.track})`);
+  if (ranges !== "side side+pullOut threeQuarter+rise") fail(`Example 2's camera ranges are ${ranges}, not side side+pullOut threeQuarter+rise`);
+  if (edges.join(" ") !== "0 9 21 35") fail(`Example 2's camera edges moved when its music loaded: ${edges.join(" ")}`);
+  if (locks || ex2.r.travelLock) fail("Example 2 has stations (a camera lock or a travel lock): its moves should run unbroken between the hits");
+  if (ex2.r.beatGrid.bpm !== 174 || ex2.r.beatGrid.offsetSeconds !== 0) fail(`Example 2 is not on its given grid (${ex2.r.beatGrid.bpm} BPM, ${ex2.r.beatGrid.offsetSeconds} s)`);
+  if (off > 0.05) fail(`Example 2's frame 0 camera is ${off.toFixed(3)} m from the CLI render's`);
+  if (!(Math.abs(ex2.length - 11.04) < 0.02)) fail(`Example 2's track is ${ex2.length} s, not the 11.04 s loop`);
+  // One hop on the kick at 6.636 s (beat 19.24), in the gap between the first two blocks; the walk runs the whole clip.
+  const hops = (ex2.r.reactive?.markers ?? []).filter(m => m.accent === "jump"), lanes = ex2.s.character.map(b => `${b.from}-${b.to} ${b.word}`).join(", ");
+  console.log(`draw control: Example 2's character lane ${lanes}; hop at ${hops.map(m => m.seconds.toFixed(3)).join(", ")} s; walk ${ex2.r.moves[0]?.lengthBeats} beats`);
+  if (hops.length !== 1 || Math.abs(hops[0].seconds - 6.636) > 0.03) fail(`Example 2 should hop once on the kick at 6.636 s (got ${JSON.stringify(hops)})`);
+  if (lanes !== "0-19 glide, 19-35 hop" || ex2.r.moves[0]?.lengthBeats !== 35) fail(`Example 2's hop broke the travel (lanes ${lanes}, walk ${ex2.r.moves[0]?.lengthBeats} beats)`);
+  const head0 = await page.evaluate(() => window.__beatPath.head());
+  await page.click("#play");
+  await page.waitForTimeout(600);
+  const playing = await page.evaluate(() => ({ head: window.__beatPath.head(), playing: window.__beatPath.playing() }));
+  await page.click("#play");
+  const moved = (playing.head - head0 + 12) % 12;
+  console.log(`draw control: Example 2 plays (head ${head0.toFixed(2)} → ${playing.head.toFixed(2)} s in 0.6 s)`);
+  if (!playing.playing || !(moved > 0.2 && moved < 1.5)) fail(`Example 2's music did not play (${JSON.stringify(playing)}, from ${head0})`);
 }
 
 /** Example 1's frame 0 camera in the CLI render (out/ex5/final/camera.json, track[0].position). */

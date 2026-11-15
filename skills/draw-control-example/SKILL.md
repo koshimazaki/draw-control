@@ -5,7 +5,7 @@ license: MIT
 compatibility: Node 24; the motion-studio CLI (cli/bin/motion-studio.mjs) or MCP server; ffmpeg for contact sheets
 metadata:
   repo: motion-studio
-  version: 0.1.0
+  version: 0.2.0
 ---
 
 # Making a Draw Control example
@@ -16,7 +16,8 @@ order; every trap below cost a real render once.
 
 Grammar: `docs/recipe.md#shot-script` (rows, camera words, and every settings line: `rig:`, `box:`,
 `scenery:`, `figure:`, `shot …:`). Working examples: `examples/scripts/beat-path-ex*.txt`;
-`beat-path-ex4-drone.txt` is the worked answer to an isometric → pan → top → side brief.
+`beat-path-ex4-drone.txt` is the worked answer to an isometric → pan → top → side brief;
+`beat-path-ex2-runner.txt` to "one guide for a runner, a skater and a forklift" (step 8).
 
 ## 0. Setup
 
@@ -44,6 +45,13 @@ ms describe out/x/base.json --analysis out/x/m.json  # "Onsets in beats": kicks,
   the sample rate (one loop read 107.5 BPM at 44.1 kHz and 122.9 BPM from a 48 kHz WAV, and lost
   five kicks). The CLI, the editor and the Gallery all decode at 44.1 kHz for that reason
   (`DECODE_RATE` in `packages/studio/src/audio.ts`); never analyse a WAV you resampled to 48 kHz.
+- **Check the tempo against the hits, not only against the estimate.** A 174 BPM drum and bass loop
+  read 69.7 BPM (the owner guessed 139, double the estimate; neither fits). Score candidate grids:
+  `node skills/draw-control-example/scripts/beat-grid.mjs out/x/m.json 69.7 139.4 174` prints how
+  close the strong kicks and snares land to each grid's half beats, how many beats fit the file
+  (32.02 at 174 for 11.04 s: eight bars, the loop's real length), and the hits in beats on the best
+  grid. Then set that grid in the CLI base (`ms set out/x/base.json beatGrid.bpm 174`) and in
+  `tracks.ts`, and write a copy of the analysis with that `bpm` for `describe`.
 - **Where beat 0 sits.** The page's clip window starts at beat 0. A loop that starts on its
   downbeat wants beat 0 at the file's start, so frame 0 of the guide is the music's start (the
   finish step, step 7, then needs no offset): `grid` offset 0 in `tracks.ts`, and in the CLI
@@ -65,6 +73,11 @@ ms describe out/x/base.json --analysis out/x/m.json  # "Onsets in beats": kicks,
 - **A paid model may refuse the length**: the page refuses any estimate over its 3 USD limit before
   the cost dialog (Seedance 2.5 at 14 s). Check each model's estimate for the clip in the page
   (Generate shows it; nothing is sent in dev) before you settle the length, and say which refuse.
+- **Three sync points, not a station on every hit.** The owner's rule (15 Nov 2026): the motion starts
+  on the first kick, one move starts around the middle, one more (the reveal or the push into the
+  detail); each camera block starts on one of them and runs **unbroken** to the next. No
+  `lock … hold` on the camera and no travel lock on the subject (he tunes hit response himself with
+  Sensitivity in the page). Check for plateaus with `scripts/camera-speed.mjs` (step 5).
 - Put camera changes **on snares** (or kicks). For a CLI-only shot, use the exact beat numbers
   (`3.03`). For a **page example**, round each edge to the nearest half beat (`3`, `7`, `9`): the
   page snaps lane edges to half beats, so exact edges would make the page and the CLI differ.
@@ -115,6 +128,9 @@ box: -10 2.5 2 2 3.2                               # x z width depth height (met
   walk block: the path still runs to the last row.
 - A gap between boxes must take the figure's wingspan (the flyer's is 3.8 m: a 5 m gap leaves
   0.6 m a side).
+- **A two-point path needs `corners 0`** in a page example (`walk on path (-24,0) (24,0) corners 0`):
+  the page stores every path with its corner rounding and the CLI only when the script gives one, so
+  without it the MCP parity test sees a `rootShape` on one side only.
 - Use `walk on path` for anything that travels. `glide on path` **holds the figure's opening
   facing** (yaw 0, towards +z) and slides it sideways along the path, which also changes what
   `follow side` means (side of the facing, not of the travel). Use glide only for a path that
@@ -124,7 +140,11 @@ box: -10 2.5 2 2 3.2                               # x z width depth height (met
 - Placed boxes have no collision with the camera, only the line of sight matters to you: a box
   in the camera's arc fills a corner of the frame or puts the camera on its roof. Check the
   camera's track (`camera.json`) against each box before you settle the layout.
-- `shot subject|environment|action|legend:` lines describe what the model should draw.
+- `shot subject|environment|action|legend:` lines describe what the model should draw. **The page
+  builds the legend itself** from the figure's colours ("the orange figure is the character; grey
+  blocks are placeholders for the environment"): write exactly that legend line, or the page and the
+  CLI recipes differ; say what the blocks are in the environment line instead ("the grey blocks are
+  its steel pillars").
 
 ## 3. Camera: views
 
@@ -163,6 +183,14 @@ rig: distance 8m height 5m fov 30 yaw 45           # the opening framing (frame 
   angle whatever the rig's yaw, so give the `rig:` the same (`yaw 135` with `angle 90`) for the map.
 - A top view shows only the grid once the subject has left the boxes: keep it among them, and
   widen the fov (75) when the camera is 6 m above it so the boxes reach the frame's edge.
+- **A detail shot (the feet, a board, a wheel)** needs `aim`: every follow camera looks at about 1 m on
+  the subject (a preset at 1.1–1.35 m), so a low close camera frames the body, never the shoe.
+  `follow side distance 2.5m height 0.3m aim 0.3m fov 32` frames the lower body and the ground. The
+  aim carries on like a distance or height: give the next block `aim 1m`. A block at beat 0 with an
+  aim starts on it (the rig has none). The framing guard still turns the aim up a little where the
+  subject's centre nears the top of the frame (frame 0 looked at 0.6 m, then settled to 0.3 m).
+- **Distance limits differ:** the `rig:` line takes 1.5–12 m, a follow block 1–30 m. A far opening
+  view needs a block of its own, not the rig.
 - `fov`, offsets and presets carry on into later blocks (top/above excepted, above): give **every** block its own `fov` and offsets when the next view should differ.
 
 ## 4. Camera: smooth transitions
@@ -193,6 +221,12 @@ rig: distance 8m height 5m fov 30 yaw 45           # the opening framing (frame 
 - A follow camera trails wide through a sharp turn, wider the larger its distance: a follow
   block of 9 m starting as the subject turned out of an alley swung into the corner tower for
   5 frames; 6 m cleared it. Keep follow distances short through turns between boxes.
+- **At a fast tempo an offset is a whip.** A follow offset, a preset or a fov eases in over the block's
+  first beat (`slow`: 2.5 beats at most): 0.34 s at 174 BPM, so pulling a camera from 2.5 m to 11 m
+  moved it at 39 m/s. Put the big change in a **programmed move**, which eases over the whole block:
+  `follow side height 1.6m aim 1m + pull out to 13m`, `three-quarter distance 13m + rise to 8m` (one
+  amount move per block: pull or rise, the other through the offset, kept small). Peak speed fell
+  to 7–12 m/s.
 - `slow` arrives late, `fast` early, `even` in between. A `slow` block that starts in the last
   ~1.5 s barely shows: start it earlier or use `even`.
 - `lock snare 1 hold` on a moving block pauses it on each snare (stations), still ending on its amount.
@@ -218,6 +252,15 @@ ffmpeg -v error -y -i out/x/v1/guide.mp4 -vf "select='not(mod(n\,16))',scale=320
 - To check where the camera really is: `out/x/v1/camera.json` → `track[n].position` and
   `.target` in metres (y up; the subject faces +Z at yaw 0). "Side view" means the camera is
   level with the subject along its direction of travel and offset sideways.
+- Check the camera's speed per block on every render:
+  `node skills/draw-control-example/scripts/camera-speed.mjs out/x/v1/camera.json 0,9,21,35 174`
+  (edges in beats, then the BPM). A plateau (speed near 0 at each hit inside a block) is a lock the
+  owner did not want; a peak far above the subject's speed is a whip (step 4).
+- **A camera that moves through a row of blocks** (a pull out from beside the subject to beyond the
+  row) crosses the row's depth at some point along the street: find that frame in `camera.json`,
+  and leave a gap in the row there (`camera-boxes.mjs` reports "within 0.75 m").
+- A camera close to a row of blocks sees one block fill the frame: keep blocks narrow (3 m) with
+  gaps as wide, and the camera 6–8 m beyond them, so a block and a gap share the frame.
 - Iterate: one change per render, note what it fixed. Six or seven renders is normal for a new shot.
 - Fast loop for one stretch: `--start 6 --length 2 --unit seconds` renders just that tail (it warns
   it is under a model's 3 s minimum; fine for checking). Its `camera.json` track starts at
@@ -244,7 +287,8 @@ The page reads the script into its own state and prints it back, so write the fi
    (`git grep -n -E '"drone"|drone:|ExampleId'` shows every place example 4 touched; the
    switcher in `layout.ts`, the smoke's example loops and the MCP parity test's script count are
    not in that grep: `git grep -n -E 'Example 4|"3", "0"|toBe\(1[0-9]\)'`).
-   **Replacing an example** (as Example 1 was): the tests and smokes that used it as a generic
+   **Replacing an example** (as Examples 1 and 2 were; the old ones are `beat-path-avenue-cross.txt` and
+   `beat-path-skate-rail.txt`, and the smokes that need an 8 s clip with music longer than it now use Example 3): the tests and smokes that used it as a generic
    fixture break (a two-block snare-locked lane, an 8 s clip, music longer than the clip, slicing
    it). Keep the old script under a new name (`beat-path-avenue-cross.txt`, read by
    `packages/studio/test/avenue.ts`) and point those tests at it; move the smokes that slice or
@@ -254,6 +298,9 @@ The page reads the script into its own state and prints it back, so write the fi
    against your CLI render's `camera.json` `track[0].position` (they agree to the millimetre when
    the script is in page form). For a file track also check `trackLength()` against the clip and
    that playback wraps at the clip's end.
+   **Tests that load file-track examples on a generated groove** (the MCP parity test, the in-frame test)
+   must use the track's given grid (`tracks.ts`), or a 12 s clip at 120 BPM has 25 beats and a script
+   running to beat 35 is refused. Both now look the grid up by the `# track: file` name.
 4. **Look at the map**: the subject path and every camera block drawn and labelled. A Playwright
    screenshot of `#map` (`const { chromium } = await import("playwright-core")`, a Vite server on
    `packages/studio/`, wait for `window.__beatPath.trackName()`), checked against the contact
@@ -269,6 +316,36 @@ one frame: 13.500 s of video at 24 fps for 13.488 s of music). It needs beat 0 a
 start (step 1), or the music lands early by the offset. Try it on your rendered guide first:
 `npm run finish -- out/x/v3/guide.mp4 <music> --out out/x/finished.mp4`, and check both durations
 it prints.
+
+## 8. One guide, many subjects
+
+When the owner wants one guide cut into several looks (a realistic runner, an anime skater, a forklift
+in a factory: Example 2), only the shot description and the references change. Make the guide
+neutral on purpose:
+- **Figure**: a person-sized, upright, neutral shape (`runner`: a 1.55 m capsule with a chest marker).
+  It reads as a person or a skater, and as a forklift's upright mast and cab; a `car` shape would pull
+  the people versions towards a vehicle, and a `flyer` reads as aircraft.
+- **One accent on the music, without breaking the travel**: the owner wanted "a little more movement
+  with the audio". A hop on one kick (`beats 19-21 | action: continue, jump @kick 1`; the page's
+  Character lane **Hop** block) lifts 0.28 m and lands on the kick while the walk runs on. A page
+  `jump` block is `rest, jump @beat mid`, which ends the travel: use Hop. Put it where it is seen (a
+  gap between blocks in the running view, not in the close detail, where it leaves the frame) and
+  name it in every subject's action line (a hop, an ollie, a bump over a floor plate). Check the
+  marker's seconds in the recipe and the lift with `frameAt` against `camera.json`.
+- **Path**: straight and steady, no ramp, rail, trick or travel lock, at a speed every subject can
+  hold (4 m/s: a jog, a push on a board, a brisk forklift). A ramp was dropped because it would crash
+  the runner and the forklift.
+- **Blocks**: generic boxes that each version can name (shopfronts and cafés; the factory's pillars and
+  machines); low ones between camera and subject, tall ones beyond as the far side or the wall.
+- **Camera**: framings that mean the same thing for each subject. A low close detail reads as "the
+  shoe", "the deck", "the wheel" when the action line says which.
+- **Shot lines**: the runner (say) as the script's own `shot` lines; the others ready to paste, as
+  comment lines at the top of the script (`#   shot subject: …`, ignored by every reader) and in
+  `docs/beat-path.md`. Only subject, environment and action differ; the legend line is the page's.
+- **Avoid brand names** in the shot lines ("shot like a running-shoe advert", not the brand): a model
+  may refuse or copy a logo.
+- Make each look differ from the other examples' camera order (Example 1 ends zooming in from the top;
+  Example 2 opens on the detail and ends on the wide view), so a reel of examples shows the range.
 
 ## Report
 

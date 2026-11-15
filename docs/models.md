@@ -10,6 +10,8 @@ What the three models Draw Control offers take and give back, checked 14 Novembe
 
 Example 1 runs 14 s: all three take that length (MiniMax H3 is the tightest, at 15 s), but the page's 3 USD limit refuses Seedance 2.5 at 14 s (its estimate is over it; Kling 4.0 is up to 2.63 USD, MiniMax H3 up to 2.95 USD in the fake-provider dev run).
 
+Example 2 runs 12 s: the page's 3 USD limit refuses Seedance 2.5 there too; Kling 4.0 is up to 2.26 USD and MiniMax H3 up to 2.53 USD (fake-provider dev run, 15 Nov 2026).
+
 The lengths and guide limits come from the vendored Model Arena spec (built from Runware's schemas), which marks the output fps of all three as "not stated". None of the three takes an fps setting, and Runware returns no fps field.
 
 ## Sources
