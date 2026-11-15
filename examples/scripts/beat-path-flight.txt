@@ -1,6 +1,6 @@
-# Beat Path example: something flying. The path climbs and dives; the camera flies its own arc.
+# Draw Control example: something flying. The path climbs and dives; the camera flies its own arc.
 # prompt: A white seagull glides low over the sea, climbs and banks into a dive, the camera sweeping past; the orange figure is the bird, white marks its head.
-# clip: 8 s · figure: glider · Beat Path
+# clip: 8 s · figure: glider · Draw Control
 shot subject: a white seagull
 shot environment: low over a calm sea
 shot action: glides, climbs and banks into a dive while the camera sweeps past

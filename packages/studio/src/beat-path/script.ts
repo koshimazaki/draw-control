@@ -1,5 +1,5 @@
 /**
- * The Beat Path page's state is a shot script (docs/recipe.md, "Shot script"): `toScript`
+ * The Draw Control page's state is a shot script (docs/recipe.md, "Shot script"): `toScript`
  * prints the state, `fromScript` reads a script back into it. The two lanes are the script's
  * action and camera columns, the paths are its point lists with their `corners` word, and
  * the global lock and "on each hit" are its `lock …` words. A script with words outside the
@@ -122,7 +122,7 @@ export function toScript(state: BeatPathState): string {
   const lines: string[] = [];
   if (state.prompt) lines.push(`# prompt: ${state.prompt}`);
   if (state.track) lines.push(`# track: ${({ flyer: "straight", runner: "drive", car: "laidback" } as const)[state.track]}`);
-  lines.push(`# clip: ${state.clip} s · figure: ${state.figure.shape} · Beat Path`);
+  lines.push(`# clip: ${state.clip} s · figure: ${state.figure.shape} · Draw Control`);
   lines.push(`landmarks: ${state.landmarks.on ? `on seed ${state.landmarks.seed}` : "off"}`);
   if (state.slice !== undefined) lines.push(`slice: ${f(state.slice)}s`);
   if (state.markers?.length) {

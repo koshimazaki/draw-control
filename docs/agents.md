@@ -9,7 +9,7 @@ Everything a person does in the studio is a command in `packages/core/src/comman
 
 Both tools run the TypeScript sources directly on Node 24 (no build step). Everything stays on this machine; the only network use is `npm install`.
 
-Working on the Beat Path page itself (its files, its state, the rules a change must keep): start at [beat-path.md](beat-path.md).
+Working on the Draw Control page itself (its files, its state, the rules a change must keep): start at [beat-path.md](beat-path.md).
 
 ## CLI
 
@@ -22,8 +22,8 @@ npm run cli -- commands                   # or: node cli/bin/motion-studio.mjs c
 | Command | What it does |
 | --- | --- |
 | `analyse <audio> --out analysis.json` | Tempo, first beat, kick, snare and hat onsets with strengths, amplitude peaks, and the loudness envelopes. WAV is read directly; MP3, M4A, FLAC and OGG need ffmpeg. |
-| `groove <straight\|drive\|laidback> [--bars 9] --out track.wav` | The drum music of the Beat Path examples (the page's own synth), so `analyse` has a file. |
-| `new [--character rigged\|mannequin\|block\|stick\|blob\|glider] [--clip 8] [--slice 42.5] [--analysis a.json] --out recipe.json` | A starting recipe (the rigged mannequin dancing), fitted to the track's tempo and length. `glider` starts the Beat Path base instead: a clip of `--clip` seconds from beat 0 with the page's camera rig, ready for a Beat Path script (`examples/scripts/beat-path-*.txt`). The page offers whole seconds 3 to 30; the CLI takes up to 60 (default 8). `--slice` starts the clip that many seconds into a longer track, snapped to its nearest beat ([below](#slicing-a-clip-out-of-a-longer-track-round-9)). |
+| `groove <straight\|drive\|laidback> [--bars 9] --out track.wav` | The drum music of the Draw Control examples (the page's own synth), so `analyse` has a file. |
+| `new [--character rigged\|mannequin\|block\|stick\|blob\|glider] [--clip 8] [--slice 42.5] [--analysis a.json] --out recipe.json` | A starting recipe (the rigged mannequin dancing), fitted to the track's tempo and length. `glider` starts the Draw Control base instead: a clip of `--clip` seconds from beat 0 with the page's camera rig, ready for a Draw Control script (`examples/scripts/beat-path-*.txt`). The page offers whole seconds 3 to 30; the CLI takes up to 60 (default 8). `--slice` starts the clip that many seconds into a longer track, snapped to its nearest beat ([below](#slicing-a-clip-out-of-a-longer-track-round-9)). |
 | `apply <recipe.json> <commands.json> [--analysis a.json] [--out next.json]` | Apply a list of commands in order. All or nothing: a refused command names its index and the reason. |
 | `set <recipe.json> <path> <value> [--out next.json]` | Set any recipe field by path: `beatGrid.bpm 98`, `moves#Dance_Loop-4.speed 2`, `moves[0].phases[0].amplitude 2.5`, `camera.distance 5`, `reactive.amplitude 1`. The value is JSON when it parses, text otherwise; `null` deletes the field. |
 | `describe <recipe.json> [--analysis a.json] [--script]` | The timeline as text: move blocks with start, end, speed, amplitude and lock, rests, hit markers, the camera ranges (with shots, amounts and locks), the camera lanes and paths, the walk path and its lock, the envelope, and the kicks, snares and hats in beats. With `--script` (put it last): the shot script instead. |
@@ -59,7 +59,7 @@ Register it with any MCP client as a stdio server with that command (absolute pa
 | --- | --- |
 | `analyse_audio` | `path`, `out?` (also writes analysis.json) |
 | `load_analysis` | `path` |
-| `new_recipe` | `character?` (`glider`: the Beat Path base), `clip?` (seconds, with `glider`), `slice?` (seconds into a longer track) |
+| `new_recipe` | `character?` (`glider`: the Draw Control base), `clip?` (seconds, with `glider`), `slice?` (seconds into a longer track) |
 | `load_recipe`, `save_recipe` | `path` |
 | `get_recipe`, `describe`, `get_script`, `list_commands`, `undo` | none |
 | `apply_script` | `script` (returns the script as it now reads) |
@@ -161,7 +161,7 @@ M render glide.json --audio drums.wav --out bundle-glide --start 0 --length 16 -
 
 Over MCP the same text goes to `apply_script`, then `render`. `npm run mcp-check` does exactly that against the real server over stdio (`node mcp/bin/motion-studio-mcp.mjs`, as an MCP client starts it): `analyse_audio`, `new_recipe`, `apply_script` with this file, `render` to `out/mcp-check/bundle/` in headless Chrome (about 3–5 s for 193 frames on this machine), and checks the bundle's files.
 
-## Worked example: voice to a Beat Path script, no page needed
+## Worked example: voice to a Draw Control script, no page needed
 
 Spoken: *"The character runs; the camera goes over her shoulder; she jumps and the camera rises above; she freezes mid-air while the camera circles her; she lands; the camera cranes down from high to low, then dollies in; she moves on."* An agent writes [`examples/scripts/voice-freeze-orbit.txt`](../examples/scripts/voice-freeze-orbit.txt):
 
@@ -178,10 +178,10 @@ beats 10.5-13  | action: continue           | camera: rise 6m to 1m  | shot: wid
 beats 13-17    | action: continue           | camera: dolly in 2m    | shot: wide
 ```
 
-Then, with the CLI: `motion-studio analyse track.wav --out a.json`, `motion-studio new --character glider --clip 8 --analysis a.json --out base.json`, `motion-studio script base.json examples/scripts/voice-freeze-orbit.txt --analysis a.json --out shot.json`, `motion-studio render shot.json --audio track.wav --out bundle`. Over MCP: `analyse_audio` (or `load_analysis`), `new_recipe { character: "glider", clip: 8 }`, `apply_script`, `render`. Both give the same recipe (`mcp/test/voice-freeze.test.ts`, which also checks the figure hangs in the air through the freeze, lands after it, and the camera circles meanwhile). `rise 6m to 1m` cranes down: rise takes descending heights. Commands for agents added with Beat Path: `setSceneryBoxes`, `addSceneryBox`, `removeSceneryBox` and `setScenerySight` (build a street box by box: `box: 6 4 5 8 12` lines, or `scenery: street sight passes` for columns between camera and subject), `setLandmarks`, `setScenery` ("put it in a big city": `{ "type": "setScenery", "preset": "city" }` or the script line `scenery: city`), `muteHit`, `resetMutedHits`, `setFigure` (`shape`: glider, car, flyer, runner), `setShot` (each field is one line: a line break becomes a space, so a field cannot add a script row); the camera grammar (`over shoulder`, `above`, `slow|even|fast`, `then`, `at 2s`) and the settings lines are in [recipe.md](recipe.md#shot-script).
+Then, with the CLI: `motion-studio analyse track.wav --out a.json`, `motion-studio new --character glider --clip 8 --analysis a.json --out base.json`, `motion-studio script base.json examples/scripts/voice-freeze-orbit.txt --analysis a.json --out shot.json`, `motion-studio render shot.json --audio track.wav --out bundle`. Over MCP: `analyse_audio` (or `load_analysis`), `new_recipe { character: "glider", clip: 8 }`, `apply_script`, `render`. Both give the same recipe (`mcp/test/voice-freeze.test.ts`, which also checks the figure hangs in the air through the freeze, lands after it, and the camera circles meanwhile). `rise 6m to 1m` cranes down: rise takes descending heights. Commands for agents added with Draw Control: `setSceneryBoxes`, `addSceneryBox`, `removeSceneryBox` and `setScenerySight` (build a street box by box: `box: 6 4 5 8 12` lines, or `scenery: street sight passes` for columns between camera and subject), `setLandmarks`, `setScenery` ("put it in a big city": `{ "type": "setScenery", "preset": "city" }` or the script line `scenery: city`), `muteHit`, `resetMutedHits`, `setFigure` (`shape`: glider, car, flyer, runner), `setShot` (each field is one line: a line break becomes a space, so a field cannot add a script row); the camera grammar (`over shoulder`, `above`, `slow|even|fast`, `then`, `at 2s`) and the settings lines are in [recipe.md](recipe.md#shot-script).
 
 
-## Worked example: a parallel-street shot (Beat Path Examples 1 and 2, round 8)
+## Worked example: a parallel-street shot (Draw Control Examples 1 and 2, round 8)
 
 The owner's shot: the subject travels along one street, the camera along the parallel street,
 blocks in between, so the subject is seen through the gaps; camera and subject start apart.

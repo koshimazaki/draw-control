@@ -1,6 +1,6 @@
-# Beat Path example: a dancer crosses and spins while the camera circles. Snare-locked.
+# Draw Control example: a dancer crosses and spins while the camera circles. Snare-locked.
 # prompt: A dancer in a red coat crosses a bare studio floor and spins on the last beats as the camera circles her; the orange figure is the dancer, white marks where she faces.
-# clip: 8 s · figure: glider · Beat Path
+# clip: 8 s · figure: glider · Draw Control
 shot subject: a dancer in a red coat
 shot environment: a bare studio floor
 shot action: crosses the floor and spins on the last beats as the camera circles her

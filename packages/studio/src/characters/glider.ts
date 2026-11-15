@@ -14,7 +14,7 @@ import type { FrameState } from "@motion-studio/core/internal";
 import type { Character } from "./types";
 
 export type FigureShape = "glider" | "car" | "flyer" | "runner";
-/** The guide's fixed colour coding (README "Beat Path"): orange figure, white front. */
+/** The guide's fixed colour coding (README "Draw Control"): orange figure, white front. */
 export const GLIDER_COLOURS = { body: 0xff6a13, front: 0xffffff } as const;
 /** Proportions of the default shape, metres. */
 export const GLIDER = { base: 0.36, apex: 0.86, hover: 0.04, sphereY: 1.16, sphereR: 0.19 } as const;

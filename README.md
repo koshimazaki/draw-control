@@ -6,7 +6,9 @@ The result exports as a guide clip, with its beats and camera path, for video mo
 
 Status: working studio, CLI and MCP server, 11 November 2026. What is not done is [at the end](#not-done). Detail: [PRD](docs/PRD.md) · [plan and current state](docs/plan.md) · [agents: CLI and MCP](docs/agents.md) · [Hermes on Runware](docs/hermes.md) · [recipe and shot script format](docs/recipe.md) · [video models: length and frame rate](docs/models.md).
 
-## Beat Path (start here)
+## Draw Control (start here)
+
+Draw control of camera and character: you draw, and the drawing controls the camera and the figure. (In the code the page is still `beat-path`: the folder, the build mode, the npm scripts.)
 
 The lean demo: **draw a path on a map, add music, and the movement and the camera lock to the beat; export a guide clip for video models.** One screen, an abstract figure, a handful of controls.
 Changing the page (developers and agents): [docs/beat-path.md](docs/beat-path.md) says how to run and check it and which file owns each control.
@@ -94,7 +96,7 @@ assets/characters/ the bundled rigged mannequin (licences below)
 | --- | --- |
 | `dev`, `build` | the studio on http://127.0.0.1:5180, or a static build in `packages/studio/dist/` |
 | `check` | `typecheck` (core, studio, CLI, MCP) + `lint` + `test` (vitest) |
-| `smoke` | real headless Chrome through the studio: tracks, drags, lanes, a script, recording, four exports checked with ffprobe; then the Beat Path page (a drawn path, lock on kick, a lane menu, a pasted script, an export validated against the schema); `out/smoke/` |
+| `smoke` | real headless Chrome through the studio: tracks, drags, lanes, a script, recording, four exports checked with ffprobe; then the Draw Control page (a drawn path, lock on kick, a lane menu, a pasted script, an export validated against the schema); `out/smoke/` |
 | `mcp-check` | the MCP server over stdio: `apply_script` and `render`; `out/mcp-check/` |
 | `drums` | a generated 120 BPM drum track, `out/drums-120.wav` |
 | `examples` | regenerate the example bundles in `examples/bundles/` |

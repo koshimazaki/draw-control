@@ -1,5 +1,5 @@
 /**
- * The Beat Path page's state to a recipe: the core's `beatPathBase` (grid, clip length,
+ * The Draw Control page's state to a recipe: the core's `beatPathBase` (grid, clip length,
  * glider, camera rig) with the page's shot script applied through `applyScript`, the same
  * command the CLI (`new --character glider --clip 8`, then `script`) and the MCP server
  * (`new_recipe`, then `apply_script`) run. An agent that writes the script gets the page's

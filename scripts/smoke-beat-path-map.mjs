@@ -1,5 +1,5 @@
 /**
- * Map checks for the Beat Path page, called from smoke-beat-path.mjs:
+ * Map checks for the Draw Control page, called from smoke-beat-path.mjs:
  * - the map's tool row stays visible and clickable after every tool and view switch, after zooming,
  *   after dragging the divider to both extremes, and at 1100 and 1280 px wide;
  * - the map's +/− zoom the map and not the timeline, and the timeline's +/− zoom the timeline;
@@ -114,7 +114,7 @@ export async function smokeBeatPathMap(browser, base, { fail, SHOTS }) {
     }
     await page.screenshot({ path: `${SHOTS}beat-path-map-${width}.png` });
     if (errors.length) fail(`at ${width} px the page logged: ${errors.join(" | ")}`);
-    console.log(`beat path map: ${width} px tool row and camera drawing checked`);
+    console.log(`draw control map: ${width} px tool row and camera drawing checked`);
     await page.close();
   }
 }
@@ -139,7 +139,7 @@ async function smokeSmooth(page, fail, SHOTS) {
   if (drawn.length < 5 || await page.isDisabled("#smoothPath")) { fail(`the zig-zag did not draw a path Smooth can work on (${drawn.length} points)`); return; }
   await page.click("#smoothPath");
   const smoothed = await subject();
-  console.log(`beat path map: Smooth: ${drawn.length} points, off the line by ${wobble(drawn).toFixed(2)} m → ${wobble(smoothed).toFixed(2)} m (${smoothed.length} points)`);
+  console.log(`draw control map: Smooth: ${drawn.length} points, off the line by ${wobble(drawn).toFixed(2)} m → ${wobble(smoothed).toFixed(2)} m (${smoothed.length} points)`);
   if (!(wobble(smoothed) < wobble(drawn) * 0.8) || smoothed.length !== drawn.length || JSON.stringify([smoothed[0], smoothed.at(-1)]) !== JSON.stringify([drawn[0], drawn.at(-1)])) fail("Smooth did not flatten the zig-zag with its ends and point count kept");
   await page.screenshot({ path: `${SHOTS}beat-path-smooth.png` });
   await page.keyboard.press("ControlOrMeta+z");

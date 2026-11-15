@@ -1,6 +1,6 @@
-# Beat Path example: free flow, no lock: even travel, the camera drifts round on its own time.
+# Draw Control example: free flow, no lock: even travel, the camera drifts round on its own time.
 # prompt: A paper boat drifts down a calm canal as the camera glides beside it and slowly circles; the orange figure is the boat, white marks its bow.
-# clip: 8 s · figure: glider · Beat Path
+# clip: 8 s · figure: glider · Draw Control
 landmarks: on seed 7
 shot subject: a paper boat
 shot environment: a calm canal between old houses

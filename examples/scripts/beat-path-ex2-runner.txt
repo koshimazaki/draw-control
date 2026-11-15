@@ -1,6 +1,6 @@
-# Beat Path example 2: a skateboarder along one street, seen from the parallel street through the gaps between the blocks; the camera comes over, goes round to the front, and the clip ends on a very wide lens as the rail trick lands. The figure is a runner shape.
+# Draw Control example 2: a skateboarder along one street, seen from the parallel street through the gaps between the blocks; the camera comes over, goes round to the front, and the clip ends on a very wide lens as the rail trick lands. The figure is a runner shape.
 # track: drive
-# clip: 8 s · figure: runner · Beat Path
+# clip: 8 s · figure: runner · Draw Control
 landmarks: on seed 7
 figure: shape runner body #ff6a13 head #f2a35e
 scenery: street sight passes

@@ -1,5 +1,5 @@
 /**
- * The clumsy-user pass for the Beat Path page, called from smoke-beat-path.mjs. Each step is a
+ * The clumsy-user pass for the Draw Control page, called from smoke-beat-path.mjs. Each step is a
  * regression check for a bug found in the round-5 hunt:
  * - rapid example switching while playing lands on the last example with its own music;
  * - a selected scenery box or lane block never carries over to another example (Delete there did nothing wrong);
@@ -130,7 +130,7 @@ export async function smokeBeatPathHunt(browser, base, { fail }) {
   if (!noTrack.playing || noTrack.head < 0.2) fail(`no-track mode does not play (${JSON.stringify(noTrack)})`);
 
   if (errors.length) fail(`clumsy pass logged: ${errors.join(" | ")}`);
-  console.log("beat path hunt: switching, selections, field keys, undo, generate (cancel, stop, twice, mid-switch), gallery, no track, paid-run safety checked");
+  console.log("draw control hunt: switching, selections, field keys, undo, generate (cancel, stop, twice, mid-switch), gallery, no track, paid-run safety checked");
   await page.close();
   await smokePaidRuns(browser, base, { fail });
 }
@@ -176,7 +176,7 @@ async function smokeLaneMove(page, { fail }) {
   // One undo step takes the move back.
   await page.keyboard.press("ControlOrMeta+z");
   if (shape(await lane()) !== shape(before)) fail(`undo after a block move did not restore the order: ${shape(await lane())}`);
-  console.log(`beat path lanes: block drag ${shape(before)} → ${shape(after)}, Escape, click, undo checked`);
+  console.log(`draw control lanes: block drag ${shape(before)} → ${shape(after)}, Escape, click, undo checked`);
 }
 
 /**
@@ -203,7 +203,7 @@ async function smokeLaneEdge(page, { fail }) {
   for (let k = 1; k <= 40; k++) { await page.mouse.move(x0 + k / 40 * 4 * lane.width / total, y); cuts.push(JSON.parse(await cameraLane(page))[0][2]); }
   await page.mouse.up();
   const after = JSON.parse(await cameraLane(page))[0][2], steps = new Set(cuts).size;
-  console.log(`beat path lanes: edge drag in 40 small steps, cut ${cut0} → ${after} through ${steps} positions`);
+  console.log(`draw control lanes: edge drag in 40 small steps, cut ${cut0} → ${after} through ${steps} positions`);
   if (!(after >= cut0 + 3) || steps < 3) fail(`an edge drag lost the pointer after the first step (cut ${cut0} → ${after}, ${steps} positions: ${cuts.join(",")})`);
   if (!(await page.evaluate(() => document.getElementById("menu").hidden))) fail("releasing an edge drag opened the menu");
   await page.keyboard.press("ControlOrMeta+z");
@@ -223,7 +223,7 @@ async function smokeLaneUndoHeld(page, { fail }) {
   await page.keyboard.press("ControlOrMeta+z");
   const after = { lane: await cameraLane(page), sight: await sight() };
   await page.mouse.up();
-  console.log(`beat path lanes: undo during a held block drag: ${moved} → ${after.lane}, sight ${sight1} → ${after.sight}`);
+  console.log(`draw control lanes: undo during a held block drag: ${moved} → ${after.lane}, sight ${sight1} → ${after.sight}`);
   if (moved === before) fail("the held block drag did not rearrange the lane (the undo step proves nothing)");
   if (after.lane !== before || after.sight !== sight1) fail(`one undo during a held drag did more than end the drag: ${JSON.stringify(after)} (lane ${before}, sight ${sight1})`);
   await page.keyboard.press("ControlOrMeta+z");   // the sight toggle, taken back for the steps after
@@ -251,7 +251,7 @@ async function smokeLaneInterrupted(page, { fail }) {
   const released = await cameraLane(page);
   await page.waitForSelector("#costDialog:not([hidden])", { timeout: 120_000 }); await page.keyboard.press("Escape");
   await page.waitForFunction(() => document.getElementById("runGenerate").textContent === "Generate" && !window.__beatPath.busy(), null, { timeout: 15_000 }).catch(() => fail("the run did not end after Escape at its question"));
-  console.log(`beat path lanes: a block drag interrupted by the guide render: ${before} → mid-drag ${moved} → render ${during.lane}, released ${released}`);
+  console.log(`draw control lanes: a block drag interrupted by the guide render: ${before} → mid-drag ${moved} → render ${during.lane}, released ${released}`);
   if (moved === before) fail("the block drag did not rearrange the lane before the render (the step proves nothing)");
   if (during.lane !== before || during.moving) fail(`the render started with the lane mid-drag: ${JSON.stringify(during)} (before ${before})`);
   if (released !== before) fail(`releasing a block drag the render ended changed the lane: ${released} vs ${before}`);
@@ -298,7 +298,7 @@ async function smokePaidRuns(browser, base, { fail }) {
   await page.waitForTimeout(500);   // a render that kept going would reach its task by now
   const stopped = await page.evaluate(() => ({ status: document.getElementById("status").textContent, busy: window.__beatPath.busy(), shotOn: !document.getElementById("shotSubject").disabled, dialog: !document.getElementById("costDialog").hidden }));
   const sentAfterStop = await videoTasks() - tasks0;
-  console.log(`beat path paid runs: Stop during the render: Generate again after ${stopMs} ms, ${JSON.stringify(stopped)}, ${sentAfterStop} tasks sent`);
+  console.log(`draw control paid runs: Stop during the render: Generate again after ${stopMs} ms, ${JSON.stringify(stopped)}, ${sentAfterStop} tasks sent`);
   if (!gaveBack || stopMs > 1500) fail(`Stop during the guide render took ${stopMs} ms to give Generate back`);
   if (!/stopped/i.test(stopped.status ?? "") || !/nothing was submitted/i.test(stopped.status ?? "")) fail(`Stop during the render did not say it stopped with nothing submitted: ${stopped.status}`);
   if (stopped.busy || !stopped.shotOn || stopped.dialog) fail(`Stop during the render left the page busy, the shot locked or a question open (${JSON.stringify(stopped)})`);
@@ -312,14 +312,14 @@ async function smokePaidRuns(browser, base, { fail }) {
   await page.waitForFunction(() => document.getElementById("outputNote")?.textContent === "Rendering the guide…" && document.getElementById("outputNote")?.isConnected);
   await ex("1");
   const during = await bp(() => ({ slot: window.__beatPath.slot(), status: document.getElementById("status").textContent, on: document.querySelector('[data-control="example"] button.on')?.dataset.value }));
-  console.log(`beat path paid runs: switch during the render: ${JSON.stringify(during)}`);
+  console.log(`draw control paid runs: switch during the render: ${JSON.stringify(during)}`);
   if (during.slot !== "0" || during.on !== "0" || !/guide is rendering/.test(during.status ?? "")) fail(`a switch during the guide render was not refused: ${JSON.stringify(during)}`);
   // An edit refused during the render says so, not that it landed (Whole clip once reported success over the refusal).
   const laneNow = () => bp(() => JSON.stringify(window.__beatPath.state().cameraLane));
   const lane0 = await laneNow();
   const whole = await bp(() => { document.getElementById("status").textContent = ""; document.getElementById("wholeClip").click(); return { status: document.getElementById("status").textContent, busy: window.__beatPath.busy() }; });
   whole.same = (await laneNow()) === lane0;
-  console.log(`beat path paid runs: Whole clip during the render: ${JSON.stringify(whole)}`);
+  console.log(`draw control paid runs: Whole clip during the render: ${JSON.stringify(whole)}`);
   if (!whole.busy) fail("the render ended before Whole clip was pressed (the step proves nothing)");
   else if (!/guide is rendering/.test(whole.status ?? "") || !whole.same) fail(`Whole clip during the guide render did not say it was refused: ${JSON.stringify(whole)}`);
   await dialogOpen(); await page.click("#costOk"); await idle();
@@ -344,7 +344,7 @@ async function smokePaidRuns(browser, base, { fail }) {
   const imageNote = await page.textContent("#status");
   await page.waitForFunction(() => document.getElementById("costTitle").textContent === "Generate with this model?" && !document.getElementById("costDialog").hidden, null, { timeout: 10_000 })
     .catch(() => fail("the video run's question did not show after the image's was answered"));
-  console.log(`beat path paid runs: questions in turn: "${first}", still "${still}" after the guide, then "${await title()}"; status: ${imageNote}`);
+  console.log(`draw control paid runs: questions in turn: "${first}", still "${still}" after the guide, then "${await title()}"; status: ${imageNote}`);
   if (first !== "Generate this image?" || still !== first) fail(`the second question overwrote the first (${first} → ${still})`);
   if (!/Cancelled/.test(imageNote ?? "")) fail(`Cancel did not answer the image's question: ${imageNote}`);
   await page.click("#costOk"); await idle();
@@ -360,7 +360,7 @@ async function smokePaidRuns(browser, base, { fail }) {
   await press('[data-control="example"] [data-value="0"]');
   await page.waitForFunction(() => window.__beatPath.slot() === "0", null, { timeout: 30_000 });
   const back = await page.evaluate(() => { const b = document.querySelector("#generateSlot #genProgress"); return { bar: !!b && !b.hidden, note: document.querySelector("#generateSlot #outputNote")?.textContent ?? null }; });
-  console.log(`beat path paid runs: progress away ${away}, back ${JSON.stringify(back)}`);
+  console.log(`draw control paid runs: progress away ${away}, back ${JSON.stringify(back)}`);
   if (away || !back.bar || !back.note) fail(`the running job's progress was not shown again on its example (away ${away}, back ${JSON.stringify(back)})`);
   await press("#runGenerate");
   await idle().catch(() => fail("Stop did not end a run waiting on its question"));
@@ -372,7 +372,7 @@ async function smokePaidRuns(browser, base, { fail }) {
   const rows = await page.evaluate(() => [...document.querySelectorAll("#runsList .run-row.done")].map(r => ({
     kept: /kept in this browser/.test(r.textContent ?? ""), offers: [...r.querySelectorAll("button, a")].map(b => b.textContent).filter(t => t === "Show" || t === "Download" || /^Open/.test(t ?? "")),
   })));
-  console.log(`beat path paid runs: Runs rows ${JSON.stringify(rows)}`);
+  console.log(`draw control paid runs: Runs rows ${JSON.stringify(rows)}`);
   if (rows.some(r => !r.kept && r.offers.length)) fail(`Runs offers a local preview's released link: ${JSON.stringify(rows)}`);
   const shows = page.locator("#runsList .run-row.done button", { hasText: "Show" });
   if ((await shows.count()) < 2) fail(`Runs has fewer than two kept videos to show (${await shows.count()})`);
@@ -384,6 +384,6 @@ async function smokePaidRuns(browser, base, { fail }) {
     await page.evaluate(() => { document.getElementById("status").textContent = ""; });
   }
   if (errors.length) fail(`paid-run pass logged: ${errors.join(" | ")}`);
-  console.log("beat path paid runs: render lock, question queue, progress on return, Stop on a waiting question checked");
+  console.log("draw control paid runs: render lock, question queue, progress on return, Stop on a waiting question checked");
   await page.close();
 }

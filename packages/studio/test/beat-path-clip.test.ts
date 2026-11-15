@@ -10,7 +10,7 @@ import { BLANK_STATE, exampleState } from "../src/beat-path/examples";
 import { MODELS, clipRefusal } from "../src/beat-path/generate";
 import { faderHTML } from "../src/beat-path/ui/fader";
 
-describe("Beat Path clip length", () => {
+describe("Draw Control clip length", () => {
   it("takes whole seconds from 3 to 30", () => {
     expect([clampClip(2), clampClip(3), clampClip(12.4), clampClip(12.6), clampClip(30), clampClip(45), clampClip(NaN)]).toEqual([3, 3, 12, 13, 30, 30, 8]);
     expect(CLIP_SECONDS.marks).toEqual([5, 8, 10, 15, 20, 30]);

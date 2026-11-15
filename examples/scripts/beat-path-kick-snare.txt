@@ -1,6 +1,6 @@
-# Beat Path example: the figure lands on the kicks, the camera moves on the snares (each lane its own lock).
+# Draw Control example: the figure lands on the kicks, the camera moves on the snares (each lane its own lock).
 # prompt: A skateboarder pushes across an empty plaza, landing each push on the kick while the camera changes its angle on the snares; the orange figure is the skater, white marks the front.
-# clip: 8 s · figure: glider · Beat Path
+# clip: 8 s · figure: glider · Draw Control
 landmarks: on seed 7
 shot subject: a skateboarder
 shot environment: an empty concrete plaza

@@ -34,7 +34,7 @@ export async function smokeBeatPathRefs(browser, base, { fail, SHOTS }) {
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.waitForFunction(() => document.getElementById("thumbEnvironment").classList.contains("set"), null, { timeout: 10_000 }).catch(() => fail("dragging a gallery guide onto Environment did not fill the drop"));
   const tips = await page.evaluate(() => [document.getElementById("dropCharacter").dataset.tip, document.getElementById("dropEnvironment").dataset.tip, !document.getElementById("clearCharacter").hidden]);
-  console.log(`beat path refs: ${JSON.stringify(tips)}`);
+  console.log(`draw control refs: ${JSON.stringify(tips)}`);
   if (!/frame of the guide/.test(tips[0] ?? "") || !/frame of the guide/.test(tips[1] ?? "") || !tips[2]) fail(`the drops do not say where their images came from: ${JSON.stringify(tips)}`);
   await page.screenshot({ path: `${SHOTS}beat-path-refs.png` });
   // The cost dialog sends them.

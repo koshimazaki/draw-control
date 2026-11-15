@@ -1,6 +1,6 @@
 # Video models: length and frame rate
 
-What the three models Beat Path offers take and give back, checked 14 November 2026. Our guide video is always 24 fps with 24 × seconds + 1 frames (on the 8k+1 grid). Each model's output rate is its own, so the clip readout shows seconds only.
+What the three models Draw Control offers take and give back, checked 14 November 2026. Our guide video is always 24 fps with 24 × seconds + 1 frames (on the 8k+1 grid). Each model's output rate is its own, so the clip readout shows seconds only.
 
 | Model | Clip length | Guide video it accepts | Output fps |
 | --- | --- | --- | --- |

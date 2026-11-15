@@ -1,6 +1,6 @@
-# Beat Path example: over the shoulder, then the camera rises above and pushes in (typed camera direction).
+# Draw Control example: over the shoulder, then the camera rises above and pushes in (typed camera direction).
 # prompt: A hiker in a yellow jacket walks a ridge trail; the camera starts over her shoulder, then lifts above her and pushes in; the orange figure is the hiker, white marks her front.
-# clip: 8 s · figure: glider · Beat Path
+# clip: 8 s · figure: glider · Draw Control
 landmarks: on seed 7
 shot subject: a hiker in a yellow jacket
 shot environment: a ridge trail in the mountains

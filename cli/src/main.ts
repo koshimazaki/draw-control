@@ -1,9 +1,9 @@
 /**
  * motion-studio: the studio's edit commands from a terminal or an agent.
  *   analyse <audio> --out analysis.json
- *   groove <straight|drive|laidback> [--bars 9] --out track.wav   (the Beat Path examples' in-repo drum music)
+ *   groove <straight|drive|laidback> [--bars 9] --out track.wav   (the Draw Control examples' in-repo drum music)
  *   new [--character rigged|mannequin|block|stick|blob|glider] [--clip 5|8|10] [--slice 42.5] [--analysis a.json] --out recipe.json
- *       (--slice: where a Beat Path clip starts in a longer track, seconds, snapped to its nearest beat)
+ *       (--slice: where a Draw Control clip starts in a longer track, seconds, snapped to its nearest beat)
  *   apply <recipe.json> <commands.json> [--analysis a.json] [--out next.json]
  *   set <recipe.json> <path> <value> [--out next.json]
  *   describe <recipe.json> [--analysis a.json] [--script]
@@ -63,7 +63,7 @@ const FIGURE_NAMES: Record<string, string> = { mannequin: "Procedural mannequin"
 
 /** Start a recipe: the rigged mannequin dancing (or a procedural figure), fitted to the analysed track. */
 export function newRecipe(character: string, analysis?: AnalysisJson, clip = 8, slice?: number): Recipe {
-  // The glider starts from the Beat Path base: a clip of `clip` seconds, the rig the page uses; a slice starts it later in the track.
+  // The glider starts from the Draw Control base: a clip of `clip` seconds, the rig the page uses; a slice starts it later in the track.
   if (character === "glider") {
     const start = slice !== undefined && analysis?.bpm ? sliceStart(slice, { bpm: analysis.bpm, firstBeat: analysis.offsetSeconds, lengthSeconds: analysis.lengthSeconds }, clip) : undefined;
     const base = beatPathBase({ seconds: clip, ...(analysis?.bpm ? { bpm: analysis.bpm, offsetSeconds: start ?? analysis.offsetSeconds } : {}),
@@ -107,7 +107,7 @@ export async function main(argv: string[], out: (s: string) => void = s => conso
         const character = flagStr(flags, "character") ?? "rigged";
         if (!["rigged", ...PROCEDURAL_KINDS, "glider"].includes(character)) throw new Error(`--character must be rigged, ${PROCEDURAL_KINDS.join(", ")} or glider`);
         const clip = flagStr(flags, "clip") === undefined ? 8 : Number(flagStr(flags, "clip"));
-        if (!(clip > 0 && clip <= 60)) throw new Error("--clip takes seconds (Beat Path: whole seconds, 3 to 30)");
+        if (!(clip > 0 && clip <= 60)) throw new Error("--clip takes seconds (Draw Control: whole seconds, 3 to 30)");
         const slice = flagStr(flags, "slice") === undefined ? undefined : Number(flagStr(flags, "slice"));
         if (slice !== undefined && !(slice >= 0)) throw new Error("--slice takes seconds into the track");
         output(newRecipe(character, contextFrom(flags).analysis, clip, slice), flags, out);

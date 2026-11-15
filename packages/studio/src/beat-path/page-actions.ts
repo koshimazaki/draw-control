@@ -1,5 +1,5 @@
 /**
- * The Beat Path page's controls: the example switcher, the map tools, the lane menus and
+ * The Draw Control page's controls: the example switcher, the map tools, the lane menus and
  * lock chips, Settings (clip, locks, snap, grid, scenery, figure, download guide), the shot
  * fields, the music strip, and the keyboard (Space plays, Cmd/Ctrl-Z undoes, Shift redoes,
  * Delete removes the selection, Escape cancels a stroke or clears it). Split from page.ts.
@@ -334,7 +334,7 @@ export function bindActions(p: Page) {
       const recipe = p.recipe, range = exportRange(recipe, p.state.clip);
       const result = await exportBundle({ recipe, range, viewport: p.viewport, ...EXPORT, audio: p.track?.buffer ?? null, drive: p.drive,
         onProgress: (d, t) => { button.querySelector(".btn-label")!.textContent = `Rendering ${Math.round(d / t * 100)}%`; } });
-      download(result.zip, "beat-path-guide.zip", "application/zip");
+      download(result.zip, "draw-control-guide.zip", "application/zip");
       p.say(`Exported ${result.frames} frames, ${EXPORT.width}×${EXPORT.height}, ${(result.zip.length / 1e6).toFixed(1)} MB`);
     } catch (e) { p.say(`Export failed: ${(e as Error).message}`); }
     finally { p.busy = false; button.disabled = false; button.querySelector(".btn-label")!.textContent = "Download guide (.zip)"; }

@@ -5,7 +5,7 @@
  * exports two guide bundles and checks their contents. Fixtures are synthetic.
  * Covers: the 1280×720 default and the inline size and length warnings; a mid-track
  * range export (trimmed audio, re-based beats.json, ffprobe); the inline confirm that
- * clears library moves when switching to a loaded character; the Beat Path page (smoke-beat-path.mjs).
+ * clears library moves when switching to a loaded character; the Draw Control page (smoke-beat-path.mjs).
  * Output: out/smoke/ (gitignored). Needs Google Chrome installed (or CHROME_PATH).
  *   npm run smoke
  */
@@ -224,8 +224,8 @@ try {
 
   if (errors.length) fail(`page errors: ${errors.join(" | ")}`);
 
-  await page.close();   // the studio page holds dev-server connections open; Beat Path gets its own page
-  // 6. The Beat Path page (path.html): first run, a drawn path, lock on kick, a lane menu, a pasted script, an export.
+  await page.close();   // the studio page holds dev-server connections open; Draw Control gets its own page
+  // 6. The Draw Control page (path.html): first run, a drawn path, lock on kick, a lane menu, a pasted script, an export.
   await smokeBeatPath(browser, BASE, { fail, OUT, SHOTS: new URL("../out/", import.meta.url).pathname });
 } finally {
   await browser.close();
