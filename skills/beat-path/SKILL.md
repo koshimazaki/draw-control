@@ -42,6 +42,10 @@ The CLI equivalents are in `docs/agents.md` (`npm run cli -- commands`).
 
 The model gets the guide video, up to two reference images (character, environment) and the shot description: subject, action, setting. Describe what the guide shows in the words the model needs: the subject and how it moves, not the camera (the guide carries the camera). One guide serves many verticals: changing only the description and references turns a flying car in New Tokyo into a forklift in an engine factory.
 
+## Making a new example
+
+For a new example or shot from a brief (camera views such as isometric, top and side, and the transitions between them), follow [`skills/draw-control-example`](../draw-control-example/SKILL.md): the exact steps and the traps.
+
 ## Rules
 
 - **Never start a paid generation.** Rendering the guide is free. Generating a video or image spends the owner's Runware credits: propose the model, the clip length and the price (`docs/models.md`, the page's cost dialog), then wait for a yes.
