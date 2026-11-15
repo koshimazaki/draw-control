@@ -30,7 +30,15 @@ export type Mp4Writer = {
   /** Encode one rendered frame. Frame n is shown at n / fps seconds. */
   addFrame(canvas: HTMLCanvasElement, n: number): Promise<void>;
   finish(): Promise<{ bytes: Uint8Array; audioInVideo: boolean; codec: string }>;
+  /** Release the encoders. Safe in any state: before a frame, mid-encode, after a failure, after `finish`, twice. */
+  close(): void;
 };
+
+/** WebCodecs throws on closing a closed codec; a codec that already errored closes itself. */
+function shut(codec: { state: CodecState; close(): void } | null) {
+  if (!codec || codec.state === "closed") return;
+  try { codec.close(); } catch { /* closed meanwhile (an error callback) */ }
+}
 
 export async function createMp4Writer(opts: {
   width: number; height: number; fps: number;
@@ -48,38 +56,44 @@ export async function createMp4Writer(opts: {
     fastStart: "in-memory",
     firstTimestampBehavior: "offset",
   });
-  let failure: unknown = null;
+  let failure: unknown = null, closed = false;
+  let audio: AudioEncoder | null = null;
   const video = new VideoEncoder({ output: (chunk, meta) => muxer.addVideoChunk(chunk, meta), error: e => { failure = e; } });
-  video.configure(videoConfig);
+  const close = () => { closed = true; shut(video); shut(audio); };
+  try { video.configure(videoConfig); } catch (e) { close(); throw e; }
   const frameUs = 1_000_000 / opts.fps;
+  const live = () => { if (closed) throw new Error("The MP4 writer is closed."); if (failure) throw failure; };
 
   return {
     async addFrame(canvas, n) {
-      if (failure) throw failure;
+      live();
       const frame = new VideoFrame(canvas, { timestamp: Math.round(n * frameUs), duration: Math.round(frameUs) });
-      video.encode(frame, { keyFrame: n % (opts.fps * 2) === 0 });
-      frame.close();
-      while (video.encodeQueueSize > 6) await new Promise(r => setTimeout(r, 1));
+      try { video.encode(frame, { keyFrame: n % (opts.fps * 2) === 0 }); } finally { frame.close(); }
+      while (video.encodeQueueSize > 6 && !closed && !failure) await new Promise(r => setTimeout(r, 1));
+      live();
     },
     async finish() {
+      live();
       await video.flush();
-      video.close();
+      shut(video);
       let audioInVideo = false;
       if (audioConfig && opts.audio) {
-        await encodeAudio(opts.audio, channelCount, audioConfig, muxer);
+        audio = new AudioEncoder({ output: (chunk, meta) => muxer.addAudioChunk(chunk, meta), error: e => { failure = e; } });
+        await encodeAudio(audio, opts.audio, channelCount, audioConfig);
+        shut(audio);
         audioInVideo = true;
       }
-      if (failure) throw failure;
+      live();
       muxer.finalize();
+      closed = true;
       return { bytes: new Uint8Array(target.buffer), audioInVideo, codec: videoConfig.codec };
     },
+    close,
   };
 }
 
-async function encodeAudio(audio: { channels: Float32Array[]; sampleRate: number; startSeconds: number; seconds: number },
-  channelCount: number, config: AudioEncoderConfig, muxer: Muxer<ArrayBufferTarget>) {
-  let failure: unknown = null;
-  const encoder = new AudioEncoder({ output: (chunk, meta) => muxer.addAudioChunk(chunk, meta), error: e => { failure = e; } });
+async function encodeAudio(encoder: AudioEncoder, audio: { channels: Float32Array[]; sampleRate: number; startSeconds: number; seconds: number },
+  channelCount: number, config: AudioEncoderConfig) {
   encoder.configure(config);
   const total = Math.round(audio.seconds * audio.sampleRate);
   const from = Math.round(audio.startSeconds * audio.sampleRate);
@@ -93,10 +107,7 @@ async function encodeAudio(audio: { channels: Float32Array[]; sampleRate: number
     }
     const data = new AudioData({ format: "f32-planar", sampleRate: audio.sampleRate, numberOfFrames: n, numberOfChannels: channelCount,
       timestamp: Math.round(start / audio.sampleRate * 1_000_000), data: planar });
-    encoder.encode(data);
-    data.close();
+    try { encoder.encode(data); } finally { data.close(); }
   }
   await encoder.flush();
-  encoder.close();
-  if (failure) throw failure;
 }
