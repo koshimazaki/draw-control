@@ -6,10 +6,12 @@
  * audio.wav is the clip's length and its beats.json starts on a beat. 10 s clips export 241
  * frames. Then Example 1 is sliced with a hit switched off and a marker on a kick, Example 2 shown
  * and Example 1 again: it comes back with its cut, and both still sit on kicks of the music loaded.
+ * Then slicing again for a loop, zoom and the playhead (smoke-beat-path-reslice.mjs).
  * Any console error or warning fails the run.
  */
 import { writeFileSync } from "node:fs";
 import { drumWav } from "./smoke-features.mjs";
+import { smokeBeatPathReslice } from "./smoke-beat-path-reslice.mjs";
 
 export async function smokeBeatPathSlice(browser, base, { fail, OUT, SHOTS }) {
   const wav = `${OUT}long-track.wav`;
@@ -82,6 +84,7 @@ export async function smokeBeatPathSlice(browser, base, { fail, OUT, SHOTS }) {
   if (errors.length) fail(`slice step logged: ${errors.join(" | ")}`);
   await page.close();
   await smokeSliceReturn(browser, base, { fail });
+  await smokeBeatPathReslice(browser, base, { fail, OUT });
 }
 
 /** Example 1 sliced, Example 2 shown, Example 1 again: its cut comes back (slot-music.ts), and the switched-off hit and the marker sit on kicks of the music loaded. */

@@ -297,13 +297,13 @@ async function smokeTrackActions(page, fail, SHOTS) {
   const rate = v.getUint32(24, true), ch = v.getUint16(22, true), seconds = v.getUint32(40, true) / 2 / ch / rate;
   console.log(`draw control track: Export saved ${file.suggestedFilename()}: ${seconds.toFixed(3)} s, ${ch} channel(s), ${rate} Hz (window ${before.clip} s)`);
   if (String.fromCharCode(...bytes.subarray(0, 4)) !== "RIFF" || !/\.wav$/.test(file.suggestedFilename()) || Math.abs(seconds - before.clip) > 1 / 24) fail(`Export did not save the window as a WAV (${file.suggestedFilename()}, ${seconds} s)`);
-  // Slice: the track becomes the window, on the same beat grid; the lanes stay; Slice is then disabled.
+  // Slice: the track becomes the window, on the same beat grid; the lanes stay; the overview still shows and Slice stays available (a shorter window slices again).
   await page.click("#sliceTrack");
   await page.waitForFunction(n => window.__beatPath.trackName() !== n, before.name, { timeout: 30_000 });
   const sliced = await look();
   console.log(`draw control track: Slice → "${sliced.name}", ${sliced.length.toFixed(3)} s, ${sliced.bpm} BPM, beat 0 at ${sliced.offset} s; Slice ${sliced.slice ? "enabled" : "disabled"}, Export ${sliced.export ? "enabled" : "disabled"}; status "${sliced.status}"`);
   if (Math.abs(sliced.length - before.clip) > 1 / 24 || sliced.bpm !== before.bpm || sliced.offset !== 0 || sliced.lanes !== before.lanes) fail(`Slice did not make the window the track on the same grid (${JSON.stringify({ ...sliced, lanes: undefined })})`);
-  if (sliced.slice || !sliced.export || !/Sliced to/.test(sliced.status)) fail(`after Slice: Slice should be disabled and Export enabled, and the status say so (${sliced.slice}, ${sliced.export}, "${sliced.status}")`);
+  if (!sliced.slice || !sliced.export || !/Sliced to/.test(sliced.status)) fail(`after Slice: Slice and Export should stay enabled, and the status say so (${sliced.slice}, ${sliced.export}, "${sliced.status}")`);
   // The exported file loads back through Your track with the same length and tempo.
   await page.setInputFiles("#trackFile", { name: file.suggestedFilename(), mimeType: "audio/wav", buffer: bytes });
   await page.waitForFunction(n => window.__beatPath.trackName() === n, file.suggestedFilename(), { timeout: 30_000 });
