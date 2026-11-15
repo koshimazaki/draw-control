@@ -11,10 +11,10 @@ import { cameraAtFrame, clipBeats, planCamera } from "@motion-studio/core";
 import { EXAMPLES, exampleState } from "../src/beat-path/examples";
 import { beatPathRecipe, hopOnBeat } from "../src/beat-path/recipe-map";
 import { BLANK_STATE, fitLanes, fromScript, toScript } from "../src/beat-path/script";
-import { EXAMPLE_TRACKS } from "../src/beat-path/tracks";
+import { TRACKS } from "../src/beat-path/tracks";
 
 const i = EXAMPLES.findIndex(e => e.id === "runner");
-const t = EXAMPLE_TRACKS.runner;
+const t = TRACKS.runner;
 const info = { name: t.name, licence: t.licence, bpm: t.grid!.bpm, offsetSeconds: t.grid!.offsetSeconds, lengthSeconds: 11.04 };
 
 describe("Example 2: one street guide for any subject", () => {

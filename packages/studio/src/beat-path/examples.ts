@@ -1,26 +1,27 @@
 /**
- * The example switcher: four examples, each its own subject shape, path, scenery, camera,
- * music (tracks.ts) and shot description, stored as shot scripts in examples/scripts/ so
- * agents use the same files; "Your own" starts from a plain state. The other scripts in
- * examples/scripts/ (beat-path-*.txt) stay for agents and tests.
+ * The example switcher: Example 1 (the ship on the Neon Rain loop) and Example 2 (the street guide
+ * on the drum and bass loop), each its own subject shape, path, scenery, camera, music (tracks.ts)
+ * and shot description, stored as shot scripts in examples/scripts/ so agents use the same files;
+ * "Your own" starts from a plain state. The other scripts in examples/scripts/ (beat-path-*.txt)
+ * stay for agents, tests and the skill, off the page: beat-path-ex3-car.txt and
+ * beat-path-ex4-drone.txt were Examples 3 and 4 until 15 Nov 2026 (`scriptState` reads them).
  */
 import { BLANK_STATE, fromScript, type BeatPathState } from "./script";
+import type { ExampleId } from "./tracks";
 import flyer from "../../../../examples/scripts/beat-path-ex1-flyer.txt?raw";
 import runner from "../../../../examples/scripts/beat-path-ex2-runner.txt?raw";
-import car from "../../../../examples/scripts/beat-path-ex3-car.txt?raw";
-import drone from "../../../../examples/scripts/beat-path-ex4-drone.txt?raw";
 
 export { BLANK_STATE, DEFAULT_CAMERA_PATH } from "./script";
 
 export const EXAMPLES = [
   { id: "flyer", label: "Flying car", script: flyer },
   { id: "runner", label: "Street, any subject", script: runner },
-  { id: "car", label: "Car on a bend", script: car },
-  { id: "drone", label: "Drone between pillars", script: drone },
-] as const;
+] as const satisfies readonly { id: ExampleId; label: string; script: string }[];
 
-const TEMPO = { flyer: 107.5, runner: 174, car: 100, drone: 100 } as const;
-export const exampleState = (i: number): BeatPathState => fromScript(EXAMPLES[i].script, BLANK_STATE, { bpm: TEMPO[EXAMPLES[i].id], offsetSeconds: 0.09 }).state;
+const TEMPO: Record<ExampleId, number> = { flyer: 107.5, runner: 174 };
+/** A shot script's page state, its lanes timed at `bpm` (a script-only example's groove is 100 BPM). */
+export const scriptState = (script: string, bpm: number): BeatPathState => fromScript(script, BLANK_STATE, { bpm, offsetSeconds: 0.09 }).state;
+export const exampleState = (i: number): BeatPathState => scriptState(EXAMPLES[i].script, TEMPO[EXAMPLES[i].id]);
 
 /** "Your own": a plain path and camera to start from, no music of its own. */
 export const ownState = (): BeatPathState => ({

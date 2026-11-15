@@ -1,18 +1,21 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { cameraAtFrame, planCamera } from "@motion-studio/core";
-import { EXAMPLES, exampleState } from "../src/beat-path/examples";
+import { scriptState } from "../src/beat-path/examples";
 import { beatPathRecipe } from "../src/beat-path/recipe-map";
 import { BLANK_STATE, fromScript, setWord, toScript, type BeatPathState } from "../src/beat-path/script";
 import { SETUP_KIND, SETUP_VERSION, readSetup } from "../src/beat-path/setup-file";
 
-const drone = EXAMPLES.findIndex(e => e.id === "drone");
+/** The script-only examples (Examples 3 and 4 until 15 Nov 2026), read as fixtures: their grooves are 100 BPM. */
+const script = (name: string) => readFileSync(new URL(`../../../examples/scripts/${name}`, import.meta.url), "utf8");
+const droneState = () => scriptState(script("beat-path-ex4-drone.txt"), 100), carState = () => scriptState(script("beat-path-ex3-car.txt"), 100);
 const file = (state: unknown) => JSON.stringify({ kind: SETUP_KIND, version: SETUP_VERSION, state });
 
 describe("the page's camera start (the rig: line)", () => {
-  it("Example 4 carries its rig, and the page's recipe opens on it", () => {
-    const s = exampleState(drone);
+  it("the drone script (beat-path-ex4-drone.txt) carries its rig, and the page's recipe opens on it", () => {
+    const s = droneState();
     expect(s.rig).toEqual({ distance: 8, height: 5, fov: 30, yaw: 45 });
-    expect(s.track).toBe("drone");
+    expect(s.track).toBe("laidback-6");
     const r = beatPathRecipe(s, { name: "generated-laidback-100-6bars.wav", licence: "MIT", bpm: 100, offsetSeconds: 0.09, lengthSeconds: 15 });
     expect(r.camera).toMatchObject({ distance: 8, height: 5, fov: 30, startYaw: 45 });
     expect(r.camera!.segments.map(g => g.modes.join("+"))).toEqual(["threeQuarter", "orbit", "top", "side"]);
@@ -27,13 +30,13 @@ describe("the page's camera start (the rig: line)", () => {
     expect(fromScript(toScript(BLANK_STATE), s).state.rig).toBeUndefined();
     expect(beatPathRecipe(BLANK_STATE, null).camera).toMatchObject({ distance: 7, height: 1.6, fov: 40, startYaw: 0 });
   });
-  it("the track comment tells Example 3 and Example 4 apart (both laidback)", () => {
-    expect(toScript(exampleState(drone))).toMatch(/^# track: laidback 6 bars$/m);
-    expect(toScript(exampleState(EXAMPLES.findIndex(e => e.id === "car")))).toMatch(/^# track: laidback$/m);
-    expect(fromScript("# track: laidback\nbeats 0-4 | action: rest\n", BLANK_STATE).state.track).toBe("car");
+  it("the track comment tells the car and drone scripts' grooves apart (both laidback)", () => {
+    expect(toScript(droneState())).toMatch(/^# track: laidback 6 bars$/m);
+    expect(toScript(carState())).toMatch(/^# track: laidback$/m);
+    expect(fromScript("# track: laidback\nbeats 0-4 | action: rest\n", BLANK_STATE).state.track).toBe("laidback");
   });
   it("a camera block written with shot: - keeps it (no preset pulls it to the preset's framing); a new word drops it", () => {
-    const s = exampleState(drone);
+    const s = droneState();
     expect(s.cameraLane.every(b => b.shot === "-")).toBe(true);
     expect(toScript(s).split("\n").filter(l => l.startsWith("beats ")).every(l => l.endsWith("| shot: -"))).toBe(true);
     expect(setWord(s.cameraLane, 2, "top")[2].shot).toBeUndefined();
@@ -50,9 +53,9 @@ describe("a follow block keeps its fov", () => {
     expect(b.phrase).toBeUndefined();
     expect(toScript(state)).toContain(`camera: ${cell} | shot: -`);
   });
-  it("Example 4's last block is a plain side block with fov 35", () => {
-    expect(exampleState(drone).cameraLane.at(-1)).toMatchObject({ word: "side", follow: { distance: 6, height: 1.6, angle: 180 }, fov: 35 });
-    expect(exampleState(drone).cameraLane.at(-1)!.phrase).toBeUndefined();
+  it("the drone script's last block is a plain side block with fov 35", () => {
+    expect(droneState().cameraLane.at(-1)).toMatchObject({ word: "side", follow: { distance: 6, height: 1.6, angle: 180 }, fov: 35 });
+    expect(droneState().cameraLane.at(-1)!.phrase).toBeUndefined();
   });
   it("a fov outside the camera's range stays a typed direction; a setup file clamps it", () => {
     expect(fromScript("beats 0-4 | action: rest | camera: follow side fov 200 | shot: -\n", BLANK_STATE).state.cameraLane[0].phrase).toBe("follow side fov 200");

@@ -12,7 +12,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { EXAMPLES } from "../src/beat-path/examples";
 import { MODELS } from "../src/beat-path/generate";
-import { EXAMPLE_TRACKS } from "../src/beat-path/tracks";
+import { EXAMPLE_IDS } from "../src/beat-path/tracks";
 import { checkClip, isRecord, loadPublished, parsePublished, resolveClipUrl, tileClip, withClip, emptyIndex } from "../src/beat-path/published";
 
 const ids = { examples: EXAMPLES.map(e => e.id), models: MODELS.map(m => m.id) };
@@ -23,9 +23,11 @@ describe("Published clips: reading the list", () => {
     const list = parsePublished({ version: 1, clips: {
       flyer: { "kling-4": { url: "published/flyer-kling-4.mp4", prompt: "a car", costUsd: 0.42, seconds: 8 }, "h3": { url: "https://r2.example/h3.mp4", prompt: "p" }, "nope": { url: "x.mp4" } },
       runner: { "kling-4": { url: "javascript:alert(1)" }, "seedance-2.5": { url: "//evil.example/x.mp4" }, "h3": { url: "data:video/mp4;base64,AA" } },
-      car: { "kling-4": { url: "c.mp4", costUsd: -1 }, "h3": { url: "c.mp4", seconds: "8" }, "seedance-2.5": "not an object" },
+      // An example no longer on the page (Example 3 until 15 Nov 2026) is dropped like any unknown one.
+      car: { "kling-4": { url: "c.mp4" } },
       ghost: { "kling-4": { url: "g.mp4" } },
     } }, ids, PAGE);
+    expect(parsePublished({ version: 1, clips: { runner: { "kling-4": { url: "c.mp4", costUsd: -1 }, "h3": { url: "c.mp4", seconds: "8" }, "seedance-2.5": "not an object" } } }, ids, PAGE)).toEqual([]);
     expect(list).toEqual([
       { example: "flyer", model: "kling-4", url: "https://demo.example/some/sub/path/published/flyer-kling-4.mp4", prompt: "a car", costUsd: 0.42, seconds: 8 },
       { example: "flyer", model: "h3", url: "https://r2.example/h3.mp4", prompt: "p" },
@@ -41,7 +43,7 @@ describe("Published clips: reading the list", () => {
   });
   it("fetches the list next to the page and never throws", async () => {
     let asked = "";
-    const ok = (async (u: string) => { asked = u; return { ok: true, json: async () => ({ version: 1, clips: { car: { h3: { url: "published/c.mp4", prompt: "" } } } }) }; }) as unknown as typeof fetch;
+    const ok = (async (u: string) => { asked = u; return { ok: true, json: async () => ({ version: 1, clips: { runner: { h3: { url: "published/c.mp4", prompt: "" } } } }) }; }) as unknown as typeof fetch;
     expect(await loadPublished(ids, PAGE, ok)).toHaveLength(1);
     expect(asked).toBe("https://demo.example/some/sub/path/published/index.json");
     const missing = (async () => ({ ok: false, status: 404, json: async () => ({}) })) as unknown as typeof fetch;
@@ -78,8 +80,8 @@ describe("Published clips: which clip a model tile shows", () => {
   it("setting an entry over a value that is not an object starts that example afresh", () => {
     const clip = { url: "a.mp4", prompt: "" };
     for (const prev of ["oops", ["x"], 3, null]) {
-      const broken = { version: 1, clips: { flyer: prev, car: { h3: clip } } } as unknown as Parameters<typeof withClip>[0];
-      expect(withClip(broken, "flyer", "h3", clip).clips).toEqual({ flyer: { h3: clip }, car: { h3: clip } });
+      const broken = { version: 1, clips: { flyer: prev, runner: { h3: clip } } } as unknown as Parameters<typeof withClip>[0];
+      expect(withClip(broken, "flyer", "h3", clip).clips).toEqual({ flyer: { h3: clip }, runner: { h3: clip } });
     }
   });
 });
@@ -93,7 +95,7 @@ describe("Published clips: npm run publish:clip", () => {
   afterEach(() => { if (root) rmSync(root, { recursive: true, force: true }); });
 
   it("checks against the same example ids the page uses", () => {
-    expect(Object.keys(EXAMPLE_TRACKS).sort()).toEqual([...ids.examples].sort());
+    expect([...EXAMPLE_IDS].sort()).toEqual([...ids.examples].sort());
   });
   it("copies a local clip into public/published/ and writes its entry", () => {
     fresh(); const clip = join(root, "take.mp4"); writeFileSync(clip, "fake");
@@ -104,13 +106,14 @@ describe("Published clips: npm run publish:clip", () => {
   });
   it("writes only the entry for a URL, keeping the others", () => {
     fresh();
-    expect(run("car", "h3", "https://r2.example/car-h3.mp4").status).toBe(0);
+    expect(run("runner", "h3", "https://r2.example/runner-h3.mp4").status).toBe(0);
     expect(run("flyer", "kling-4", "https://r2.example/f.mp4", "--prompt", "p").status).toBe(0);
-    expect(index().clips).toEqual({ car: { h3: { url: "https://r2.example/car-h3.mp4", prompt: "" } }, flyer: { "kling-4": { url: "https://r2.example/f.mp4", prompt: "p" } } });
+    expect(index().clips).toEqual({ runner: { h3: { url: "https://r2.example/runner-h3.mp4", prompt: "" } }, flyer: { "kling-4": { url: "https://r2.example/f.mp4", prompt: "p" } } });
   });
   it("refuses unknown ids, a path-like id, a non-video file, a bad number and a broken list", () => {
     fresh(); const clip = join(root, "take.mp4"); writeFileSync(clip, "fake"); writeFileSync(join(root, "notes.txt"), "x");
-    for (const args of [["nope", "h3", clip], ["flyer", "gpt", clip], ["../../etc", "h3", clip], ["flyer", "../h3", clip], ["flyer", "h3", join(root, "notes.txt")], ["flyer", "h3", clip, "--cost", "-2"], ["flyer", "h3", "javascript:alert(1)"]]) {
+    // "car" and "drone" were Examples 3 and 4 until 15 Nov 2026: no longer example ids.
+    for (const args of [["nope", "h3", clip], ["car", "h3", clip], ["drone", "h3", clip], ["flyer", "gpt", clip], ["../../etc", "h3", clip], ["flyer", "../h3", clip], ["flyer", "h3", join(root, "notes.txt")], ["flyer", "h3", clip, "--cost", "-2"], ["flyer", "h3", "javascript:alert(1)"]]) {
       const r = run(...args);
       expect(r.status, args.join(" ")).not.toBe(0);
     }
@@ -123,19 +126,19 @@ describe("Published clips: npm run publish:clip", () => {
   it("refuses a list with a non-object example or an entry the page would not show, naming it and leaving the file as it was", () => {
     fresh(); mkdirSync(join(root, "packages/studio/public/published"), { recursive: true });
     const file = join(root, "packages/studio/public/published/index.json");
-    for (const body of ['{"version":1,"clips":{"flyer":"oops"}}', '{"version":1,"clips":{"car":{},"flyer":["x"]}}', '{"version":1,"clips":{"flyer":null}}', '{"version":1,"clips":{"flyer":{"h3":"oops"}}}', '{"version":1,"clips":{"car":{"h3":{"url":"javascript:alert(1)"}}}}']) {
+    for (const body of ['{"version":1,"clips":{"flyer":"oops"}}', '{"version":1,"clips":{"runner":{},"flyer":["x"]}}', '{"version":1,"clips":{"flyer":null}}', '{"version":1,"clips":{"flyer":{"h3":"oops"}}}', '{"version":1,"clips":{"runner":{"h3":{"url":"javascript:alert(1)"}}}}']) {
       writeFileSync(file, body);
       const r = run("flyer", "h3", "https://r2.example/f.mp4");
       expect(r.status, body).not.toBe(0);
       expect(r.stderr).toMatch(/fix or remove it first/);
       expect(readFileSync(file, "utf8")).toBe(body);
     }
-    const body = '{"version":1,"clips":{"car":{"h3":{"url":"c.mp4","prompt":""}},"flyer":{"h3":"oops","kling-4":{"url":"f.mp4","costUsd":-1}}}}';
+    const body = '{"version":1,"clips":{"runner":{"h3":{"url":"c.mp4","prompt":""}},"flyer":{"h3":"oops","kling-4":{"url":"f.mp4","costUsd":-1}}}}';
     writeFileSync(file, body);
-    const r = run("car", "h3", "https://r2.example/c.mp4");
+    const r = run("runner", "h3", "https://r2.example/c.mp4");
     expect(r.status).not.toBe(0);
     expect(r.stderr).toMatch(/flyer\/h3, flyer\/kling-4\); fix or remove it first/);
-    expect(r.stderr).not.toMatch(/car\/h3/);
+    expect(r.stderr).not.toMatch(/runner\/h3/);
     expect(readFileSync(file, "utf8")).toBe(body);
   });
   it("refuses a local file over 25 MiB before copying it, unless --force", () => {
@@ -156,15 +159,15 @@ describe("Published clips: npm run publish:clip", () => {
   it("keeps one clip per tile: a new extension or a URL removes the old copy", () => {
     fresh(); const dir = join(root, "packages/studio/public/published");
     const mp4 = join(root, "take.mp4"), webm = join(root, "take.webm"); writeFileSync(mp4, "a"); writeFileSync(webm, "b");
-    expect(run("car", "h3", mp4).status).toBe(0);
-    const r = run("car", "h3", webm);
-    expect(r.stdout).toMatch(/removed the old car-h3\.mp4/);
-    expect(existsSync(join(dir, "car-h3.mp4"))).toBe(false);
-    expect(existsSync(join(dir, "car-h3.webm"))).toBe(true);
-    expect(run("car", "h3", webm).stdout).toMatch(/car-h3\.webm/);
-    expect(run("car", "h3", "https://r2.example/c.mp4").status).toBe(0);
-    expect(existsSync(join(dir, "car-h3.webm"))).toBe(false);
-    expect(index().clips.car.h3.url).toBe("https://r2.example/c.mp4");
+    expect(run("runner", "h3", mp4).status).toBe(0);
+    const r = run("runner", "h3", webm);
+    expect(r.stdout).toMatch(/removed the old runner-h3\.mp4/);
+    expect(existsSync(join(dir, "runner-h3.mp4"))).toBe(false);
+    expect(existsSync(join(dir, "runner-h3.webm"))).toBe(true);
+    expect(run("runner", "h3", webm).stdout).toMatch(/runner-h3\.webm/);
+    expect(run("runner", "h3", "https://r2.example/c.mp4").status).toBe(0);
+    expect(existsSync(join(dir, "runner-h3.webm"))).toBe(false);
+    expect(index().clips.runner.h3.url).toBe("https://r2.example/c.mp4");
   });
   it("runs as an npm script with no other setup", () => {
     fresh();

@@ -12,12 +12,12 @@ import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, realpat
 import { extname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { MODELS } from "../packages/studio/src/beat-path/generate.ts";
-import { EXAMPLE_TRACKS } from "../packages/studio/src/beat-path/tracks.ts";
+import { EXAMPLE_IDS } from "../packages/studio/src/beat-path/tracks.ts";
 import { checkClip, emptyIndex, isRecord, withClip } from "../packages/studio/src/beat-path/published.ts";
 
 const PAGES_LIMIT = 25 * 1024 * 1024;
 const VIDEO_EXT = new Set([".mp4", ".webm"]);
-const examples = Object.keys(EXAMPLE_TRACKS), models = MODELS.map(m => m.id);
+const examples = [...EXAMPLE_IDS], models = MODELS.map(m => m.id);
 const usage = "usage: npm run publish:clip -- <example-id> <model-id> <file-or-url> [--prompt \"…\"] [--cost 0.42] [--seconds 8] [--force]";
 
 function fail(msg) { console.error(`publish:clip: ${msg}`); process.exit(1); }

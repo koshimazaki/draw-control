@@ -40,9 +40,12 @@ export function bindSetup(p: Page) {
     const read = readSetup(source.text);
     if (!read.ok) { p.say(`Not loaded: ${read.error}`); return; }
     if (p.busy) { p.say(BUSY); return; }
+    // Saved on Example 3 or 4, which left the page: it loads into Your own, its state and its groove as saved.
+    if (read.retired && p.slot !== "own") { await p.switchSlot("own"); if (p.slot !== "own") return; }
     const done = await p.loadSetup(read.state, read.music, source.audio);
     if (!done) return;
-    const notes = [...(done.note ? [done.note] : []), ...read.notes, ...(done.music ? ["Undo puts back the page, not the music"] : [])];
+    const retired = read.retired ? [`it was made on ${read.retired}, no longer on the page: loaded as Your own, as it was saved`] : [];
+    const notes = [...retired, ...(done.note ? [done.note] : []), ...read.notes, ...(done.music ? ["Undo puts back the page, not the music"] : [])];
     // A shot that does not build (the music loaded lacks the hits it anchors on) is said first, never hidden behind "Loaded".
     const refusal = shotRefusal(p);
     p.say(`${refusal ? `${refusal} · the preview shows the last shot that built · ` : ""}Loaded the setup from ${from}${notes.length ? ` · ${notes.join(" · ")}` : ""}`);

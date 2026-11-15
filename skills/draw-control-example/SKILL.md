@@ -16,7 +16,7 @@ order; every trap below cost a real render once.
 
 Grammar: `docs/recipe.md#shot-script` (rows, camera words, and every settings line: `rig:`, `box:`,
 `scenery:`, `figure:`, `shot …:`). Working examples: `examples/scripts/beat-path-ex*.txt`;
-`beat-path-ex4-drone.txt` is the worked answer to an isometric → pan → top → side brief;
+`beat-path-ex4-drone.txt` (script-only: Example 4 on the page until 15 Nov 2026) is the worked answer to an isometric → pan → top → side brief;
 `beat-path-ex2-runner.txt` to "one guide for a runner, a skater and a forklift" (step 8).
 
 ## 0. Setup
@@ -270,6 +270,13 @@ ffmpeg -v error -y -i out/x/v1/guide.mp4 -vf "select='not(mod(n\,16))',scale=320
 
 ## 6. Ship it as a page example
 
+A script does not have to be on the page: the switcher shows Example 1, Example 2 and Your own,
+and every other script in `examples/scripts/` is for agents, tests and this skill. The drone
+(`beat-path-ex4-drone.txt`) is the script-only worked example: it was Example 4 until
+15 Nov 2026, left the switcher with the car (`beat-path-ex3-car.txt`), and still renders through
+the CLI and MCP; its groove stays in `tracks.ts` (`laidback-6`) for anything that names it. Ship
+a script as a page example only when the owner asks for it on the page.
+
 The page reads the script into its own state and prints it back, so write the file in the page's form:
 - block edges on half beats (see step 1);
 - every camera cell carries the camera lane's lock, or none (the page applies one lock to all; Example 1 has none);
@@ -282,13 +289,16 @@ The page reads the script into its own state and prints it back, so write the fi
   fallback `groove`.
 
 1. `examples/scripts/beat-path-ex<N>-<id>.txt` with `# track:` and `# clip:` header lines.
-2. `packages/studio/src/beat-path/examples.ts` (EXAMPLES, TEMPO), `tracks.ts` (EXAMPLE_TRACKS,
-   `ExampleId`), the example switcher in `layout.ts`, and anything else that lists the ids
-   (`git grep -n -E '"drone"|drone:|ExampleId'` shows every place example 4 touched; the
-   switcher in `layout.ts`, the smoke's example loops and the MCP parity test's script count are
-   not in that grep: `git grep -n -E 'Example 4|"3", "0"|toBe\(1[0-9]\)'`).
+2. `packages/studio/src/beat-path/examples.ts` (EXAMPLES, TEMPO), `tracks.ts` (`EXAMPLE_IDS`,
+   `TRACKS`, `TrackId`), the example switcher in `layout.ts`, and anything else that lists the
+   ids (`git grep -n -E 'EXAMPLE_IDS|ExampleId|TrackId|"runner"|runner:'`; the switcher in
+   `layout.ts`, the smokes' example loops (`data-value`, `["0", "1", "own"]`) and the MCP parity
+   test's script count are not in that grep: `git grep -n -E 'Example 2|"1", "own"|toBe\(1[0-9]\)'`).
+   **Taking an example off the page** (as Examples 3 and 4 were, 15 Nov 2026): keep its script and
+   its track entry, add its old id to `RETIRED_TRACKS` in `tracks.ts` so a setup saved on it loads
+   as Your own, and move every smoke step that switches to it.
    **Replacing an example** (as Examples 1 and 2 were; the old ones are `beat-path-avenue-cross.txt` and
-   `beat-path-skate-rail.txt`, and the smokes that need an 8 s clip with music longer than it now use Example 3): the tests and smokes that used it as a generic
+   `beat-path-skate-rail.txt`; the smokes that need an 8 s clip with music longer than it now use Your own, which keeps the loaded track under its 8 s clip, and the slice-return smoke shortens Example 2's clip): the tests and smokes that used it as a generic
    fixture break (a two-block snare-locked lane, an 8 s clip, music longer than the clip, slicing
    it). Keep the old script under a new name (`beat-path-avenue-cross.txt`, read by
    `packages/studio/test/avenue.ts`) and point those tests at it; move the smokes that slice or

@@ -10,7 +10,7 @@ Every edit in the page is a command an agent can run too, so the page, the CLI a
 | --- | --- | --- |
 | MCP server | `node mcp/bin/motion-studio-mcp.mjs` (stdio) | [docs/agents.md](docs/agents.md) |
 | CLI | `npm run cli -- commands` | [docs/agents.md](docs/agents.md) |
-| Shot scripts | `examples/scripts/beat-path-*.txt` | [docs/recipe.md](docs/recipe.md#shot-script) |
+| Shot scripts | `examples/scripts/beat-path-*.txt` (the page shows Example 1, `beat-path-ex1-flyer.txt`, and Example 2, `beat-path-ex2-runner.txt`; the car and drone, `-ex3-car` and `-ex4-drone`, are script-only) | [docs/recipe.md](docs/recipe.md#shot-script) |
 | Hermes on Runware | `npm run hermes:setup`, then `hermes -p beat-path` | [docs/hermes.md](docs/hermes.md) |
 
 ## Skills

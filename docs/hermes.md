@@ -75,7 +75,7 @@ So the limit is a counter of declared estimates that forces a fresh yes from the
 
 ## Things to ask it
 
-- "Open example 3, make the car a lorry with a trailer, and keep the camera swinging round it on the snare." The agent edits the shot description, describes the shot back and renders the guide.
+- "Open the car on the bend (`examples/scripts/beat-path-ex3-car.txt`), make the car a lorry with a trailer, and keep the camera swinging round it on the snare." The agent edits the shot description, describes the shot back and renders the guide.
 - "Draw a path that weaves between the towers, and move the camera to the top on every fourth snare." The agent writes the paths in metres and cuts the Camera lane on the snares.
 - "Make a character reference: a courier in a plain brown uniform, three views." The agent reads the price through Runware's MCP, says it, and runs it after your yes (and after Hermes's own approval prompt).
 - "Review this branch with GLM-5.3, then check its findings." The agent dry-runs `npm run review`, tells you the ceiling and what goes out, runs it with `--yes` only after your yes, and checks each finding against the code ([`skills/runware-review`](../skills/runware-review/SKILL.md)).

@@ -2,17 +2,18 @@
  * The setup file (setup-file.ts, setup-source.ts): the whole page saved as JSON and read back, never
  * throwing on a bad file; a guide zip's or folder's setup.json and audio; what music a setup brings.
  */
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { strToU8, zipSync } from "fflate";
-import { EXAMPLES, exampleState, ownState } from "../src/beat-path/examples";
+import { EXAMPLES, exampleState, ownState, scriptState } from "../src/beat-path/examples";
 import { BLANK_STATE, toScript, type BeatPathState } from "../src/beat-path/script";
 import { SETUP_KIND, SETUP_VERSION, buildSetup, readSetup, setupJson } from "../src/beat-path/setup-file";
 import { awaitFor, fromZip, keepSliceIn, matchAwaited, musicKind, pickFromFolder, planMusic, restoreAwaited, tooBig } from "../src/beat-path/setup-source";
-import { EXAMPLE_TRACKS } from "../src/beat-path/tracks";
+import { TRACKS } from "../src/beat-path/tracks";
 import { notBuilt, shotRefusal } from "../src/beat-path/page-setup";
 import { avenueState } from "./avenue";
 
-const flyerMusic = { name: EXAMPLE_TRACKS.flyer.name, licence: EXAMPLE_TRACKS.flyer.licence, bpm: 120, offsetSeconds: 0.1, lengthSeconds: 18.6 };
+const flyerMusic = { name: TRACKS.flyer.name, licence: TRACKS.flyer.licence, bpm: 120, offsetSeconds: 0.1, lengthSeconds: 18.6 };
 const own = { name: "song.mp3", licence: "unspecified", bpm: 128, offsetSeconds: 0.32, lengthSeconds: 201.4 };
 const ok = (text: string) => { const r = readSetup(text); if (!r.ok) throw new Error(r.error); return r; };
 const file = (state: unknown, extra: Record<string, unknown> = {}) => JSON.stringify({ kind: SETUP_KIND, version: SETUP_VERSION, state, ...extra });
@@ -20,11 +21,32 @@ const file = (state: unknown, extra: Record<string, unknown> = {}) => JSON.strin
 describe("round trip", () => {
   it.each(EXAMPLES.map((e, i) => [e.id, i] as const))("example %s comes back as it was saved", (_, i) => {
     // Each example's music at its own tempo (examples.ts).
-    const id = EXAMPLES[i].id, music = { ...flyerMusic, name: EXAMPLE_TRACKS[id].name, bpm: { flyer: 107.5, runner: 174, car: 100, drone: 100 }[id] };
+    const id = EXAMPLES[i].id, music = { ...flyerMusic, name: TRACKS[id].name, bpm: { flyer: 107.5, runner: 174 }[id] };
     const state = exampleState(i), r = ok(setupJson(state, music));
     expect(r.state).toEqual(state);
     expect(r.notes).toEqual([]);
     expect(r.music).toEqual(music);
+  });
+  it.each([["car", "beat-path-ex3-car.txt", "laidback", "Example 3"], ["drone", "beat-path-ex4-drone.txt", "laidback-6", "Example 4"]] as const)(
+    "a setup saved on the retired %s example (track id kept) loads intact on its groove, flagged for Your own", (old, name, id, example) => {
+      // Saved before 15 Nov 2026: the state named the example ("car", "drone") as its track.
+      const state = scriptState(readFileSync(new URL(`../../../examples/scripts/${name}`, import.meta.url), "utf8"), 100);
+      const music = { ...flyerMusic, name: TRACKS[id].name, bpm: 100 };
+      const r = ok(file({ ...state, track: old }, { music }));
+      expect(r.state).toEqual(state);
+      expect(r.state.track).toBe(id);
+      expect(r.retired).toMatch(new RegExp(`^${example} `));
+      expect(r.notes).toEqual([]);
+      expect(planMusic(r.state, r.music, null, false)).toEqual({ plan: { kind: "example", id } });
+    });
+  it("a setup of the page's own examples is not flagged retired, and an unknown track id is dropped with a note", () => {
+    expect(ok(setupJson(exampleState(0), null)).retired).toBeUndefined();
+    for (const bad of ["__proto__", "constructor", "boat"]) {
+      const r = ok(file({ ...exampleState(0), track: bad }));
+      expect(r.retired).toBeUndefined();
+      expect(r.state.track).toBeUndefined();
+      expect(r.notes).toContain("example music: not readable, left as on a blank page");
+    }
   });
   describe("the camera's next move on each hit (anchors that need the track's hits)", () => {
     // The avenue shot (Example 1 until 15 Nov): camera locked to the snare; with advance on, the script anchors its second block on "@snare 1".
