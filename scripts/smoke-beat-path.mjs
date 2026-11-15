@@ -9,14 +9,17 @@
  * 5. Export saves the music in the clip window as a WAV, Slice makes it the track, the WAV loads back alike;
  * 6. screenshots of both themes at 1280×720 and 1440×900 in out/;
  * 7. Settings › Setup: save, load back, the guide zip and folder, the user's own track (smoke-beat-path-setup.mjs);
- * 8. the prompt editor and Timed on Example 1 (smoke-beat-path-prompt.mjs).
+ * 8. the prompt editor and Timed on Examples 1 and 2 (smoke-beat-path-prompt.mjs);
+ * 9. A setup saved on Example 3 or 4 (off the page since 15 Nov 2026) loads as Your own, as saved (smoke-beat-path-retired.mjs).
  */
 import { mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { unzipSync, strFromU8 } from "fflate";
+import { drumWav } from "./smoke-features.mjs";
 import { smokeBeatPathMap } from "./smoke-beat-path-map.mjs";
 import { smokeBeatPathHunt } from "./smoke-beat-path-hunt.mjs";
 import { smokeBeatPathFallback } from "./smoke-beat-path-fallback.mjs";
+import { smokeBeatPathRetired } from "./smoke-beat-path-retired.mjs";
 import { smokeBeatPathFollow } from "./smoke-beat-path-follow.mjs";
 import { smokeBeatPathParallel } from "./smoke-beat-path-parallel.mjs";
 import { smokeBeatPathSlice } from "./smoke-beat-path-slice.mjs";
@@ -155,15 +158,15 @@ export async function smokeBeatPath(browser, base, { fail, OUT, SHOTS }) {
   if ((await probe()).state.boxes.length !== boxes.length) fail("Delete did not remove the block");
   await page.mouse.move(mid.x, mid.y);
   await page.screenshot({ path: `${SHOTS}beat-path-blocks.png` });
-  // Example 3's camera follows its lane (no drawn path): the camera tool says so.
-  await page.click('[data-control="example"] [data-value="2"]');
+  // Example 2's camera follows its lane (no drawn path): the camera tool says so.
+  await page.click('[data-control="example"] [data-value="1"]');
   await page.click('[data-control="tool"] [data-value="camera"]');
   const hint = await page.textContent("#mapHint");
   if (!/camera follows the Camera lane/.test(hint ?? "")) fail(`the camera tool does not say the camera follows the lane: ${hint}`);
   await page.click('[data-control="tool"] [data-value="subject"]');
 
   // Every example loads framed: each path point, camera-track point and scenery box inside the map.
-  for (const ex of ["1", "2", "3", "0"]) {
+  for (const ex of ["1", "0"]) {
     await page.click(`[data-control="example"] [data-value="${ex}"]`);
     await page.waitForTimeout(400);
     const inside = await page.evaluate(() => window.__beatPath.mapInside());
@@ -178,27 +181,13 @@ export async function smokeBeatPath(browser, base, { fail, OUT, SHOTS }) {
   await page.waitForFunction(() => window.__beatPath.recipe().figure?.shape === "runner" && window.__beatPath.recipe().beatGrid.bpm === 174, null, { timeout: 30_000 });
   await page.screenshot({ path: `${SHOTS}beat-path-example-2.png` });
   await smokeExample2(page, fail);
-  await page.click('[data-control="example"] [data-value="2"]');
-  await page.waitForFunction(() => window.__beatPath.recipe().figure?.shape === "car" && window.__beatPath.recipe().beatGrid.bpm < 110, null, { timeout: 30_000 });
-  await page.screenshot({ path: `${SHOTS}beat-path-example-3.png` });
-  // Example 4: the drone opens on the rig's start (the script's rig: line), isometric and high, then orbit, top and side.
-  await page.click('[data-control="example"] [data-value="3"]');
-  await page.waitForFunction(() => window.__beatPath.recipe().figure?.shape === "flyer" && window.__beatPath.recipe().camera?.startYaw === 45, null, { timeout: 30_000 });
-  const drone = await page.evaluate(() => ({ r: window.__beatPath.recipe(), cam0: window.__beatPath.cameraAt(0), track: window.__beatPath.trackName() }));
-  const ranges = drone.r.camera.segments.map(s => s.modes.join("+")).join(" ");
-  console.log(`draw control: Example 4 builds: ranges ${ranges}; rig ${drone.r.camera.distance} m, ${drone.r.camera.height} m, fov ${drone.r.camera.fov}, yaw ${drone.r.camera.startYaw}; frame 0 camera at ${drone.cam0.position.map(v => v.toFixed(2)).join(", ")} (fov ${drone.cam0.fov}); track ${drone.track}`);
-  if (ranges !== "threeQuarter orbit top side") fail(`Example 4's camera ranges are ${ranges}, not threeQuarter orbit top side`);
-  if (!(drone.cam0.position[1] > 5)) fail(`Example 4's frame 0 camera is at ${drone.cam0.position[1]} m, not above 5 m`);
-  if (drone.track !== "generated-laidback-100-6bars.wav") fail(`Example 4 plays ${drone.track}, not its own 6-bar laidback groove`);
-  await page.click("#play");
-  await page.waitForTimeout(600);
-  if (!(await page.evaluate(() => window.__beatPath.playing()))) fail("Example 4 does not play");
-  await page.click("#play");
-  await page.screenshot({ path: `${SHOTS}beat-path-example-4.png` });
+  // The switcher is Example 1, Example 2 and Your own (Examples 3 and 4 left the page on 15 Nov 2026; smoke-beat-path-retired.mjs loads their setups).
+  const choices = await page.$$eval('[data-control="example"] button', bs => bs.map(b => `${b.dataset.value}:${b.textContent}`).join(" "));
+  if (choices !== "0:Example 1 1:Example 2 own:Your own") fail(`the example switcher offers ${choices}, not Example 1, Example 2 and Your own`);
   await page.click('[data-control="example"] [data-value="0"]');
   await page.waitForFunction(() => window.__beatPath.recipe().figure?.shape === "flyer" && window.__beatPath.recipe().camera?.startYaw === 145 && window.__beatPath.recipe().beatGrid.bpm === 107.5, null, { timeout: 30_000 });
   p = await probe();
-  console.log(`draw control: examples switch: runner 174 on its file, car 100, drone 100, back to flyer on its file (${p.recipe.beatGrid.bpm} BPM), edits kept ${JSON.stringify(p.state.subject) === JSON.stringify(edited)}`);
+  console.log(`draw control: examples switch (${choices}): runner 174 on its file, back to flyer on its file (${p.recipe.beatGrid.bpm} BPM), edits kept ${JSON.stringify(p.state.subject) === JSON.stringify(edited)}`);
   if (JSON.stringify(p.state.subject) !== JSON.stringify(edited)) fail("switching examples lost the edits of Example 1");
   // Scenery: the Settings chevron, scenery none and back to city.
   await page.click("#settings summary");
@@ -268,10 +257,14 @@ export async function smokeBeatPath(browser, base, { fail, OUT, SHOTS }) {
   if (!playingAfterOne || (await probe()).playing) fail("clicking the video did not toggle play twice");
   await page.screenshot({ path: `${SHOTS}beat-path-generated.png` });
   if (!(await page.isVisible("#gallery h2"))) fail("no gallery section");
-  // Export and Slice in the track panel: the music inside the clip window as a WAV, then as the track itself. On Example 3,
-  // whose music is longer than its clip (Examples 1 and 2 play files shorter than their clips: smokeExample1 and smokeExample2 check that case).
-  await page.click('[data-control="example"] [data-value="2"]');
-  await page.waitForFunction(() => window.__beatPath.trackName() === "generated-laidback-100.wav", null, { timeout: 30_000 });
+  // Export and Slice in the track panel: the music inside the clip window as a WAV, then as the track itself. On Your own,
+  // its 8 s clip on a loaded 16.6 s drum track at 120 BPM, so the music is longer than the clip and its tempo reads the
+  // same from any window (Examples 1 and 2 play files shorter than their own clips: smokeExample1 and smokeExample2 check that case).
+  await page.click('[data-control="example"] [data-value="own"]');
+  await page.waitForFunction(() => window.__beatPath.slot() === "own" && window.__beatPath.state().clip === 8, null, { timeout: 30_000 });
+  writeFileSync(`${OUT}own-drums-120.wav`, drumWav(120, 8).buf);
+  await page.setInputFiles("#trackFile", `${OUT}own-drums-120.wav`);
+  await page.waitForFunction(() => window.__beatPath.trackName() === "own-drums-120.wav", null, { timeout: 60_000 });
   await smokeTrackActions(page, fail, SHOTS);
   // No track: a plain timed clip that still plays and exports.
   await page.click("#removeTrack");
@@ -292,7 +285,7 @@ export async function smokeBeatPath(browser, base, { fail, OUT, SHOTS }) {
   if (!fits) fail("the Draw Control editor does not fit one screen at 1440×900");
   await page.screenshot({ path: `${SHOTS}beat-path-runware-1440.png` });
   await page.evaluate(() => document.getElementById("gallery").scrollIntoView());
-  await page.waitForFunction(() => document.querySelectorAll("#gallerySlot .gallery-row video").length >= 3, null, { timeout: 120_000 }).catch(() => fail("the gallery rows did not render their guides"));
+  await page.waitForFunction(() => document.querySelectorAll("#gallerySlot .gallery-row video").length >= 2, null, { timeout: 120_000 }).catch(() => fail("the gallery rows did not render their guides"));
   await page.locator("#gallery").screenshot({ path: `${SHOTS}beat-path-gallery-rows.png` });
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({ path: `${SHOTS}beat-path-runware-full.png`, fullPage: true });
@@ -307,6 +300,7 @@ export async function smokeBeatPath(browser, base, { fail, OUT, SHOTS }) {
   await smokeBeatPathRefs(browser, base, { fail, SHOTS });
   await smokeBeatPathImages(browser, base, { fail, SHOTS });
   await smokeBeatPathSetup(browser, base, { fail, OUT });
+  await smokeBeatPathRetired(browser, base, { fail, OUT, SHOTS });
   await smokeBeatPathFallback(browser, base, { fail });
 }
 

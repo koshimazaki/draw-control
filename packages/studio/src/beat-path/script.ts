@@ -7,7 +7,7 @@
  */
 import { FOV_RANGE, parseRows, parseSettings, type FollowOffset } from "@motion-studio/core";
 import { escapeLines, followWords, multiLine, parseFollowArgs } from "@motion-studio/core/internal";
-import { EXAMPLE_TRACKS, type ExampleId } from "./tracks";
+import { TRACKS, type TrackId } from "./tracks";
 
 export type PathPt = { x: number; z: number; y?: number };
 export const CHARACTER_WORDS = ["glide", "hover", "spin", "jump", "hop", "freeze"] as const;
@@ -20,7 +20,11 @@ export type CameraWord = (typeof CAMERA_WORDS)[number];
  * A camera block read with `shot: -` where the page would print a framing preset keeps `shot: "-"`: no preset, its own
  * distance, height and fov frame it (a preset would pull the camera to the preset's framing).
  */
-export type Block<W extends string> = { from: number; to: number; word: W; phrase?: string; follow?: FollowOffset; fov?: number; shot?: "-" };
+export type Block<W extends string> = { from: number; to: number; word: W; phrase?: string; follow?: FollowOffset; fov?: number; shot?: "-"; at?: HopAnchor };
+/** Where a hop lands when not on its row's first kick: the Nth hit of a band, or (beat) N beats after the block's start. */
+export type HopAnchor = { band: "kick" | "snare" | "hat" | "beat"; n: number };
+/** One rule for a hop's @beat offset everywhere (script, setup file, printing): inside its block, 0 to its last half beat. */
+export const hopOffset = (n: number, len: number) => Math.round(Math.min(Math.max(n, 0), Math.max(0, len - 0.5)) * 1000) / 1000;
 /** The page's follow words and the rig mode each prints as. */
 export const FOLLOW_WORDS = { behind: "chase", side: "side" } as const;
 export const isFollowWord = (w: string): w is keyof typeof FOLLOW_WORDS => w in FOLLOW_WORDS;
@@ -72,7 +76,7 @@ export type BeatPathState = {
   /** Scenery boxes once edited on the map (they replace the preset's placement). */
   boxes?: { x: number; z: number; w: number; d: number; h: number; yaw?: number }[];
   /** The example's music (tracks.ts), when it ships its own. */
-  track?: ExampleId;
+  track?: TrackId;
   /**
    * The camera rig's start framing (the script's `rig:` line). Frame 0 is the rig start. Each block starts where the block
    * before it ended: a follow offset (distance, height; it wins over a shot preset), a shot preset, a fov and the end of a
@@ -124,21 +128,21 @@ const rigWords = (rig?: BeatPathState["rig"]) => !rig ? "" : [
   rig.fov !== undefined ? `fov ${f(rig.fov)}` : "", rig.yaw !== undefined ? `yaw ${f(rig.yaw)}` : "",
 ].filter(Boolean).join(" ");
 /** An example's "# track:" words: its file ("file neon-rain-loop.mp3"), else its groove, and its bars when an earlier example has the same groove ("laidback 6 bars"). */
-const trackWords = (id: ExampleId) => {
-  const t = EXAMPLE_TRACKS[id];
+const trackWords = (id: TrackId) => {
+  const t = TRACKS[id];
   if (t.file) return `file ${t.name}`;
-  const first = Object.values(EXAMPLE_TRACKS).find(o => !o.file && o.groove === t.groove)!;
+  const first = Object.values(TRACKS).find(o => !o.file && o.groove === t.groove)!;
   return first === t ? t.groove : `${t.groove} ${t.bars} bars`;
 };
 /** The example a "# track:" comment names: the file, or the groove with the bars picking between examples that share it. */
-const trackFrom = (text: string): ExampleId | undefined => {
-  const ids = Object.keys(EXAMPLE_TRACKS) as ExampleId[];
+const trackFrom = (text: string): TrackId | undefined => {
+  const ids = Object.keys(TRACKS) as TrackId[];
   const file = /^#\s*track:\s*file\s+(\S+)/im.exec(text);
-  if (file) return ids.find(id => EXAMPLE_TRACKS[id].file && EXAMPLE_TRACKS[id].name === file[1]);
+  if (file) return ids.find(id => TRACKS[id].file && TRACKS[id].name === file[1]);
   const m = /^#\s*track:\s*(straight|drive|laidback)(?:\s+(\d+)\s*bars?)?/im.exec(text);
   if (!m) return undefined;
-  const list = ids.filter(id => !EXAMPLE_TRACKS[id].file && EXAMPLE_TRACKS[id].groove === m[1]);
-  return (m[2] ? list.find(id => EXAMPLE_TRACKS[id].bars === Number(m[2])) : undefined) ?? list[0];
+  const list = ids.filter(id => !TRACKS[id].file && TRACKS[id].groove === m[1]);
+  return (m[2] ? list.find(id => TRACKS[id].bars === Number(m[2])) : undefined) ?? list[0];
 };
 const pts = (list: PathPt[]) => list.map(p => `(${f(p.x)},${f(p.z)}${p.y ? `,${f(p.y)}` : ""})`).join(" ");
 
@@ -189,7 +193,7 @@ export function toScript(state: BeatPathState): string {
       if (c === glide && state.subject.length >= 2) action = `walk on path ${pts(state.subject)} corners ${f(state.subjectCorners)}${lock}`;
       else if (c.word === "spin" || c.word === "jump") action = `rest, ${c.word} @beat ${f(mid)}`;
       // A hop jumps on the first kick of its row while the travel carries on through it (the walk block runs on).
-      else if (c.word === "hop") action = "continue, jump @kick 1";
+      else if (c.word === "hop") action = `continue, jump ${!c.at ? "@kick 1" : c.at.band === "beat" ? `@beat ${f(c.from + hopOffset(c.at.n, c.to - c.from))}` : `@${c.at.band} ${c.at.n}`}`;
       else if (c.word === "freeze") action = "freeze";
       else action = "rest";
     }
@@ -262,7 +266,7 @@ export function fromScript(text: string, base: BeatPathState, grid: { bpm: numbe
     const a = row.action ?? "continue";
     if (a === "continue") { const last = state.character.at(-1); if (last) last.to = row.to; }
     else {
-      let word: CharacterWord = "hover";
+      let word: CharacterWord = "hover", at: HopAnchor | undefined;
       if (/\bon path\b/.test(a)) {
         word = "glide";
         const p = pointsIn(a);
@@ -270,12 +274,23 @@ export function fromScript(text: string, base: BeatPathState, grid: { bpm: numbe
         const c = cornersIn(a);
         state.subjectCorners = c ?? 0;
         if (readLock(a, state.charLock)) charSeen = true;
-      } else if (/^continue\b/.test(a) && /\b(jump|kick)\s*@/.test(a)) word = "hop";
+      } else if (/^continue\b/.test(a) && /\b(jump|kick)\s*@/.test(a)) {
+        // The anchor the row was written with is kept, so it prints back where it was ("@kick 1", the default, is not stored).
+        word = "hop";
+        const m = /\b(?:jump|kick)\s*@(kick|snare|hat|beat)\s+([\d.]+)/.exec(a);
+        if (m && !(m[1] === "kick" && m[2] === "1")) {
+          // A beat is kept as an offset from the block's start; it is held inside the block once the block's end is known (below).
+          const n = Number(m[2]);
+          if (m[1] === "beat") at = { band: "beat", n: Math.round((n - row.from) * 1000) / 1000 };
+          else if (Number.isInteger(n) && n >= 1 && n <= 64) at = { band: m[1] as HopAnchor["band"], n };
+          else notes.push(`line ${row.line}: @${m[1]} ${m[2]}: count from 1 to 64, so the hop lands on the first kick`);
+        }
+      }
       else if (/^freeze\b/.test(a)) word = "freeze";
       else if (/\bspin\s*@/.test(a)) word = "spin";
       else if (/\b(jump|kick)\s*@/.test(a)) word = "jump";
       else if (!/^(rest|idle)\b/.test(a)) notes.push(`line ${row.line}: "${a}" reads as hover`);
-      state.character.push({ from: row.from, to: row.to, word });
+      state.character.push({ from: row.from, to: row.to, word, ...(at ? { at } : {}) });
     }
     const c = row.camera ?? "continue";
     if (c === "continue") { const last = state.cameraLane.at(-1); if (last) last.to = row.to; continue; }
@@ -331,6 +346,12 @@ export function fromScript(text: string, base: BeatPathState, grid: { bpm: numbe
     if (lane[0].from > 0) lane[0].from = 0;
     for (let i = 1; i < lane.length; i++) lane[i].from = lane[i - 1].to;
   }
+  // A hop's @beat outside its block lands inside it (hopOffset, as a setup file and printing hold it).
+  for (const b of state.character) if (b.at?.band === "beat") {
+    const n = hopOffset(b.at.n, b.to - b.from);
+    if (n !== b.at.n) notes.push(`the hop at beats ${f(b.from)}-${f(b.to)}: @beat ${f(b.from + b.at.n)} is outside it, so it lands on beat ${f(b.from + n)}`);
+    b.at = { band: "beat", n };
+  }
   return { state, notes };
 }
 
@@ -343,7 +364,9 @@ export function fitLanes(state: BeatPathState, beats: number): BeatPathState {
     for (const b of lane) {
       const from = out.length ? out.at(-1)!.to : 0;
       const to = Math.min(beats, Math.max(from + 1, Math.round(b.to * k * 2) / 2));
-      if (to > from) out.push({ ...b, from, to });
+      // A hop on a beat keeps its place in the block, scaled with it.
+      const at = b.at?.band === "beat" ? { band: "beat" as const, n: hopOffset(Math.round(b.at.n * (to - from) / (b.to - b.from) * 1000) / 1000, to - from) } : b.at;
+      if (to > from) out.push({ ...b, from, to, ...(at ? { at } : {}) });
     }
     out[out.length - 1].to = beats;
     return out;

@@ -7,14 +7,15 @@
  */
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { cameraAtFrame, clipBeats, planCamera } from "@motion-studio/core";
+import { applyScript, cameraAtFrame, clipBeats, describeRecipe, planCamera } from "@motion-studio/core";
 import { EXAMPLES, exampleState } from "../src/beat-path/examples";
-import { beatPathRecipe, hopOnBeat } from "../src/beat-path/recipe-map";
+import { baseFor, beatPathRecipe } from "../src/beat-path/recipe-map";
 import { BLANK_STATE, fitLanes, fromScript, toScript } from "../src/beat-path/script";
-import { EXAMPLE_TRACKS } from "../src/beat-path/tracks";
+import { buildSetup, readSetup } from "../src/beat-path/setup-file";
+import { TRACKS } from "../src/beat-path/tracks";
 
 const i = EXAMPLES.findIndex(e => e.id === "runner");
-const t = EXAMPLE_TRACKS.runner;
+const t = TRACKS.runner;
 const info = { name: t.name, licence: t.licence, bpm: t.grid!.bpm, offsetSeconds: t.grid!.offsetSeconds, lengthSeconds: 11.04 };
 
 describe("Example 2: one street guide for any subject", () => {
@@ -64,7 +65,65 @@ describe("Example 2: one street guide for any subject", () => {
   it("with no kick to land on (no track analysed yet), the hop lands on its row's start and the shot still builds", () => {
     const r = beatPathRecipe(exampleState(i), info);
     expect(r.reactive?.markers?.map(m => [Math.round(m.seconds * 1000) / 1000, m.accent])).toEqual([[Math.round(19 * 60 / 174 * 1000) / 1000, "jump"]]);
-    expect(hopOnBeat("beats 19-21 | action: continue, jump @kick 1 | camera: continue")).toBe("beats 19-21 | action: continue, jump @beat 19 | camera: continue");
+    // The core lands it there, so the CLI and MCP (applyScript on the same script) build the same recipe.
+    expect(applyScript(baseFor(12, info), { script: toScript(exampleState(i)) })).toEqual(r);
+    // With hits but none in its row: the same, and describe names the anchor that fell back.
+    const bands = { hopSeconds: 0.01, low: [{ seconds: 1, strength: 0.4 }], mid: [], high: [], peaks: [] } as never;
+    const withHits = beatPathRecipe(exampleState(i), info, { bands });
+    expect(withHits.reactive?.markers).toEqual(r.reactive?.markers);
+    expect(applyScript(baseFor(12, info), { script: toScript(exampleState(i)) }, { bands })).toEqual(withHits);
+    expect(describeRecipe(withHits)).toMatch(/jump@19 \(@kick 1: no such hit in its row, on the row's start\)/);
+  });
+  it("a hop keeps the anchor it was written with: @beat, @snare N print back as read", () => {
+    for (const a of ["@beat 19.5", "@snare 2"]) {
+      const text = toScript(exampleState(i)).replace("continue, jump @kick 1", `continue, jump ${a}`);
+      const s = fromScript(text, BLANK_STATE, { bpm: 174, offsetSeconds: 0 }).state;
+      expect(s.character.find(b => b.word === "hop")).toBeDefined();
+      expect(toScript(s)).toMatch(new RegExp(`^beats 19-21 \\| action: continue, jump ${a} \\|`, "m"));
+    }
+    expect(fromScript(toScript(exampleState(i)), BLANK_STATE, { bpm: 174, offsetSeconds: 0 }).state.character.find(b => b.word === "hop")!.at).toBeUndefined();
+    const s = fromScript(toScript(exampleState(i)).replace("jump @kick 1", "jump @snare 2"), BLANK_STATE, { bpm: 174, offsetSeconds: 0 }).state;
+    const read = readSetup(JSON.stringify(buildSetup(s, info)));
+    expect(read.ok && read.state.character.find(b => b.word === "hop")!.at).toEqual({ band: "snare", n: 2 });
+  });
+  it("a hop's @beat outside its block lands inside it, with a note, the same in a script and a setup file", () => {
+    // The hop block runs 19-35 (the walk carries on through it): a beat past 35 lands on its last half beat.
+    const text = toScript(exampleState(i)).replace("continue, jump @kick 1", "continue, jump @beat 40");
+    const read = fromScript(text, BLANK_STATE, { bpm: 174, offsetSeconds: 0 });
+    expect(read.state.character.find(b => b.word === "hop")!.at).toEqual({ band: "beat", n: 15.5 });
+    expect(read.notes.join(" ")).toMatch(/the hop at beats 19-35: @beat 40 is outside it, so it lands on beat 34\.5/);
+    expect(toScript(read.state)).toMatch(/continue, jump @beat 34\.5 \|/);
+    expect(fromScript(text.replace("@beat 40", "@beat 25"), BLANK_STATE, { bpm: 174, offsetSeconds: 0 }).notes.join(" ")).not.toMatch(/outside/);
+    const hop = (at: unknown) => {
+      const st = structuredClone(exampleState(i)) as unknown as { character: { word: string; at?: unknown }[] };
+      st.character.find(b => b.word === "hop")!.at = at;
+      return readSetup(JSON.stringify(buildSetup(st as never, info)));
+    };
+    for (const [at, n] of [[{ band: "beat", n: 30 }, 15.5], [{ band: "beat", n: -2 }, 0]] as const) {
+      const r = hop(at);
+      expect(r.ok && r.state.character.find(b => b.word === "hop")!.at).toEqual({ band: "beat", n });
+      expect(r.ok && r.notes.join(" ")).toMatch(/1 hop on a beat outside the block moved inside it/);
+    }
+    const bad = hop({ band: "kick", n: 0 });
+    expect(bad.ok && bad.state.character.find(b => b.word === "hop")!.at).toBeUndefined();
+    expect(bad.ok && bad.notes.join(" ")).toMatch(/1 unreadable hop anchor dropped/);
+    // A hop index past 64 (or not whole) is dropped with a note, as a setup file drops it; the hop lands on the first kick.
+    const far = fromScript(text.replace("@beat 40", "@kick 1000"), BLANK_STATE, { bpm: 174, offsetSeconds: 0 });
+    expect(far.state.character.find(b => b.word === "hop")!.at).toBeUndefined();
+    expect(far.notes.join(" ")).toMatch(/@kick 1000: count from 1 to 64/);
+    // A setup block whose edges are joined shorter: its @beat is held inside the joined block.
+    const st = structuredClone(exampleState(i)) as unknown as { character: { from: number; to: number; word: string; at?: unknown }[] };
+    st.character = [{ from: 0, to: 22, word: "glide" }, { from: 19, to: 23, word: "hop", at: { band: "beat", n: 1.8 } }, { from: 23, to: 35, word: "hover" }];
+    const joined = readSetup(JSON.stringify(buildSetup(st as never, info)));
+    expect(joined.ok && joined.state.character.find(b => b.word === "hop")).toMatchObject({ from: 22, to: 23, at: { band: "beat", n: 0.5 } });
+    expect(joined.ok && joined.notes.join(" ")).toMatch(/1 hop on a beat outside the block moved inside it/);
+    // Refitting the lanes scales the hop's beat with its block, so it stays where it was in it.
+    const fitted = fitLanes(read.state, 70).character.find(b => b.word === "hop")!;
+    expect(fitted.at).toEqual({ band: "beat", n: 31 });
+    // A block that shrinks under its @beat prints the hop inside it.
+    const shrunk = structuredClone(read.state), h = shrunk.character.find(b => b.word === "hop")!;
+    h.to = 21; shrunk.character.push({ from: 21, to: 35, word: "hover" });
+    expect(toScript(shrunk)).toMatch(/continue, jump @beat 20\.5 \|/);
   });
   it("the page prints the script back to the same shot", () => {
     const s = exampleState(i);

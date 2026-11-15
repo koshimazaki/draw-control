@@ -83,7 +83,8 @@ export const removeMarker = (recipe: Recipe, drive: AudioDrive | undefined, inde
 export function moveMarker(recipe: Recipe, drive: AudioDrive | undefined, index: number, seconds: number): Recipe {
   const markers = currentMarkers(recipe, drive);
   if (!markers[index]) return recipe;
-  markers[index] = { ...markers[index], seconds: r4(Math.max(0, seconds)) };
+  const { fellBack: _, ...m } = markers[index];   // moved by hand: no longer where a fallback put it
+  markers[index] = { ...m, seconds: r4(Math.max(0, seconds)) };
   return withMarkers(recipe, markers);
 }
 

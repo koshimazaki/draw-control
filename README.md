@@ -1,10 +1,22 @@
-# Motion Studio
+# Draw Control
 
-A browser studio where a neutral figure moves to your music, beat by beat, under a camera that moves with it.
-You (or an agent, by command or by a plain-text shot script) edit the moves and the camera on a timeline.
-The result exports as a guide clip, with its beats and camera path, for video models to follow.
+**Draw your camera move. The video model follows it.**
 
-Status: working studio, CLI and MCP server, 11 November 2026. What is not done is [at the end](#not-done). Detail: [PRD](docs/PRD.md) · [plan and current state](docs/plan.md) · [agents: CLI and MCP](docs/agents.md) · [Hermes on Runware](docs/hermes.md) · [recipe and shot script format](docs/recipe.md) · [video models: length and frame rate](docs/models.md).
+<!-- DEMO VIDEO: on github.com, edit this file and drag the screen recording onto this line; GitHub uploads it and inserts a link that plays inline. -->
+
+Draw Control is an open-source, in-browser tool for directing AI video. You literally draw the camera's path and the subject's path on a map, block out the scene with simple primitives (grey blocks for towers, shop fronts, pillars), and the page renders a guide clip: an orange stand-in figure, the camera move and the blockout, timed to your music. A video model (Kling 4.0, Seedance 2.5 or MiniMax H3, through Runware) follows the guide for motion and framing, while your prompt and reference images decide what it looks like.
+
+- **Draw, don't describe.** Camera and subject paths drawn on a map; views (isometric, behind, side, top), orbits, push-ins and pull-outs placed on two lanes, Character and Camera.
+- **Primitives and blockouts drive the motion.** The grey blocks stand in for anything, so one guide serves many subjects: Example 2 is one street guide for a runner, an anime skater and a factory forklift.
+- **Beat-synced, audio-reactive.** Drop in your music: the page finds the tempo, kicks, snares and hats. Moves start on hits, locks land on them, your own markers drive them, and the timed prompt tells the model what happens on which hit.
+- **Agents built in.** The page, a CLI and an MCP server run the same commands, so your own agent harness (Claude Code, Hermes, Codex and others), typed or spoken to, can draw, edit and render shots. The skills in [`skills/`](skills/) teach an agent the whole process, from a brief to a finished example.
+- **Your key, your browser.** It runs locally; generation uses your own Runware key, and every run shows its estimated cost and waits for your OK before anything is sent.
+
+```bash
+nvm use && npm install && npm run dev   # then open http://127.0.0.1:5180/path.html
+```
+
+How it works, step by step, is below. This repository is named `motion-studio` because it also holds the engine and the full studio underneath Draw Control: the recipe format, the CLI, the MCP server and the guide export ([more below](#motion-studio-the-engine-underneath)).
 
 ## Draw Control (start here)
 
@@ -17,7 +29,7 @@ Changing the page (developers and agents): [docs/beat-path.md](docs/beat-path.md
 nvm use && npm install && npm run dev   # open http://127.0.0.1:5180/path.html  (the Runware look; /path.html?theme=neutral for the neutral palette)
 ```
 
-It opens on **Example 1**, a flying car (the ship) down a city avenue on the owner's own music (a 13.488 s loop of "Neon Rain, Empty Streets" by glitchcandies, made with Suno, used with permission), in three moves that start on the music's hits: isometric down the avenue, right behind as it turns left into a gap between the towers and starts to land, then from the top, pushing in, as it comes down between the buildings, with one zoom accent on a kick as it passes the first towers; press **Play**. *Example 2* is one street guide for any travelling subject (a New York runner by default; an anime skater and a factory forklift are ready-to-paste shot lines, [docs/beat-path.md](docs/beat-path.md#one-guide-three-subjects-example-2)) on the owner's drum and bass loop: low and close on the feet, alongside as it passes behind the blocks, then a high view of the whole street, *Example 3* a car on a coastal bend, *Example 4* a drone weaving between pillars (the camera opens isometric, pans round, rises to the top view and ends on the side view from the other side), *Your own* starts from a plain path; each keeps its edits and brings its own figure shape, scenery, camera and track (Examples 1 and 2 a music file at 107.5 and 174 BPM, the others a generated groove at 100 BPM; the example-to-track table is `packages/studio/src/beat-path/tracks.ts`, your own files go in `packages/studio/public/tracks/`). Example 1's clip is 14 s and its music 13.488 s, Example 2's 12 s and 11.04 s: after a model has made the clip, `npm run finish` lays the original music over it and cuts it to the music's length ([docs/beat-path.md](docs/beat-path.md#finishing-a-generated-clip)).
+It opens on **Example 1**, a flying car (the ship) down a city avenue on the owner's own music (a 13.488 s loop of "Neon Rain, Empty Streets" by glitchcandies, made with Suno, used with permission), in three moves that start on the music's hits: isometric down the avenue, right behind as it turns left into a gap between the towers and starts to land, then from the top, pushing in, as it comes down between the buildings, with one zoom accent on a kick as it passes the first towers; press **Play**. *Example 2* is one street guide for any travelling subject (a New York runner by default; an anime skater and a factory forklift are ready-to-paste shot lines, [docs/beat-path.md](docs/beat-path.md#one-guide-three-subjects-example-2)) on the owner's drum and bass loop: low and close on the feet, alongside as it passes behind the blocks, then a high view of the whole street, and *Your own* starts from a plain path; each keeps its edits, and each example brings its own figure shape, scenery, camera and music file (107.5 and 174 BPM; the example-to-track table is `packages/studio/src/beat-path/tracks.ts`, your own files go in `packages/studio/public/tracks/`). More shots are shot scripts in `examples/scripts/`, off the page: a car on a coastal bend (`beat-path-ex3-car.txt`) and a drone weaving between pillars (`beat-path-ex4-drone.txt`: the camera opens isometric, pans round, rises to the top view and ends on the side view from the other side) were Examples 3 and 4 until 15 Nov 2026, on a generated groove at 100 BPM; a setup saved on either loads as *Your own*. Example 1's clip is 14 s and its music 13.488 s, Example 2's 12 s and 11.04 s: after a model has made the clip, `npm run finish` lays the original music over it and cuts it to the music's length ([docs/beat-path.md](docs/beat-path.md#finishing-a-generated-clip)).
 
 - **Map** (left): *Subject*, *Camera* or *Blocks*; *Top* or *Side* (heights); *Edit* (default; a stray click never draws) or *Draw new* (drag a stroke or click points; Escape stops); *Corners*. Pan with a scroll, a middle-button drag or a drag with Space held; zoom with ctrl/cmd + wheel or a pinch; *+*, *−*, *Fit* (every example loads framed). The camera's track is drawn block by block with labels, beat dots and hit rings; with no camera path the map says the camera follows the Camera lane, and a path drawn new flies the selected camera block. **Blocks**: click to select, drag to move, drag a corner to resize, a height field, *Draw new* drags a rectangle, Cmd/Ctrl-D duplicates, Cmd/Ctrl-C and -V copy and paste at the pointer, Delete removes; a block that would swallow the path is nudged off it.
 - **Preview** (right), and once something is generated, the **output** beside it on the same playhead and music: drag the divider (double-click resets), swap the sides.
@@ -30,6 +42,14 @@ It opens on **Example 1**, a flying car (the ship) down a city avenue on the own
 Generation uses the vendored Model Arena embed (`npm run vendor:arena` copies it into `packages/studio/public/vendor/`); in development, or with `?fake=1`, a local fake provider answers instead of Runware so the layout can be judged with no key and no cost. A model receives only the guide video (with its music), the reference images and the prompt from the shot description, never the script. Agents still drive everything through the shot script (CLI, MCP, `examples/scripts/`), which does not show on the page. Static deploy (Cloudflare Pages or any host): [docs/deploy.md](docs/deploy.md). The page's name is one constant, `packages/studio/src/beat-path/name.ts`.
 
 **Colours in the guide** (so a prompt can name them; the figure's colours can be changed, the legend line follows): the **orange figure** is the subject, shaped like it (a flyer, a runner, a car, or a pyramid with a sphere); **white** marks its front (nose, chest marker, headlights); the **dark ground with lighter grid lines** is the floor (1 m cells, bolder every 4 m, fading into a dark horizon; *Grid* turns it off); the **grey blocks** are the scenery (a scatter of boxes, a street of buildings, or a city grid), placed clear of both paths and the line of sight so travel and parallax read in every still. Nothing else is in frame. Design tokens, the two themes and the sources of the Runware values: [docs/design.md](docs/design.md).
+
+## Motion Studio (the engine underneath)
+
+A browser studio where a neutral figure moves to your music, beat by beat, under a camera that moves with it.
+You (or an agent, by command or by a plain-text shot script) edit the moves and the camera on a timeline.
+The result exports as a guide clip, with its beats and camera path, for video models to follow.
+
+Status: working studio, CLI and MCP server, 11 November 2026. What is not done is [at the end](#not-done). Detail: [PRD](docs/PRD.md) · [plan and current state](docs/plan.md) · [agents: CLI and MCP](docs/agents.md) · [Hermes on Runware](docs/hermes.md) · [recipe and shot script format](docs/recipe.md) · [video models: length and frame rate](docs/models.md).
 
 ## Five-minute quickstart
 

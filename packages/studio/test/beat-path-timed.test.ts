@@ -5,11 +5,11 @@ import { beatPathRecipe } from "../src/beat-path/recipe-map";
 import { BLANK_STATE, fromScript, toScript, type BeatPathState } from "../src/beat-path/script";
 import { SETUP_KIND, SETUP_VERSION, readSetup, setupJson } from "../src/beat-path/setup-file";
 import { promptWarning } from "../src/beat-path/generate";
-import { EXAMPLE_TRACKS } from "../src/beat-path/tracks";
+import { TRACKS } from "../src/beat-path/tracks";
 import { replacesEdited, timedStyleFor } from "../src/beat-path/shot-editor";
 
 const onTrack = (i: number) => {
-  const st = exampleState(i), g = EXAMPLE_TRACKS[st.track!].grid!;
+  const st = exampleState(i), g = TRACKS[st.track!].grid!;
   return beatPathRecipe(st, { name: "x.mp3", licence: "MIT", bpm: g.bpm, offsetSeconds: g.offsetSeconds, lengthSeconds: 60 });
 };
 const multi: BeatPathState["shot"] = { subject: "a flying car\nsleek and low", environment: "a city at night", action: "0.0–2.5 s: it flies\n\n2.5–8.0 s, on the snare: top view | camera: top" };

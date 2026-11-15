@@ -26,7 +26,7 @@ export async function smokeBeatPathHunt(browser, base, { fail }) {
 
   // 1. Rapid switching while playing.
   await page.click("#barPlay");
-  for (const s of ["1", "2", "0", "2", "1"]) await ex(s);
+  for (const s of ["1", "own", "0", "own", "1"]) await ex(s);
   await page.waitForFunction(() => window.__beatPath.trackName() === "drum-n-bass.mp3", null, { timeout: 30_000 }).catch(() => {});
   const landed = await bp(() => ({ slot: window.__beatPath.slot(), track: window.__beatPath.trackName(), kind: window.__beatPath.recipe().character.kind, playing: window.__beatPath.playing() }));
   if (landed.slot !== "1" || landed.track !== "drum-n-bass.mp3" || landed.playing) fail(`rapid switching did not land on Example 2 with its music, paused: ${JSON.stringify(landed)}`);
@@ -38,7 +38,7 @@ export async function smokeBeatPathHunt(browser, base, { fail }) {
     const at = await page.evaluate(q => window.__beatPath.mapPoint(q), { x: box.x, z: box.z });
     await page.mouse.click(at.x, at.y);
     const picked = await bp(() => window.__beatPath.boxSelected());
-    await ex("2");
+    await ex("0");
     const n = (await bp(() => window.__beatPath.boxes())).length;
     await page.locator("#map").focus(); await page.keyboard.press("Delete");
     const after = await bp(() => ({ sel: window.__beatPath.boxSelected(), n: window.__beatPath.boxes().length }));
@@ -72,6 +72,10 @@ export async function smokeBeatPathHunt(browser, base, { fail }) {
   if (sel.sel && sel.sel.index >= sel.n) fail("a selection points past the path after undo");
 
   // 4b. Move a Camera block by dragging its body past its neighbour; a plain click still opens the menu; undo puts it back.
+  // On Your own (Example 3's wide blocks until 15 Nov 2026): its one block split every 4 beats, so the blocks are wide
+  // enough that a drag past the next block's middle lands after it (Example 1's one-beat accent blocks are not).
+  await ex("own");
+  await page.waitForFunction(() => window.__beatPath.slot() === "own", null, { timeout: 30_000 });
   await smokeLaneMove(page, { fail });
 
   // 5. Generate on every model: Escape at the cost dialog, Stop mid-run, switch example mid-run, run twice.
@@ -104,16 +108,16 @@ export async function smokeBeatPathHunt(browser, base, { fail }) {
   await page.click("#runGenerate"); await page.waitForSelector("#costDialog:not([hidden])"); await page.click("#costOk");
   await page.click("#runGenerate");
   await page.waitForFunction(() => document.getElementById("runGenerate").textContent === "Generate", null, { timeout: 30_000 }).catch(() => fail("Stop did not end the run"));
-  // A run started on Your own, then a switch to Example 3 mid-run: the result stays with Your own.
+  // A run started on Your own, then a switch to Example 2 mid-run: the result stays with Your own.
   await ex("own");
   await page.click("#runGenerate");
   if (!/Describe the shot first/.test(await page.textContent("#status") ?? "") || await page.evaluate(() => document.activeElement?.id) !== "shotSubject") fail("Generate with an empty shot did not ask for one");
   await page.fill("#shotSubject", "a paper plane"); await page.press("#shotSubject", "Tab");
   await page.click("#runGenerate"); await page.waitForSelector("#costDialog:not([hidden])"); await page.click("#costOk");
-  await ex("2");
+  await ex("1");
   await page.waitForFunction(() => document.getElementById("runGenerate").textContent === "Generate", null, { timeout: 60_000 });
   const leaked = await page.evaluate(() => !!document.querySelector("#generateSlot arena-player") && !document.getElementById("screenOutput").hidden);
-  if (leaked) fail("a run started on Your own showed its result on Example 3");
+  if (leaked) fail("a run started on Your own showed its result on Example 2");
   await ex("own");
   if (!(await page.evaluate(() => !!document.querySelector("#generateSlot arena-player")))) fail("the run started on Your own is not shown back on Your own");
 

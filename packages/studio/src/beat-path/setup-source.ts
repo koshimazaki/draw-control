@@ -7,7 +7,7 @@
 import { unzipSync } from "fflate";
 import { BUNDLE_FILES } from "@motion-studio/core/internal";
 import { SETUP_FILE, SETUP_MAX_BYTES, type SetupMusic } from "./setup-file";
-import { EXAMPLE_TRACKS } from "./tracks";
+import { TRACKS } from "./tracks";
 import type { BeatPathState } from "./script";
 
 /** The guide's audio is a clip of at most 30 s: 16-bit stereo at 48 kHz is under 6 MB; this leaves room for any rate. */
@@ -95,7 +95,7 @@ export type MusicPlan =
  * the user's own file (an example slot keeps its `track` under a dropped file), or none.
  */
 export function musicKind(state: Pick<BeatPathState, "track">, music: Pick<SetupMusic, "name"> | null): "example" | "example-cut" | "own" | "none" {
-  const example = state.track ? EXAMPLE_TRACKS[state.track].name : undefined;
+  const example = state.track ? TRACKS[state.track].name : undefined;
   if (example && (!music || music.name === example)) return "example";
   if (!music) return "none";
   return example && music.name.startsWith(`${example} (`) ? "example-cut" : "own";

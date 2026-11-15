@@ -16,7 +16,7 @@ import { main } from "../../cli/src/main.ts";
 import { driveFrom, parseAnalysis } from "../../cli/src/analysis.ts";
 import { beatPathRecipe } from "../../packages/studio/src/beat-path/recipe-map.ts";
 import { BLANK_STATE, fromScript, toScript } from "../../packages/studio/src/beat-path/script.ts";
-import { EXAMPLE_TRACKS } from "../../packages/studio/src/beat-path/tracks.ts";
+import { TRACKS } from "../../packages/studio/src/beat-path/tracks.ts";
 
 const dir = mkdtempSync(join(tmpdir(), "ms-beat-path-"));
 const analysisPath = join(dir, "analysis.json");
@@ -27,7 +27,7 @@ const wavFor = (style: GrooveStyle) => {
   return path;
 };
 /** A file track's given beat grid (tracks.ts), as the page uses it: the clip's beats depend on it. */
-const gridFor = (text: string) => { const name = /^#\s*track:\s*file\s+(\S+)/m.exec(text)?.[1]; return Object.values(EXAMPLE_TRACKS).find(t => t.file && t.name === name)?.grid; };
+const gridFor = (text: string) => { const name = /^#\s*track:\s*file\s+(\S+)/m.exec(text)?.[1]; return Object.values(TRACKS).find(t => t.file && t.name === name)?.grid; };
 const scriptsDir = new URL("../../examples/scripts/", import.meta.url);
 const examples = readdirSync(scriptsDir).filter(f => f.startsWith("beat-path-"));
 const cli = async (...argv: string[]) => { const err: string[] = []; const code = await main(argv, () => {}, s => err.push(s)); if (code) throw new Error(err.join("\n")); };

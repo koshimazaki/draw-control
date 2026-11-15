@@ -55,9 +55,9 @@ export async function smokeBeatPathSetup(browser, base, { fail, OUT }) {
   /** Settings open (a click elsewhere may have closed it). */
   const settings = async () => { if (!(await page.isVisible("#saveSetup"))) await page.click("#settings summary"); };
   await settings();
-  // 0. Example 1 with its camera locked to the snares (it has no lock of its own; its one-beat accent block at 7–8 holds no
-  //    kick but a snare) and "Next move on each hit" on (its camera anchors on hits): saved, it loads back as it was.
-  await page.click("#chipCamera"); await page.click('#menu button:has-text("Lock to snare")');
+  // 0. Example 1 with its camera locked to the kicks (it has no lock of its own) and "Next move on each hit" on
+  //    (its camera anchors on hits): saved, it loads back as it was.
+  await page.click("#chipCamera"); await page.click('#menu button:has-text("Lock to kick")');
   const advance = async () => { await settings(); await page.click("#setCamLock"); await page.click('#menu button:has-text("Next move on each hit")'); };
   await advance();
   if (!(await state()).camLock.advance) fail("Next move on each hit did not turn on");
@@ -144,10 +144,6 @@ export async function smokeBeatPathSetup(browser, base, { fail, OUT }) {
   //    refuse up front, with nothing sent; once its track is loaded the shot builds and Generate asks again.
   await page.setInputFiles("#trackFile", `${dir}own.wav`);
   await page.waitForFunction(() => window.__beatPath.trackName() === "own.wav", null, { timeout: 120_000 });
-  // Next move on each hit needs a hit in every camera block: Example 1's one-beat zoom accent (beats 6–7, 7–8), refitted to
-  // own.wav, holds none, so its two short blocks go first ("Remove": the block before takes its beats), then on kicks.
-  for (let k = 0; k < 2; k++) { await page.click("#laneCamera .block >> nth=1"); await page.click('#menu button:has-text("Remove")'); }
-  await page.click("#chipCamera"); await page.click('#menu button:has-text("Lock to kick")');
   await advance();
   if (!(await state()).camLock.advance) fail("Next move on each hit did not turn on over own.wav");
   await settings();

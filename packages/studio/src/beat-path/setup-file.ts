@@ -17,9 +17,10 @@
 import { CAMERA_MAX_HEIGHT, FOLLOW_LIMITS, FOV_RANGE, RIG_LIMITS, SHOT_LIMITS, clipBeats, type CommandContext, type FollowOffset } from "@motion-studio/core";
 import { beatPathRecipe, type TrackInfo } from "./recipe-map";
 import {
-  BLANK_STATE, CAMERA_WORDS, CHARACTER_WORDS, HIT_CHOICES, LOCK_CHOICES, clampClip, fitLanes, toScript,
+  BLANK_STATE, CAMERA_WORDS, CHARACTER_WORDS, HIT_CHOICES, LOCK_CHOICES, clampClip, fitLanes, hopOffset, toScript,
   type BeatPathState, type Block, type PathPt,
 } from "./script";
+import { RETIRED_TRACKS, TRACKS, type TrackId } from "./tracks";
 
 export const SETUP_KIND = "beat-path-setup";
 export const SETUP_VERSION = 1;
@@ -32,7 +33,11 @@ export const SETUP_MAX_BYTES = 2_000_000;
 
 export type SetupMusic = TrackInfo;
 export type SetupFile = { kind: typeof SETUP_KIND; version: typeof SETUP_VERSION; saved: string; music: SetupMusic | null; state: BeatPathState; script: string };
-export type SetupRead = { ok: true; state: BeatPathState; music: SetupMusic | null; notes: string[]; /** "Next move on each hit" waits for the hits of a track not given in `ctx`. */ waitsForHits?: boolean } | { ok: false; error: string };
+export type SetupRead = {
+  ok: true; state: BeatPathState; music: SetupMusic | null; notes: string[];
+  /** "Next move on each hit" waits for the hits of a track not given in `ctx`. */ waitsForHits?: boolean;
+  /** Saved on an example no longer on the page ("Example 3 (car on a bend)"): page-setup.ts loads it as Your own. */ retired?: string;
+} | { ok: false; error: string };
 
 /** The file for the page's state and the music it is timed to. */
 export function buildSetup(state: BeatPathState, music: TrackInfo | null, now = new Date()): SetupFile {
@@ -51,7 +56,9 @@ const BANDS = ["low", "mid", "high"] as const;
 const SHAPES = ["glider", "car", "flyer", "runner"] as const;
 const SCENERY = ["none", "scatter", "street", "city"] as const;
 const SIGHT = ["clear", "passes"] as const;
-const TRACKS = ["flyer", "runner", "car", "drone"] as const;
+const TRACK_IDS = Object.keys(TRACKS) as TrackId[];
+/** A track id from a setup saved before Examples 3 and 4 left the page ("car", "drone"), or undefined. */
+export const retiredTrack = (v: unknown) => (typeof v === "string" && Object.hasOwn(RETIRED_TRACKS, v) ? RETIRED_TRACKS[v] : undefined);
 /** The state's optional fields (BLANK_STATE leaves them out). */
 const OPTIONAL = ["sensitivity", "markers", "slice", "boxes", "track", "rig", "prompt"] as const;
 
@@ -101,7 +108,8 @@ export function readSetup(text: string, ctx: CommandContext = {}): SetupRead {
     if (result) { state = bare; notes.push(`camera directions dropped (${why!.replace(/^Recipe: /, "")})`); }
   }
   if (!result) return { ok: false, error: `The setup does not make a shot: ${why!.replace(/^Recipe: /, "")}` };
-  return { ok: true, state, music, notes, ...(result === "hits" ? { waitsForHits: true } : {}) };
+  const retired = retiredTrack(raw.state.track)?.example;
+  return { ok: true, state, music, notes, ...(result === "hits" ? { waitsForHits: true } : {}), ...(retired ? { retired } : {}) };
 }
 
 function readMusic(v: unknown, notes: string[]): SetupMusic | null {
@@ -139,6 +147,8 @@ export function readState(s: Rec, notes: string[]): BeatPathState {
     if (lane) {
       (out as Rec)[key] = lane.list;
       if (lane.dropped) notes.push(`${key === "character" ? "character" : "camera"} lane: ${lane.dropped} unreadable blocks dropped`);
+      if (lane.hops?.clamped) notes.push(`character lane: ${lane.hops.clamped} hop${lane.hops.clamped > 1 ? "s" : ""} on a beat outside the block moved inside it`);
+      if (lane.hops?.dropped) notes.push(`character lane: ${lane.hops.dropped} unreadable hop anchor${lane.hops.dropped > 1 ? "s" : ""} dropped (the hop lands on the first kick)`);
       if (lane.capped) notes.push(`camera lane: ${lane.capped} blocks past the rig's ${LIMIT.cameraBlocks} dropped${lane.phrases ? `, with ${lane.phrases} typed camera direction${lane.phrases > 1 ? "s" : ""}` : ""}; the last block kept runs to the end`);
     }
     else drop(`${key === "character" ? "character" : "camera"} lane`);
@@ -203,7 +213,8 @@ export function readState(s: Rec, notes: string[]): BeatPathState {
     }
   }
   if (has("rig")) { const r = isRec(s.rig) ? rig(s.rig, notes) : undefined; if (r) out.rig = r; else drop("camera start"); }
-  const track = pick(s.track, TRACKS);
+  // A retired example's id plays the same generated groove under its track id (tracks.ts).
+  const track = pick(s.track, TRACK_IDS) ?? retiredTrack(s.track)?.id;
   if (track) out.track = track; else if (has("track")) drop("example music");
   if (has("shot")) {
     const sh = isRec(s.shot) ? s.shot : {}, changed: string[] = [];
@@ -239,8 +250,9 @@ function points(v: unknown, camera: boolean): { list: PathPt[]; cut?: string } |
 }
 
 /** A lane: readable blocks in order, edges joined (each block starts where the last ends, the first at 0). */
-function blocks(v: unknown, words: readonly string[], camera: boolean): { list: Block<string>[]; dropped: number; capped?: number; phrases?: number } | null {
+function blocks(v: unknown, words: readonly string[], camera: boolean): { list: Block<string>[]; dropped: number; capped?: number; phrases?: number; hops?: { clamped: number; dropped: number } } | null {
   if (!Array.isArray(v)) return null;
+  const hopNotes = { clamped: 0, dropped: 0 };
   const list = v.slice(0, LIMIT.blocks).flatMap(b => {
     if (!isRec(b)) return [];
     const from = num(b.from), to = num(b.to), word = pick(b.word, words);
@@ -251,11 +263,19 @@ function blocks(v: unknown, words: readonly string[], camera: boolean): { list: 
     const fov = num(b.fov);
     if (camera && (word === "behind" || word === "side") && fov !== undefined) block.fov = clamp(fov, FOV_RANGE[0], FOV_RANGE[1]);
     if (camera && b.shot === "-") block.shot = "-";
+    if (!camera && word === "hop" && b.at !== undefined) {
+      // As fromScript reads it: a beat offset is kept inside the block (hopOffset), a hit index is 1–64; anything else is dropped.
+      const n = isRec(b.at) ? num(b.at.n) : undefined, band = isRec(b.at) ? b.at.band : undefined;
+      if (n !== undefined && band === "beat") block.at = { band, n };   // held inside the block once the edges are joined (below)
+      else if (n !== undefined && (band === "kick" || band === "snare" || band === "hat") && Number.isInteger(n) && n >= 1 && n <= 64) block.at = { band, n };
+      else hopNotes.dropped++;
+    }
     return [block];
   }).sort((a, b) => a.from - b.from);
   if (!list.length) return null;
   list[0].from = 0;
   for (let i = 1; i < list.length; i++) { list[i].from = list[i - 1].to; if (list[i].to <= list[i].from) list[i].to = list[i].from + 1; }
+  for (const b of list) if (b.at?.band === "beat") { const n = hopOffset(b.at.n, b.to - b.from); if (n !== b.at.n) { hopNotes.clamped++; b.at = { band: "beat", n }; } }
   const read = list.length;
   // The camera rig holds at most 32 ranges (camera.ts): the 32nd block runs on to the lane's end.
   let phrases = 0;
@@ -264,7 +284,7 @@ function blocks(v: unknown, words: readonly string[], camera: boolean): { list: 
     phrases = list.slice(LIMIT.cameraBlocks).filter(b => b.phrase).length;
     list.length = LIMIT.cameraBlocks; list[list.length - 1].to = end;
   }
-  return { list, dropped: v.length - read, ...(read > list.length ? { capped: read - list.length, phrases } : {}) };
+  return { list, dropped: v.length - read, ...(read > list.length ? { capped: read - list.length, phrases } : {}), ...(hopNotes.clamped || hopNotes.dropped ? { hops: hopNotes } : {}) };
 }
 
 function follow(f: Rec): FollowOffset | undefined {
