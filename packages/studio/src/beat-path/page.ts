@@ -19,6 +19,7 @@ import { GRID_LOOKS } from "../ground-grid";
 import { exampleState, ownState } from "./examples";
 import { bindGenerate } from "./page-generate";
 import { editStep, endDrag } from "./drag-edit";
+import { musicFor, type Cut } from "./slot-music";
 import { movedIndex } from "./lane-cuts";
 import { LaneView, Menu } from "./lanes";
 import { LAYOUT } from "./layout";
@@ -337,6 +338,8 @@ export function startBeatPath(root: HTMLElement) {
   function useCut(next: Track, move: (s: BeatPathState) => BeatPathState): boolean {
     if (refused()) return false;
     const grid = { bpm: bpm(), offsetSeconds: 0 };
+    // On an example, the cut stays its music for the session (slot-music.ts): coming back brings the cut, not the whole track.
+    if (state.track) cuts.set(slot, { track: next, licence: info?.licence ?? "unspecified", grid, from: state.track });
     for (const list of [past, future]) list.forEach((s, i) => { list[i] = move(s); });
     dragBase = null;
     state = move(state);
@@ -366,8 +369,10 @@ export function startBeatPath(root: HTMLElement) {
     const bpm = GROOVES[t.groove].bpm, seconds = 0.1 + t.bars * 4 * 60 / bpm + 0.5;
     return useTrack(trackFromSamples(t.name, [synthDrums(grooveTimes(t.groove, t.bars, 0.1), seconds)], 44100), t.licence);
   }
-  /** The example switcher: each slot keeps its own edits; an example brings its own music. */
+  /** The example switcher: each slot keeps its own edits; an example brings its own music, or the cut a Slice made of it. */
   const slots = new Map<string, BeatPathState>();
+  /** A Slice made on an example, per slot: its music when it shows again (slot-music.ts). */
+  const cuts = new Map<string, Cut<Track, keyof typeof EXAMPLE_TRACKS>>();
   let slot = "0", switching = 0;
   async function switchSlot(next: string) {
     if (next === slot && slots.size) return;
@@ -382,7 +387,9 @@ export function startBeatPath(root: HTMLElement) {
     state = slots.get(next) ?? (next === "own" ? ownState() : exampleState(Number(next)));
     // Nothing selected carries over: a lane block, a path point or a scenery box of the last example.
     selection = null; blocks.selected = -1; menu.hide();
-    if (state.track) { await useExampleTrack(state.track, () => ticket === switching); if (ticket !== switching) return; }
+    const music = musicFor(state, cuts.get(next));
+    if (music.kind === "cut") await useTrack(music.cut.track, music.cut.licence, music.cut.grid);
+    else if (music.kind === "example") { await useExampleTrack(music.id, () => ticket === switching); if (ticket !== switching) return; }
     else if (next === "own" && !track) rebuild();
     else { state = fitLanes(state, totalBeats()); rebuild(); }
     map.fit();
@@ -397,6 +404,7 @@ export function startBeatPath(root: HTMLElement) {
       const loaded = await loadTrack(file, stage => { strip.message = stage; strip.setScene({ track, start: window0(), end: window1(), beats: [], kicks: [], snares: [], hats: [], added: [], selected: -1, locked: [], muted: [] }); });
       // A new track starts at its first beat, with no markers of its own (the old ones belong to the old track).
       state = { ...state, slice: undefined, markers: undefined, muted: [] };
+      cuts.delete(slot);
       await useTrack(loaded, "unspecified");
     }
     catch (e) { strip.message = ""; rebuild(); say(`Could not read the track: ${(e as Error).message}`); }

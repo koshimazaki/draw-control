@@ -129,7 +129,9 @@ export function bindSlice(p: Page) {
     const start = p.window0(), clip = p.state.clip, origin = originOf(track);
     const cut = trackFromSamples(slicedName(origin.name, origin.offset + start, origin.offset + start + clip), cutChannels(track.buffer, start, clip), track.buffer.sampleRate);
     origins.set(cut, { name: origin.name, offset: origin.offset + start });
-    if (p.useCut(cut, s => moveOntoCut(s, start, clip))) p.say(`Sliced to ${clip.toFixed(1)} s. Load the file again to get the whole track back`);
+    // An example keeps its cut when it shows again (its markers moved onto the cut); its whole music comes back with a reload.
+    const example = !!p.state.track;
+    if (p.useCut(cut, s => moveOntoCut(s, start, clip))) p.say(`Sliced to ${clip.toFixed(1)} s. ${example ? "The example keeps this cut while the page is open: reload the page for its whole music" : "Load the file again to get the whole track back"}`);
   };
   exportButton.onclick = () => {
     const track = p.track;
