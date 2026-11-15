@@ -30,6 +30,7 @@ describe("Lane cuts", () => {
   it("reads plain move names, and says which word is not one", () => {
     expect(parseMoves("Orbit, top → push in then my path")).toEqual({ words: ["orbit", "top", "push", "path"] });
     expect(parseMoves("orbit, zoom")).toEqual({ error: expect.stringContaining('"zoom"') });
+    for (const w of ["constructor", "toString", "__proto__", "hasOwnProperty"]) expect(parseMoves(`orbit, ${w}`)).toEqual({ error: expect.stringContaining(`"${w.toLowerCase()}" is not a camera move`) });
   });
   it("finds the block at a beat", () => {
     expect(blockAt(lane, 8)).toBe(1); expect(blockAt(lane, 17)).toBe(1); expect(blockAt(lane, 3)).toBe(0);

@@ -159,7 +159,10 @@ export function planCamera(recipe: Recipe, drive?: AudioDrive, frames = 0): Came
       // Lead / chase: swing the base yaw so the camera sits in front of or behind the heading.
       const rig = followOffset(modes), off = rig === null ? null : rig + turn(beat) - SHOULDER.angle * shoulderW;
       if (off !== null) {
-        let want = s.heading + off - yaw0 - orbit;
+        // The programmed orbit carried in from earlier blocks (prog.orbit at this block's first frame) is part of the
+        // yaw too: take it out, so a follow block sits at its own angle; an orbit inside this block still turns it.
+        const seg = segAt(beat), first = seg ? Math.max(0, Math.min(total - 1, Math.round(secondsAtBeat(g, seg.fromBeat) * fps))) : n;
+        let want = s.heading + off - yaw0 - orbit - prog.orbit[first];
         want += 2 * Math.PI * Math.round((followYaw - want) / (2 * Math.PI));
         const headingV = (s.heading - sp.heading) / dt;
         [followYaw, followV] = followStep(followYaw, followV, want, headingV - orbitRate, 2.2 * Math.sqrt(pace), CAMERA_LIMITS.yawAccel * pace, dt);

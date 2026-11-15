@@ -117,6 +117,8 @@ export const DEFAULT_CAMERA: CameraConfig = {
   segments: [{ fromBeat: 0, toBeat: 16, modes: ["orbit"] }],
   intensity: 0.6, orbitDegreesPerBeat: 6, distance: 4.4, height: 1.15, fov: 38, startYaw: 0,
 };
+/** The rig's start framing limits (camera.distance, height, fov, startYaw): what `validateCamera` and a script's `rig:` line take. */
+export const RIG_LIMITS = { distance: [1.5, 12], height: [0.2, 6], fov: [15, 80], startYaw: [-360, 360] } as const;
 /** Most camera ranges a rig holds. */
 export const CAMERA_SEGMENTS_MAX = 32;
 
@@ -161,10 +163,10 @@ export function validateCamera(input: unknown, durationBeats: number): CameraCon
     segments,
     intensity: num(input.intensity, 0, 1, "camera.intensity"),
     orbitDegreesPerBeat: num(input.orbitDegreesPerBeat, -45, 45, "camera.orbitDegreesPerBeat"),
-    distance: num(input.distance, 1.5, 12, "camera.distance"),
-    height: num(input.height, 0.2, 6, "camera.height"),
-    fov: num(input.fov, 15, 80, "camera.fov"),
-    startYaw: num(input.startYaw, -360, 360, "camera.startYaw"),
+    distance: num(input.distance, ...RIG_LIMITS.distance, "camera.distance"),
+    height: num(input.height, ...RIG_LIMITS.height, "camera.height"),
+    fov: num(input.fov, ...RIG_LIMITS.fov, "camera.fov"),
+    startYaw: num(input.startYaw, ...RIG_LIMITS.startYaw, "camera.startYaw"),
   };
   if (path) out.path = path;
   if (input.keepInFrame !== undefined) { if (typeof input.keepInFrame !== "boolean") fail("camera.keepInFrame must be true or false"); if (input.keepInFrame) out.keepInFrame = true; }

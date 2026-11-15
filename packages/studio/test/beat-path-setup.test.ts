@@ -19,7 +19,7 @@ const file = (state: unknown, extra: Record<string, unknown> = {}) => JSON.strin
 describe("round trip", () => {
   it.each(EXAMPLES.map((e, i) => [e.id, i] as const))("example %s comes back as it was saved", (_, i) => {
     // Each example's music at its own tempo (examples.ts).
-    const id = EXAMPLES[i].id, music = { ...flyerMusic, name: EXAMPLE_TRACKS[id].name, bpm: { flyer: 120, runner: 140, car: 100 }[id] };
+    const id = EXAMPLES[i].id, music = { ...flyerMusic, name: EXAMPLE_TRACKS[id].name, bpm: { flyer: 120, runner: 140, car: 100, drone: 100 }[id] };
     const state = exampleState(i), r = ok(setupJson(state, music));
     expect(r.state).toEqual(state);
     expect(r.notes).toEqual([]);

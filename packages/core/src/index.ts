@@ -40,13 +40,14 @@ export { applyMotionCommand, applyCommands, commandHelp, type MotionCommand, typ
 
 // The shot script and the timeline as text.
 export { printScript, cameraWords } from "./shot-script";
-export { applyScript, parseRows, parseSettings } from "./script-apply";
+export { applyScript, parseRows, parseSettings, type ScriptSettings } from "./script-apply";
+export { parseRig, type ScriptRig } from "./script-rig";
 export { ACTION_WORDS, CAMERA_WORDS } from "./shot-script";
 export { describeRecipe } from "./describe";
 
 // Camera rig: shots, programmed moves, beat locks, automation lanes, the per-frame plan.
 export {
-  CAMERA_MODES, CAMERA_MAX_HEIGHT, FOLLOW_LIMITS, FOLLOW_MODES, FOV_RANGE, DEFAULT_CAMERA, SHOTS, SHOT_PRESETS,
+  CAMERA_MODES, CAMERA_MAX_HEIGHT, FOLLOW_LIMITS, RIG_LIMITS, FOLLOW_MODES, FOV_RANGE, DEFAULT_CAMERA, SHOTS, SHOT_PRESETS,
   type CameraConfig, type CameraSegment, type CameraMode, type FollowOffset, type Shot,
 } from "./camera";
 export { planCamera, cameraAtFrame, cameraAtSeconds, fovForAspect, type CameraPlan, type CameraSample, type Vec3 } from "./camera-rig";

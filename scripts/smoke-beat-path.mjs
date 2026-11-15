@@ -156,7 +156,7 @@ export async function smokeBeatPath(browser, base, { fail, OUT, SHOTS }) {
   await page.click('[data-control="tool"] [data-value="subject"]');
 
   // Every example loads framed: each path point, camera-track point and scenery box inside the map.
-  for (const ex of ["1", "2", "0"]) {
+  for (const ex of ["1", "2", "3", "0"]) {
     await page.click(`[data-control="example"] [data-value="${ex}"]`);
     await page.waitForTimeout(400);
     const inside = await page.evaluate(() => window.__beatPath.mapInside());
@@ -173,10 +173,24 @@ export async function smokeBeatPath(browser, base, { fail, OUT, SHOTS }) {
   await page.click('[data-control="example"] [data-value="2"]');
   await page.waitForFunction(() => window.__beatPath.recipe().figure?.shape === "car" && window.__beatPath.recipe().beatGrid.bpm < 110, null, { timeout: 30_000 });
   await page.screenshot({ path: `${SHOTS}beat-path-example-3.png` });
+  // Example 4: the drone opens on the rig's start (the script's rig: line), isometric and high, then orbit, top and side.
+  await page.click('[data-control="example"] [data-value="3"]');
+  await page.waitForFunction(() => window.__beatPath.recipe().figure?.shape === "flyer" && window.__beatPath.recipe().camera?.startYaw === 45, null, { timeout: 30_000 });
+  const drone = await page.evaluate(() => ({ r: window.__beatPath.recipe(), cam0: window.__beatPath.cameraAt(0), track: window.__beatPath.trackName() }));
+  const ranges = drone.r.camera.segments.map(s => s.modes.join("+")).join(" ");
+  console.log(`draw control: Example 4 builds: ranges ${ranges}; rig ${drone.r.camera.distance} m, ${drone.r.camera.height} m, fov ${drone.r.camera.fov}, yaw ${drone.r.camera.startYaw}; frame 0 camera at ${drone.cam0.position.map(v => v.toFixed(2)).join(", ")} (fov ${drone.cam0.fov}); track ${drone.track}`);
+  if (ranges !== "threeQuarter orbit top side") fail(`Example 4's camera ranges are ${ranges}, not threeQuarter orbit top side`);
+  if (!(drone.cam0.position[1] > 5)) fail(`Example 4's frame 0 camera is at ${drone.cam0.position[1]} m, not above 5 m`);
+  if (drone.track !== "generated-laidback-100-6bars.wav") fail(`Example 4 plays ${drone.track}, not its own 6-bar laidback groove`);
+  await page.click("#play");
+  await page.waitForTimeout(600);
+  if (!(await page.evaluate(() => window.__beatPath.playing()))) fail("Example 4 does not play");
+  await page.click("#play");
+  await page.screenshot({ path: `${SHOTS}beat-path-example-4.png` });
   await page.click('[data-control="example"] [data-value="0"]');
-  await page.waitForFunction(() => window.__beatPath.recipe().figure?.shape === "flyer", null, { timeout: 30_000 });
+  await page.waitForFunction(() => window.__beatPath.recipe().figure?.shape === "flyer" && window.__beatPath.recipe().camera?.startYaw === 0 && window.__beatPath.recipe().beatGrid.bpm > 110, null, { timeout: 30_000 });
   p = await probe();
-  console.log(`draw control: examples switch: runner 140, car 100, back to flyer (${p.recipe.beatGrid.bpm} BPM), edits kept ${JSON.stringify(p.state.subject) === JSON.stringify(edited)}`);
+  console.log(`draw control: examples switch: runner 140, car 100, drone 100, back to flyer (${p.recipe.beatGrid.bpm} BPM), edits kept ${JSON.stringify(p.state.subject) === JSON.stringify(edited)}`);
   if (JSON.stringify(p.state.subject) !== JSON.stringify(edited)) fail("switching examples lost the edits of Example 1");
   // Scenery: the Settings chevron, scenery none and back to city.
   await page.click("#settings summary");

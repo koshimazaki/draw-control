@@ -99,7 +99,7 @@ export function parseMoves(text: string): { words: CameraWord[] } | { error: str
   const parts = text.toLowerCase().split(/[,→>\n]+|\bthen\b/).map(s => s.trim()).filter(Boolean);
   const words: CameraWord[] = [];
   for (const p of parts) {
-    const w = ALIASES[p] ?? (CAMERA_WORDS as readonly string[]).find(x => x === p) as CameraWord | undefined;
+    const w = (Object.hasOwn(ALIASES, p) ? ALIASES[p] : undefined) ?? (CAMERA_WORDS as readonly string[]).find(x => x === p) as CameraWord | undefined;
     if (!w) return { error: `"${p}" is not a camera move: use follow behind, follow side, orbit, top, push in or my path` };
     words.push(w);
   }
