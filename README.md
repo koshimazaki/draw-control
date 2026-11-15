@@ -2,6 +2,10 @@
 
 **Draw your camera move. The video model follows it.**
 
+[![Draw Control: the path map, the guide preview and the beat-timed lanes](docs/img/draw-control.jpg)](https://draw-control.pages.dev/)
+
+**Try it live:** https://draw-control.pages.dev/
+
 <!-- DEMO VIDEO: on github.com, edit this file and drag the screen recording onto this line; GitHub uploads it and inserts a link that plays inline. -->
 
 Draw Control turns a drawing into a camera move for AI video. Draw the subject's path and the camera's path on a map, block out the scene with simple grey primitives, and drop in your music. The page renders a guide clip (a stand-in figure, the camera move and the blockout, timed to the beat), and a video model follows it for motion and framing, while your prompt and reference images decide the look.
