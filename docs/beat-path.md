@@ -58,7 +58,7 @@ All paths below are in `packages/studio/src/beat-path/` unless they say otherwis
 | The result player | `result-sync.ts`, `result-fetch.ts` | The clip plays from a copy in the tab and follows the page's clock; one download per file |
 | Runs and saved files | `page-history.ts`, `run-log.ts`, `run-assets.ts` | The Runs list in the header; the log in `localStorage` (`beatPath.runs`, 40 entries); copies of finished files in Cache Storage, retried |
 | Reference images | `page-refs.ts`, `ref-store.ts`, `page-image.ts`, `image-panel.ts` | The Character and Environment drops, "Use as reference", and generating a reference with an image model |
-| The gallery | `gallery.ts` | One row per example plus "Your runs" (those rows are held in memory and go on reload; Runs keeps the history) |
+| The gallery | `gallery.ts` | One row per example plus "Your runs" (those rows are held in memory only and are gone after a reload; Runs keeps the history) |
 | The shot script | `script.ts`, `recipe-map.ts` | `toScript` and `fromScript` between the page state and the script; the state to a recipe |
 | Name, styles | `name.ts`, `beat-path.css`, `ui/components.css`, `themes/` | The page name; layout; components; the two themes ([design.md](design.md)) |
 
