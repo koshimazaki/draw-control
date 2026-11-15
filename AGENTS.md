@@ -1,6 +1,6 @@
 # Motion Studio for agents
 
-Motion Studio makes guide videos that video models follow: a figure, its path, a camera plan and the music's beats, rendered to an MP4. **Beat Path** (`packages/studio/path.html`) is the page built for Runware: it draws a shot, renders the guide and generates on Runware's video models.
+Motion Studio makes guide videos that video models follow: a figure, its path, a camera plan and the music's beats, rendered to an MP4. **Draw Control** (`packages/studio/path.html`, built as the `beat-path` mode; identifiers keep that old name) is the page built for Runware: it draws a shot, renders the guide and generates on Runware's video models.
 
 ## How an agent drives it
 
@@ -17,7 +17,7 @@ Every edit in the page is a command an agent can run too, so the page, the CLI a
 
 Skills follow the open Agent Skills format (`SKILL.md` with `name` and `description`), so Claude Code, Codex, Hermes and other agents can load them:
 
-- [`skills/beat-path`](skills/beat-path/SKILL.md): draw and edit a Beat Path shot through the MCP server or the CLI, then render the guide.
+- [`skills/beat-path`](skills/beat-path/SKILL.md): draw and edit a Draw Control shot through the MCP server or the CLI, then render the guide.
 - [`skills/runware-hermes`](skills/runware-hermes/SKILL.md): run Hermes on Runware, with text models, images and video on one key.
 - [`skills/runware-review`](skills/runware-review/SKILL.md): a second-opinion code review from another model family on Runware (`npm run review`: sends the diff and this file, paid, asks first), and quick GPT Image sketches.
 
@@ -33,7 +33,7 @@ Skills follow the open Agent Skills format (`SKILL.md` with `name` and `descript
 ## Map
 
 - `packages/core`: the recipe, the commands, audio analysis and the beat locks (pure TypeScript).
-- `packages/studio`: the studio and Beat Path pages (Vite, three.js). `src/beat-path/` is the page.
+- `packages/studio`: the studio and Draw Control pages (Vite, three.js). `src/beat-path/` is the page.
 - `mcp/`, `cli/`: the MCP server and CLI over the same commands.
 - `docs/`: [models.md](docs/models.md) (what each video model takes), [recipe.md](docs/recipe.md), [design.md](docs/design.md), [friction.md](docs/friction.md).
 - `hermes/beat-path/`: the Hermes profile. `skills/`: the agent skills.

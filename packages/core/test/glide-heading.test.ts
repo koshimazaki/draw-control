@@ -1,6 +1,6 @@
 /**
  * The glider's heading and lean along a drawn path (glide-heading.ts). The S-curve is what the
- * Beat Path pen keeps of a hand-drawn stroke with tremor (8 points), flown by the flyer over
+ * Draw Control pen keeps of a hand-drawn stroke with tremor (8 points), flown by the flyer over
  * the 8 s clip with a kick lock, as the page's first example does. On the straight polyline
  * interpolation the yaw stepped up to 8.6° a frame at Corners 0.5, its rate jumped 5.4° a
  * frame at the points, and the bank reversed 16 times with 18° roll steps: the jitter on the

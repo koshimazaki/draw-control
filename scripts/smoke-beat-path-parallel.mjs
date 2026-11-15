@@ -44,7 +44,7 @@ export async function smokeBeatPathParallel(browser, base, { fail, SHOTS }) {
     if (shift) await page.keyboard.up("Shift");
   }
   const st = await state();
-  console.log(`beat path parallel by hand: ${steps} steps; subject ${JSON.stringify(st.subject)}, camera ${JSON.stringify(st.camera)}, lane ${st.cameraLane.map(x => `${x.word} ${x.from}-${x.to}`).join(", ")}`);
+  console.log(`draw control parallel by hand: ${steps} steps; subject ${JSON.stringify(st.subject)}, camera ${JSON.stringify(st.camera)}, lane ${st.cameraLane.map(x => `${x.word} ${x.from}-${x.to}`).join(", ")}`);
   if (st.camera.length !== 2 || st.camera[0].z !== st.camera[1].z) fail(`the camera's street is not a straight two-point path: ${JSON.stringify(st.camera)}`);
   if (st.cameraLane.length !== 1 || st.cameraLane[0].word !== "path") fail(`the drawn camera path does not fly the whole clip: ${JSON.stringify(st.cameraLane)}`);
   await page.screenshot({ path: `${SHOTS}beat-path-parallel-by-hand.png` });

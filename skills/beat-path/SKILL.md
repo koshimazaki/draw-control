@@ -1,6 +1,6 @@
 ---
 name: beat-path
-description: Draw and edit a Beat Path shot (paths, camera, beat locks) through the motion-studio MCP or CLI, then render the guide.
+description: Draw and edit a Draw Control shot (paths, camera, beat locks) through the motion-studio MCP or CLI, then render the guide.
 license: MIT
 compatibility: Node 24; the motion-studio MCP server (mcp/bin/motion-studio-mcp.mjs) or CLI (cli/bin/motion-studio.mjs)
 metadata:
@@ -8,9 +8,9 @@ metadata:
   version: 0.1.0
 ---
 
-# Beat Path for agents
+# Draw Control for agents
 
-Beat Path turns a hand-drawn path, a camera plan and a music track into a guide video that a video model follows. The page, the CLI and the MCP server run the same commands, so anything you do here can be opened and fine-tuned by hand in the page.
+Draw Control turns a hand-drawn path, a camera plan and a music track into a guide video that a video model follows. The page, the CLI and the MCP server run the same commands, so anything you do here can be opened and fine-tuned by hand in the page.
 
 ## Tools
 
@@ -19,7 +19,7 @@ Over MCP (server `motion-studio`):
 | Tool | Use |
 | --- | --- |
 | `analyse_audio` / `load_analysis` | Read a track: tempo, kicks, snares, hats. Run it before anything locks to the music. |
-| `new_recipe` | A starting shot: `{ character: "glider", clip: 8 }` gives the Beat Path base (clip 3–30 s, `slice` to start inside a long track). The figure shape (glider, car, flyer, runner) is the `figure:` script line or the `setFigure` command. |
+| `new_recipe` | A starting shot: `{ character: "glider", clip: 8 }` gives the Draw Control base (clip 3–30 s, `slice` to start inside a long track). The figure shape (glider, car, flyer, runner) is the `figure:` script line or the `setFigure` command. |
 | `apply_script` | The main tool: a shot script, one row per block (grammar in `docs/recipe.md#shot-script`). |
 | `apply`, `set` | Single commands or recipe fields, when a script is too coarse. `list_commands` lists every command. |
 | `describe`, `get_script` | Read the shot back as text. Always read it back after an edit and check what changed. |

@@ -79,7 +79,7 @@ So the price check is yours, not Hermes's:
 
 - Before every paid `run`, read `model_pricing` and say the price, the model and what the result is for, and wait for a yes, even when Hermes would not ask.
 - One take first. Batches and variations come after the person has seen the first.
-- Images for Beat Path go to the character or environment reference; pick the model by job (GPT-Image-2.6 Sunburst or Flare for text, layout and mockups; FLUX or Seedream for looks) from `list_models`.
+- Images for Draw Control go to the character or environment reference; pick the model by job (GPT-Image-2.6 Sunburst or Flare for text, layout and mockups; FLUX or Seedream for looks) from `list_models`.
 
 ## Rules
 

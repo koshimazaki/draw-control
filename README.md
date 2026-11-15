@@ -8,6 +8,8 @@ Status: working studio, CLI and MCP server, 11 November 2026. What is not done i
 
 ## Draw Control (start here)
 
+Draw control of camera and character: you draw, and the drawing controls the camera and the figure. (In the code the page is still `beat-path`: the folder, the build mode, the npm scripts.)
+
 The lean demo: **draw a path on a map, add music, and the movement and the camera lock to the beat; export a guide clip for video models.** One screen, an abstract figure, a handful of controls.
 Changing the page (developers and agents): [docs/beat-path.md](docs/beat-path.md) says how to run and check it and which file owns each control.
 

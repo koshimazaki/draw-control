@@ -1,13 +1,15 @@
 ---
 tags: [beat-path, agents, onboarding, motion-studio]
-summary: The first file to open for the Beat Path page - what it is for, how to run and check it, which file owns each control, the state model, the rules a change must keep, and how to add something small.
+summary: The first file to open for the Draw Control page - what it is for, how to run and check it, which file owns each control, the state model, the rules a change must keep, and how to add something small.
 ---
 
-# Beat Path for developers and agents
+# Draw Control for developers and agents
 
-Beat Path is a one-screen page in this repo: **draw a path on the map, set it to music, generate a video.** You draw where the subject travels, the movement and the camera lock to the beat of a track, and the page renders a guide clip (a plain orange figure among grey blocks) that a video model follows when it makes the real shot.
+Draw Control is a one-screen page in this repo, "draw control of camera and character": **draw a path on the map, set it to music, generate a video.** You draw where the subject travels, the movement and the camera lock to the beat of a track, and the page renders a guide clip (a plain orange figure among grey blocks) that a video model follows when it makes the real shot.
 
-What a user sees and does is in the [README](../README.md#beat-path-start-here). The design system and the log of UI rounds are in [design.md](design.md), the shot script grammar in [recipe.md](recipe.md#shot-script), the CLI and the MCP server in [agents.md](agents.md), the static build in [deploy.md](deploy.md), the models' limits in [models.md](models.md). This file does not repeat them.
+What a user sees and does is in the [README](../README.md#draw-control-start-here). The design system and the log of UI rounds are in [design.md](design.md), the shot script grammar in [recipe.md](recipe.md#shot-script), the CLI and the MCP server in [agents.md](agents.md), the static build in [deploy.md](deploy.md), the models' limits in [models.md](models.md). This file does not repeat them.
+
+The page was first called Beat Path, and the code keeps that name: the folder `packages/studio/src/beat-path/`, the `beat-path` build mode and npm scripts, the CSS classes, the TypeScript symbols (`BeatPathState`, `beatPathBase`), the Hermes profile and the skill (`beat-path`), and this file's name. Only what a user reads says Draw Control.
 
 ## Run it and see it
 
@@ -16,7 +18,7 @@ nvm use && npm install     # Node 24 (.nvmrc)
 npm run dev                # then open http://127.0.0.1:5180/path.html
 ```
 
-`/` on the same server is the full studio, a different page; Beat Path is `path.html`. If port 5180 is taken, Vite moves to the next free port and prints it. `?theme=runware` switches to the Runware look. The page opens on Example 1 with its own generated music: press Play, or click the picture.
+`/` on the same server is the full studio, a different page; Draw Control is `path.html`. If port 5180 is taken, Vite moves to the next free port and prints it. `?theme=runware` switches to the Runware look. The page opens on Example 1 with its own generated music: press Play, or click the picture.
 
 **No key and no charge in development.** While `npm run dev` serves the page (or with `?fake=1` on any build), Generate uses a local fake provider (`fakeFetch` in `arena.ts`) as long as no Runware key is connected. It answers the Runware API locally and hands back the guide itself as the "result", so the whole flow (cost question, progress, the output beside the preview, Runs, the gallery) can be tried with nothing sent and nothing charged. **Connecting a real key switches the fake off, in development too:** from then on Generate is a paid call. Do not connect one unless the owner has approved the spend (see [plan.md](plan.md#agent-rules) and [costs.md](costs.md)).
 
@@ -27,8 +29,8 @@ The Model Arena embed that draws the key panel and runs the generation is vendor
 | Command | What it proves | Time on the owner's machine (15 Nov 2026) |
 | --- | --- | --- |
 | `npm run check` | TypeScript in core, studio, CLI and MCP; ESLint; every vitest unit test (the page's pure parts: script round trips, lane cuts and moves, the cost dialog queue, the run log, result playback, Slice) | about 30 s |
-| `node scripts/smoke-beat-path.mjs` | The Beat Path page alone in headless Chrome against its own dev server: drawing, locks, lane menus and drags, examples, the guide export validated against the schema, Slice and Export, Generate with the fake provider (cancel, Stop, a switch refused during the render, two questions in turn), the gallery; any console error or warning fails it | 1 min 45 s |
-| `npm run smoke` | The studio first, then the same Beat Path step | about 2 min on a quiet machine |
+| `node scripts/smoke-beat-path.mjs` | The Draw Control page alone in headless Chrome against its own dev server: drawing, locks, lane menus and drags, examples, the guide export validated against the schema, Slice and Export, Generate with the fake provider (cancel, Stop, a switch refused during the render, two questions in turn), the gallery; any console error or warning fails it | 1 min 45 s |
+| `npm run smoke` | The studio first, then the same Draw Control step | about 2 min on a quiet machine |
 
 Both smoke commands need Google Chrome (or `CHROME_PATH`) and write screenshots to `out/`. The times grow when the machine is busy; the clip-rendering steps are the slow part.
 

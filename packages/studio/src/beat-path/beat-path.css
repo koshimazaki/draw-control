@@ -1,4 +1,4 @@
-/* Beat Path page layout: one screen, no scrolling; tokens and components only (ui/components.css, themes/). */
+/* Draw Control page layout: one screen, no scrolling; tokens and components only (ui/components.css, themes/). */
 :root { --top: 52px; --dock: 136px; --compose: calc(3 * var(--control-h) + 3 * var(--s-2) + var(--status-h)); --status-h: 16px; --gap: var(--s-4); --pad: var(--s-5); }
 html, body { height: auto; overflow: visible; }
 .editor { display: grid; grid-template-rows: var(--top) minmax(0, 1fr) var(--dock); height: 100vh; }

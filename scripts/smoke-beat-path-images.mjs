@@ -43,7 +43,7 @@ export async function smokeBeatPathImages(browser, base, { fail, SHOTS }) {
     await pop.locator(".ip-family").selectOption(fam); await pop.locator(".ip-model").selectOption(key);
     prompts[key] = await pop.locator(".ip-prompt").inputValue();
   }
-  console.log(`beat path images: per-model prompts ${JSON.stringify(Object.fromEntries(Object.entries(prompts).map(([k, v]) => [k, v.slice(0, 70)])))}`);
+  console.log(`draw control images: per-model prompts ${JSON.stringify(Object.fromEntries(Object.entries(prompts).map(([k, v]) => [k, v.slice(0, 70)])))}`);
   if (new Set(Object.values(prompts)).size !== 4) fail("the prompt does not differ per model for the same shot");
   const link = await pop.locator(".ip-guide a").evaluate(a => ({ href: a.href, target: a.target, rel: a.rel })).catch(() => null);
   const want = await page.evaluate(() => import(new URL("vendor/model-arena/model-arena-embed.js", document.baseURI).href).then(m => m.imageModels().find(x => x.key === "flux-3-image-klein").guide.url));
@@ -60,10 +60,10 @@ export async function smokeBeatPathImages(browser, base, { fail, SHOTS }) {
   if ((await pop.locator(".ip-prompt").inputValue()) !== prompts["seedream-5.5"]) fail("Rewrite for this model did not restore the model's prompt");
   await page.keyboard.press("Escape");
   const a = await make("ByteDance Seedream", "seedream-5.5", false);
-  console.log(`beat path images: seedream ${JSON.stringify(a)}`);
+  console.log(`draw control images: seedream ${JSON.stringify(a)}`);
   if (a && !/Up to .* USD on .*limit 0\.50 USD/.test(a.cost ?? "")) fail(`the per-image cost dialog does not show the bound and the 0.50 USD limit: ${a.cost}`);
   const b = await make("OpenAI GPT Image", "gpt-image-2.6-flare", true);
-  console.log(`beat path images: flare ${JSON.stringify(b)}`);
+  console.log(`draw control images: flare ${JSON.stringify(b)}`);
   if (b && (b.notice?.title !== "No published price limit" || !/no upper price/i.test(b.notice?.text ?? ""))) fail(`no plain no-bound notice before the token-priced run: ${JSON.stringify(b.notice)}`);
   if (b && !/No published upper price/.test(b.cost ?? "")) fail(`the token-priced cost dialog does not say there is no bound: ${b.cost}`);
   // GPT quality reaches the request (fake mode records what would be sent).
@@ -71,7 +71,7 @@ export async function smokeBeatPathImages(browser, base, { fail, SHOTS }) {
   if (!/"quality":"high"/.test(tasks)) fail("the GPT quality did not reach the image request");
   // MiniMax H3: an estimate, no no-bound notice, and a size sent.
   const c = await make("MiniMax H3", "h3-image", false);
-  console.log(`beat path images: h3 ${JSON.stringify(c?.cost)}`);
+  console.log(`draw control images: h3 ${JSON.stringify(c?.cost)}`);
   if (c && !/estimate/i.test(c.cost ?? "")) fail(`the H3 cost dialog does not show the embed's estimate: ${c.cost}`);
   const h3 = JSON.parse(await page.evaluate(() => JSON.stringify(globalThis.__fakeTasks ?? []))).filter(t => t.taskType === "imageInference" && /h3/.test(t.model)).at(-1);
   if (!h3 || h3.width !== 1280 || h3.height !== 720) fail(`H3 was not sent a size: ${JSON.stringify(h3 && { width: h3.width, height: h3.height, resolution: h3.resolution })}`);
@@ -91,7 +91,7 @@ export async function smokeBeatPathImages(browser, base, { fail, SHOTS }) {
   await page.waitForFunction(() => document.querySelector(".image-pop").hidden, null, { timeout: 30_000 }).catch(() => fail("the double-clicked image run did not finish"));
   await page.waitForTimeout(500);
   const sentTwice = (await imageTasks()) - before;
-  console.log(`beat path images: double click on Generate sent ${sentTwice} image task(s), ${answered} question(s) answered`);
+  console.log(`draw control images: double click on Generate sent ${sentTwice} image task(s), ${answered} question(s) answered`);
   if (sentTwice !== 1 || answered !== 2) fail(`two fast clicks on the image Generate sent ${sentTwice} image tasks after ${answered} questions (want 1 after 2)`);
   // The gallery's "Your runs" shows the images.
   const imgs = await page.locator("#gallerySlot .gallery-row:last-child .row-media img").count();

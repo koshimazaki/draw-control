@@ -1,9 +1,9 @@
 ---
 tags: [agents, hermes, runware, mcp]
-summary: Run Beat Path from Hermes Agent, open source, with Runware as both the model provider and the generator.
+summary: Run Draw Control from Hermes Agent, open source, with Runware as both the model provider and the generator.
 ---
 
-# Beat Path in Hermes, on Runware
+# Draw Control in Hermes, on Runware
 
 [Hermes Agent](https://github.com/NousResearch/hermes-agent) (Nous Research, MIT) is an open-source agent. The `beat-path` profile runs it entirely on one Runware key:
 

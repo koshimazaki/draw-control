@@ -25,7 +25,7 @@ export async function smokeBeatPathSlice(browser, base, { fail, OUT, SHOTS }) {
   // The page keeps answering while the worker analyses.
   const alive = await page.evaluate(() => new Promise(r => window.requestAnimationFrame(() => r(true))));
   await page.waitForFunction(() => window.__beatPath.trackName() === "long-track.wav", null, { timeout: 120_000 });
-  console.log(`beat path slice: a 3-minute track analysed in ${((Date.now() - t0) / 1000).toFixed(1)} s (page responsive: ${alive})`);
+  console.log(`draw control slice: a 3-minute track analysed in ${((Date.now() - t0) / 1000).toFixed(1)} s (page responsive: ${alive})`);
   if (!(await page.locator("#overview").isVisible())) { fail("the track overview does not show for a track longer than the clip"); await page.close(); return; }
   const state = () => page.evaluate(() => window.__beatPath.state());
   const grid = () => page.evaluate(() => window.__beatPath.recipe().beatGrid);
@@ -36,7 +36,7 @@ export async function smokeBeatPathSlice(browser, base, { fail, OUT, SHOTS }) {
   await page.mouse.move(startX, y); await page.mouse.down(); await page.mouse.move(box.x + box.width / 3, y, { steps: 8 }); await page.mouse.up();
   let s = await state(), g = await grid();
   const beat = 60 / g.bpm, phase = (x) => Math.abs(((x - 0.1) / beat) - Math.round((x - 0.1) / beat));
-  console.log(`beat path slice: window at ${s.slice} s (grid offset ${g.offsetSeconds}, ${g.bpm} BPM)`);
+  console.log(`draw control slice: window at ${s.slice} s (grid offset ${g.offsetSeconds}, ${g.bpm} BPM)`);
   if (!(s.slice > 40 && s.slice < 80)) fail(`dragging the window did not move the clip (slice ${s.slice})`);
   if (Math.abs(g.offsetSeconds - s.slice) > 1e-6) fail("the beat grid does not start at the slice");
   if (phase(s.slice) > 0.06) fail(`the slice does not start on a beat (${s.slice})`);
@@ -65,7 +65,7 @@ export async function smokeBeatPathSlice(browser, base, { fail, OUT, SHOTS }) {
     const x1 = b.x + (st.slice + st.clip) / L * b.width, yy = b.y + b.height / 2;
     await page.mouse.move(x1 - 0.5, yy); await page.mouse.down(); await page.mouse.move(x1 + 4 / L * b.width, yy, { steps: 6 }); await page.mouse.up();
     const after = await state();
-    console.log(`beat path slice: bracket drag ${st.clip} s → ${after.clip} s (start ${st.slice} → ${after.slice})`);
+    console.log(`draw control slice: bracket drag ${st.clip} s → ${after.clip} s (start ${st.slice} → ${after.slice})`);
     if (!(after.clip > st.clip && Number.isInteger(after.clip)) || Math.abs(after.slice - st.slice) > 1e-6) fail(`dragging the right bracket did not lengthen the clip in whole seconds, start held (${st.clip} → ${after.clip}, ${st.slice} → ${after.slice})`);
   }
   // Export in memory: the audio is the slice, beats.json starts on a beat.
@@ -76,7 +76,7 @@ export async function smokeBeatPathSlice(browser, base, { fail, OUT, SHOTS }) {
     const beats = JSON.parse(await b.files["beats.json"].text());
     return { seconds: (wav.length - 44) / (rate * ch * bits / 8), firstBeat: beats.beats[0], count: beats.beats.length };
   });
-  console.log(`beat path slice: exported audio ${out.seconds.toFixed(3)} s, first beat ${out.firstBeat} s, ${out.count} beats`);
+  console.log(`draw control slice: exported audio ${out.seconds.toFixed(3)} s, first beat ${out.firstBeat} s, ${out.count} beats`);
   if (Math.abs(out.seconds - (await state()).clip) > 0.1) fail(`the exported audio is not the clip's length (${out.seconds} s)`);
   if (!(out.firstBeat >= 0 && out.firstBeat < 0.05)) fail(`beats.json does not start on the clip's first beat (${out.firstBeat})`);
   if (errors.length) fail(`slice step logged: ${errors.join(" | ")}`);
@@ -116,7 +116,7 @@ async function smokeSliceReturn(browser, base, { fail }) {
   await page.waitForFunction(() => window.__beatPath.slot() === "0", null, { timeout: 30_000 });
   await page.waitForTimeout(300);
   const back = await onKicks();
-  console.log(`beat path slice: Example 1 sliced (${sliced.name}), away and back: ${back.name}, muted ${back.muted} markers ${back.markers}, worst ${(back.worst * 1000).toFixed(1)} ms off a kick`);
+  console.log(`draw control slice: Example 1 sliced (${sliced.name}), away and back: ${back.name}, muted ${back.muted} markers ${back.markers}, worst ${(back.worst * 1000).toFixed(1)} ms off a kick`);
   if (sliced.worst > 0.02) fail(`after Slice the switched-off hit or the marker is off the kicks (${JSON.stringify(sliced)})`);
   if (back.name !== sliced.name || back.worst > 0.02 || back.muted.length !== 1 || back.markers.length !== 1) fail(`Example 1 came back with its markers off the music loaded (${JSON.stringify(back)}, sliced ${JSON.stringify(sliced)})`);
   if (errors.length) fail(`slice return logged: ${errors.join(" | ")}`);
