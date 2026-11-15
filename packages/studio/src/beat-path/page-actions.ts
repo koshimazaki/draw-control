@@ -326,9 +326,9 @@ export function bindActions(p: Page) {
       if (x < v0 + scroller.clientWidth * 0.1 || x > v1 - scroller.clientWidth * 0.1) scroller.scrollLeft = x - scroller.clientWidth * 0.25;
     }
     requestAnimationFrame(followHead);
-  bindPlayhead(p);
   };
   requestAnimationFrame(followHead);
+  bindPlayhead(p);
 
   // The shot description: three fields, stored in the recipe (recipe.json in the bundle) and the script.
   for (const k of ["subject", "environment", "action"] as const) {

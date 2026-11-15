@@ -18,7 +18,9 @@ type Page = {
 export const timeAtFraction = (window0: number, clip: number, fraction: number) => window0 + Math.max(0, Math.min(1, fraction)) * clip;
 
 export function bindPlayhead(p: Page) {
-  const inner = p.$("tlInner"), line = document.createElement("div");
+  const inner = p.$("tlInner");
+  if (inner.querySelector(".tl-head")) return;   // bound already: one line, one loop, one listener per lane
+  const line = document.createElement("div");
   line.className = "tl-head";
   line.setAttribute("aria-hidden", "true");
   inner.append(line);
@@ -35,6 +37,7 @@ export function bindPlayhead(p: Page) {
       if (e.target !== lane || e.button !== 0) return;   // a block, its edge or its menu: as before
       const at = (ev: PointerEvent) => { const r = lane.getBoundingClientRect(); return timeAtFraction(p.window0(), p.state.clip, (ev.clientX - r.left) / Math.max(1, r.width)); };
       e.preventDefault();
+      lane.dataset.seeks = String(Number(lane.dataset.seeks ?? 0) + 1);   // counted for the smoke: one seek per press
       p.seek(at(e));
       captureDrag(lane, e, ev => p.seek(at(ev)));
     });

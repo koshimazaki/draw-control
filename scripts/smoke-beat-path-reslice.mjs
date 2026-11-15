@@ -67,7 +67,7 @@ export async function smokeBeatPathReslice(browser, base, { fail, OUT }) {
   await page.locator(".dock").screenshot({ path: `${OUT}beat-path-resliced-8s.png` });
   await page.click("#sliceTrack");
   s = await look();
-  if (!/Nothing to slice/.test(s.status) || Math.abs(s.length - 8) > 1 / 24) fail(`Slice on a window that is the whole track should only say so ("${s.status}", ${s.length} s)`);
+  if (!/Nothing to slice: the 8 s window covers/.test(s.status) || Math.abs(s.length - 8) > 1 / 24) fail(`Slice on a window that is the whole track should only say so ("${s.status}", ${s.length} s)`);
 
   // Drag the window's right bracket in to 4 s, then slice again.
   {
@@ -102,6 +102,19 @@ export async function smokeBeatPathReslice(browser, base, { fail, OUT }) {
   const redone = await look();
   console.log(`draw control reslice: undo → clip ${undone.clip} s on ${undone.length.toFixed(1)} s, redo → clip ${redone.clip} s`);
   if (Math.abs(undone.length - 4) > 1 / 24 || redone.clip !== 4 || /Not applied/.test(redone.status)) fail(`undo/redo after slicing again is not coherent (${JSON.stringify({ undone, redone })})`);
+
+  // Bound once: after the page has idled, one playhead line over the lanes, and a lane click seeks once (each seek counts on the lane).
+  await page.waitForTimeout(1500);
+  const once = await bp(() => {
+    const lane = document.getElementById("laneCharacter"), r = lane.getBoundingClientRect();
+    lane.dataset.seeks = "0";
+    lane.dispatchEvent(new window.PointerEvent("pointerdown", { clientX: r.left + r.width * 0.75, clientY: r.top + r.height / 2, button: 0, bubbles: true }));
+    lane.dispatchEvent(new window.PointerEvent("pointerup", { bubbles: true }));
+    return { lines: document.querySelectorAll(".tl-head").length, seeks: Number(lane.dataset.seeks) };
+  });
+  console.log(`draw control reslice: after 1.5 s idle, ${once.lines} playhead line(s) over the lanes; a lane click seeked ${once.seeks} time(s)`);
+  if (once.lines !== 1 || once.seeks !== 1) fail(`the playhead is bound more than once (${once.lines} lines, a lane click seeked ${once.seeks} times)`);
+  if (await bp(() => window.__beatPath.playing())) await page.click("#play");
 
   // The playhead, paused: a click at 50% of the strip, then the playhead dragged to 25%.
   if (await bp(() => window.__beatPath.playing())) await page.click("#play");

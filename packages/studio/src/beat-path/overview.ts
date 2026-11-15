@@ -49,7 +49,7 @@ export class TrackOverview {
         return;
       }
       // The playhead line (within 4 px, inside the window) scrubs the playback position.
-      if (this.head >= this.start && this.head <= this.start + this.clip && Math.abs(px - x(this.head)) <= 4) {
+      if (this.headInWindow() && Math.abs(px - x(this.head)) <= 4) {
         this.host.seek(at(e));
         captureDrag(canvas, e, ev => this.host.seek(at(ev)));
         return;
@@ -64,7 +64,7 @@ export class TrackOverview {
       if (e.buttons || !this.track) return;
       const r = canvas.getBoundingClientRect(), px = e.clientX - r.left, k = r.width / this.span(), x = (t: number) => (t - this.view0) * k;
       const grip = this.grip(k);
-      canvas.style.cursor = Math.abs(px - x(this.start)) <= grip || Math.abs(px - x(this.start + this.clip)) <= grip || Math.abs(px - x(this.head)) <= 4 ? "ew-resize" : "";
+      canvas.style.cursor = Math.abs(px - x(this.start)) <= grip || Math.abs(px - x(this.start + this.clip)) <= grip || (this.headInWindow() && Math.abs(px - x(this.head)) <= 4) ? "ew-resize" : "";
     });
     // Zoomed in: a sideways (or Shift-) scroll pans along the track. Cmd/Ctrl-scroll is the timeline zoom (page-actions.ts).
     canvas.addEventListener("wheel", e => {
@@ -90,6 +90,8 @@ export class TrackOverview {
 
   /** The brackets' grab zone (px): 6, smaller on a narrow window so its middle still moves it. */
   private grip(k: number) { return Math.max(2, Math.min(6, this.clip * k / 5)); }
+  /** The playhead can be grabbed only inside the clip window (the page's clock never leaves it). */
+  private headInWindow() { return this.head >= this.start && this.head <= this.start + this.clip; }
   /** The seconds the strip spans: the track, or further when the window runs past its end. */
   private length() { return Math.max(this.track?.buffer.duration ?? 1, this.start + this.clip); }
   /** The seconds shown at this zoom (never less than the window and a margin). */

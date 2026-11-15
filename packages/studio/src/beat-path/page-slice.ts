@@ -152,7 +152,7 @@ export function bindSlice(p: Page) {
   sliceButton.onclick = () => {
     const track = p.track, info = p.info;
     if (!track || !info) return;
-    if (!sliceable(info, p.state.clip)) { p.say(`Nothing to slice: the window is the whole track (${info.lengthSeconds.toFixed(1)} s) · drag an edge of the window in the strip above the music inward, then Slice`); return; }
+    if (!sliceable(info, p.state.clip)) { p.say(`Nothing to slice: the ${p.state.clip} s window covers the ${info.lengthSeconds.toFixed(1)} s track (within half a second) · drag a bracket of the window in the strip above the music inward first, then Slice`); return; }
     const start = p.window0(), clip = p.state.clip, origin = originOf(track);
     const cut = trackFromSamples(slicedName(origin.name, origin.offset + start, origin.offset + start + clip), cutChannels(track.buffer, start, clip), track.buffer.sampleRate);
     origins.set(cut, { name: origin.name, offset: origin.offset + start });
