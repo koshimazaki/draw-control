@@ -33,6 +33,21 @@ export const RUNWARE_API = "https://api.runware.ai/v1";
 const KEY = "beatPath.runs";
 const INFERENCE: Record<string, RunEntry["kind"]> = { videoInference: "video", imageInference: "image" };
 
+/**
+ * The log cut to `max` entries (newest first, order kept). A paid run still processing is never
+ * dropped (its task id is the only way to ask for its result); local previews go first, then the
+ * oldest finished runs. The copy of a dropped run's file is deleted with it (run-assets.ts).
+ */
+export function trimRuns(list: RunEntry[], max: number): RunEntry[] {
+  let over = list.length - max;
+  if (over <= 0) return list;
+  const drop = new Set<RunEntry>();
+  const take = (keep: (e: RunEntry) => boolean) => { for (let i = list.length - 1; i >= 0 && over > 0; i--) if (!drop.has(list[i]) && keep(list[i])) { drop.add(list[i]); over--; } };
+  take(e => !!e.local);
+  take(e => e.status !== "processing");
+  return list.filter(e => !drop.has(e));
+}
+
 export class RunLog {
   private listeners = new Set<() => void>();
   constructor(private store: Storage | null, private max = 40) {}
@@ -41,7 +56,7 @@ export class RunLog {
     try { const raw = this.store?.getItem(KEY); const v = raw ? JSON.parse(raw) : []; return Array.isArray(v) ? v : []; } catch { return []; }
   }
   private save(list: RunEntry[]) {
-    try { this.store?.setItem(KEY, JSON.stringify(list.slice(0, this.max))); } catch { /* storage full or off: the run still goes ahead */ }
+    try { this.store?.setItem(KEY, JSON.stringify(trimRuns(list, this.max))); } catch { /* storage full or off: the run still goes ahead */ }
     for (const f of this.listeners) f();
   }
   add(e: RunEntry) { this.save([e, ...this.list().filter(x => x.taskUUID !== e.taskUUID)]); }
