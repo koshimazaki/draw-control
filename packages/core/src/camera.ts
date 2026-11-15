@@ -117,11 +117,13 @@ export const DEFAULT_CAMERA: CameraConfig = {
   segments: [{ fromBeat: 0, toBeat: 16, modes: ["orbit"] }],
   intensity: 0.6, orbitDegreesPerBeat: 6, distance: 4.4, height: 1.15, fov: 38, startYaw: 0,
 };
+/** Most camera ranges a rig holds. */
+export const CAMERA_SEGMENTS_MAX = 32;
 
 export function validateCamera(input: unknown, durationBeats: number): CameraConfig {
   if (!isObject(input)) return fail("camera must be an object");
   only(input, ["segments", "intensity", "orbitDegreesPerBeat", "distance", "height", "fov", "startYaw", "path", "lanes", "followHeight", "corners", "keepInFrame"], "camera");
-  if (!Array.isArray(input.segments) || input.segments.length < 1 || input.segments.length > 32) fail("camera.segments needs 1–32 ranges");
+  if (!Array.isArray(input.segments) || input.segments.length < 1 || input.segments.length > CAMERA_SEGMENTS_MAX) fail(`camera.segments needs 1–${CAMERA_SEGMENTS_MAX} ranges`);
   let last = -Infinity;
   const segments = (input.segments as unknown[]).map((s, i): CameraSegment => {
     const where = `camera.segments[${i}]`;

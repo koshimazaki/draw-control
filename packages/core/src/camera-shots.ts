@@ -98,6 +98,16 @@ function valuesIn(s: CameraSegment, v: Values, hits: number[], beat: number): Va
   };
 }
 
+/**
+ * The programmed distance and height each range starts from (carried from the end of the
+ * range before; the first starts from the rig numbers). A range ends on its full move
+ * whatever its lock, so this needs no hits.
+ */
+export function rangeStarts(config: CameraConfig): { distance: number; height: number }[] {
+  let v: Values = { d: config.distance, h: config.height, f: config.fov, a: 1, orbit: 0, truck: 0 };
+  return config.segments.map(s => { const start = { distance: v.d, height: v.h }; v = valuesIn(s, v, [], s.toBeat); return start; });
+}
+
 export function programCamera(config: CameraConfig, grid: BeatGrid, bands: BandAnalysis | undefined, total: number, fps: number): ProgrammedCamera {
   const arr = () => new Float64Array(total), bytes = () => new Uint8Array(total);
   const out: ProgrammedCamera = {

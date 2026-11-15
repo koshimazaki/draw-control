@@ -169,11 +169,30 @@ export function bindActions(p: Page) {
     else p.update({ ...s, camera: [], cameraLane: s.cameraLane.map(b => (b.word === "path" ? { ...b, word: "behind" as const } : b)) });
   };
 
+  /**
+   * Why a state would not build a recipe (null when it does), so a lane edit the engine refuses
+   * (more camera blocks than the rig holds, after cutting on every hit) is said, not stored half-applied.
+   */
+  function refusal(state: BeatPathState): string | null {
+    try { beatPathRecipe(state, p.info, p.track && p.drive ? { drive: p.drive, bands: p.drive.bands } : {}); return null; }
+    catch (e) {
+      return (e as Error).message.replace(/^Recipe: /, "").replace(/^script line \d+: /, "")
+        .replace(/^setCameraModes: the camera holds up to (\d+) ranges, and this edit would make (\d+).*$/, "the Camera lane takes up to $1 blocks and this would make $2: cut on fewer hits (lower Sensitivity) or longer blocks");
+    }
+  }
+  /** Apply a lane edit, or say why it cannot be. */
+  function updateOrSay(state: BeatPathState): boolean {
+    const why = refusal(state);
+    if (why) { p.say(`Not applied: ${why}`); return false; }
+    p.update(state);
+    return true;
+  }
+
   // Lane block menus: the lane's words, then split and remove.
   function openBlock<W extends string>(key: "character" | "cameraLane", view: LaneView<W>, anchor: HTMLElement, i: number, beat: number,
     labels: Record<W, string>, words: readonly W[], single?: W) {
     const blocks = p.state[key] as unknown as Block<W>[], b = blocks[i];
-    const set = (next: Block<W>[] | null, extra: Partial<BeatPathState> = {}) => { if (next) p.update({ ...p.state, [key]: next, ...extra }); };
+    const set = (next: Block<W>[] | null, extra: Partial<BeatPathState> = {}) => { if (next) updateOrSay({ ...p.state, [key]: next, ...extra }); };
     const items: MenuItem[] = words.map(w => ({
       label: labels[w], on: w === b.word,
       run: () => {
@@ -210,8 +229,8 @@ export function bindActions(p: Page) {
         const next = (blocks as unknown as Block<CameraWord>[]).map((x, k) => (k !== i ? x : phrase ? { ...x, word: wordOf(phrase, x.word), phrase } : { from: x.from, to: x.to, word: x.word }));
         const state = { ...p.state, cameraLane: next };
         if (/\bpath\b/.test(phrase) && state.camera.length < 2) state.camera = DEFAULT_CAMERA_PATH.map(q => ({ ...q }));
-        try { beatPathRecipe(state, p.info, p.track && p.drive ? { drive: p.drive, bands: p.drive.bands } : {}); }
-        catch (e) { return (e as Error).message.replace(/^script line \d+: /, ""); }
+        const why = refusal(state);
+        if (why) return why;
         p.update(state);
         return null;
       },
@@ -235,10 +254,13 @@ export function bindActions(p: Page) {
         if ("error" in parsed) return parsed.error;
         const hits = laneHits(lock, 0, total);
         if (!hits.length) return `No ${lock} hits in the clip: add a track, or raise Sensitivity`;
-        lastMoves = text;
         const lane = movesOnHits(total, hits, parsed.words), extra: Partial<BeatPathState> = {};
         if (parsed.words.includes("path") && p.state.camera.length < 2) extra.camera = DEFAULT_CAMERA_PATH.map(q => ({ ...q }));
-        p.update({ ...p.state, ...extra, cameraLane: lane, camLock: { ...cl, lock, advance: false } });
+        const state: BeatPathState = { ...p.state, ...extra, cameraLane: lane, camLock: { ...cl, lock, advance: false } };
+        const why = refusal(state);
+        if (why) return why;
+        lastMoves = text;
+        p.update(state);
         p.say(`Camera lane cut on every ${lock}: ${lane.length} blocks, ${parsed.words.length} moves cycling · each block's menu still edits it`);
         return null;
       },
@@ -379,7 +401,7 @@ export function bindActions(p: Page) {
       const cut = p.snapLane(beat), next = i >= 0 ? splitBlockAt(blocks, i, [cut]) : null;
       e.preventDefault();
       if (!next) { p.say("No split here: each part needs at least a beat (zoom in and move the playhead)"); return; }
-      p.update({ ...p.state, [key]: next });
+      if (!updateOrSay({ ...p.state, [key]: next })) return;
       p.say(`${key === "cameraLane" ? "Camera" : "Character"} lane split at beat ${+cut.toFixed(2)} · click the new block to pick its move`);
       return;
     }
