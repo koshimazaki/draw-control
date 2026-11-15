@@ -4,7 +4,7 @@ import { musicFor, type Cut } from "../src/beat-path/slot-music";
 import { moveOntoCut } from "../src/beat-path/track-cut";
 import { BLANK_STATE, type BeatPathState } from "../src/beat-path/script";
 
-type K = "flyer" | "runner" | "car";
+type K = "flyer" | "runner" | "car" | "drone";
 const example: BeatPathState = { ...structuredClone(BLANK_STATE), track: "flyer", slice: 4.1, clip: 8, muted: [4.6, 9.1], markers: [{ band: "low", seconds: 6.1 }] };
 const cut: Cut<string, K> = { track: "generated-straight-120.wav (4.1–12.1 s)", licence: "MIT", grid: { bpm: 120, offsetSeconds: 0 }, from: "flyer" };
 

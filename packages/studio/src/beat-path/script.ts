@@ -7,6 +7,7 @@
  */
 import { parseRows, parseSettings, type FollowOffset } from "@motion-studio/core";
 import { followWords, parseFollowArgs } from "@motion-studio/core/internal";
+import { EXAMPLE_TRACKS, type ExampleId } from "./tracks";
 
 export type PathPt = { x: number; z: number; y?: number };
 export const CHARACTER_WORDS = ["glide", "hover", "spin", "jump", "freeze"] as const;
@@ -16,8 +17,10 @@ export type CameraWord = (typeof CAMERA_WORDS)[number];
 /**
  * A lane block; a camera block may carry a typed phrase (the script's camera words, e.g. "go above then dolly in 2m fast"),
  * and a follow block (behind, side) its offset: distance, height, angle (180 on side = the subject's right).
+ * A camera block read with `shot: -` where the page would print a framing preset keeps `shot: "-"`: no preset, its own
+ * distance, height and fov frame it (a preset would pull the camera to the preset's framing).
  */
-export type Block<W extends string> = { from: number; to: number; word: W; phrase?: string; follow?: FollowOffset };
+export type Block<W extends string> = { from: number; to: number; word: W; phrase?: string; follow?: FollowOffset; shot?: "-" };
 /** The page's follow words and the rig mode each prints as. */
 export const FOLLOW_WORDS = { behind: "chase", side: "side" } as const;
 export const isFollowWord = (w: string): w is keyof typeof FOLLOW_WORDS => w in FOLLOW_WORDS;
@@ -66,7 +69,12 @@ export type BeatPathState = {
   /** Scenery boxes once edited on the map (they replace the preset's placement). */
   boxes?: { x: number; z: number; w: number; d: number; h: number; yaw?: number }[];
   /** The example's music (tracks.ts), when it ships its own. */
-  track?: "flyer" | "runner" | "car";
+  track?: ExampleId;
+  /**
+   * The camera rig's start framing (the script's `rig:` line): frame 0 is this view, and a camera block without its own
+   * distance or height falls back to it. Absent fields (or no rig) keep the Draw Control base: 7 m, 1.6 m, fov 40, yaw 0.
+   */
+  rig?: { distance?: number; height?: number; fov?: number; yaw?: number };
   /** The shot description that travels with the guide (the legend line is built from the figure's colours). */
   shot: { subject: string; environment: string; action: string };
   /** A suggested prompt line (examples carry one); printed as a comment. */
@@ -101,6 +109,23 @@ export function legendFor(figure: { body: string; head: string }): string {
 export const CAMERA_AMOUNTS = { orbitPerBeat: 15, pushTo: 2.6, punch: 0.9 } as const;
 
 const f = (x: number) => String(Math.round(x * 1000) / 1000);
+/** The rig's words after "rig:" ("" when it sets nothing). */
+const rigWords = (rig?: BeatPathState["rig"]) => !rig ? "" : [
+  rig.distance !== undefined ? `distance ${f(rig.distance)}m` : "", rig.height !== undefined ? `height ${f(rig.height)}m` : "",
+  rig.fov !== undefined ? `fov ${f(rig.fov)}` : "", rig.yaw !== undefined ? `yaw ${f(rig.yaw)}` : "",
+].filter(Boolean).join(" ");
+/** An example's "# track:" words: its groove, and its bars when an earlier example has the same groove ("laidback 6 bars"). */
+const trackWords = (id: ExampleId) => {
+  const t = EXAMPLE_TRACKS[id], first = Object.values(EXAMPLE_TRACKS).find(o => o.groove === t.groove)!;
+  return first === t ? t.groove : `${t.groove} ${t.bars} bars`;
+};
+/** The example a "# track:" comment names: the groove, the bars picking between examples that share it. */
+const trackFrom = (text: string): ExampleId | undefined => {
+  const m = /^#\s*track:\s*(straight|drive|laidback)(?:\s+(\d+)\s*bars?)?/im.exec(text);
+  if (!m) return undefined;
+  const list = (Object.keys(EXAMPLE_TRACKS) as ExampleId[]).filter(id => EXAMPLE_TRACKS[id].groove === m[1]);
+  return (m[2] ? list.find(id => EXAMPLE_TRACKS[id].bars === Number(m[2])) : undefined) ?? list[0];
+};
 const pts = (list: PathPt[]) => list.map(p => `(${f(p.x)},${f(p.z)}${p.y ? `,${f(p.y)}` : ""})`).join(" ");
 
 /** The lanes' cuts, as rows: every block edge on either lane starts a row. */
@@ -121,8 +146,10 @@ export function toScript(state: BeatPathState): string {
   let pathPrinted = false;
   const lines: string[] = [];
   if (state.prompt) lines.push(`# prompt: ${state.prompt}`);
-  if (state.track) lines.push(`# track: ${({ flyer: "straight", runner: "drive", car: "laidback" } as const)[state.track]}`);
+  if (state.track) lines.push(`# track: ${trackWords(state.track)}`);
   lines.push(`# clip: ${state.clip} s · figure: ${state.figure.shape} · Draw Control`);
+  const rig = rigWords(state.rig);
+  if (rig) lines.push(`rig: ${rig}`);
   lines.push(`landmarks: ${state.landmarks.on ? `on seed ${state.landmarks.seed}` : "off"}`);
   if (state.slice !== undefined) lines.push(`slice: ${f(state.slice)}s`);
   if (state.markers?.length) {
@@ -169,6 +196,7 @@ export function toScript(state: BeatPathState): string {
         shot = word === "path" ? "-" : word === "top" ? "top" : "wide";
       }
     }
+    if (k?.shot) shot = k.shot;
     lines.push(`beats ${f(from)}-${f(to)} | action: ${action} | camera: ${camera}${shot ? ` | shot: ${shot}` : ""}`);
   }
   return lines.join("\n") + "\n";
@@ -200,8 +228,9 @@ export function fromScript(text: string, base: BeatPathState, grid: { bpm: numbe
   state.scenery = parsed.scenery ?? (state.landmarks.on ? "scatter" : "none");
   state.sight = parsed.sight ?? "clear";
   state.boxes = parsed.boxes;
-  const groove = /^#\s*track:\s*(straight|drive|laidback)/im.exec(text);
-  state.track = groove ? ({ straight: "flyer", drive: "runner", laidback: "car" } as const)[groove[1] as "straight"] : undefined;
+  state.track = trackFrom(text);
+  state.rig = parsed.rig ? { ...(parsed.rig.distance !== undefined ? { distance: parsed.rig.distance } : {}), ...(parsed.rig.height !== undefined ? { height: parsed.rig.height } : {}),
+    ...(parsed.rig.fov !== undefined ? { fov: parsed.rig.fov } : {}), ...(parsed.rig.startYaw !== undefined ? { yaw: parsed.rig.startYaw } : {}) } : undefined;
   state.shot = { subject: parsed.shot?.subject ?? "", environment: parsed.shot?.environment ?? "", action: parsed.shot?.action ?? "" };
   if (settings) state.landmarks = { on: settings.on, seed: settings.seed ?? state.landmarks.seed };
   let charSeen = false, camSeen = false, hitSeen = false, advanceSeen = false;
@@ -263,6 +292,8 @@ export function fromScript(text: string, base: BeatPathState, grid: { bpm: numbe
     const plain = followOk || /^(follow behind|follow side|top|push in to 2\.6m|orbit\s+-?[\d.]+)$/.test(bare) || /^path\b/.test(bare) && !/\bthen\b/.test(bare);
     const block: Block<CameraWord> = { from: row.from, to: row.to, word, ...(follow ? { follow } : {}) };
     if (!plain) block.phrase = bare.replace(/\(([^)]*)\)\s*/g, "").replace(/\s*corners\s+[\d.]+/, "").trim();
+    // "shot: -" on a block the page would give a preset: kept, so the block frames itself.
+    if (row.shot === "-" && block.word !== "path" && !/\bpath\b/.test(block.phrase ?? "")) block.shot = "-";
     state.cameraLane.push(block);
   }
   // An orbit whose degrees differ from the page's 15° a beat keeps them as its phrase.
@@ -300,8 +331,8 @@ export function fitLanes(state: BeatPathState, beats: number): BeatPathState {
 
 /** Only one glide block (the script has one walk path): making one glide turns the others to hover. */
 export function setWord<W extends string>(lane: Block<W>[], index: number, word: W, single?: W): Block<W>[] {
-  // A follow offset stays only on a follow word (a block turned into Orbit or Top drops it).
-  const next = (b: Block<W>): Block<W> => { const { follow, ...rest } = b; return isFollowWord(word) && follow ? { ...rest, word, follow } : { ...rest, word }; };
+  // A follow offset stays only on a follow word (a block turned into Orbit or Top drops it); a new word takes its own framing preset.
+  const next = (b: Block<W>): Block<W> => { const { follow, shot: _shot, ...rest } = b; void _shot; return isFollowWord(word) && follow ? { ...rest, word, follow } : { ...rest, word }; };
   return lane.map((b, i) => (i === index ? next(b) : single && word === single && b.word === single ? { ...b, word: "hover" as W } : b));
 }
 

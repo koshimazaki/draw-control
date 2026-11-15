@@ -1,0 +1,19 @@
+# Draw Control example 4: a hovering drone weaves between four pillars; the camera opens isometric (the rig line sets frame 0), pans round, rises to the top view, and ends on the side view from the other side. The figure is a flyer shape.
+# track: laidback 6 bars
+# clip: 8 s · figure: flyer · Draw Control
+rig: distance 8m height 5m fov 30 yaw 45
+landmarks: on seed 7
+figure: shape flyer body #ff6a13 head #ffb27a
+scenery: street
+box: -10 2.5 2 2 3.2
+box: -3 -2.5 2 2 3.5
+box: 4 2.5 2 2 3
+box: 11 -2.5 2 2 2.6
+shot subject: a small unbranded drone with a glowing orange body (the orange figure; white marks its nose)
+shot environment: a test hall of tall concrete pillars, soft overhead light
+shot action: it hovers and weaves between the pillars in smooth S-curves, bobbing gently
+shot legend: the orange figure is the character; grey blocks are placeholders for the environment
+beats 0-3   | action: walk on path (-18,-1.5,2.2) (-10,-1.5,2.6) (-3,1.5,2.2) (4,-1.5,2.8) (11,1.5,2.3) (18,1.5,2.6) corners 0.9 | camera: three-quarter distance 8m height 5m fov 30 lock snare 1 hold       | shot: -
+beats 3-7   | action: continue | camera: orbit 70 slow lock snare 1 hold                                    | shot: -
+beats 7-9   | action: continue | camera: above fov 70 lock snare 1 hold                                     | shot: -
+beats 9-14  | action: continue | camera: follow side right distance 6m height 1.6m fov 35 lock snare 1 hold | shot: -
