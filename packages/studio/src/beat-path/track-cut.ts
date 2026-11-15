@@ -14,12 +14,13 @@ export type Samples = { numberOfChannels: number; sampleRate: number; getChannel
 export const sampleRange = (sampleRate: number, startSeconds: number, seconds: number) =>
   ({ from: Math.round(startSeconds * sampleRate), count: Math.max(0, Math.round(seconds * sampleRate)) });
 
-/** Every channel's samples inside the window; past the track's end, silence (as the guide's audio.wav). */
+/** Every channel's samples inside the window; before the track's start and past its end, silence (as the guide's audio.wav). */
 export function cutChannels(audio: Samples, startSeconds: number, seconds: number): Float32Array[] {
   const { from, count } = sampleRange(audio.sampleRate, startSeconds, seconds);
   return Array.from({ length: audio.numberOfChannels }, (_, c) => {
     const src = audio.getChannelData(c), out = new Float32Array(count);
-    out.set(src.subarray(Math.max(0, from), Math.max(0, Math.min(src.length, from + count))), Math.max(0, -from));
+    // A window starting before the track: its first -from samples are silence (never placed past the window's end).
+    out.set(src.subarray(Math.max(0, from), Math.max(0, Math.min(src.length, from + count))), Math.min(count, Math.max(0, -from)));
     return out;
   });
 }

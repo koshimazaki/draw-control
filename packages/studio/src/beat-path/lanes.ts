@@ -3,7 +3,9 @@
  * menu of words; drag the edge between two blocks to move the cut, snapped to half beats
  * by the core's `snapBeat` (the studio timeline's snap), every block at least one beat. Drag a
  * block's body to move it along the lane (it keeps its length; the blocks it passes change places
- * with it), or Alt+Left/Right with it focused; Escape during the drag puts it back.
+ * with it), or Alt+Left/Right with it focused; Escape during the drag puts it back. A drag ends as
+ * one undo step or puts the lane back with none (`cancel`); both listen on the window, as the lane
+ * re-renders (and replaces its elements) on every step.
  */
 import { dropIndex, moveBlock } from "./lane-cuts";
 import type { Block } from "./script";
@@ -23,14 +25,22 @@ export type LaneHost<W extends string> = {
   total(): number;
   label(word: W): string;
   snap(beat: number): number;
-  /** The lane changed; `final` when a drag ended. */
-  commit(blocks: Block<W>[], final: boolean): void;
+  /** The lane changed; `final` when a drag ended. False when the page refused it (a guide is rendering): nothing changed. */
+  commit(blocks: Block<W>[], final: boolean): boolean;
+  /** A drag ended with no change (Escape, a drop where it began, refused, aborted): the lane as it was, no undo step. */
+  cancel(): void;
   open(anchor: HTMLElement, index: number, beat: number): void;
-  /** Block `from` was moved to place `to` (a selection by index follows it). */
+  /** Block `from` was moved to place `to` (a selection by index follows it). Called before the commit, so the rebuild it makes reads the moved selection; called back with the places swapped when the commit is refused. */
   moved?(from: number, to: number): void;
 };
 
 const el = (tag: string, className = "", text = "") => { const e = document.createElement(tag); if (className) e.className = className; if (text) e.textContent = text; return e; };
+/** The click that follows a drag's release is the drag's, not a request for the menu. */
+function eatNextClick() {
+  const eat = (ev: Event) => { ev.stopPropagation(); ev.preventDefault(); };
+  window.addEventListener("click", eat, true);
+  setTimeout(() => window.removeEventListener("click", eat, true), 0);
+}
 
 export class LaneView<W extends string> {
   constructor(readonly root: HTMLElement, private host: LaneHost<W>) {}
@@ -60,13 +70,13 @@ export class LaneView<W extends string> {
         if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); this.host.open(d, i, (b.from + b.to) / 2); }
         else if (e.altKey && (e.key === "ArrowLeft" || e.key === "ArrowRight")) {
           e.preventDefault(); e.stopPropagation();
-          this.place(i, i + (e.key === "ArrowLeft" ? -1 : 1));
-          (this.root.children[Math.max(0, Math.min(blocks.length - 1, i + (e.key === "ArrowLeft" ? -1 : 1)))] as HTMLElement | undefined)?.focus();
+          if (this.place(i, i + (e.key === "ArrowLeft" ? -1 : 1)))
+            (this.root.children[Math.max(0, Math.min(blocks.length - 1, i + (e.key === "ArrowLeft" ? -1 : 1)))] as HTMLElement | undefined)?.focus();
         }
       });
       if (i < blocks.length - 1) {
-        const edge = el("div", "edge");
-        edge.addEventListener("pointerdown", e => this.dragEdge(e, edge, i));
+        const edge = el("div", `edge${this.edging === i ? " dragging" : ""}`);
+        edge.addEventListener("pointerdown", e => this.dragEdge(e, i));
         edge.addEventListener("click", e => e.stopPropagation());
         d.appendChild(edge);
       }
@@ -83,14 +93,30 @@ export class LaneView<W extends string> {
 
   /** The block being dragged by its body: where it sits now, its left edge under the pointer (beats). */
   private moving: { at: number; left: number } | null = null;
+  /** The edge being dragged (its index), or -1. */
+  private edging = -1;
+  /** Ends the drag in progress, putting the lane back (set while a press or an edge drag is held). */
+  private stop: (() => void) | null = null;
+  get dragging() { return !!this.stop; }
+  /** End a held drag now, the lane put back with no undo step (the page is about to render a guide, undo or switch); true when one was held. */
+  abort(): boolean {
+    if (!this.stop) return false;
+    this.stop();
+    return true;
+  }
 
-  /** Move block `i` to place `to` as one undo step (Alt+Left/Right); false when it cannot move. */
+  /** Move block `i` to place `to` as one undo step (Alt+Left/Right); false when it cannot move or the page refused it. */
   place(i: number, to: number): boolean {
     const next = moveBlock(this.host.blocks(), i, to);
     if (!next) return false;
-    this.host.commit(next, true);
-    this.host.moved?.(i, to);
-    return true;
+    return this.land(next, i, to);
+  }
+  /** Commit a move as one undo step, the selection moved first; put the selection back when the page refuses it. */
+  private land(next: Block<W>[], from: number, to: number): boolean {
+    this.host.moved?.(from, to);
+    if (this.host.commit(next, true)) return true;
+    this.host.moved?.(to, from);
+    return false;
   }
 
   /**
@@ -100,6 +126,7 @@ export class LaneView<W extends string> {
    */
   private press(e: PointerEvent, i: number) {
     if (e.button !== 0 || (e.target as HTMLElement).classList.contains("edge")) return;
+    this.abort();   // a second pointer: the first drag ends (put back) before this one starts
     const start = this.host.blocks().map(b => ({ ...b }));
     if (start.length < 2) return;   // one block: nothing to move, the press stays a click
     const x0 = e.clientX, id = e.pointerId, len = start[i].to - start[i].from, total = this.host.total();
@@ -107,15 +134,13 @@ export class LaneView<W extends string> {
     const end = (keep: boolean) => {
       window.removeEventListener("pointermove", move, true); window.removeEventListener("pointerup", up, true);
       window.removeEventListener("pointercancel", cancel, true); window.removeEventListener("keydown", key, true);
+      this.stop = null;
       if (!dragging) return;
-      // The click that follows the release is the drag's, not a request for the menu.
-      const eat = (ev: Event) => { ev.stopPropagation(); ev.preventDefault(); };
-      window.addEventListener("click", eat, true);
-      setTimeout(() => window.removeEventListener("click", eat, true), 0);
+      eatNextClick();
       this.moving = null;
+      // A move commits as one undo step; anything else (Escape, back on its own place, refused) puts the lane back with none.
       const next = keep ? moveBlock(start, i, at) : null;
-      if (next) { this.host.commit(next, true); this.host.moved?.(i, at); }
-      else if (at !== i) this.host.commit(start, false);   // back as it was: no undo step
+      if (!next || !this.land(next, i, at)) this.host.cancel();
       this.render();
     };
     const move = (ev: PointerEvent) => {
@@ -131,8 +156,7 @@ export class LaneView<W extends string> {
       this.moving = { at: to, left };
       if (to !== at) {
         const next = moveBlock(start, i, to) ?? start;
-        this.host.commit(next, false);
-        if (this.host.blocks() !== next) { at = i; dragging = false; this.moving = null; end(false); this.render(); return; }   // the page refused it (busy)
+        if (!this.host.commit(next, false)) { end(false); return; }   // the page refused it (busy): back as it was
         at = to;
         this.render();
       } else {
@@ -148,28 +172,45 @@ export class LaneView<W extends string> {
     window.addEventListener("pointerup", up, true);
     window.addEventListener("pointercancel", cancel, true);
     window.addEventListener("keydown", key, true);
+    this.stop = () => end(false);
   }
 
-  private dragEdge(e: PointerEvent, edge: HTMLElement, i: number) {
+  /**
+   * The edge between blocks `i` and `i + 1` dragged: the cut follows the pointer (snapped), one undo
+   * step on release, none when it ends where it began. On the window, not a pointer capture on the
+   * edge: the lane re-renders on every step and the captured edge was replaced, which lost the drag.
+   */
+  private dragEdge(e: PointerEvent, i: number) {
     e.preventDefault(); e.stopPropagation();
-    edge.setPointerCapture(e.pointerId);
-    edge.classList.add("dragging");
-    const start = this.host.blocks().map(b => ({ ...b }));
+    this.abort();
+    const start = this.host.blocks().map(b => ({ ...b })), id = e.pointerId;
     let last = start;
+    this.edging = i;
+    this.root.querySelectorAll(".edge")[i]?.classList.add("dragging");
     const move = (ev: PointerEvent) => {
+      if (ev.pointerId !== id) return;
+      ev.preventDefault();
       const lo = start[i].from + MIN_BEATS, hi = start[i + 1].to - MIN_BEATS;
       const cut = Math.max(lo, Math.min(hi, this.host.snap(this.beatAt(ev.clientX))));
       if (cut === last[i].to) return;
-      last = start.map((b, k) => (k === i ? { ...b, to: cut } : k === i + 1 ? { ...b, from: cut } : b));
-      this.host.commit(last, false);
+      const next = start.map((b, k) => (k === i ? { ...b, to: cut } : k === i + 1 ? { ...b, from: cut } : b));
+      if (!this.host.commit(next, false)) { end(false); return; }   // the page refused it (busy)
+      last = next;
     };
-    const up = () => {
-      edge.removeEventListener("pointermove", move); edge.removeEventListener("pointerup", up); edge.removeEventListener("pointercancel", up);
-      this.host.commit(last, true);
+    const end = (keep: boolean) => {
+      window.removeEventListener("pointermove", move, true); window.removeEventListener("pointerup", up, true); window.removeEventListener("pointercancel", cancel, true);
+      this.stop = null; this.edging = -1;
+      const moved = last[i].to !== start[i].to;
+      if (moved) eatNextClick();
+      if (!(keep && moved && this.host.commit(last, true))) this.host.cancel();
+      this.render();
     };
-    edge.addEventListener("pointermove", move);
-    edge.addEventListener("pointerup", up);
-    edge.addEventListener("pointercancel", up);
+    const up = (ev: PointerEvent) => { if (ev.pointerId === id) end(true); };
+    const cancel = (ev: PointerEvent) => { if (ev.pointerId === id) end(false); };
+    window.addEventListener("pointermove", move, true);
+    window.addEventListener("pointerup", up, true);
+    window.addEventListener("pointercancel", cancel, true);
+    this.stop = () => end(false);
   }
 }
 

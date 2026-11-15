@@ -41,6 +41,15 @@ describe("Slice: the samples inside the clip window", () => {
     expect(cut[0][999]).toBeGreaterThan(0);
     expect(cut[0][1000]).toBe(0);
   });
+  it("before the track's start it is silence, also for a window wholly before it", () => {
+    const track = ramp(1, 3000);
+    expect(Array.from(cutChannels(track, -0.005, 0.003)[0])).toEqual([0, 0, 0]);
+    const cut = cutChannels(track, -0.5, 1);
+    expect(cut[0].length).toBe(1000);
+    expect(cut[0][499]).toBe(0);
+    expect(cut[0][500]).toBe(track.data[0][0]);
+    expect(cut[0][999]).toBe(track.data[0][499]);
+  });
 });
 
 describe("Export: the window as a WAV file", () => {

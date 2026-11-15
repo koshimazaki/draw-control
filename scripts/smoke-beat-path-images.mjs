@@ -75,6 +75,24 @@ export async function smokeBeatPathImages(browser, base, { fail, SHOTS }) {
   if (c && !/estimate/i.test(c.cost ?? "")) fail(`the H3 cost dialog does not show the embed's estimate: ${c.cost}`);
   const h3 = JSON.parse(await page.evaluate(() => JSON.stringify(globalThis.__fakeTasks ?? []))).filter(t => t.taskType === "imageInference" && /h3/.test(t.model)).at(-1);
   if (!h3 || h3.width !== 1280 || h3.height !== 720) fail(`H3 was not sent a size: ${JSON.stringify(h3 && { width: h3.width, height: h3.height, resolution: h3.resolution })}`);
+  // Two fast clicks on Generate for a token-priced model (its no-bound question comes first) send one image task, not two.
+  const imageTasks = () => page.evaluate(() => (globalThis.__fakeTasks ?? []).filter(t => t.taskType === "imageInference").length);
+  const before = await imageTasks();
+  await page.click("#genCharacter");
+  await pop.locator(".ip-family").selectOption("OpenAI GPT Image"); await pop.locator(".ip-model").selectOption("gpt-image-2.6-flare");
+  await page.evaluate(() => { const b = document.querySelector(".image-pop .ip-run"); b.click(); b.click(); });
+  let answered = 0;
+  for (let k = 0; k < 6; k++) {
+    const up = await page.waitForSelector("#costDialog:not([hidden])", { timeout: 3_000 }).then(() => true, () => false);
+    if (!up) break;
+    await page.click("#costOk"); answered++;
+    await page.waitForTimeout(150);
+  }
+  await page.waitForFunction(() => document.querySelector(".image-pop").hidden, null, { timeout: 30_000 }).catch(() => fail("the double-clicked image run did not finish"));
+  await page.waitForTimeout(500);
+  const sentTwice = (await imageTasks()) - before;
+  console.log(`beat path images: double click on Generate sent ${sentTwice} image task(s), ${answered} question(s) answered`);
+  if (sentTwice !== 1 || answered !== 2) fail(`two fast clicks on the image Generate sent ${sentTwice} image tasks after ${answered} questions (want 1 after 2)`);
   // The gallery's "Your runs" shows the images.
   const imgs = await page.locator("#gallerySlot .gallery-row:last-child .row-media img").count();
   if (imgs < 2) fail(`"Your runs" does not show the two images (${imgs})`);

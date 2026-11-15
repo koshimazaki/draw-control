@@ -4,7 +4,9 @@
  * clip's window; the window is dragged (it lands on a beat), nudged with an arrow key, a kick
  * marker is added with Alt-click on the strip; the guide is exported in memory and its
  * audio.wav is the clip's length and its beats.json starts on a beat. 10 s clips export 241
- * frames. Any console error or warning fails the run.
+ * frames. Then Example 1 is sliced with a hit switched off and a marker on a kick, Example 2 shown
+ * and Example 1 again: it comes back with its cut, and both still sit on kicks of the music loaded.
+ * Any console error or warning fails the run.
  */
 import { writeFileSync } from "node:fs";
 import { drumWav } from "./smoke-features.mjs";
@@ -78,5 +80,45 @@ export async function smokeBeatPathSlice(browser, base, { fail, OUT, SHOTS }) {
   if (Math.abs(out.seconds - (await state()).clip) > 0.1) fail(`the exported audio is not the clip's length (${out.seconds} s)`);
   if (!(out.firstBeat >= 0 && out.firstBeat < 0.05)) fail(`beats.json does not start on the clip's first beat (${out.firstBeat})`);
   if (errors.length) fail(`slice step logged: ${errors.join(" | ")}`);
+  await page.close();
+  await smokeSliceReturn(browser, base, { fail });
+}
+
+/** Example 1 sliced, Example 2 shown, Example 1 again: its cut comes back (slot-music.ts), and the switched-off hit and the marker sit on kicks of the music loaded. */
+async function smokeSliceReturn(browser, base, { fail }) {
+  const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+  const errors = [];
+  page.on("pageerror", e => errors.push(e.message));
+  page.on("console", m => { if (m.type() === "error" || m.type() === "warning") errors.push(`${m.type()}: ${m.text()}`); });
+  await page.goto(`${base}/path.html`);
+  await page.waitForFunction(() => window.__beatPath?.recipe().audio && window.__beatPath.trackName() === "generated-straight-120.wav", null, { timeout: 30_000 });
+  const ex = slot => page.click(`[data-control="example"] [data-value="${slot}"]`);
+  await page.$eval("#sliceStart", el => { el.value = "4"; el.dispatchEvent(new window.Event("change")); });
+  const s0 = await page.evaluate(() => window.__beatPath.state());
+  // A kick a second into the clip switched off (a click on it), and a marker added on a later kick (Alt-click on it).
+  const kicks = (await page.evaluate(() => window.__beatPath.kicks())).filter(t => t > s0.slice + 1 && t < s0.slice + s0.clip - 1);
+  const strip = await page.locator("#wave").boundingBox(), xOf = t => strip.x + (t - s0.slice) / s0.clip * strip.width, y = strip.y + strip.height * 0.15;
+  await page.mouse.click(xOf(kicks[0]), y);
+  await page.keyboard.down("Alt"); await page.mouse.click(xOf(kicks[2]), y); await page.keyboard.up("Alt");
+  const onKicks = async () => {
+    const { state, kicks: k, name } = await page.evaluate(() => ({ state: window.__beatPath.state(), kicks: window.__beatPath.kicks(), name: window.__beatPath.trackName() }));
+    const off = t => Math.min(...k.map(x => Math.abs(x - t)));
+    return { name, muted: state.muted, markers: (state.markers ?? []).map(m => m.seconds), worst: Math.max(...state.muted.map(off), ...(state.markers ?? []).map(m => off(m.seconds))) };
+  };
+  const set = await onKicks();
+  if (set.muted.length !== 1 || set.markers.length !== 1) fail(`the step could not switch a kick off and add a marker (${JSON.stringify(set)})`);
+  await page.click("#sliceTrack");
+  await page.waitForFunction(() => /\(/.test(window.__beatPath.trackName() ?? ""), null, { timeout: 30_000 });
+  const sliced = await onKicks();
+  await ex("1");
+  await page.waitForFunction(() => window.__beatPath.slot() === "1" && window.__beatPath.trackName() === "generated-drive-140.wav", null, { timeout: 30_000 });
+  await ex("0");
+  await page.waitForFunction(() => window.__beatPath.slot() === "0", null, { timeout: 30_000 });
+  await page.waitForTimeout(300);
+  const back = await onKicks();
+  console.log(`beat path slice: Example 1 sliced (${sliced.name}), away and back: ${back.name}, muted ${back.muted} markers ${back.markers}, worst ${(back.worst * 1000).toFixed(1)} ms off a kick`);
+  if (sliced.worst > 0.02) fail(`after Slice the switched-off hit or the marker is off the kicks (${JSON.stringify(sliced)})`);
+  if (back.name !== sliced.name || back.worst > 0.02 || back.muted.length !== 1 || back.markers.length !== 1) fail(`Example 1 came back with its markers off the music loaded (${JSON.stringify(back)}, sliced ${JSON.stringify(sliced)})`);
+  if (errors.length) fail(`slice return logged: ${errors.join(" | ")}`);
   await page.close();
 }

@@ -18,6 +18,8 @@ import { Viewport } from "../viewport";
 import { GRID_LOOKS } from "../ground-grid";
 import { exampleState, ownState } from "./examples";
 import { bindGenerate } from "./page-generate";
+import { editStep, endDrag } from "./drag-edit";
+import { musicFor, type Cut } from "./slot-music";
 import { movedIndex } from "./lane-cuts";
 import { LaneView, Menu } from "./lanes";
 import { LAYOUT } from "./layout";
@@ -78,16 +80,33 @@ export function startBeatPath(root: HTMLElement) {
     actions.sync();
     return true;
   }
-  /** Every edit: the new state; history on a final edit (a drag records where it began). */
-  function update(next: BeatPathState, final = true) {
-    if (refused()) return;
-    if (!dragBase) dragBase = structuredClone(state);
-    state = next;
-    if (final) { past.push(dragBase); if (past.length > 200) past.shift(); future.length = 0; dragBase = null; }
+  /**
+   * Every edit: the new state; history on a final edit (a drag records where it began). False when it
+   * was refused (a guide is rendering): nothing changed, so a caller says or does nothing more.
+   */
+  function update(next: BeatPathState, final = true): boolean {
+    if (refused()) return false;
+    const r = editStep({ state, base: dragBase }, next, final);
+    state = r.state; dragBase = r.base;
+    if (r.step) { past.push(r.step); if (past.length > 200) past.shift(); future.length = 0; }
     schedule(final);
+    return true;
   }
+  /** A drag that ended without a change: the state goes back to where it began, no undo step (drag-edit.ts). */
+  function restoreDrag() {
+    const r = endDrag({ state, base: dragBase });
+    state = r.state; dragBase = r.base;
+    if (r.restored) schedule(true);
+  }
+  /**
+   * A lane drag still held when something else takes over (a guide render starting, undo, an example
+   * switch) is put back first: never left half done with no undo step, or with its base kept.
+   */
+  function endLaneDrags(): boolean { const a = characterLane.abort(), b = cameraLane.abort(); return a || b; }
   function undo(redo = false) {
     if (refused()) return;
+    // Undo during a held lane drag ends the drag (the lane put back) and stops there: one key, one change.
+    if (endLaneDrags()) return;
     const from = redo ? future : past, to = redo ? past : future;
     const s = from.pop();
     if (!s) return;
@@ -105,6 +124,7 @@ export function startBeatPath(root: HTMLElement) {
     corners: t => (t === "camera" ? state.cameraCorners : state.subjectCorners),
     change: (t, points, final) => {
       const next = { ...state, ...(t === "subject" ? { subject: points } : { camera: points }) };
+      let note = "";
       // A drawn camera path flies a block: the selected camera block, else the block under the playhead
       // (a new "path" block when the lane is empty). It is never silently stored with nothing using it.
       if (t === "camera" && final && points.length >= 2) {
@@ -115,10 +135,10 @@ export function startBeatPath(root: HTMLElement) {
           const k = sel >= 0 ? sel : next.cameraLane.findIndex(b => beat >= b.from && beat < b.to);
           if (k < 0) next.cameraLane = [...next.cameraLane, { from: 0, to: totalBeats(), word: "path" as const }];
           else next.cameraLane = next.cameraLane.map((b, i) => (i === k ? { from: b.from, to: b.to, word: "path" as const } : b));
-          say(k < 0 ? "A new path block on the Camera lane flies your path" : next.cameraLane.length > 1 ? `Block ${k + 1} of the Camera lane now flies your path · Whole clip (map footer) makes it fly all of it` : "Your path flies the whole clip");
-        } else say(`Block ${used + 1} of the Camera lane flies your path`);
+          note = (k < 0 ? "A new path block on the Camera lane flies your path" : next.cameraLane.length > 1 ? `Block ${k + 1} of the Camera lane now flies your path · Whole clip (map footer) makes it fly all of it` : "Your path flies the whole clip");
+        } else note = `Block ${used + 1} of the Camera lane flies your path`;
       }
-      update(next, final);
+      if (update(next, final) && note) say(note);
     },
     blocksDown: (e, w, toScreen, fromScreen) => blocks.down(e, w, toScreen, fromScreen),
     followDown: (e, toScreen, fromScreen) => follow.down(e, toScreen, fromScreen),
@@ -166,6 +186,7 @@ export function startBeatPath(root: HTMLElement) {
       label: w => labels[w],
       snap: b => snapLane(b),
       commit: (blocks, final) => update({ ...state, [key]: blocks }, final),
+      cancel: () => restoreDrag(),
       open: (anchor, i, beat) => actions.openBlock(key, view, anchor, i, beat, labels, words, single),
       moved: (from, to) => { if (selection?.kind === "block" && selection.lane === key) selection = { ...selection, index: movedIndex(selection.index, from, to) }; },
     });
@@ -323,6 +344,8 @@ export function startBeatPath(root: HTMLElement) {
   function useCut(next: Track, move: (s: BeatPathState) => BeatPathState): boolean {
     if (refused()) return false;
     const grid = { bpm: bpm(), offsetSeconds: 0 };
+    // On an example, the cut stays its music for the session (slot-music.ts): coming back brings the cut, not the whole track.
+    if (state.track) cuts.set(slot, { track: next, licence: info?.licence ?? "unspecified", grid, from: state.track });
     for (const list of [past, future]) list.forEach((s, i) => { list[i] = move(s); });
     dragBase = null;
     state = move(state);
@@ -352,13 +375,16 @@ export function startBeatPath(root: HTMLElement) {
     const bpm = GROOVES[t.groove].bpm, seconds = 0.1 + t.bars * 4 * 60 / bpm + 0.5;
     return useTrack(trackFromSamples(t.name, [synthDrums(grooveTimes(t.groove, t.bars, 0.1), seconds)], 44100), t.licence);
   }
-  /** The example switcher: each slot keeps its own edits; an example brings its own music. */
+  /** The example switcher: each slot keeps its own edits; an example brings its own music, or the cut a Slice made of it. */
   const slots = new Map<string, BeatPathState>();
+  /** A Slice made on an example, per slot: its music when it shows again (slot-music.ts). */
+  const cuts = new Map<string, Cut<Track, keyof typeof EXAMPLE_TRACKS>>();
   let slot = "0", switching = 0;
   async function switchSlot(next: string) {
     if (next === slot && slots.size) return;
     if (refused()) return;
     if (map.busy) map.cancelStroke();
+    endLaneDrags();
     slots.set(slot, structuredClone(state));
     slot = next;
     const ticket = ++switching;
@@ -367,7 +393,9 @@ export function startBeatPath(root: HTMLElement) {
     state = slots.get(next) ?? (next === "own" ? ownState() : exampleState(Number(next)));
     // Nothing selected carries over: a lane block, a path point or a scenery box of the last example.
     selection = null; blocks.selected = -1; menu.hide();
-    if (state.track) { await useExampleTrack(state.track, () => ticket === switching); if (ticket !== switching) return; }
+    const music = musicFor(state, cuts.get(next));
+    if (music.kind === "cut") await useTrack(music.cut.track, music.cut.licence, music.cut.grid);
+    else if (music.kind === "example") { await useExampleTrack(music.id, () => ticket === switching); if (ticket !== switching) return; }
     else if (next === "own" && !track) rebuild();
     else { state = fitLanes(state, totalBeats()); rebuild(); }
     map.fit();
@@ -382,6 +410,7 @@ export function startBeatPath(root: HTMLElement) {
       const loaded = await loadTrack(file, stage => { strip.message = stage; strip.setScene({ track, start: window0(), end: window1(), beats: [], kicks: [], snares: [], hats: [], added: [], selected: -1, locked: [], muted: [] }); });
       // A new track starts at its first beat, with no markers of its own (the old ones belong to the old track).
       state = { ...state, slice: undefined, markers: undefined, muted: [] };
+      cuts.delete(slot);
       await useTrack(loaded, "unspecified");
     }
     catch (e) { strip.message = ""; rebuild(); say(`Could not read the track: ${(e as Error).message}`); }
@@ -392,7 +421,7 @@ export function startBeatPath(root: HTMLElement) {
   const page = {
     $, map, menu, viewport, strip, player,
     get state() { return state; }, get recipe() { return recipe; }, get tool() { return tool; }, get view() { return view; },
-    get track() { return track; }, get drive() { return live(); }, get info() { return info; }, get busy() { return busy; }, set busy(v: boolean) { busy = v; dirty = true; lockShot(v); if (!v && rebuildAfter) { rebuildAfter = false; rebuild(); } },
+    get track() { return track; }, get drive() { return live(); }, get info() { return info; }, get busy() { return busy; }, set busy(v: boolean) { if (v && !busy) endLaneDrags(); busy = v; dirty = true; lockShot(v); if (!v && rebuildAfter) { rebuildAfter = false; rebuild(); } },
     get head() { return head; }, get playing() { return player.playing && !busy; }, get shown() { return shown; }, get slot() { return slot; }, get followSegs() { return followSegs; }, get slice() { return hooks.slice; }, blocks, snapLane, seek, removeTrack, totalBeats, window0, window1, update, undo, rebuild, setPlaying, switchSlot, useFile, useCut, say,
     setTool(t: Tool) { tool = t; if (pen === "draw") map.startNew(); map.refresh(); actions.sync(); },
     setView(v: View) { view = v; map.refresh(); actions.sync(); },

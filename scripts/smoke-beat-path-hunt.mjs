@@ -6,6 +6,8 @@
  * - typing in the API key's password field or the box height keeps Backspace and Cmd/Ctrl-Z for the field;
  * - undo after deleting points never leaves a selection pointing past the path;
  * - a Camera block dragged by its body changes places with its neighbour (Escape cancels, a click stays a click, one undo);
+ * - an edge dragged in small steps across several beats follows all the way (one undo); a block drag
+ *   held while Generate starts the guide render goes back, with no undo step of its own;
  * - Generate: Escape cancels the cost dialog, Stop ends a run, a run started on one example files
  *   its result there (never on the example switched to), a second run works, Add to gallery once per clip;
  * - the gallery re-rendered keeps one playing row at most; no-track mode plays;
@@ -75,6 +77,9 @@ export async function smokeBeatPathHunt(browser, base, { fail }) {
   // 5. Generate on every model: Escape at the cost dialog, Stop mid-run, switch example mid-run, run twice.
   await page.waitForFunction(() => document.querySelector("#keySlot arena-key"), null, { timeout: 30_000 });
   await ex("0");
+  await smokeLaneEdge(page, { fail });
+  await smokeLaneInterrupted(page, { fail });
+  await smokeLaneUndoHeld(page, { fail });
   for (const model of await page.$$eval('[data-control="model"] button', bs => bs.map(b => b.dataset.value))) {
     await page.click(`[data-control="model"] [data-value="${model}"]`);
     await page.click("#runGenerate"); await page.waitForSelector("#costDialog:not([hidden])");
@@ -142,9 +147,8 @@ async function smokeLaneMove(page, { fail }) {
   const first = await lane();
   if (first[0].word === first[1].word) { await page.click("#laneCamera .block >> nth=1"); await page.click(`#menu button:has-text("${first[1].word === "top" ? "Orbit" : "Top"}")`); }
   const before = await lane();
-  const box = async k => page.locator("#laneCamera .block").nth(k).boundingBox();
   const drag = async (end, escape = false) => {
-    const a = await box(0), b = await box(1), y = a.y + a.height / 2;
+    const [a, b] = await laneBoxes(page), y = a.y + a.height / 2;
     await page.mouse.move(a.x + a.width / 2, y); await page.mouse.down();
     // Far enough that block 1's middle is passed: the right edge of block 0 goes past it.
     const dx = b.x + b.width / 2 - (a.x + a.width) + 12;
@@ -176,7 +180,90 @@ async function smokeLaneMove(page, { fail }) {
 }
 
 /**
+ * Where the Camera lane's blocks (or edges) are, measured together in the page once the lane is ready
+ * to grab: no menu open, at least two blocks, each laid out. One measurement for all of them, so a
+ * lane re-rendered between two lookups (it replaces its elements) can never hand back a detached one.
+ */
+const laneBoxes = (page, what = ".block") => page.waitForFunction(sel => {
+  const els = [...document.querySelectorAll(`#laneCamera ${sel}`)];
+  if (!document.getElementById("menu").hidden || els.length < (sel === ".block" ? 2 : 1)) return null;
+  const r = els.map(e => e.getBoundingClientRect());
+  return r.every(b => b.width > 0 && b.height > 0) ? r.map(b => ({ x: b.x, y: b.y, width: b.width, height: b.height })) : null;
+}, what, { timeout: 10_000 }).then(h => h.jsonValue());
+
+const cameraLane = page => page.evaluate(() => JSON.stringify(window.__beatPath.state().cameraLane.map(b => [b.word, b.from, b.to])));
+
+/** The edge between two Camera blocks dragged in small steps over four beats: the cut follows to the end (the lane re-renders each step), one undo. */
+async function smokeLaneEdge(page, { fail }) {
+  const before = await cameraLane(page), total = await page.evaluate(() => window.__beatPath.state().cameraLane.at(-1).to);
+  const lane = await page.locator("#laneCamera").boundingBox(), [edge] = await laneBoxes(page, ".edge");
+  const x0 = edge.x + 2, y = edge.y + edge.height / 2, cut0 = JSON.parse(before)[0][2];
+  await page.mouse.move(x0, y); await page.mouse.down();
+  const cuts = [];
+  for (let k = 1; k <= 40; k++) { await page.mouse.move(x0 + k / 40 * 4 * lane.width / total, y); cuts.push(JSON.parse(await cameraLane(page))[0][2]); }
+  await page.mouse.up();
+  const after = JSON.parse(await cameraLane(page))[0][2], steps = new Set(cuts).size;
+  console.log(`beat path lanes: edge drag in 40 small steps, cut ${cut0} → ${after} through ${steps} positions`);
+  if (!(after >= cut0 + 3) || steps < 3) fail(`an edge drag lost the pointer after the first step (cut ${cut0} → ${after}, ${steps} positions: ${cuts.join(",")})`);
+  if (!(await page.evaluate(() => document.getElementById("menu").hidden))) fail("releasing an edge drag opened the menu");
+  await page.keyboard.press("ControlOrMeta+z");
+  if (await cameraLane(page) !== before) fail(`one undo after an edge drag did not restore the lane: ${await cameraLane(page)} vs ${before}`);
+}
+
+/** Cmd/Ctrl-Z while a block drag is held: the drag ends (the lane put back) and that is all; the edit before it stays. */
+async function smokeLaneUndoHeld(page, { fail }) {
+  const sight = () => page.evaluate(() => window.__beatPath.state().sight);
+  await page.evaluate(() => document.getElementById("sightPasses").click());
+  const sight1 = await sight(), before = await cameraLane(page);
+  const [a, b] = await laneBoxes(page), y = a.y + a.height / 2;
+  await page.mouse.move(a.x + a.width / 2, y); await page.mouse.down();
+  const dx = b.x + b.width / 2 - (a.x + a.width) + 12;
+  for (let k = 1; k <= 8; k++) await page.mouse.move(a.x + a.width / 2 + dx * k / 8, y);
+  const moved = await cameraLane(page);
+  await page.keyboard.press("ControlOrMeta+z");
+  const after = { lane: await cameraLane(page), sight: await sight() };
+  await page.mouse.up();
+  console.log(`beat path lanes: undo during a held block drag: ${moved} → ${after.lane}, sight ${sight1} → ${after.sight}`);
+  if (moved === before) fail("the held block drag did not rearrange the lane (the undo step proves nothing)");
+  if (after.lane !== before || after.sight !== sight1) fail(`one undo during a held drag did more than end the drag: ${JSON.stringify(after)} (lane ${before}, sight ${sight1})`);
+  await page.keyboard.press("ControlOrMeta+z");   // the sight toggle, taken back for the steps after
+}
+
+/**
+ * A block drag still held when Generate (pressed with the keyboard) starts the guide render: the lane goes
+ * back to its order before the drag, the release changes nothing, and the drag leaves no undo step (one
+ * undo takes back the edit before it, a lane-free one).
+ */
+async function smokeLaneInterrupted(page, { fail }) {
+  const sight = () => page.evaluate(() => window.__beatPath.state().sight);
+  const sight0 = await sight();
+  await page.evaluate(() => document.getElementById("sightPasses").click());   // the last undo step: no lane in it
+  const before = await cameraLane(page);
+  const [a, b] = await laneBoxes(page), y = a.y + a.height / 2;
+  await page.mouse.move(a.x + a.width / 2, y); await page.mouse.down();
+  const dx = b.x + b.width / 2 - (a.x + a.width) + 12;
+  for (let k = 1; k <= 8; k++) await page.mouse.move(a.x + a.width / 2 + dx * k / 8, y);
+  const moved = await cameraLane(page);
+  await page.focus("#runGenerate"); await page.keyboard.press("Enter");
+  await page.waitForFunction(() => document.getElementById("outputNote")?.textContent === "Rendering the guide…", null, { timeout: 15_000 }).catch(() => fail("Generate from the keyboard did not start the guide render"));
+  const during = { lane: await cameraLane(page), moving: await page.evaluate(() => !!document.querySelector("#laneCamera .block.moving, #laneCamera .lane-slot")) };
+  await page.mouse.move(a.x + a.width / 2 + dx + 30, y); await page.mouse.up();
+  const released = await cameraLane(page);
+  await page.waitForSelector("#costDialog:not([hidden])", { timeout: 120_000 }); await page.keyboard.press("Escape");
+  await page.waitForFunction(() => document.getElementById("runGenerate").textContent === "Generate" && !window.__beatPath.busy(), null, { timeout: 15_000 }).catch(() => fail("the run did not end after Escape at its question"));
+  console.log(`beat path lanes: a block drag interrupted by the guide render: ${before} → mid-drag ${moved} → render ${during.lane}, released ${released}`);
+  if (moved === before) fail("the block drag did not rearrange the lane before the render (the step proves nothing)");
+  if (during.lane !== before || during.moving) fail(`the render started with the lane mid-drag: ${JSON.stringify(during)} (before ${before})`);
+  if (released !== before) fail(`releasing a block drag the render ended changed the lane: ${released} vs ${before}`);
+  await page.keyboard.press("ControlOrMeta+z");
+  const undone = { lane: await cameraLane(page), sight: await sight() };
+  if (undone.lane !== before || undone.sight !== sight0) fail(`one undo after the interrupted drag did not take back the edit before it, and only it: ${JSON.stringify(undone)} (lane before ${before}, sight ${sight0})`);
+}
+
+/**
  * Paid-run safety, with the fake provider:
+ * - Stop while the guide renders: Generate again within about a second, "nothing was submitted", no
+ *   inference task sent, the page free (not busy, the shot fields on); a second run then goes to the end;
  * - a switch during "Rendering the guide…" is refused, and the run completes on the example it started on;
  * - the image panel's question while the video guide renders waits its turn: OK answers the question on screen;
  * - switching away from the running job and back shows its progress again; Stop ends a question still waiting.
@@ -199,14 +286,42 @@ async function smokePaidRuns(browser, base, { fail }) {
   await ex("0");
   await page.waitForFunction(() => window.__beatPath.slot() === "0", null, { timeout: 30_000 });
 
+  // 0. Stop while the guide renders.
+  const videoTasks = () => page.evaluate(() => (globalThis.__fakeTasks ?? []).filter(t => t.taskType === "videoInference").length);
+  const tasks0 = await videoTasks();
+  await page.click("#runGenerate");
+  await page.waitForFunction(() => document.getElementById("outputNote")?.textContent === "Rendering the guide…" && window.__beatPath.busy(), null, { timeout: 30_000 });
+  const t0 = Date.now();
+  await page.click("#runGenerate");
+  const gaveBack = await page.waitForFunction(() => document.getElementById("runGenerate").textContent === "Generate", null, { timeout: 5_000 }).then(() => true, () => false);
+  const stopMs = Date.now() - t0;
+  await page.waitForTimeout(500);   // a render that kept going would reach its task by now
+  const stopped = await page.evaluate(() => ({ status: document.getElementById("status").textContent, busy: window.__beatPath.busy(), shotOn: !document.getElementById("shotSubject").disabled, dialog: !document.getElementById("costDialog").hidden }));
+  const sentAfterStop = await videoTasks() - tasks0;
+  console.log(`beat path paid runs: Stop during the render: Generate again after ${stopMs} ms, ${JSON.stringify(stopped)}, ${sentAfterStop} tasks sent`);
+  if (!gaveBack || stopMs > 1500) fail(`Stop during the guide render took ${stopMs} ms to give Generate back`);
+  if (!/stopped/i.test(stopped.status ?? "") || !/nothing was submitted/i.test(stopped.status ?? "")) fail(`Stop during the render did not say it stopped with nothing submitted: ${stopped.status}`);
+  if (stopped.busy || !stopped.shotOn || stopped.dialog) fail(`Stop during the render left the page busy, the shot locked or a question open (${JSON.stringify(stopped)})`);
+  if (sentAfterStop) fail(`Stop during the render still sent ${sentAfterStop} inference task(s)`);
+  await page.click("#runGenerate"); await dialogOpen(); await page.click("#costOk"); await idle();
+  if (!(await page.evaluate(() => !!document.querySelector("#generateSlot arena-player"))) || await videoTasks() - tasks0 !== 1) fail("the run after a Stop during the render did not go to the end");
+
   // 1. A switch during the render is refused; the run goes out with Example 1's shot.
   const subject = (await bp(() => window.__beatPath.state())).shot.subject;
   await page.click("#runGenerate");
-  await page.waitForFunction(() => document.getElementById("outputNote").textContent === "Rendering the guide…" && document.getElementById("outputNote").isConnected);
+  await page.waitForFunction(() => document.getElementById("outputNote")?.textContent === "Rendering the guide…" && document.getElementById("outputNote")?.isConnected);
   await ex("1");
   const during = await bp(() => ({ slot: window.__beatPath.slot(), status: document.getElementById("status").textContent, on: document.querySelector('[data-control="example"] button.on')?.dataset.value }));
   console.log(`beat path paid runs: switch during the render: ${JSON.stringify(during)}`);
   if (during.slot !== "0" || during.on !== "0" || !/guide is rendering/.test(during.status ?? "")) fail(`a switch during the guide render was not refused: ${JSON.stringify(during)}`);
+  // An edit refused during the render says so, not that it landed (Whole clip once reported success over the refusal).
+  const laneNow = () => bp(() => JSON.stringify(window.__beatPath.state().cameraLane));
+  const lane0 = await laneNow();
+  const whole = await bp(() => { document.getElementById("status").textContent = ""; document.getElementById("wholeClip").click(); return { status: document.getElementById("status").textContent, busy: window.__beatPath.busy() }; });
+  whole.same = (await laneNow()) === lane0;
+  console.log(`beat path paid runs: Whole clip during the render: ${JSON.stringify(whole)}`);
+  if (!whole.busy) fail("the render ended before Whole clip was pressed (the step proves nothing)");
+  else if (!/guide is rendering/.test(whole.status ?? "") || !whole.same) fail(`Whole clip during the guide render did not say it was refused: ${JSON.stringify(whole)}`);
   await dialogOpen(); await page.click("#costOk"); await idle();
   const sent = await page.evaluate(() => (globalThis.__fakeTasks ?? []).filter(t => t.taskType === "videoInference").at(-1)?.positivePrompt ?? "");
   const shown = await bp(() => ({ slot: window.__beatPath.slot(), player: !!document.querySelector("#generateSlot arena-player") }));
@@ -215,7 +330,7 @@ async function smokePaidRuns(browser, base, { fail }) {
 
   // 2. Two questions at once: the image's shows first, the video's waits and shows after it.
   await page.click("#runGenerate");
-  await page.waitForFunction(() => document.getElementById("outputNote").textContent === "Rendering the guide…");
+  await page.waitForFunction(() => document.getElementById("outputNote")?.textContent === "Rendering the guide…");
   await page.click("#genCharacter");
   const pop = page.locator(".image-pop");
   await pop.locator(".ip-family").selectOption("ByteDance Seedream"); await pop.locator(".ip-model").selectOption("seedream-5.5");
@@ -223,7 +338,7 @@ async function smokePaidRuns(browser, base, { fail }) {
   await dialogOpen();
   const first = await title();
   // The guide finishes behind the dialog: the video run reaches its own question, which waits.
-  await page.waitForFunction(() => /^estimated/.test(document.getElementById("outputNote").textContent ?? ""), null, { timeout: 120_000 });
+  await page.waitForFunction(() => /^estimated/.test(document.getElementById("outputNote")?.textContent ?? ""), null, { timeout: 120_000 });
   const still = await title();
   await page.click("#costCancel");
   const imageNote = await page.textContent("#status");
@@ -250,6 +365,24 @@ async function smokePaidRuns(browser, base, { fail }) {
   await press("#runGenerate");
   await idle().catch(() => fail("Stop did not end a run waiting on its question"));
   if (!(await page.evaluate(() => document.getElementById("costDialog").hidden))) fail("Stop left the run's question on screen");
+
+  // 4. Runs: a local preview's link is the page's own (it is released), so a run is offered only through its kept copy; Show plays it.
+  await page.waitForFunction(() => window.__beatPath.slot() === "0");
+  await page.click("#runsButton");
+  const rows = await page.evaluate(() => [...document.querySelectorAll("#runsList .run-row.done")].map(r => ({
+    kept: /kept in this browser/.test(r.textContent ?? ""), offers: [...r.querySelectorAll("button, a")].map(b => b.textContent).filter(t => t === "Show" || t === "Download" || /^Open/.test(t ?? "")),
+  })));
+  console.log(`beat path paid runs: Runs rows ${JSON.stringify(rows)}`);
+  if (rows.some(r => !r.kept && r.offers.length)) fail(`Runs offers a local preview's released link: ${JSON.stringify(rows)}`);
+  const shows = page.locator("#runsList .run-row.done button", { hasText: "Show" });
+  if ((await shows.count()) < 2) fail(`Runs has fewer than two kept videos to show (${await shows.count()})`);
+  else for (const k of [0, 1]) {
+    if (k) await page.click("#runsButton");
+    await shows.nth(k).click();
+    await page.waitForFunction(() => /shown from Runs/.test(document.getElementById("status").textContent ?? "") && !!document.querySelector("#generateSlot arena-player, #generateSlot video"), null, { timeout: 15_000 })
+      .catch(() => fail(`Show on kept run ${k + 1} did not put it in the output pane`));
+    await page.evaluate(() => { document.getElementById("status").textContent = ""; });
+  }
   if (errors.length) fail(`paid-run pass logged: ${errors.join(" | ")}`);
   console.log("beat path paid runs: render lock, question queue, progress on return, Stop on a waiting question checked");
   await page.close();

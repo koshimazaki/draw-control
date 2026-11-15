@@ -42,7 +42,8 @@ export const sideOf = (a: Anchor, p: { x: number; z: number }) => Math.sign(-Mat
 export type FollowHost = {
   segments(): FollowSeg[];
   current(block: number): FollowOffset | undefined;
-  set(block: number, f: FollowOffset, final: boolean): void;
+  /** False when the page refused the edit (a guide is rendering). */
+  set(block: number, f: FollowOffset, final: boolean): boolean;
   say(text: string): void;
 };
 
@@ -75,8 +76,7 @@ export class FollowTool {
       this.host.set(seg.block, last, false);
     }, () => {
       this.canvas.classList.remove("dragging");
-      if (last) {
-        this.host.set(seg.block, last, true);
+      if (last && this.host.set(seg.block, last, true)) {
         const right = seg.word === "side" && Math.abs(last.angle ?? 0) > 90;
         this.host.say(`${name}${seg.word === "side" ? (right ? ", right side" : ", left side") : ""}: ${last.distance} m${last.angle ? `, turned ${last.angle}°` : ""} (still a follow; undo with Cmd/Ctrl-Z)`);
       }
