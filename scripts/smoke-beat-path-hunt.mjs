@@ -146,9 +146,8 @@ async function smokeLaneMove(page, { fail }) {
   const first = await lane();
   if (first[0].word === first[1].word) { await page.click("#laneCamera .block >> nth=1"); await page.click(`#menu button:has-text("${first[1].word === "top" ? "Orbit" : "Top"}")`); }
   const before = await lane();
-  const box = async k => page.locator("#laneCamera .block").nth(k).boundingBox();
   const drag = async (end, escape = false) => {
-    const a = await box(0), b = await box(1), y = a.y + a.height / 2;
+    const [a, b] = await laneBoxes(page), y = a.y + a.height / 2;
     await page.mouse.move(a.x + a.width / 2, y); await page.mouse.down();
     // Far enough that block 1's middle is passed: the right edge of block 0 goes past it.
     const dx = b.x + b.width / 2 - (a.x + a.width) + 12;
@@ -179,12 +178,24 @@ async function smokeLaneMove(page, { fail }) {
   console.log(`beat path lanes: block drag ${shape(before)} → ${shape(after)}, Escape, click, undo checked`);
 }
 
+/**
+ * Where the Camera lane's blocks (or edges) are, measured together in the page once the lane is ready
+ * to grab: no menu open, at least two blocks, each laid out. One measurement for all of them, so a
+ * lane re-rendered between two lookups (it replaces its elements) can never hand back a detached one.
+ */
+const laneBoxes = (page, what = ".block") => page.waitForFunction(sel => {
+  const els = [...document.querySelectorAll(`#laneCamera ${sel}`)];
+  if (!document.getElementById("menu").hidden || els.length < (sel === ".block" ? 2 : 1)) return null;
+  const r = els.map(e => e.getBoundingClientRect());
+  return r.every(b => b.width > 0 && b.height > 0) ? r.map(b => ({ x: b.x, y: b.y, width: b.width, height: b.height })) : null;
+}, what, { timeout: 10_000 }).then(h => h.jsonValue());
+
 const cameraLane = page => page.evaluate(() => JSON.stringify(window.__beatPath.state().cameraLane.map(b => [b.word, b.from, b.to])));
 
 /** The edge between two Camera blocks dragged in small steps over four beats: the cut follows to the end (the lane re-renders each step), one undo. */
 async function smokeLaneEdge(page, { fail }) {
   const before = await cameraLane(page), total = await page.evaluate(() => window.__beatPath.state().cameraLane.at(-1).to);
-  const lane = await page.locator("#laneCamera").boundingBox(), edge = await page.locator("#laneCamera .edge").first().boundingBox();
+  const lane = await page.locator("#laneCamera").boundingBox(), [edge] = await laneBoxes(page, ".edge");
   const x0 = edge.x + 2, y = edge.y + edge.height / 2, cut0 = JSON.parse(before)[0][2];
   await page.mouse.move(x0, y); await page.mouse.down();
   const cuts = [];
@@ -208,7 +219,7 @@ async function smokeLaneInterrupted(page, { fail }) {
   const sight0 = await sight();
   await page.evaluate(() => document.getElementById("sightPasses").click());   // the last undo step: no lane in it
   const before = await cameraLane(page);
-  const a = await page.locator("#laneCamera .block").nth(0).boundingBox(), b = await page.locator("#laneCamera .block").nth(1).boundingBox(), y = a.y + a.height / 2;
+  const [a, b] = await laneBoxes(page), y = a.y + a.height / 2;
   await page.mouse.move(a.x + a.width / 2, y); await page.mouse.down();
   const dx = b.x + b.width / 2 - (a.x + a.width) + 12;
   for (let k = 1; k <= 8; k++) await page.mouse.move(a.x + a.width / 2 + dx * k / 8, y);
