@@ -24,6 +24,7 @@ import { RefStore } from "./ref-store";
 import { bindRefs, readableVideo, videoFrame } from "./page-refs";
 import { bindImages } from "./page-image";
 import { applyStep, followStep, playLocal } from "./result-sync";
+import { bindCostDialog } from "./cost-dialog";
 
 const EXPORT = { width: 1280, height: 720 } as const;
 const store = (() => { try { return window.sessionStorage; } catch { return null; } })();
@@ -133,20 +134,11 @@ export function bindGenerate(p: Page) {
     if (v) { model = v; sync(); }
   });
 
-  /** The page's own cost dialog (video, images, the no-bound notice): resolves true only on its OK button. */
-  const ask = (title: string, text: string, ok = "Generate") => new Promise<boolean>(resolve => {
-    $("costTitle").textContent = title; $("costText").textContent = text; $("costOk").lastChild!.textContent = ok;
-    $("costDialog").hidden = false;
-    $("costOk").focus();
-    const esc = (e: KeyboardEvent) => { if (e.key === "Escape") { e.preventDefault(); done(false); } };
-    const done = (v: boolean) => { $("costDialog").hidden = true; window.removeEventListener("keydown", esc, true); resolve(v); };
-    window.addEventListener("keydown", esc, true);
-    $("costOk").onclick = () => done(true);
-    $("costCancel").onclick = () => done(false);
-  });
+  /** The page's own cost dialog (video, images, the no-bound notice): one question at a time, true only on OK (cost-dialog.ts). */
+  const ask = bindCostDialog($);
   const localNote = () => (fake && !key?.connected ? " Local preview: nothing is sent and nothing is charged." : "");
-  const confirmCost = (q: { usd: number; modelName: string; inputs: unknown[] }) => ask("Generate with this model?",
-    `Up to ${q.usd.toFixed(2)} USD on ${q.modelName} (limit ${MAX_PRICE} USD). It sends the guide video${(q.inputs?.length ?? 0) > 1 ? ", the reference images" : ""} and the prompt from your shot description.${localNote()}`);
+  const confirmCost = (q: { usd: number; modelName: string; inputs: unknown[] }, signal: AbortSignal) => ask("Generate with this model?",
+    `Up to ${q.usd.toFixed(2)} USD on ${q.modelName} (limit ${MAX_PRICE} USD). It sends the guide video${(q.inputs?.length ?? 0) > 1 ? ", the reference images" : ""} and the prompt from your shot description.${localNote()}`, "Generate", signal);
 
   // One run at a time; while it runs the Generate button stops it. The run belongs to the example it
   // started on: switching examples mid-run files the result there and never shows it on another.
@@ -188,7 +180,7 @@ export function bindGenerate(p: Page) {
       const r = bundle.references;
       const result = await arena.generateFromGuide({
         guide: bundle.files, model: runModel, shot: runShot, signal: abort.signal, references: { character: r.character, environment: r.environment }, maxPrice: MAX_PRICE,
-        key: key?.connected ? key : "local-preview-key-0000000000000000", confirm: confirmCost,
+        key: key?.connected ? key : "local-preview-key-0000000000000000", confirm: (q: Parameters<typeof confirmCost>[0]) => confirmCost(q, abort.signal),
         onProgress: (g: { stage: string; message: string; progress?: number }) => { if (!here()) return; note.textContent = g.message; fill.style.width = `${40 + Math.round((g.progress ?? ({ plan: 5, confirm: 10, upload: 30, submit: 40, poll: 60, done: 100 } as Record<string, number>)[g.stage] ?? 50) * 0.6)}%`; },
         fetch: logged(fake && !key?.connected ? fakeFetch(() => fakeResult) : null, labelOf(runModel), fake && !key?.connected, slot),
         ...(fake && !key?.connected ? { poll: { initialDelayMs: 100, intervalMs: 100, maxIntervalMs: 200 } } : {}),

@@ -20,7 +20,8 @@ type Deps = {
   $: <T extends HTMLElement = HTMLElement>(id: string) => T;
   slot(): string; shot(): { subject: string; environment: string };
   arena(): ArenaModule | null; key(): ArenaKeyElement | null; fake: boolean;
-  ask(title: string, text: string, ok?: string): Promise<boolean>;
+  /** The page's cost dialog (cost-dialog.ts): one question at a time; `signal` ends a waiting or shown question as false. */
+  ask(title: string, text: string, ok?: string, signal?: AbortSignal): Promise<boolean>;
   store: RefStore; runs: Run[]; renderGallery(): void;
   fakeFetch(image: () => string): unknown;
   /** The fetch for a run, wrapped so the run log keeps its task id (the fake one in the local preview). */
@@ -163,16 +164,17 @@ export function bindImages(d: Deps) {
     if (needsUnpriced(m) && !(await d.ask("No published price limit", unpricedNotice(m), "Continue"))) { d.say("Nothing sent"); return; }
     const local = !d.key()?.connected && d.fake, slot = d.slot(), kind = s.kind, words = s.prompt.trim();
     running = new AbortController();
+    const signal = running.signal;
     runLabel.textContent = "Stop"; note.textContent = "Starting…"; spin.start();
     try {
       const fakeImage = local ? await placeholder(kind, m.name) : "";
       const r = await arena.generateImage({
-        model: m.key, prompt: words, references: refList(), maxPrice: IMAGE_MAX_PRICE, signal: running.signal,
+        model: m.key, prompt: words, references: refList(), maxPrice: IMAGE_MAX_PRICE, signal,
         ...(sizeFor(m).size ? { size: sizeFor(m).size } : {}),
         ...(m.accepts.quality ? { quality: qualityValue } : {}),
         ...(needsUnpriced(m) ? { allowUnpriced: true } : {}),
         key: d.key()?.connected ? d.key() : "local-preview-key-0000000000000000",
-        confirm: (cq: CostQuestion) => d.ask("Generate this image?", imageCostText(cq, local ? " Local preview: nothing is sent and nothing is charged." : "")),
+        confirm: (cq: CostQuestion) => d.ask("Generate this image?", imageCostText(cq, local ? " Local preview: nothing is sent and nothing is charged." : ""), "Generate", signal),
         onProgress: (g: { message: string }) => { note.textContent = g.message; },
         fetch: d.logged(local ? d.fakeFetch(() => fakeImage) : null, m.name, local),
         ...(local ? { poll: { initialDelayMs: 100, intervalMs: 100, maxIntervalMs: 200 } } : {}),
