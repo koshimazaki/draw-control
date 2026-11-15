@@ -39,7 +39,32 @@ ms new --character glider --clip 8 --analysis out/x/m.json --out out/x/base.json
 ms describe out/x/base.json --analysis out/x/m.json  # "Onsets in beats": kicks, snares, hats
 ```
 
-- Clip beats = seconds × BPM / 60 (8 s at 100 BPM ≈ 13.3 beats). Rows may run past the clip end.
+- **Your own music file** instead of a groove: `ms analyse <file.mp3> --out out/x/m.json` (the CLI
+  decodes at 44.1 kHz). **Check the tempo against what the owner says**: the estimate can depend on
+  the sample rate (one loop read 107.5 BPM at 44.1 kHz and 122.9 BPM from a 48 kHz WAV), and the
+  page decodes at the browser's rate. For a page example give the file its beat grid in
+  `tracks.ts` (`grid: { bpm, offsetSeconds }`) so the page cannot drift from the CLI.
+- **Where beat 0 sits.** The page's clip window starts at beat 0. A loop that starts on its
+  downbeat wants beat 0 at the file's start, so frame 0 of the guide is the music's start (the
+  finish step, step 7, then needs no offset): `grid` offset 0 in `tracks.ts`, and in the CLI
+  `ms set out/x/base.json beatGrid.offsetSeconds 0 --out out/x/base.json` after `ms new`. The hits
+  then sit a little after the beat numbers (0.08 s here); half-beat edges land just before them.
+  **Analyse again after any edit to the audio**: the hits move (rotating one loop by 0.37 s took
+  its kicks from 24 to 8).
+- **Music shorter than the clip** (a 13.488 s loop under a 14 s clip, because the model's length is
+  in whole seconds): the page plays the music, runs on in silence to the clip's end and wraps; the
+  guide's audio has the same silent tail. Finish the generated clip with step 7.
+- `describe` lists the first 16 onsets per band only. The full list is in the analysis file:
+  `bands.low|mid|high[].seconds`, and beat = (seconds − `offsetSeconds`) × `bpm` / 60. Pick the
+  strong ones (`strength`): a syncopated kick track has many weak hits.
+- Clip beats = seconds × BPM / 60 (8 s at 100 BPM ≈ 13.3 beats). Rows may run past the clip end
+  in a CLI-only shot. For a **page example** the last row must end exactly at
+  `ceil((seconds + 1/24) × BPM / 60)` (`clipBeats`: 8 s at 120 → 17, 14 s at 107.5 → 26): on
+  loading the music the page rescales every lane so its last edge lands there, which moves every
+  edge (and re-times the path) when the script ends anywhere else.
+- **A paid model may refuse the length**: the page refuses any estimate over its 3 USD limit before
+  the cost dialog (Seedance 2.5 at 14 s). Check each model's estimate for the clip in the page
+  (Generate shows it; nothing is sent in dev) before you settle the length, and say which refuse.
 - Put camera changes **on snares** (or kicks). For a CLI-only shot, use the exact beat numbers
   (`3.03`). For a **page example**, round each edge to the nearest half beat (`3`, `7`, `9`): the
   page snaps lane edges to half beats, so exact edges would make the page and the CLI differ.
@@ -58,8 +83,28 @@ box: -10 2.5 2 2 3.2                               # x z width depth height (met
   (`scenery: street`): placed boxes replace the preset's own placement.
 - Placed boxes are **never moved** out of the camera's way. Keep them lower than the camera
   (a hovering subject at 2.5 m between 3–3.5 m pillars, camera at 5 m+) or out of its arc.
+- **Boxes taller than the 8 m ceiling** (city towers of 10–20 m) can never be seen over, and
+  `sight passes` does not help: it only lets the *preset's* blocks cross the line of sight, never
+  placed ones. Keep the whole camera track inside the open space: a follow or three-quarter
+  camera sits `distance × sin(angle)` to the side of the subject, so a 9 m three-quarter is 6.4 m
+  to the side and inside a tower on a 12 m street. Open a wide view where there are no boxes
+  (before the street starts), go behind (sideways offset near 0) inside it, and run
+  `scripts/camera-boxes.mjs` on every render (below).
 - Path: `walk on path (x,z,height) … corners 0.9` in the first row's action; x right, z towards
   the front camera; height for a hovering subject. `corners 0.8–0.9` gives smooth curves.
+- **A turn on a hit**: the path is travelled at one average speed over the action block (the
+  travel lock keeps the subject where steady travel would be on each locked hit), so a corner's
+  middle lands at block length × (path length to the corner / whole length). Choose the legs so
+  each corner lands on its kick (L1 : L2 : L3 = t1 : t2 − t1 : end − t2), then check with
+  `node skills/draw-control-example/scripts/path-beats.mjs out/x/shot.json out/x/m.json 11.03,15.67`:
+  the heading is half way round on the hit (yaw 45 between 90 and 0 for a right turn, 135 between 90 and 180 for a left). Lengthening any leg
+  re-times every corner; corners 0.5 round a quarter of each leg. A short last leg after a late
+  turn forces a slow subject everywhere (it is one speed): to land a subject, end the travel early
+  with a `rest` row after it (`beats 23-26 | action: rest`: the walk block ends at 23 and the
+  subject stays where the path ends; the page reads it as hover). `freeze` does **not** end the
+  walk block: the path still runs to the last row.
+- A gap between boxes must take the figure's wingspan (the flyer's is 3.8 m: a 5 m gap leaves
+  0.6 m a side).
 - Use `walk on path` for anything that travels. `glide on path` **holds the figure's opening
   facing** (yaw 0, towards +z) and slides it sideways along the path, which also changes what
   `follow side` means (side of the facing, not of the travel). Use glide only for a path that
@@ -101,6 +146,13 @@ rig: distance 8m height 5m fov 30 yaw 45           # the opening framing (frame 
   error. `follow` only prefixes `side`, `behind`, `front`.
 - With a hovering subject, heights count **from the subject** (it flies at 2.6 m: `height 5m`
   puts the camera at 7.6 m). The camera stops at 8 m: `describe` says "height clamped … on N frames".
+  Follow heights start 0.2 m above the subject, so **street level** means lowering the subject
+  (a path point with a lower height, `(6.5,15.5,1.2)`), then `follow behind … height 0.3m`.
+- `three-quarter` sits 45° off the subject's nose, on its left; `angle` turns it from there
+  (`angle 90` = 135°, behind-left). A three-quarter block at beat 0 frames frame 0 at its own
+  angle whatever the rig's yaw, so give the `rig:` the same (`yaw 135` with `angle 90`) for the map.
+- A top view shows only the grid once the subject has left the boxes: keep it among them, and
+  widen the fov (75) when the camera is 6 m above it so the boxes reach the frame's edge.
 - `fov`, offsets and presets carry on into later blocks (top/above excepted, above): give **every** block its own `fov` and offsets when the next view should differ.
 
 ## 4. Camera: smooth transitions
@@ -108,6 +160,9 @@ rig: distance 8m height 5m fov 30 yaw 45           # the opening framing (frame 
 - A shot or offset eases in over the block's first beat, but a **follow swing** (top → side,
   behind → front) is a spring: a 150–180° swing takes about **2 s**. Give a follow block at least
   2 s plus a settled tail (start the final side block ~3 s before the end).
+- A follow camera trails wide through a sharp turn, wider the larger its distance: a follow
+  block of 9 m starting as the subject turned out of an alley swung into the corner tower for
+  5 frames; 6 m cleared it. Keep follow distances short through turns between boxes.
 - `slow` arrives late, `fast` early, `even` in between. A `slow` block that starts in the last
   ~1.5 s barely shows: start it earlier or use `even`.
 - `lock snare 1 hold` on a moving block pauses it on each snare (stations), still ending on its amount.
@@ -122,6 +177,10 @@ ms render out/x/shot.json --audio out/x/m.wav --out out/x/v1 --grid --start 0 --
 ffmpeg -v error -y -i out/x/v1/guide.mp4 -vf "select='not(mod(n\,16))',scale=320:-1,tile=4x3" -frames:v 1 out/x/v1.png
 ```
 
+- For a longer clip change `--length` and the sheet: 14 s is 337 frames, `select='not(mod(n\,21))'` and `tile=4x4`.
+- With `box:` lines, check the camera against them on every render:
+  `node skills/draw-control-example/scripts/camera-boxes.mjs out/x/v1/camera.json out/x/shot.txt`
+  (camera inside a box, within 0.75 m, or a box between camera and target; exit 1 when inside).
 - Always `--grid`: without ground lines nothing shows the subject moving.
 - The guide must be 193 frames for 8 s (24N+1). **Never trim or edit a rendered file**: change
   the script and render again.
@@ -142,15 +201,44 @@ The page reads the script into its own state and prints it back, so write the fi
 - block edges on half beats (see step 1);
 - every camera cell carries the camera lane's lock (`… lock snare 1 hold`), because the page applies one lock to all;
 - `shot: -` on camera blocks keeps the carried framing (a preset like `wide` or `top` overrides it, and carries on after). The page prints a top block it made itself as `top | shot: top`, so a following orbit then runs at 1.4 m / 6.5 m / fov 45; write `shot: -` on the top block (the page keeps it) when the next block should come back to the earlier framing;
-- `# track: <groove> <bars> bars` names the music, e.g. `# track: laidback 6 bars`.
+- the last row ends at the page's clip beats (step 1), or loading the music moves every edge;
+- `# track: <groove> <bars> bars` names the music, e.g. `# track: laidback 6 bars`; a music file
+  is `# track: file <name>` (Example 1), with the file in `packages/studio/public/tracks/`
+  (compressed, a few hundred KB; `*.mp3` is gitignored, so add a `!` line for it) and its entry in
+  `tracks.ts` with `file`, its `grid` (step 1), a `licence` exactly as the owner gave it, and a
+  fallback `groove`.
 
 1. `examples/scripts/beat-path-ex<N>-<id>.txt` with `# track:` and `# clip:` header lines.
 2. `packages/studio/src/beat-path/examples.ts` (EXAMPLES, TEMPO), `tracks.ts` (EXAMPLE_TRACKS,
    `ExampleId`), the example switcher in `layout.ts`, and anything else that lists the ids
-   (`git grep -n -E '"drone"|drone:|ExampleId'` shows every place example 4 touched).
+   (`git grep -n -E '"drone"|drone:|ExampleId'` shows every place example 4 touched; the
+   switcher in `layout.ts`, the smoke's example loops and the MCP parity test's script count are
+   not in that grep: `git grep -n -E 'Example 4|"3", "0"|toBe\(1[0-9]\)'`).
+   **Replacing an example** (as Example 1 was): the tests and smokes that used it as a generic
+   fixture break (a two-block snare-locked lane, an 8 s clip, music longer than the clip, slicing
+   it). Keep the old script under a new name (`beat-path-avenue-cross.txt`, read by
+   `packages/studio/test/avenue.ts`) and point those tests at it; move the smokes that slice or
+   assume 8 s to another example; keep the published-clip ids.
 3. Check it in the page the way the smoke does: `window.__beatPath.recipe().camera.segments`
-   for the ranges and `cameraAt(0)` for frame 0, against your CLI render's `camera.json`.
-4. `npm run check` and `npm run smoke`; open the page and play the example.
+   for the ranges, the lane edges unchanged after the music loads, and `cameraAt(0)` for frame 0
+   against your CLI render's `camera.json` `track[0].position` (they agree to the millimetre when
+   the script is in page form). For a file track also check `trackLength()` against the clip and
+   that playback wraps at the clip's end.
+4. **Look at the map**: the subject path and every camera block drawn and labelled. A Playwright
+   screenshot of `#map` (`const { chromium } = await import("playwright-core")`, a Vite server on
+   `packages/studio/`, wait for `window.__beatPath.trackName()`), checked against the contact
+   sheet: a left turn of a subject travelling +x goes **up** the map.
+5. `npm run check`, `npm run smoke` and `npm run mcp-check`; open the page and play the example.
+
+## 7. Finishing a generated clip
+
+When the clip is longer than the music (a model's length is whole seconds), finish the model's
+video offline: `npm run finish -- <video.mp4> <music> --out <file.mp4>` lays the original music
+over it and cuts the video to the music's length, re-encoded so the cut lands on a frame (within
+one frame: 13.500 s of video at 24 fps for 13.488 s of music). It needs beat 0 at the music's
+start (step 1), or the music lands early by the offset. Try it on your rendered guide first:
+`npm run finish -- out/x/v3/guide.mp4 <music> --out out/x/finished.mp4`, and check both durations
+it prints.
 
 ## Report
 
