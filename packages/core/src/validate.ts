@@ -19,8 +19,8 @@ export const text = (x: unknown, max: number, where: string): string => {
   if (/https?:|data:|javascript:/i.test(x as string)) fail(`${where} must not contain a URL`);
   return x as string;
 };
-/** Text on one line: each run of line breaks (and the spaces around it) becomes a single space. */
-export const oneLine = (s: string): string => s.replace(/[^\S\r\n]*[\r\n]+\s*/g, " ");
+/** Text on one line: each run of line breaks (and the spaces around it) becomes a single space, and the ends are trimmed (only whitespace: ""). */
+export const oneLine = (s: string): string => s.replace(/[^\S\r\n]*[\r\n]+\s*/g, " ").trim();
 /** A number in a range, with a readable error. */
 export const num = (x: unknown, min: number, max: number, where: string): number => {
   if (!finite(x, min, max)) fail(`${where} must be ${min}–${max}`);
