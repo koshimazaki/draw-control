@@ -10,8 +10,8 @@ import type { GrooveStyle } from "@motion-studio/core";
 /**
  * `grid`: the music's beat grid, given instead of estimated. Example 1's guide starts at the file's
  * own start (beat 0 at 0 s, where the analysis puts it at 0.081 s), so the finish step
- * (scripts/finish-clip.mjs) lays the original audio on a generated clip with no offset. It holds on
- * the fallback groove too, so the moves stay put when the file cannot load.
+ * (scripts/finish-clip.mjs) lays the original audio on a generated clip with no offset. It belongs to
+ * the file: the fallback groove plays at its own tempo, and the lanes refit to it.
  * Example 2's drum and bass loop reads 69.7 BPM to the estimator; its kicks and snares sit on a 174 BPM grid (32 beats,
  * eight bars, in its 11.04 s, every strong hit within 15 ms of a half beat), so its grid is given too.
  */

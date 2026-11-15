@@ -390,18 +390,19 @@ async function smokeExample1(page, fail, SHOTS) {
   const ranges = ex1.r.camera.segments.map(s => s.modes.join("+")).join(" "), edges = ex1.s.cameraLane.map(b => b.from).concat(ex1.s.cameraLane.at(-1).to);
   const off = Math.max(...ex1.cam0.position.map((v, i) => Math.abs(v - EX1_CLI_FRAME0[i])));
   console.log(`draw control: Example 1 builds: ranges ${ranges}; edges ${edges.join(" ")}; ${ex1.r.beatGrid.bpm} BPM, beat 0 at ${ex1.r.beatGrid.offsetSeconds} s; frame 0 camera at ${ex1.cam0.position.map(v => v.toFixed(2)).join(", ")} (CLI ${EX1_CLI_FRAME0.map(v => v.toFixed(3)).join(", ")}, off ${off.toFixed(3)} m); track ${ex1.track} ${ex1.length?.toFixed(3)} s, clip ${ex1.s.clip} s`);
-  if (ranges !== "threeQuarter chase top top+pushIn") fail(`Example 1's camera ranges are ${ranges}, not threeQuarter chase top top+pushIn`);
+  if (ranges !== "threeQuarter threeQuarter threeQuarter chase top top+pushIn") fail(`Example 1's camera ranges are ${ranges}, not threeQuarter ×3 (the zoom accent at 6–7), chase, top, top+pushIn`);
   if (ex1.r.travelLock || ex1.r.camera.segments.some(s => s.lock)) fail("Example 1 holds on the hits (a travel or camera lock is set)");
-  if (edges.join(" ") !== "0 8 16 18 26") fail(`Example 1's camera edges moved when its music loaded: ${edges.join(" ")}`);
+  if (edges.join(" ") !== "0 6 7 8 16 18 26") fail(`Example 1's camera edges moved when its music loaded: ${edges.join(" ")}`);
   if (ex1.r.beatGrid.bpm !== 107.5 || ex1.r.beatGrid.offsetSeconds !== 0) fail(`Example 1 is not on its given grid (${ex1.r.beatGrid.bpm} BPM, ${ex1.r.beatGrid.offsetSeconds} s)`);
   if (off > 0.05) fail(`Example 1's frame 0 camera is ${off.toFixed(3)} m from the CLI render's`);
   if (!(Math.abs(ex1.length - 13.488) < 0.01)) fail(`Example 1's track is ${ex1.length} s, not the 13.488 s loop`);
   // Past the music's end (13.488 s) the clock runs on in silence to the clip's end (14 s), then wraps to the start.
   await page.click("#play");
   await page.evaluate(() => { const s = document.getElementById("scrub"); s.value = "0.955"; s.dispatchEvent(new window.Event("input")); });
-  await page.waitForTimeout(250);
+  // Past the music's end, waited for rather than timed (a busy machine runs the clock later).
+  await page.waitForFunction(() => window.__beatPath.head() > 13.5 || window.__beatPath.head() < 1, null, { timeout: 5_000 }).catch(() => {});
   const tail = await page.evaluate(() => ({ head: window.__beatPath.head(), playing: window.__beatPath.playing() }));
-  await page.waitForTimeout(700);
+  await page.waitForFunction(() => window.__beatPath.head() < 1, null, { timeout: 5_000 }).catch(() => {});
   const looped = await page.evaluate(() => ({ head: window.__beatPath.head(), playing: window.__beatPath.playing() }));
   await page.click("#play");
   console.log(`draw control: Example 1 plays past the music's end (head ${tail.head.toFixed(2)} s) and wraps (head ${looped.head.toFixed(2)} s)`);

@@ -204,14 +204,18 @@ const cameraLane = page => page.evaluate(() => JSON.stringify(window.__beatPath.
 /** The edge between two Camera blocks dragged in small steps over four beats: the cut follows to the end (the lane re-renders each step), one undo. */
 async function smokeLaneEdge(page, { fail }) {
   const before = await cameraLane(page), total = await page.evaluate(() => window.__beatPath.state().cameraLane.at(-1).to);
-  const lane = await page.locator("#laneCamera").boundingBox(), [edge] = await laneBoxes(page, ".edge");
-  const x0 = edge.x + 2, y = edge.y + edge.height / 2, cut0 = JSON.parse(before)[0][2];
+  // The first edge with room after it (at least five beats: a one-beat block, as Example 1's zoom accent, cannot shrink).
+  const blocks = JSON.parse(before), k = Math.max(0, blocks.findIndex((b, i) => i > 0 && b[2] - b[1] >= 5) - 1);
+  await page.waitForFunction(n => document.querySelectorAll("#laneCamera .edge").length === n, blocks.length - 1, { timeout: 10_000 });
+  const lane = await page.locator("#laneCamera").boundingBox(), edges = await laneBoxes(page, ".edge"), edge = edges[k];
+  if (!edge) { fail(`no edge ${k} to drag (${edges.length} edges for ${blocks.length} blocks: ${before})`); return; }
+  const x0 = edge.x + 2, y = edge.y + edge.height / 2, cut0 = blocks[k][2];
   await page.mouse.move(x0, y); await page.mouse.down();
   const cuts = [];
-  for (let k = 1; k <= 40; k++) { await page.mouse.move(x0 + k / 40 * 4 * lane.width / total, y); cuts.push(JSON.parse(await cameraLane(page))[0][2]); }
+  for (let k = 1; k <= 40; k++) { await page.mouse.move(x0 + k / 40 * 4 * lane.width / total, y); cuts.push(JSON.parse(await cameraLane(page))[k]?.[2]); }
   await page.mouse.up();
-  const after = JSON.parse(await cameraLane(page))[0][2], steps = new Set(cuts).size;
-  console.log(`draw control lanes: edge drag in 40 small steps, cut ${cut0} → ${after} through ${steps} positions`);
+  const after = JSON.parse(await cameraLane(page))[k]?.[2], steps = new Set(cuts).size;
+  console.log(`draw control lanes: edge drag (edge ${k}) in 40 small steps, cut ${cut0} → ${after} through ${steps} positions; lane before ${before}, after ${await cameraLane(page)}`);
   if (!(after >= cut0 + 3) || steps < 3) fail(`an edge drag lost the pointer after the first step (cut ${cut0} → ${after}, ${steps} positions: ${cuts.join(",")})`);
   if (!(await page.evaluate(() => document.getElementById("menu").hidden))) fail("releasing an edge drag opened the menu");
   await page.keyboard.press("ControlOrMeta+z");

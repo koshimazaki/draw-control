@@ -37,8 +37,8 @@ async function exampleRecipe(i: number) {
   const s = exampleState(i), id = EXAMPLES[i].id, t = EXAMPLE_TRACKS[id], music = await exampleMusic(id);
   const f = analyseSamples(music.channels, music.sampleRate);
   const drive = buildDrive(f, 24, Math.ceil(f.lengthSeconds * 24) + 1);
-  // The example's grid even on the fallback groove, as the editor does, so the moves stay put; the fallback goes out under its own name.
-  const grid = t.grid, named = musicIdentity(id, music.fromFile);
+  // The file's grid only with the file: the fallback groove goes out under its own name and its own tempo, as in the editor.
+  const grid = music.fromFile ? t.grid : undefined, named = musicIdentity(id, music.fromFile);
   const info: TrackInfo = { name: named.name, licence: named.licence, bpm: grid?.bpm ?? f.estimatedBpm ?? GROOVES[t.groove].bpm, offsetSeconds: grid?.offsetSeconds ?? f.estimatedOffsetSeconds, lengthSeconds: f.lengthSeconds };
   return { s, recipe: beatPathRecipe(s, info, { drive, bands: drive.bands }), drive, music };
 }
