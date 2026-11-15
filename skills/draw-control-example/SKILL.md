@@ -175,6 +175,13 @@ rig: distance 8m height 5m fov 30 yaw 45           # the opening framing (frame 
   Leave the locks out (the moves still start on their hits through the block edges); the owner
   tunes hit response with Sensitivity in the page. With no lock in the script the page carries
   none (`camLock` and `charLock` off) and prints none back.
+- **One reaction on one hit** (a zoom on a single kick): write it as blocks, not a lock. The page
+  keeps one camera lock for the whole lane, so `lock kick 1 punch` on one cell becomes a punch on
+  every block. Instead: a one-beat block of the same view with a closer offset starting on the
+  half beat at the kick (`beats 6-7 | camera: three-quarter distance 4.5m height 3m …`), then the
+  original offset again (`beats 7-8 | … distance 7m height 5m …`). Offsets ease over a block's
+  first beat, so it zooms in from the kick and eases back out; in `camera.json` the distance dips
+  once (Example 1: 8.06 → 4.92 → 8.06 m over frames 81–100) and nothing else changes.
 - Measure smoothness from `camera.json`, not by eye: the camera's heading yaw per frame (rate,
   and acceleration over 3 frames; skip frames looking within 1 m of straight down), and its speed
   per frame inside each block (a hold shows as speed near 0 at each hit). Example 1 went from a
