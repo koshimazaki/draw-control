@@ -126,7 +126,7 @@ export function startBeatPath(root: HTMLElement) {
     pen: () => pen,
     // Draw new stays armed after a stroke (Escape or Edit disarms it), so a second stroke draws too.
     drew: () => {},
-    hint: text => { if (text) say(text); },
+    hint: text => actions.mapNote(text),
     selected: () => (selection?.kind === "point" ? { tool: selection.tool, index: selection.index } : null),
     select: sel => { selection = sel ? { kind: "point", ...sel } : null; },
   });
@@ -184,8 +184,11 @@ export function startBeatPath(root: HTMLElement) {
   }
   const characterLane = lane<CharacterWord>("laneCharacter", "character", LABELS.character, ["glide", "hover", "spin", "jump", "freeze"], "glide");
   const cameraLane = lane<CameraWord>("laneCamera", "cameraLane", LABELS.camera, ["behind", "side", "orbit", "top", "path", "push"]);
-  const say = (text: string) => { $("status").textContent = text; };
+  /** The status line under Generate (the whole text on hover when it is cut). Map hints go to the map's own line (page-actions.ts). */
+  const say = (text: string) => { const el = $("status"); el.textContent = text; el.title = text; };
   const ctx = () => (track ? { drive, bands: drive.bands } : {});
+  /** While the guide renders the shot fields are disabled: an edit then is refused, and a typed word would show in a field but not in the shot. */
+  const lockShot = (on: boolean) => { for (const id of ["shotSubject", "shotEnvironment", "shotAction"]) $<HTMLInputElement>(id).disabled = on; };
 
   /** Rebuild the recipe, the camera plan and every view from the state. */
   function rebuild() {
@@ -297,12 +300,13 @@ export function startBeatPath(root: HTMLElement) {
     dirty = true;
   }
 
-  async function useTrack(next: Track, licence: string) {
+  /** A new track; `grid` keeps a beat grid (Slice) instead of the analysed tempo and first beat. */
+  async function useTrack(next: Track, licence: string, grid?: { bpm: number; offsetSeconds: number }) {
     setPlaying(false);
     track = next;
     const f = next.features;
     drive = buildDrive(f, 24, Math.ceil(f.lengthSeconds * 24) + 1);
-    info = { name: next.name, licence, bpm: f.estimatedBpm ?? 120, offsetSeconds: f.estimatedBpm ? f.estimatedOffsetSeconds : 0, lengthSeconds: f.lengthSeconds };
+    info = { name: next.name, licence, bpm: grid?.bpm ?? f.estimatedBpm ?? 120, offsetSeconds: grid?.offsetSeconds ?? (f.estimatedBpm ? f.estimatedOffsetSeconds : 0), lengthSeconds: f.lengthSeconds };
     strip.message = "";
     state = fitLanes(state, clipBeats(state.clip, info.bpm));
     head = info.offsetSeconds;
@@ -310,6 +314,20 @@ export function startBeatPath(root: HTMLElement) {
     $("trackName").textContent = `${next.name} · ${info.bpm} BPM`;
     $("removeTrack").hidden = false;
     say(f.bands ? `${f.bands.low.length} kicks, ${f.bands.mid.length} snares found` : "No drums found: lock to the beat");
+  }
+  /**
+   * Slice (page-slice.ts): the cut becomes the track on the same beat grid, beat 0 at its start, so the
+   * lanes stay on the music they sat on; its hits are analysed again. Every state, the undo history
+   * too, moves its track times onto the cut. Not an undo step itself (loading a track is not one).
+   */
+  function useCut(next: Track, move: (s: BeatPathState) => BeatPathState): boolean {
+    if (refused()) return false;
+    const grid = { bpm: bpm(), offsetSeconds: 0 };
+    for (const list of [past, future]) list.forEach((s, i) => { list[i] = move(s); });
+    dragBase = null;
+    state = move(state);
+    void useTrack(next, info?.licence ?? "unspecified", grid);
+    return true;
   }
   /** No track: a plain timed clip at 120 BPM on the wall clock, a time ruler instead of the waveform. */
   function removeTrack() {
@@ -374,8 +392,8 @@ export function startBeatPath(root: HTMLElement) {
   const page = {
     $, map, menu, viewport, strip, player,
     get state() { return state; }, get recipe() { return recipe; }, get tool() { return tool; }, get view() { return view; },
-    get track() { return track; }, get drive() { return live(); }, get info() { return info; }, get busy() { return busy; }, set busy(v: boolean) { busy = v; dirty = true; if (!v && rebuildAfter) { rebuildAfter = false; rebuild(); } },
-    get head() { return head; }, get playing() { return player.playing && !busy; }, get shown() { return shown; }, get slot() { return slot; }, get followSegs() { return followSegs; }, get slice() { return hooks.slice; }, blocks, snapLane, seek, removeTrack, totalBeats, window0, window1, update, undo, rebuild, setPlaying, switchSlot, useFile, say,
+    get track() { return track; }, get drive() { return live(); }, get info() { return info; }, get busy() { return busy; }, set busy(v: boolean) { busy = v; dirty = true; lockShot(v); if (!v && rebuildAfter) { rebuildAfter = false; rebuild(); } },
+    get head() { return head; }, get playing() { return player.playing && !busy; }, get shown() { return shown; }, get slot() { return slot; }, get followSegs() { return followSegs; }, get slice() { return hooks.slice; }, blocks, snapLane, seek, removeTrack, totalBeats, window0, window1, update, undo, rebuild, setPlaying, switchSlot, useFile, useCut, say,
     setTool(t: Tool) { tool = t; if (pen === "draw") map.startNew(); map.refresh(); actions.sync(); },
     setView(v: View) { view = v; map.refresh(); actions.sync(); },
     get pen() { return pen; },

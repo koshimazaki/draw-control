@@ -2,7 +2,8 @@
  * The guide export, driven with a fake viewport, renderer and writer:
  * - the view and the rig plan are read once at the start, so a view switch or a rig edit
  *   mid-export changes neither the per-frame camera nor meta.json and camera.json;
- * - whatever fails, the writer is closed and the export's renderer disposed with its context lost.
+ * - whatever fails, the writer is closed and the export's renderer disposed with its context lost;
+ * - an abort signal stops the render between frames, cleans up the same way and throws ExportAborted.
  */
 import { describe, expect, it } from "vitest";
 import * as THREE from "three";
@@ -11,7 +12,7 @@ import { analyseSamples, buildDrive, planCamera } from "@motion-studio/core";
 import { BUNDLE_FILES, BUNDLE_SCHEMA_VERSION, buildCameraTrack, cameraAtFrame, patternTimes, synthDrums, type CameraPlan } from "@motion-studio/core/internal";
 import { beatPathRecipe, exportRange, type TrackInfo } from "../src/beat-path/recipe-map";
 import { exampleState } from "../src/beat-path/examples";
-import { exportBundle, type ExportDeps, type ExportViewport } from "../src/export/bundle";
+import { exportBundle, isExportAborted, type ExportDeps, type ExportViewport } from "../src/export/bundle";
 import type { Mp4Writer } from "../src/export/mp4";
 import { applyRigSample } from "../src/views";
 
@@ -113,5 +114,29 @@ describe("exportBundle: cleanup on every path", () => {
     const h = harness({ makeWriter: async () => { throw new Error("no H.264"); } });
     await expect(run(h)).rejects.toThrow("no H.264");
     expect(h.calls.events).toEqual(["renderer dispose", "context lost"]);
+  });
+});
+
+describe("exportBundle: an abort signal", () => {
+  it("stops within a frame of the abort, cleans up, never finishes the video, and throws an error the caller recognises", async () => {
+    const abort = new AbortController();
+    let finished = false;
+    const h = harness({ onRender: n => { if (n === 3) abort.abort(); }, writer: { finish: async () => { finished = true; return { bytes: new Uint8Array(), audioInVideo: false, codec: "fake" }; } } });
+    const err = await exportBundle({ recipe, range, viewport: h.viewport, width: W, height: H, audio: null, drive, signal: abort.signal }, h.deps).catch(e => e);
+    expect(isExportAborted(err)).toBe(true);
+    expect((err as { code: string }).code).toBe("aborted");
+    expect(h.calls.cameras).toHaveLength(4);   // frames 0-3 rendered; frame 4 never started
+    expect(finished).toBe(false);
+    expect(h.calls.events.slice(-4)).toEqual(["exporting false", "writer close", "renderer dispose", "context lost"]);
+  });
+  it("an already-aborted signal renders nothing; no signal exports every frame as before", async () => {
+    const h = harness(), abort = new AbortController();
+    abort.abort();
+    await expect(exportBundle({ recipe, range, viewport: h.viewport, width: W, height: H, audio: null, drive, signal: abort.signal }, h.deps)).rejects.toSatisfy(isExportAborted);
+    expect(h.calls.cameras).toHaveLength(0);
+    const h2 = harness();
+    const result = await exportBundle({ recipe, range, viewport: h2.viewport, width: W, height: H, audio: null, drive }, h2.deps);
+    expect(result.frames).toBe(range.frames);
+    expect(h2.calls.cameras).toHaveLength(range.frames);
   });
 });

@@ -19,6 +19,7 @@ import { bindFader, setFader } from "./ui/fader";
 import { dragHasImage } from "./page-refs";
 import { isTyping } from "./drag";
 import { bindFollowFields, followProbe, parallelStreet } from "./page-follow";
+import { canSmooth, smoothPoints, SMOOTH_STEP } from "./map-select";
 
 /** What each block's shape on the map is, said in its popover. */
 const CAMERA_NOTES: Record<CameraWord, string> = {
@@ -55,6 +56,17 @@ export function bindActions(p: Page) {
   const input = (id: string) => $<HTMLInputElement>(id);
 
   const followFields = bindFollowFields(p);
+  /** The map's own hints (map.ts `hint`) on the line under the map, not the page's status line. */
+  let note: { text: string; key: string } | null = null, noteTimer = 0;
+  const noteKey = () => `${p.tool}|${p.view}|${p.pen}`;
+  function mapNote(text: string) {
+    note = text ? { text, key: noteKey() } : null;
+    clearTimeout(noteTimer);
+    if (note) noteTimer = window.setTimeout(() => { note = null; sync(); }, 8000);
+    sync();
+    // Where the map's footer hides its hint line (a narrow map, the follow fields), the status line says it.
+    if (text && !$("mapHint").offsetWidth) p.say(text);
+  }
   function sync() {
     const s = p.state;
     const pick = (name: string, value: string | number) => document.querySelectorAll<HTMLButtonElement>(`[data-control="${name}"] button`).forEach(b => {
@@ -92,12 +104,18 @@ export function bindActions(p: Page) {
     const rigs = p.tool === "camera" && pts.length < 2 && !s.cameraLane.some(b => b.word === "path");
     empty.hidden = pts.length >= 2 || p.tool === "blocks" || rigs;
     empty.textContent = p.view === "side" ? `Draw the ${p.tool} path in the top view first.` : `No ${p.tool} path yet: press Draw new, then drag on the map or click to place points.`;
-    $("mapHint").textContent = rigs ? "The camera follows the Camera lane · drag a follow line to adjust it · Draw new replaces it with your path"
+    const hint = rigs ? "The camera follows the Camera lane · drag a follow line to adjust it · Draw new replaces it with your path"
       : p.tool === "blocks" ? (p.pen === "draw" ? "Drag a rectangle to add a block · Esc stops" : "Click to select · drag to move · corners resize · ⌘D duplicates · Delete removes")
       : p.view !== "top" ? `Drag a point up or down to set the ${p.tool}’s height`
       : p.pen === "draw" ? (p.tool === "camera" ? "Drawing replaces the block's camera with your path · Esc stops" : "Drag a stroke or click points · Esc stops")
       : "Drag points to move · Delete removes · Draw new starts a path";
+    // A hint from the map (what a click did) stays until the tool, view or pen changes, or it times out.
+    if (note && note.key !== noteKey()) note = null;
+    $("mapHint").textContent = note?.text ?? hint;
     $("mapHint").title = $("mapHint").textContent ?? "";   // the full hint when two lines cut it
+    // Smooth: on a path tool, once the path has three points.
+    $("smoothPath").hidden = p.tool === "blocks";
+    $<HTMLButtonElement>("smoothPath").disabled = pts.length < 3;
     $("map").classList.toggle("pen", p.pen === "draw");
   }
 
@@ -161,6 +179,15 @@ export function bindActions(p: Page) {
   $("wholeClip").onclick = () => {
     p.update({ ...p.state, cameraLane: [{ from: 0, to: p.totalBeats(), word: "path" }] });
     p.say("Your camera path flies the whole clip (one Camera block)");
+  };
+  // Smooth: each press moves the picked points (two or more), else every point, part of the way towards
+  // the midpoint of their neighbours; the ends stay. One undo step per press.
+  $("smoothPath").onclick = () => {
+    if (p.tool === "blocks") return;
+    const key = p.tool, pts = p.state[key], group = p.map.picked().length > 1 ? p.map.picked() : [];
+    if (!canSmooth(pts, group)) { p.say(pts.length < 3 ? "Smooth needs a path of three points or more" : "Pick points between the ends to smooth them"); return; }
+    p.update({ ...p.state, [key]: smoothPoints(pts, group, SMOOTH_STEP, key === "camera" ? 2 : 0) });
+    p.say(`Smoothed ${group.length ? `the ${group.length} picked points` : `the ${key} path`} · press again for more · Cmd/Ctrl-Z undoes`);
   };
   $("clearPath").onclick = () => {
     const s = p.state;
@@ -428,5 +455,5 @@ export function bindActions(p: Page) {
       timelineZoom: () => zoom,
     };
   }
-  return { sync, openBlock };
+  return { sync, openBlock, mapNote };
 }
