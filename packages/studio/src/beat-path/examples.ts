@@ -23,6 +23,14 @@ const TEMPO: Record<ExampleId, number> = { flyer: 107.5, runner: 174 };
 export const scriptState = (script: string, bpm: number): BeatPathState => fromScript(script, BLANK_STATE, { bpm, offsetSeconds: 0.09 }).state;
 export const exampleState = (i: number): BeatPathState => scriptState(EXAMPLES[i].script, TEMPO[EXAMPLES[i].id]);
 
+/**
+ * The slot the switcher shows for a slot id: "own", or an example's index ("0", "1"); anything else
+ * opens as Your own. A run logged before 15 Nov 2026 can name "2" or "3" (Examples 3 and 4, off the page).
+ */
+export const pageSlot = (id: string): string => (id === "own" || (/^\d+$/.test(id) && Number(id) < EXAMPLES.length) ? id : "own");
+/** What a slot id that left the page says when it opens as Your own. */
+export const SLOT_GONE = "that example left the page: opened as Your own";
+
 /** "Your own": a plain path and camera to start from, no music of its own. */
 export const ownState = (): BeatPathState => ({
   ...structuredClone(BLANK_STATE),

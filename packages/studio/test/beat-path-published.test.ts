@@ -104,6 +104,15 @@ describe("Published clips: npm run publish:clip", () => {
     expect(existsSync(join(root, "packages/studio/public/published/runner-seedance-2.5.mp4"))).toBe(true);
     expect(index()).toEqual({ version: 1, clips: { runner: { "seedance-2.5": { url: "published/runner-seedance-2.5.mp4", prompt: "a runner", costUsd: 0.42, seconds: 8 } } } });
   });
+  it("keeps an entry under an id the page no longer shows, and warns about it", () => {
+    fresh(); const dir = join(root, "packages/studio/public/published"); mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, "index.json"), JSON.stringify({ version: 1, clips: { drone: { h3: { url: "https://r2.example/d.mp4", prompt: "" } } } }));
+    const r = run("flyer", "h3", "https://r2.example/f.mp4");
+    expect(r.status, r.stderr).toBe(0);
+    expect(r.stderr).toMatch(/no longer shows \(drone\/h3\)/);
+    expect(Object.keys(index().clips).sort()).toEqual(["drone", "flyer"]);
+    expect(run("flyer", "kling-4", "https://r2.example/f.mp4").stderr).toMatch(/drone\/h3/);
+  });
   it("writes only the entry for a URL, keeping the others", () => {
     fresh();
     expect(run("runner", "h3", "https://r2.example/runner-h3.mp4").status).toBe(0);

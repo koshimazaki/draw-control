@@ -26,6 +26,7 @@ import { bindRefs, readableVideo, videoFrame } from "./page-refs";
 import { bindImages } from "./page-image";
 import { applyStep, followStep, playLocal } from "./result-sync";
 import { bindCostDialog } from "./cost-dialog";
+import { SLOT_GONE, pageSlot } from "./examples";
 
 const EXPORT = { width: 1280, height: 720 } as const;
 const store = (() => { try { return window.sessionStorage; } catch { return null; } })();
@@ -244,9 +245,11 @@ export function bindGenerate(p: Page) {
     $, log: runLog, key: () => (key?.connected ? key.getKey() ?? null : null), say: t => p.say(t),
     live: e => !!running && e.kind === "video" && e.at >= runStarted, inUse,
     show: (e, url) => {
-      outputs.set(e.slot, { url, record: null, model: e.model, prompt: "" });
-      if (p.slot === e.slot) showResult(url); else void p.switchSlot(e.slot);
-      p.say(`${e.model}: shown from Runs`);
+      // A run made on an example that left the page (Example 3 or 4) shows on Your own.
+      const slot = pageSlot(e.slot);
+      outputs.set(slot, { url, record: null, model: e.model, prompt: "" });
+      if (p.slot === slot) showResult(url); else void p.switchSlot(slot);
+      p.say(`${e.model}: shown from Runs${slot !== e.slot ? ` · ${SLOT_GONE}` : ""}`);
     },
   });
   const renderGallery = () => gallery.render();

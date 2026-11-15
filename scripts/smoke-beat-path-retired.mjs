@@ -5,6 +5,8 @@
  * Your own and loads it there as saved, with a note. The drone opens on its rig's start (the
  * script's rig: line), isometric and high, then orbit, top and side, on its 6-bar laidback groove,
  * and plays; Example 1 and back to Your own keeps it. Any console error or warning fails the run.
+ * Then a run logged on Example 4 (slot "3", kept in this browser's Runs): Runs names it Your own, and
+ * Show opens it there with a note instead of failing on a slot the switcher no longer has.
  */
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 
@@ -80,5 +82,32 @@ export async function smokeBeatPathRetired(browser, base, { fail, OUT, SHOTS }) 
   console.log(`draw control retired: Example 1 and back to Your own: figure ${back.r.figure?.shape}, yaw ${back.r.camera?.startYaw}, track ${back.track}`);
   if (back.r.camera?.startYaw !== 45 || JSON.stringify(back.state.subject) !== JSON.stringify(saved.subject)) fail("Your own did not keep the drone after a switch");
   if (errors.length) fail(`retired setup page errors: ${errors.join(" | ")}`);
+  await page.close();
+  await smokeRetiredRun(browser, base, { fail });
+}
+
+/** A Runs entry made on Example 4 before it left (slot "3"): labelled Your own, and Show opens it on Your own with a note. */
+async function smokeRetiredRun(browser, base, { fail }) {
+  const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+  // Page errors only: the seeded run's "video" is a served audio file, which the output player may not take.
+  const errors = [];
+  page.on("pageerror", e => errors.push(e.message));
+  await page.goto(`${base}/path.html`);
+  await page.evaluate(url => window.localStorage.setItem("beatPath.runs", JSON.stringify([
+    { taskUUID: "00000000-ex4-run-0000-000000000000", kind: "video", model: "Kling VIDEO 4.0", slot: "3", at: Date.now() - 60_000, status: "done", url },
+  ])), new URL("tracks/drum-n-bass.mp3", `${base}/`).href);
+  await page.reload();
+  await page.waitForFunction(() => window.__beatPath?.recipe().audio?.name === "neon-rain-loop.mp3", null, { timeout: 30_000 });
+  await page.click("#runsButton");
+  await page.waitForSelector("#runsList .run-row", { timeout: 10_000 }).catch(() => fail("the seeded Example 4 run is not listed in Runs"));
+  const where = await page.textContent("#runsList .run-row .run-where");
+  await page.click('#runsList .run-row button:has-text("Show")');
+  await page.waitForFunction(() => window.__beatPath.slot() === "own", null, { timeout: 10_000 }).catch(() => {});
+  const got = await page.evaluate(() => ({ slot: window.__beatPath.slot(), on: document.querySelector('[data-control="example"] button.on')?.dataset.value, status: document.getElementById("status").textContent }));
+  console.log(`draw control retired: a run logged on Example 4 (slot "3"): Runs says "${where}"; Show → slot ${got.slot} (switcher on ${got.on}), "${got.status}"`);
+  if (where !== "Your own") fail(`Runs names the Example 4 run "${where}", not Your own`);
+  if (got.slot !== "own" || got.on !== "own" || !/left the page: opened as Your own/.test(got.status ?? "")) fail(`Show on a run made on Example 4 did not open it on Your own with a note (${JSON.stringify(got)})`);
+  if (errors.length) fail(`retired run page errors: ${errors.join(" | ")}`);
+  await page.evaluate(() => window.localStorage.removeItem("beatPath.runs"));
   await page.close();
 }

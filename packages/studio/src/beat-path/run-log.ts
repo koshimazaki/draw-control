@@ -12,7 +12,7 @@ export type RunEntry = {
   kind: "video" | "image";
   /** The model's name as the page showed it. */
   model: string;
-  /** The example it was made for ("0", "1", "2", "own"). */
+  /** The example it was made for ("0", "1", "own"); "2" and "3" (Examples 3 and 4, off the page since 15 Nov 2026) open as Your own (examples.ts `pageSlot`). */
   slot: string;
   /** When it was sent (ms since 1970). */
   at: number;

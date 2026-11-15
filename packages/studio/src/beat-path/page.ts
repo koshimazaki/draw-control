@@ -16,7 +16,7 @@ import { musicIdentity, synthMusic } from "./example-music";
 import { TRACKS } from "./tracks";
 import { Viewport } from "../viewport";
 import { GRID_LOOKS } from "../ground-grid";
-import { exampleState, ownState } from "./examples";
+import { SLOT_GONE, exampleState, ownState, pageSlot } from "./examples";
 import { bindGenerate } from "./page-generate";
 import { editStep, endDrag } from "./drag-edit";
 import { musicFor, type Cut } from "./slot-music";
@@ -393,8 +393,10 @@ export function startBeatPath(root: HTMLElement) {
   /** A Slice made on an example, per slot: its music when it shows again (slot-music.ts). */
   const cuts = new Map<string, Cut<Track, keyof typeof TRACKS>>();
   let slot = "0", switching = 0;
-  async function switchSlot(next: string) {
-    if (next === slot && slots.size) return;
+  async function switchSlot(asked: string) {
+    // Total: a slot id the switcher no longer has (a run logged on Example 3 or 4) opens as Your own.
+    const next = pageSlot(asked), gone = next !== asked;
+    if (next === slot && slots.size) { if (gone) say(SLOT_GONE); return; }
     if (refused()) return;
     if (map.busy) map.cancelStroke();
     endLaneDrags();
@@ -414,6 +416,7 @@ export function startBeatPath(root: HTMLElement) {
     map.fit();
     actions.sync();
     hooks.generate?.onSlot(next);
+    if (gone) say(SLOT_GONE);
   }
   async function useFile(file: File) {
     if (refused()) return;

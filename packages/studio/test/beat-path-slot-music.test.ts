@@ -4,6 +4,7 @@ import { musicFor, type Cut } from "../src/beat-path/slot-music";
 import { moveOntoCut } from "../src/beat-path/track-cut";
 import { BLANK_STATE, type BeatPathState } from "../src/beat-path/script";
 import type { TrackId } from "../src/beat-path/tracks";
+import { EXAMPLES, pageSlot } from "../src/beat-path/examples";
 
 type K = TrackId;
 const example: BeatPathState = { ...structuredClone(BLANK_STATE), track: "flyer", slice: 4.1, clip: 8, muted: [4.6, 9.1], markers: [{ band: "low", seconds: 6.1 }] };
@@ -28,5 +29,13 @@ describe("An example's music when it shows again", () => {
   it("Your own (no example music) keeps the loaded track, as before", () => {
     expect(musicFor<string, K>({ ...example, track: undefined }, undefined)).toEqual({ kind: "keep" });
     expect(musicFor<string, K>({ ...example, track: undefined }, cut)).toEqual({ kind: "keep" });
+  });
+});
+
+describe("A slot id the switcher no longer has", () => {
+  it("opens as Your own: Examples 3 and 4 (\"2\", \"3\") left the page on 15 Nov 2026; the page's own ids stay", () => {
+    expect(EXAMPLES).toHaveLength(2);
+    for (const id of ["0", "1", "own"]) expect(pageSlot(id)).toBe(id);
+    for (const id of ["2", "3", "-1", "1.5", "", "x", "__proto__"]) expect(pageSlot(id)).toBe("own");
   });
 });

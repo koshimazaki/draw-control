@@ -67,6 +67,10 @@ if (existsSync(indexFile)) {
   const unusable = Object.entries(raw.clips).flatMap(([e, byModel]) => Object.entries(byModel).filter(([, c]) => !checkClip(c, "https://example.invalid/")).map(([m]) => `${e}/${m}`));
   if (unusable.length) fail(`${indexFile} has entries the page would not show (${unusable.join(", ")}); fix or remove it first`);
   index = raw;
+  // Entries under an id the page no longer shows (car and drone left with Examples 3 and 4, 15 Nov 2026) are kept, never
+  // shown: said, so they can be removed by hand (their files too) rather than deleted here.
+  const stale = Object.entries(index.clips).filter(([e]) => !examples.includes(e)).flatMap(([e, byModel]) => Object.keys(byModel).map(m => `${e}/${m}`));
+  if (stale.length) console.warn(`publish:clip: ${indexFile} keeps entries under example ids the page no longer shows (${stale.join(", ")}): the page drops them; remove them (and their files) when they are not needed`);
 }
 
 let url;
