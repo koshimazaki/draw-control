@@ -31,6 +31,17 @@ describe("motion-studio MCP server", () => {
     const names = (await client.listTools()).tools.map(t => t.name);
     expect(names).toEqual(expect.arrayContaining(["analyse_audio", "new_recipe", "apply", "set", "describe", "undo", "render", "list_commands"]));
   });
+  it("timed_prompt: the page's Timed text, and write puts it in the shot action", async () => {
+    const { call, session } = await connect();
+    await call("new_recipe", { character: "glider", clip: 8 });
+    await call("apply_script", { script: "beats 0-5 | action: glide on path (-10,0) (10,0) | camera: follow behind | shot: wide\nbeats 5-17 | action: continue | camera: top | shot: top\n" });
+    const t = (await call("timed_prompt")).text;
+    expect(t.split("\n")).toEqual(["0.0–2.5 s: wide shot; the camera follows from behind as it glides along its path", "2.5–8.0 s, on the beat: top view, looking straight down on it"]);
+    expect((await call("timed_prompt", { style: "brackets" })).text).toMatch(/^\[0-2\.5s\] /);
+    await call("timed_prompt", { write: true });
+    expect(session.recipe.shot!.action).toBe(t);
+    expect((await call("get_script")).text).toMatch(/^shot action: 0\.0–2\.5 s: .*\\n2\.5–8\.0 s/m);
+  });
   it("worked example over MCP: analyse, a jump on every second kick, a camera push on the first snare", async () => {
     const { call, session } = await connect();
     expect((await call("analyse_audio", { path: wav })).text).toMatch(/120 BPM.*20 kicks, 16 snares/);

@@ -8,7 +8,7 @@ import { isPoseName, type PoseName } from "./poses";
 import { validateCamera, type CameraConfig } from "./camera";
 import { validateReactive, type ReactiveConfig } from "./reactive-config";
 import { validateEnergyCurve, validateSteps, type EnergyCurve, type StepLane } from "./performance-config";
-import { RecipeError, fail, finite, isObject, oneLine, only, text } from "./validate";
+import { RecipeError, fail, finite, isObject, multiLine, oneLine, only, text } from "./validate";
 import { validateEnvelope, type Envelope } from "./envelope";
 import { validateLock, type BeatLock } from "./lock";
 
@@ -138,6 +138,11 @@ export type Recipe = {
 export type SceneryBox = { x: number; z: number; w: number; d: number; h: number; yaw?: number };
 export const FIGURE_SHAPES = ["glider", "car", "flyer", "runner"] as const;
 export type FigureShape = (typeof FIGURE_SHAPES)[number];
+/**
+ * The longest shot texts, in characters. The composed prompt (these plus the legend, the reference and camera
+ * lines) stays under the smallest prompt a target model takes: MiniMax H3's 7,000 (docs/models.md).
+ */
+export const SHOT_LIMITS = { subject: 500, environment: 500, action: 2000, legend: 300 } as const;
 export type ShotDescription = { subject: string; environment: string; action: string; legend: string };
 export type RootShape = { corners: number; points: { x: number; z: number; y?: number }[] };
 
@@ -321,8 +326,8 @@ export function validateRecipe(input: unknown): Recipe {
     const sh = input.shot;
     if (!isObject(sh)) return fail("shot must be an object");
     only(sh, ["subject", "environment", "action", "legend"], "shot");
-    // Single-line fields (one script line each): a typed or pasted line break becomes a space.
-    const field = (k: "subject" | "environment" | "action" | "legend") => oneLine(text(sh[k] ?? "", 300, `shot.${k}`));
+    // Subject, environment and action may run over several lines (the script writes a break as `\n`); the legend is one line.
+    const field = (k: "subject" | "environment" | "action" | "legend") => { const t = text(sh[k] ?? "", SHOT_LIMITS[k], `shot.${k}`); return k === "legend" ? oneLine(t) : multiLine(t); };
     recipe.shot = { subject: field("subject"), environment: field("environment"), action: field("action"), legend: field("legend") };
   }
   if (input.figure !== undefined) {

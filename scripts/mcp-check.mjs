@@ -30,6 +30,9 @@ try {
   console.log(await call("analyse_audio", { path: `${out}drums.wav` }));
   await call("new_recipe");
   console.log(`apply_script:\n${await call("apply_script", { script })}`);
+  const timed = await call("timed_prompt");
+  console.log(`timed_prompt:\n${timed}`);
+  if (!/^0\.0–\d+\.\d s[,:]/.test(timed)) { console.error("timed_prompt: no timed lines"); failed = true; }
   const t0 = Date.now();
   console.log(await call("render", { out: `${out}bundle`, audio: `${out}drums.wav`, start: 0, length: 16, unit: "beats" }));
   console.log(`render took ${((Date.now() - t0) / 1000).toFixed(1)} s`);

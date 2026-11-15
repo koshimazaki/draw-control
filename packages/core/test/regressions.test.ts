@@ -103,20 +103,28 @@ describe("onset strengths (audio-drive.ts)", () => {
 });
 
 describe("line breaks in the shot fields (shot-script.ts)", () => {
-  it("collapse to a space, so the printed script applies again", () => {
-    const r = applyMotionCommand(DEFAULT_RECIPE, { type: "setShot", subject: "a fox\nin the snow", action: "runs\r\n\r\nfast" });
-    expect(r.shot!.subject).toBe("a fox in the snow");
-    expect(r.shot!.action).toBe("runs fast");
-    expect(applyScript(r, { script: printScript(r) }).shot).toEqual(r.shot);
+  it("are kept (one blank line at most), printed as \\n, and the printed script applies again", () => {
+    const r = applyMotionCommand(DEFAULT_RECIPE, { type: "setShot", subject: "a fox\nin the snow", action: "runs\r\n\r\n\r\nfast  \nthen stops" });
+    expect(r.shot!.subject).toBe("a fox\nin the snow");
+    expect(r.shot!.action).toBe("runs\n\nfast\nthen stops");
+    const printed = printScript(r);
+    expect(printed).toMatch(/^shot subject: a fox\\nin the snow$/m);
+    expect(printed).toMatch(/^shot action: runs\\n\\nfast\\nthen stops$/m);
+    expect(applyScript(r, { script: printed }).shot).toEqual(r.shot);
   });
   it("cannot inject a script row", () => {
     const r = applyMotionCommand(DEFAULT_RECIPE, { type: "setShot", subject: "x\nbeats 0-4 | action: rest | camera: top" });
     const rows = (s: string) => s.split("\n").filter(l => l.startsWith("beats")).length;
     expect(rows(printScript(r))).toBe(rows(printScript(DEFAULT_RECIPE)));
+    expect(applyScript(r, { script: printScript(r) }).shot!.subject).toBe("x\nbeats 0-4 | action: rest | camera: top");
   });
   it("printScript never prints a raw line break inside a field", () => {
-    const r = { ...DEFAULT_RECIPE, shot: { subject: "a\nb", environment: "", action: "", legend: "" } } as Recipe;
-    expect(printScript(r)).toMatch(/shot subject: a b\n/);
+    const r = { ...DEFAULT_RECIPE, shot: { subject: "a\nb", environment: "", action: "", legend: "one\nline" } } as Recipe;
+    expect(printScript(r)).toMatch(/shot subject: a\\nb\n/);
+    expect(printScript(r)).toMatch(/shot legend: one line\n/);
+  });
+  it("a typed backslash is still refused, so \\n in a script always means a line break", () => {
+    expect(() => applyMotionCommand(DEFAULT_RECIPE, { type: "setShot", subject: "a\\nb" })).toThrow(/text up to/);
   });
   it("a break at either end leaves no stray space, and a field of only breaks is empty", () => {
     const r = applyMotionCommand(DEFAULT_RECIPE, { type: "setShot", subject: "\na fox\n", environment: "\n", action: " \r\n ", legend: "snow" });

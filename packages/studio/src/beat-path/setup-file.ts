@@ -14,7 +14,7 @@
  * `readSetup` never throws: a field it cannot use falls back to the blank page's value (BLANK_STATE)
  * on its own, with a note, rather than refusing the whole file; values are clamped as the page clamps them.
  */
-import { CAMERA_MAX_HEIGHT, FOLLOW_LIMITS, FOV_RANGE, RIG_LIMITS, clipBeats, type CommandContext, type FollowOffset } from "@motion-studio/core";
+import { CAMERA_MAX_HEIGHT, FOLLOW_LIMITS, FOV_RANGE, RIG_LIMITS, SHOT_LIMITS, clipBeats, type CommandContext, type FollowOffset } from "@motion-studio/core";
 import { beatPathRecipe, type TrackInfo } from "./recipe-map";
 import {
   BLANK_STATE, CAMERA_WORDS, CHARACTER_WORDS, HIT_CHOICES, LOCK_CHOICES, clampClip, fitLanes, hopOffset, toScript,
@@ -49,8 +49,8 @@ export const setupJson = (state: BeatPathState, music: TrackInfo | null, now?: D
 // boxes (recipe.ts: up to 200, ±200 m, sides 0.2–80 m, height 0.2–60 m, yaw ±7 rad), generous caps elsewhere.
 const LIMIT = {
   coord: 60, points: 16, blocks: 64, cameraBlocks: 32, boxes: 200, box: { coord: 200, side: [0.2, 80], height: [0.2, 60], yaw: 7 },
-  // The recipe's own: 512 switched-off hits and markers (recipe.ts), shot text 300 characters; `scan` bounds the work on a hostile list.
-  hits: 512, scan: 10_000, shot: 300, text: 2000, phrase: 300, seconds: 3600, subjectY: 30,
+  // The recipe's own: 512 switched-off hits and markers (recipe.ts), shot text SHOT_LIMITS; `scan` bounds the work on a hostile list.
+  hits: 512, scan: 10_000, text: 2000, phrase: 300, seconds: 3600, subjectY: 30,
 } as const;
 const BANDS = ["low", "mid", "high"] as const;
 const SHAPES = ["glider", "car", "flyer", "runner"] as const;
@@ -70,8 +70,12 @@ const pick = <T extends string>(v: unknown, list: readonly T[]): T | undefined =
 /** One line of text: no line breaks, no script separators (`|`, `#`), trimmed and capped. */
 const line = (v: string, max: number) => v.replace(/[\r\n|#]+/g, " ").replace(/\s+/g, " ").trim().slice(0, max);
 const ms = (t: number) => Math.round(t * 1000) / 1000;
-/** Shot text as the recipe takes it (validate.ts `text`): one line, no `<>{}\`, no URL schemes, at most 300 characters. */
-const shotText = (v: string) => v.replace(/[<>{}\\]/g, " ").replace(/(https?|data|javascript):\S*/gi, " ").replace(/\s*[\r\n]+\s*/g, " ").replace(/ {2,}/g, " ").trim().slice(0, LIMIT.shot).trim();
+/**
+ * Shot text as the recipe takes it (validate.ts `text`, `multiLine`): no `<>{}\`, no URL schemes, at most
+ * SHOT_LIMITS characters; it may run over several lines (at most one blank line in a row).
+ */
+const shotText = (v: string, max: number) => v.replace(/[<>{}\\]/g, " ").replace(/(https?|data|javascript):\S*/gi, " ").replace(/\r\n?/g, "\n")
+  .replace(/[^\S\n]{2,}/g, " ").replace(/[^\S\n]*\n[^\S\n]*/g, "\n").replace(/\n{3,}/g, "\n\n").trim().slice(0, max).trim();
 
 /** Read a setup file's text. Never throws: a state with notes, or a plain error. */
 export function readSetup(text: string, ctx: CommandContext = {}): SetupRead {
@@ -217,13 +221,13 @@ export function readState(s: Rec, notes: string[]): BeatPathState {
     const text = (k: "subject" | "environment" | "action") => {
       const v = sh[k];
       if (typeof v !== "string") return "";
-      const t = shotText(v);
+      const t = shotText(v, SHOT_LIMITS[k]);
       if (t !== v) changed.push(k);
       return t;
     };
     out.shot = { subject: text("subject"), environment: text("environment"), action: text("action") };
     if (!isRec(s.shot)) drop("shot description");
-    if (changed.length) notes.push(`shot ${changed.join(", ")}: shortened to one line of ${LIMIT.shot} characters, without links or <>{}\\`);
+    if (changed.length) notes.push(`shot ${changed.join(", ")}: shortened to ${SHOT_LIMITS.subject} characters (the action ${SHOT_LIMITS.action}), without links or <>{}\\`);
   }
   if (typeof s.prompt === "string" && line(s.prompt, LIMIT.text)) out.prompt = line(s.prompt, LIMIT.text); else if (has("prompt") && typeof s.prompt !== "string") drop("prompt");
   return out;

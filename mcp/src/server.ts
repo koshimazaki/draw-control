@@ -3,7 +3,7 @@
  * holds one working recipe and, optionally, one track analysis; every edit goes through
  * the same `applyMotionCommand` the studio UI and the CLI use, and can be undone.
  * Tools: analyse_audio, load_analysis, new_recipe, load_recipe, save_recipe, get_recipe,
- * describe, get_script, apply_script, list_commands, apply, set, undo, render.
+ * describe, timed_prompt, get_script, apply_script, list_commands, apply, set, undo, render.
  * Files are read and written on this machine only, and only under the allowed roots
  * (paths.ts: cwd, the repo, the temp directory, MOTION_STUDIO_ROOTS); audio input may be
  * any existing local file, never a URL.
@@ -11,7 +11,7 @@
 import { writeFileSync } from "node:fs";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { applyCommands, commandHelp, describeRecipe, printScript, validateRecipe, type CommandContext, type MotionCommand, type Recipe } from "../../packages/core/src/index.ts";
+import { applyCommands, commandHelp, describeRecipe, printScript, timedPrompt, validateRecipe, type CommandContext, type MotionCommand, type Recipe } from "../../packages/core/src/index.ts";
 import { analyse, checkAnalysis, driveFrom, type AnalysisJson } from "../../cli/src/analysis.ts";
 import { decodeAudioFile, localAudioPath } from "../../cli/src/audio-file.ts";
 import { confine, readJsonConfined } from "./paths.ts";
@@ -68,6 +68,14 @@ export function createServer(session = new Session()): McpServer {
     guard(({ path }: { path: string }) => { writeFileSync(confine(path, "write"), JSON.stringify(session.recipe, null, 2) + "\n"); return text(`Wrote ${path}.`); }));
   server.registerTool("get_recipe", { description: "The working recipe as JSON." }, guard(() => text(JSON.stringify(session.recipe, null, 2))));
   server.registerTool("describe", { description: "The timeline as text: moves (blocks), markers, camera, walk path, envelope, onsets in beats." }, guard(() => text(session.describe())));
+  server.registerTool("timed_prompt", {
+    description: "The shot as a timed prompt, the Draw Control page's Timed button: one line per camera block with times in seconds from the clip's start (\"0.0–2.5 s, on the snare: …\"), the hit or beat each block starts on (from the loaded analysis), and the subject's turns, jumps and holds. At most 12 lines: blocks past the eleventh go on the last line, each with its start. style brackets writes Seedance's \"[0-2.5s]\" windows. seconds: the clip length (default: the recipe's clip). write: true also puts it in the recipe's shot action (replacing what is there).",
+    inputSchema: { style: z.enum(["plain", "brackets"]).optional(), seconds: z.number().min(1).max(3600).optional(), write: z.boolean().optional() },
+  }, guard(({ style, seconds, write }: { style?: "plain" | "brackets"; seconds?: number; write?: boolean }) => {
+    const timed = timedPrompt(session.recipe, { bands: session.analysis?.bands, ...(style ? { style } : {}), ...(seconds !== undefined ? { seconds } : {}) });
+    if (write) { const r = session.recipe; session.replace({ ...r, shot: { subject: "", environment: "", legend: "", ...r.shot, action: timed } }); }
+    return text(write ? `Wrote the shot action:\n${timed}` : timed);
+  }));
   server.registerTool("get_script", { description: "The working recipe as a shot script: one row per block, \"beats 0-8 | action: run on path | camera: chase | shot: wide\"." },
     guard(() => text(printScript(session.recipe, session.analysis?.bands))));
   server.registerTool("apply_script", {

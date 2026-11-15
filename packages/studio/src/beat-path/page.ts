@@ -214,7 +214,7 @@ export function startBeatPath(root: HTMLElement) {
   const say = (text: string) => { const el = $("status"); el.textContent = text; el.title = text; };
   const ctx = () => (track ? { drive, bands: drive.bands } : {});
   /** While the guide renders the shot fields are disabled: an edit then is refused, and a typed word would show in a field but not in the shot. */
-  const lockShot = (on: boolean) => { for (const id of ["shotSubject", "shotEnvironment", "shotAction"]) $<HTMLInputElement>(id).disabled = on; };
+  const lockShot = (on: boolean) => { for (const id of ["shotSubject", "shotEnvironment", "shotAction", "edSubject", "edEnvironment", "edAction", "shotTimed"]) $<HTMLInputElement>(id).disabled = on; };
 
   /** Rebuild the recipe, the camera plan and every view from the state. */
   function rebuild() {

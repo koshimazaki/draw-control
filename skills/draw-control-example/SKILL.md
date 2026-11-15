@@ -267,6 +267,10 @@ ffmpeg -v error -y -i out/x/v1/guide.mp4 -vf "select='not(mod(n\,16))',scale=320
 - Fast loop for one stretch: `--start 6 --length 2 --unit seconds` renders just that tail (it warns
   it is under a model's 3 s minimum; fine for checking). Its `camera.json` track starts at
   `startFrame`, so add that offset when you match frame numbers.
+- **Write the timed prompt** once the render looks right: `ms describe out/x/shot.json --analysis out/x/m.json --timed`
+  (`--style brackets` for Seedance) prints one line per camera block in seconds, with the hit it starts on. Check each
+  line against the contact sheet, edit the wording to the brief, and put it in the script's `shot action:` line (line
+  breaks as `\n`) or with `ms set out/x/shot.json shot.action "<text>"`.
 - `describe --script` prints the script back in canonical form (`above` → `top`, `follow side
   right` → `side right`, settings reordered): the same shot, not the same text.
 

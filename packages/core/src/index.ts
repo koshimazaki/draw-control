@@ -11,7 +11,7 @@
 // Recipe: the format, its validator and starting points (docs/recipe.md).
 export {
   RECIPE_VERSION, CHARACTER_KINDS, PROCEDURAL_KINDS, AMPLITUDE_MAX, SPEED_RANGE, RecipeError, validateRecipe, recipeSeconds, secondsPerBeat,
-  FIGURE_SHAPES, type FigureShape, type SceneryBox, type Recipe, type RootShape, type ShotDescription, type Move, type Phase, type BeatGrid, type CharacterRef, type CharacterKind, type RootPoint, type Jump,
+  FIGURE_SHAPES, SHOT_LIMITS, type FigureShape, type SceneryBox, type Recipe, type RootShape, type ShotDescription, type Move, type Phase, type BeatGrid, type CharacterRef, type CharacterKind, type RootPoint, type Jump,
 } from "./recipe";
 export { DEFAULT_RECIPE, MOVE_KEYS, MOVE_LIBRARY, makeMove, type MoveKey } from "./moves";
 export { defaultRiggedRecipe } from "./examples";
@@ -44,6 +44,7 @@ export { applyScript, parseRows, parseSettings, type ScriptSettings } from "./sc
 export { parseRig, type ScriptRig } from "./script-rig";
 export { ACTION_WORDS, CAMERA_WORDS } from "./shot-script";
 export { describeRecipe } from "./describe";
+export { timedPrompt, timedLines, formatLine, isTimedLine, hitAt, TIMED_STYLES, type TimedLine, type TimedStyle, type TimedOptions } from "./timed-prompt";
 
 // Camera rig: shots, programmed moves, beat locks, automation lanes, the per-frame plan.
 export {

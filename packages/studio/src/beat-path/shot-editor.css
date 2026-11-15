@@ -1,0 +1,19 @@
+/* The prompt editor: opened by the chevron beside the shot fields, it lies over the screens (the panel
+   above the fields), exactly their size, so nothing below it moves. The action field takes what is left. */
+.side { position: relative; }
+.shot-editor { position: absolute; z-index: 6; top: 0; left: 0; right: 0; height: calc(var(--single-w) * 9 / 16 + 2px);
+  display: flex; flex-direction: column; gap: var(--s-2); padding: var(--s-3); box-sizing: border-box; overflow: hidden;
+  background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); }
+.shot-editor[hidden] { display: none; }
+.shot-editor-head { display: flex; align-items: center; gap: var(--s-2); min-width: 0; }
+.shot-editor-head strong { font-size: var(--text-sm); white-space: nowrap; }
+.shot-editor-hint { flex: 1; min-width: 0; font-size: var(--text-xs); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.shot-editor-field { display: grid; gap: 4px; min-height: 0; }
+.shot-editor-field.grow { flex: 1; grid-template-rows: auto 1fr; }
+.field.area { height: auto; min-height: 0; padding: var(--s-1) var(--s-2); resize: none; font: inherit; font-size: var(--text-sm); line-height: 1.4; }
+.shot-editor-field.grow .field.area { height: 100%; }
+.shot-editor-foot { margin: 0; font-size: var(--text-xs); min-height: 1em; }
+.icon-btn { width: var(--control-h); padding: 0; flex: none; }
+.icon-btn .icon { margin: 0; }
+/* A field holding several lines: the editor shows it whole; the one-line field only opens the editor. */
+.field.multi { cursor: pointer; color: var(--text-muted); }
