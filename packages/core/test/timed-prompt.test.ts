@@ -38,11 +38,13 @@ describe("the timed prompt (timed-prompt.ts)", () => {
   it("after a slice the bar phase is unknown: an edge on a bar says on the beat", () => {
     expect(hitAt(validateRecipe({ ...shot(TWO), slice: 3.25 }), 4)).toBe("beat");
   });
-  it("a block's start names the hit on its edge (analysed, tolerance 60 ms), else the downbeat or the beat", () => {
+  it("a block's start names the hit on its edge (analysed, within 0.1 s and a quarter beat), else the downbeat or the beat", () => {
     const r = shot(TWO);
     // Beat 5 sits at 0.25 + 2.5 = 2.75 s of the track.
     expect(hitAt(r, 5, bands({ mid: [2.78] }))).toBe("snare");
     expect(hitAt(r, 5, bands({ low: [2.75], mid: [2.79] }))).toBe("kick");
+    expect(hitAt(r, 5, bands({ low: [2.83], mid: [2.76] }))).toBe("kick");   // both in reach: the kick names it
+    expect(hitAt(r, 5, bands({ mid: [2.84] }))).toBe("snare");
     expect(hitAt(r, 5, bands({ mid: [2.9] }))).toBe("beat");
     expect(hitAt(r, 4)).toBe("downbeat");
     expect(hitAt(r, 4.5)).toBeUndefined();

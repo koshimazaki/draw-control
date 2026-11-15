@@ -5,17 +5,32 @@ import { beatPathRecipe } from "../src/beat-path/recipe-map";
 import { BLANK_STATE, fromScript, toScript, type BeatPathState } from "../src/beat-path/script";
 import { SETUP_KIND, SETUP_VERSION, readSetup, setupJson } from "../src/beat-path/setup-file";
 import { promptWarning } from "../src/beat-path/generate";
+import { EXAMPLE_TRACKS } from "../src/beat-path/tracks";
 import { replacesEdited, timedStyleFor } from "../src/beat-path/shot-editor";
 
-const flyer = () => beatPathRecipe(exampleState(0), { name: "x.wav", licence: "MIT", bpm: 120, offsetSeconds: 0.09, lengthSeconds: 30 });
+const onTrack = (i: number) => {
+  const st = exampleState(i), g = EXAMPLE_TRACKS[st.track!].grid!;
+  return beatPathRecipe(st, { name: "x.mp3", licence: "MIT", bpm: g.bpm, offsetSeconds: g.offsetSeconds, lengthSeconds: 60 });
+};
 const multi: BeatPathState["shot"] = { subject: "a flying car\nsleek and low", environment: "a city at night", action: "0.0–2.5 s: it flies\n\n2.5–8.0 s, on the snare: top view | camera: top" };
 
 describe("the timed prompt on the page (shot-editor.ts)", () => {
-  it("Example 1: one line per camera block, the drawn path in its second", () => {
-    const t = timedPrompt(flyer(), { seconds: 8 }).split("\n");
-    expect(t).toHaveLength(2);
-    expect(t[0]).toMatch(/^0\.0–2\.5 s: wide shot; the camera follows from behind as it flies along its path/);
-    expect(t[1]).toMatch(/^2\.5–8\.0 s, on the beat: the camera travels along its own route/);
+  it("Example 1: one line per camera block; the one-beat accent reads as a move in and back out; the top block pushes in", () => {
+    const t = timedPrompt(onTrack(0), { seconds: 14 }).split("\n");
+    expect(t).toHaveLength(exampleState(0).cameraLane.length);
+    expect(t[0]).toMatch(/^0\.0–3\.3 s: the camera follows from a three-quarter angle, about 7 m away and 5 m up as it flies along its path$/);
+    expect(t[1]).toMatch(/^3\.3–3\.9 s, on the beat: the camera moves in closer/);
+    expect(t[2]).toMatch(/the camera pulls back out/);
+    expect(t[3]).toMatch(/follows from behind.*turns left/);
+    expect(t.at(-1)).toMatch(/^10\.0–14\.0 s, .*top view, looking straight down on it, pushing in to about 1 m$/);
+  });
+  it("Example 2: low and close on the feet, the pull back, the hop on the kick when the hits are known", () => {
+    const r = onTrack(1), kick = r.reactive!.markers![0].seconds;
+    const t = timedPrompt(r, { seconds: 12, bands: { hopSeconds: 0.01, low: [{ seconds: kick, strength: 1 }], mid: [], high: [], peaks: [] } });
+    expect(t).toMatch(/^0\.0–3\.1 s: the camera tracks alongside it, about 2\.5 m away and 0\.3 m up, low and close on its feet/);
+    expect(t).toMatch(/pulls back to about 13 m away/);
+    expect(t).toMatch(/at 6\.6 s it does a small hop on the kick/);
+    expect(t).toMatch(/rises to about 8 m, tilting down/);
   });
   it("each model's time syntax: Seedance brackets, Kling and MiniMax plain seconds", () => {
     expect(timedStyleFor("seedance-2.5")).toBe("brackets");

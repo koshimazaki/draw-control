@@ -16,7 +16,7 @@ export async function smokeBeatPathPrompt(browser, base, { fail }) {
   const errors = [];
   page.on("pageerror", e => errors.push(e.message));
   await page.goto(`${base}/path.html`);
-  await page.waitForFunction(() => window.__beatPath?.recipe().audio?.name === "generated-straight-120.wav", null, { timeout: 30_000 });
+  await page.waitForFunction(() => window.__beatPath?.recipe().audio?.name === "neon-rain-loop.mp3" && window.__beatPath.kicks().length > 0, null, { timeout: 30_000 });
   const state = () => page.evaluate(() => window.__beatPath.state());
   const fits = () => page.evaluate(() => document.getElementById("editor").offsetHeight <= window.innerHeight + 1 && document.documentElement.scrollWidth <= window.innerWidth + 1);
   const before = (await state()).shot.action;
@@ -81,6 +81,20 @@ export async function smokeBeatPathPrompt(browser, base, { fail }) {
   if (await page.evaluate(() => document.getElementById("shotEditor").hidden)) fail("a click on the multi-line action field did not open the editor");
   await page.mouse.click(4, 4);
   if (!(await page.evaluate(() => document.getElementById("shotEditor").hidden))) fail("a click outside did not close the prompt editor");
+  // Example 2 (the street guide, a file track at 174 BPM): Timed names its low detail framing and the hop, from the page's own hits.
+  await page.click('[data-control="example"] [data-value="1"]');
+  await page.waitForFunction(() => window.__beatPath.recipe().audio?.name === "drum-n-bass.mp3" && window.__beatPath.kicks().length > 0, null, { timeout: 30_000 });
+  await page.click("#shotExpand");
+  await page.click("#shotTimed");
+  await page.waitForSelector("#costDialog:not([hidden])");
+  await page.waitForFunction(() => !document.getElementById("costOk").hasAttribute("aria-disabled"));
+  await page.click("#costOk");
+  await page.waitForFunction(() => /^0\.0–/.test(window.__beatPath.state().shot.action), null, { timeout: 5000 }).catch(() => fail("Timed did not write Example 2's action"));
+  const ex2 = (await state()).shot.action, segs2 = await page.evaluate(() => window.__beatPath.recipe().camera.segments.length);
+  console.log(`prompt editor, Example 2: ${ex2.split("\n").length} line(s) for ${segs2} camera range(s):\n  ${ex2.split("\n").join("\n  ")}`);
+  if (ex2.split("\n").length !== segs2) fail("Example 2's timed lines do not match its camera ranges");
+  if (!/low and close on its feet/.test(ex2) || !/small hop/.test(ex2)) fail("Example 2's timed prompt does not name the low detail framing and the hop");
+  await page.keyboard.press("Escape");
   if (errors.length) fail(`prompt editor page errors: ${errors.join(" | ")}`);
   await page.close();
 }

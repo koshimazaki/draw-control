@@ -32,8 +32,11 @@ export type TimedOptions = {
   style?: TimedStyle;
 };
 
-/** A hit within this many seconds of a block edge starts it. */
-export const HIT_TOLERANCE = 0.06;
+/**
+ * A hit within this many seconds of a block edge starts it (and never more than a quarter beat): the lines print
+ * tenths of a second, and a track's grid often sits a few hundredths off its own kicks (Example 1's by about 0.09 s).
+ */
+export const HIT_TOLERANCE = 0.1;
 /** At most this many lines: a model loses a long list (Seedance's guide warns against micro-control). Blocks past it go on the last line, each with its start. */
 export const MAX_TIMED_LINES = 12;
 const BAND_WORD = { low: "kick", mid: "snare", high: "hat" } as const;
@@ -41,16 +44,13 @@ const BAND_WORD = { low: "kick", mid: "snare", high: "hat" } as const;
 const r1 = (x: number) => Math.round(x * 10) / 10;
 const spanSeconds = (r: Recipe, beat: number) => beat * 60 / r.beatGrid.bpm;
 
-/** What starts a block at `beat`: the nearest hit within the tolerance, else the bar or the beat it sits on. */
+/** What starts a block at `beat`: a hit within the tolerance (kick, then snare, then hi-hat), else the bar or the beat it sits on. */
 export function hitAt(r: Recipe, beat: number, bands?: BandAnalysis): HitLabel | undefined {
   if (beat <= 1e-6) return undefined;
-  const b = hitBands(bands, r), t = spanSeconds(r, beat);
-  let best: { label: HitLabel; d: number } | undefined;
-  if (b) for (const band of ["low", "mid", "high"] as const) for (const o of b[band]) {
-    const d = Math.abs(spanSeconds(r, beatAtSeconds(r.beatGrid, o.seconds)) - t);
-    if (d <= HIT_TOLERANCE && (!best || d < best.d - 1e-9)) best = { label: BAND_WORD[band], d };
-  }
-  if (best) return best.label;
+  const b = hitBands(bands, r), t = spanSeconds(r, beat), tol = Math.min(HIT_TOLERANCE, 15 / r.beatGrid.bpm);
+  // Kick first, then snare, then hi-hat: a kick and a snare landing together read as "on the kick".
+  if (b) for (const band of ["low", "mid", "high"] as const)
+    if (b[band].some(o => Math.abs(spanSeconds(r, beatAtSeconds(r.beatGrid, o.seconds)) - t) <= tol)) return BAND_WORD[band];
   const whole = Math.abs(beat - Math.round(beat)) < 1e-3;
   if (!whole) return undefined;
   // After a slice, beat 0 is the beat nearest the cut, not a bar line: the bar phase is unknown.
@@ -73,23 +73,42 @@ export function lockClause(s: CameraSegment): string {
   return s.onHit === "punch" ? `punching in on each ${hit}` : `its move pausing on each ${hit}`;
 }
 
-/** One camera block in plain words: framing, the move, offsets, lens and pace (`lockClause` says what it does on the hits). */
-export function cameraClause(s: CameraSegment, r: Recipe): string {
+const BASE_WORD = { glider: "base", car: "wheels", flyer: "underside", runner: "feet" } as const;
+const m1 = (x: number) => `${r1(x)} m`;
+
+/**
+ * One camera block in plain words: framing, the move, offsets, where it aims, lens and pace (`lockClause` says what it
+ * does on the hits). `prev`: the block before it; the same move closer or farther reads as moving in or pulling back.
+ */
+export function cameraClause(s: CameraSegment, r: Recipe, prev?: CameraSegment): string {
   const modes = s.modes.filter(m => m !== "static" || s.modes.length === 1);
   const moves = modes.map(m => {
     if (m === "chase" && s.shoulder) return "the camera follows over its shoulder";
     if (m === "side") return (s.follow?.angle ?? 0) >= 90 ? "the camera tracks alongside it, on its right" : MOVES.side;
     if (m === "orbit") return `the camera circles ${(s.amount ?? r.camera?.orbitDegreesPerBeat ?? 1) < 0 ? "clockwise" : "anticlockwise"} around it`;
-    if (m === "rise") return (s.amount ?? ((s.to ?? 1) - (s.from ?? 0))) < 0 ? "the camera lowers, tilting up" : "the camera rises, tilting down";
+    if (m === "rise") return (s.amount ?? ((s.to ?? 1) - (s.from ?? 0))) < 0 ? `the camera lowers${s.to !== undefined ? ` to about ${m1(s.to)}` : ""}, tilting up` : `the camera rises${s.to !== undefined ? ` to about ${m1(s.to)}` : ""}, tilting down`;
     if (m === "truck") return `the camera slides ${(s.amount ?? 0) < 0 ? "left" : "right"} past it`;
+    if (m === "pushIn" && s.to !== undefined) return `the camera pushes in to about ${m1(s.to)}`;
+    if (m === "pullOut" && s.to !== undefined) return `the camera pulls back to about ${m1(s.to)} away`;
     return MOVES[m] ?? "";
   }).filter(Boolean);
+  // The same rig as the block before, nearer or farther: a move in or back out (a short accent reads as a zoom).
+  const pd = prev?.follow?.distance, d = s.follow?.distance;
+  const same = !!prev && prev.modes.join("+") === s.modes.join("+");
+  if (same && pd !== undefined && d !== undefined && Math.abs(pd - d) > 0.2) moves.splice(0, 1, d < pd ? "the camera moves in closer" : "the camera pulls back out");
   // A top block already says "top view": the preset's name is not said twice.
   const shot = s.shot && !(s.shot === "top" && modes.includes("top")) ? SHOT_WORD[s.shot] : "";
-  const parts = [moves.join(", then ")];
+  // Later moves in the same block: "…, then pulls back" (after a top view: "…, pushing in").
+  const later = moves.slice(1).map(t => t.replace(/^the camera /, ""));
+  const joined = moves.length ? moves[0] + later.map(t => (modes[0] === "top" ? `, ${t.replace(/^pushes in/, "pushing in").replace(/^pulls back/, "pulling back")}` : `, then ${t}`)).join("") : "";
+  const parts = [joined];
   const f = s.follow;
   if (f && (f.distance !== undefined || f.height !== undefined))
-    parts.push(`about ${[f.distance !== undefined ? `${r1(f.distance)} m away` : "", f.height !== undefined ? `${r1(f.height)} m up` : ""].filter(Boolean).join(" and ")}`);
+    parts.push(`about ${[f.distance !== undefined ? `${m1(f.distance)} away` : "", f.height !== undefined ? `${m1(f.height)} up` : ""].filter(Boolean).join(" and ")}`);
+  if (f?.aim !== undefined) {
+    const base = r.character.kind === "rigged" ? "feet" : BASE_WORD[r.figure?.shape ?? "glider"];
+    parts.push(f.aim <= 0.5 ? `low and close on its ${base}` : f.aim >= 1.6 ? "aimed at its top" : "");
+  }
   if (s.modes.includes("path") && r.camera?.path) {
     const ys = r.camera.path.map(p => p.y), y = ys.reduce((a, b) => a + b, 0) / ys.length;
     parts.push(y >= 5 ? "high above the ground" : y <= 0.8 ? "low to the ground" : "");
@@ -106,7 +125,7 @@ type Event = { beat: number; text: string };
 const ACCENT_VERB: Record<string, string> = { jump: "it jumps", spin: "it spins", hit: "it strikes a pose", point: "it points", nod: "it nods" };
 
 /** The subject's notable events: travel starting and stopping, turns along its path, jumps, holds and accents. */
-export function subjectEvents(r: Recipe, endBeat: number): Event[] {
+export function subjectEvents(r: Recipe, endBeat: number, bands?: BandAnalysis): Event[] {
   const out: Event[] = [];
   const verb = r.character.kind === "rigged" ? "moves" : TRAVEL_VERB[r.figure?.shape ?? "glider"];
   const travel = travelRange(r.rootPath);
@@ -137,7 +156,13 @@ export function subjectEvents(r: Recipe, endBeat: number): Event[] {
   }
   for (const j of r.jumps ?? []) out.push({ beat: j.atBeat, text: "it jumps" });
   for (const fz of r.freezes ?? []) out.push({ beat: fz.fromBeat, text: "it freezes in place" }, { beat: fz.toBeat, text: "it moves again" });
-  for (const m of r.reactive?.markers ?? []) out.push({ beat: beatAtSeconds(r.beatGrid, m.seconds), text: ACCENT_VERB[m.accent] ?? `it does a ${m.accent}` });
+  for (const m of r.reactive?.markers ?? []) {
+    const beat = beatAtSeconds(r.beatGrid, m.seconds), on = hitAt(r, beat, bands);
+    // A jump while it travels is the page's Hop: a small hop on the hit, the travel carrying on through it.
+    const moving = !!travel && beat > travel.from + 1e-6 && beat < travel.to - 1e-6;
+    const word = m.accent === "jump" && moving ? "it does a small hop" : ACCENT_VERB[m.accent] ?? `it does a ${m.accent}`;
+    out.push({ beat, text: on === "kick" || on === "snare" || on === "hat" ? `${word} ${HIT_WORDS[on]}` : word });
+  }
   return out.filter(e => e.beat >= 0 && e.beat < endBeat - 1e-6).sort((a, b) => a.beat - b.beat);
 }
 
@@ -158,18 +183,18 @@ export function clipSeconds(r: Recipe): number {
 export function timedLines(r: Recipe, opts: TimedOptions = {}): TimedLine[] {
   const seconds = opts.seconds ?? clipSeconds(r), endBeat = seconds * r.beatGrid.bpm / 60;
   const blocks: { from: number; to: number; text: string; lock?: string }[] = [];
-  let cursor = 0, lastLock = "";
+  let cursor = 0, lastLock = "", prev: CameraSegment | undefined;
   for (const s of [...(r.camera?.segments ?? [])].sort((a, b) => a.fromBeat - b.fromBeat)) {
     if (s.fromBeat >= endBeat - 1e-6) break;
     if (s.fromBeat > cursor + 1e-6) blocks.push({ from: cursor, to: s.fromBeat, text: "the camera holds still" });
     // The lock is said where it starts or changes, not on every line.
     const lock = lockClause(s);
-    blocks.push({ from: s.fromBeat, to: Math.min(s.toBeat, endBeat), text: cameraClause(s, r), ...(lock && lock !== lastLock ? { lock } : {}) });
-    lastLock = lock;
+    blocks.push({ from: s.fromBeat, to: Math.min(s.toBeat, endBeat), text: cameraClause(s, r, prev), ...(lock && lock !== lastLock ? { lock } : {}) });
+    lastLock = lock; prev = s;
     cursor = Math.min(s.toBeat, endBeat);
   }
   if (cursor < endBeat - 1e-6) blocks.push({ from: cursor, to: endBeat, text: blocks.length ? "the camera holds still" : "a steady camera keeps it in frame" });
-  const events = subjectEvents(r, endBeat);
+  const events = subjectEvents(r, endBeat, opts.bands);
   const lines: TimedLine[] = blocks.map(b => {
     const inside = events.filter(e => e.beat >= b.from - 1e-6 && e.beat < b.to - 1e-6);
     const atStart = inside.filter(e => Math.abs(spanSeconds(r, e.beat - b.from)) < 0.25).map(e => e.text);
