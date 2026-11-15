@@ -65,14 +65,28 @@ export function startBeatPath(root: HTMLElement) {
   viewport.setExportGrid(true);
   viewport.setView("rig");
 
+  /**
+   * While a guide renders (busy) it reads the rig, the landmarks and the figure live between frames,
+   * so a switch or an edit then would send a guide mixed from two shots: they are refused here, at
+   * the entry points, and a rebuild asked for by anything else waits until the render is over.
+   */
+  let rebuildAfter = false;
+  function refused(): boolean {
+    if (!busy) return false;
+    say("The guide is rendering: wait for it to finish (or press Stop) before switching examples or editing");
+    actions.sync();
+    return true;
+  }
   /** Every edit: the new state; history on a final edit (a drag records where it began). */
   function update(next: BeatPathState, final = true) {
+    if (refused()) return;
     if (!dragBase) dragBase = structuredClone(state);
     state = next;
     if (final) { past.push(dragBase); if (past.length > 200) past.shift(); future.length = 0; dragBase = null; }
     schedule(final);
   }
   function undo(redo = false) {
+    if (refused()) return;
     const from = redo ? future : past, to = redo ? past : future;
     const s = from.pop();
     if (!s) return;
@@ -173,6 +187,7 @@ export function startBeatPath(root: HTMLElement) {
 
   /** Rebuild the recipe, the camera plan and every view from the state. */
   function rebuild() {
+    if (busy) { rebuildAfter = true; return; }
     try { recipe = beatPathRecipe(state, info, ctx()); }
     catch (e) { say(`Not applied: ${(e as Error).message}`); return; }
     const frames = Math.ceil((window1() + 0.2) * recipe.fps) + 1;
@@ -270,6 +285,8 @@ export function startBeatPath(root: HTMLElement) {
     requestAnimationFrame(tick);
   }
   function setPlaying(on: boolean) {
+    // A guide rendering in the shared viewport keeps playback stopped (the music would run past the clip).
+    if (on && busy) { say("The guide is rendering: playback resumes when it is done"); return; }
     if (on) { if (head >= window1() - 0.05 || head < window0()) head = window0(); player.play(track, head); }
     else { if (player.playing) head = player.position(); player.stop(); }
     for (const id of ["play", "barPlay"]) { $(id).classList.toggle("playing", on); $(id).setAttribute("aria-label", on ? "Pause" : "Play"); }
@@ -294,6 +311,7 @@ export function startBeatPath(root: HTMLElement) {
   }
   /** No track: a plain timed clip at 120 BPM on the wall clock, a time ruler instead of the waveform. */
   function removeTrack() {
+    if (refused()) return;
     setPlaying(false);
     track = null; info = null; drive = flatDrive(24, 1);
     state = fitLanes(state, clipBeats(state.clip, 120));
@@ -319,6 +337,7 @@ export function startBeatPath(root: HTMLElement) {
   let slot = "0", switching = 0;
   async function switchSlot(next: string) {
     if (next === slot && slots.size) return;
+    if (refused()) return;
     if (map.busy) map.cancelStroke();
     slots.set(slot, structuredClone(state));
     slot = next;
@@ -336,6 +355,7 @@ export function startBeatPath(root: HTMLElement) {
     hooks.generate?.onSlot(next);
   }
   async function useFile(file: File) {
+    if (refused()) return;
     strip.message = `Decoding ${file.name}…`;
     strip.setScene({ track, start: window0(), end: window1(), beats: [], kicks: [], snares: [], hats: [], added: [], selected: -1, locked: [], muted: [] });
     try {
@@ -352,14 +372,14 @@ export function startBeatPath(root: HTMLElement) {
   const page = {
     $, map, menu, viewport, strip, player,
     get state() { return state; }, get recipe() { return recipe; }, get tool() { return tool; }, get view() { return view; },
-    get track() { return track; }, get drive() { return live(); }, get info() { return info; }, get busy() { return busy; }, set busy(v: boolean) { busy = v; dirty = true; },
+    get track() { return track; }, get drive() { return live(); }, get info() { return info; }, get busy() { return busy; }, set busy(v: boolean) { busy = v; dirty = true; if (!v && rebuildAfter) { rebuildAfter = false; rebuild(); } },
     get head() { return head; }, get playing() { return player.playing && !busy; }, get shown() { return shown; }, get slot() { return slot; }, get followSegs() { return followSegs; }, get slice() { return hooks.slice; }, blocks, snapLane, seek, removeTrack, totalBeats, window0, window1, update, undo, rebuild, setPlaying, switchSlot, useFile, say,
     setTool(t: Tool) { tool = t; if (pen === "draw") map.startNew(); map.refresh(); actions.sync(); },
     setView(v: View) { view = v; map.refresh(); actions.sync(); },
     get pen() { return pen; },
     setPen(v: "edit" | "draw") { if (v === "draw" && pen !== "draw") map.startNew(); pen = v; actions.sync(); },
     get selection() { return selection; },
-    setSelection(v: typeof selection) { selection = v; rebuild(); },
+    setSelection(v: typeof selection) { if (refused()) return; selection = v; rebuild(); },
     retheme() { map.retheme(); strip.retheme(); hooks.slice?.retheme(); },
     /** A new example or script: rebuild and frame it on the map. */
     load(next: BeatPathState) { update(next); map.fit(); },

@@ -52,12 +52,13 @@ export function bindGenerate(p: Page) {
     : composePrompt(p.state.shot, legendFor(p.state.figure));
 
   /** The guide bundle in memory: every file as a Blob (the same content as the zip), the references, the shot and the prompt. */
+  // Everything the bundle carries is read before the first await: the render awaits between frames.
   async function exportGuideInMemory(onProgress?: (done: number, total: number) => void) {
-    const recipe = p.recipe, range = exportRange(recipe, p.state.clip);
+    const recipe = p.recipe, range = exportRange(recipe, p.state.clip), references = refStore.blobs(p.slot) as References, prompt = currentPrompt();
     const result = await exportBundle({ recipe, range, viewport: p.viewport, ...EXPORT, audio: p.track?.buffer ?? null, drive: p.drive, onProgress });
     const type = (name: string) => (name.endsWith(".mp4") ? "video/mp4" : name.endsWith(".png") ? "image/png" : name.endsWith(".wav") ? "audio/wav" : "application/json");
     const files = Object.fromEntries(Object.entries(result.contents).map(([name, bytes]) => [name, new Blob([bytes as BlobPart], { type: type(name) })]));
-    return { files, references: refStore.blobs(p.slot) as References, shot: recipe.shot ?? null, prompt: currentPrompt() };
+    return { files, references, shot: recipe.shot ?? null, prompt };
   }
   (window as unknown as { beatPath: unknown }).beatPath = { exportGuideInMemory, prompt: currentPrompt };
 
@@ -166,7 +167,9 @@ export function bindGenerate(p: Page) {
     // A clip longer (or shorter) than the model takes is refused before the guide renders or anything is sent.
     const refusal = clipRefusal(model, p.state.clip);
     if (refusal) { p.say(refusal); return; }
-    const slot = p.slot, runModel = model, abort = new AbortController();
+    // The run's shot is taken now: the slot, the model, the shot and (in the bundle) the prompt and references.
+    // While the guide renders, page.ts refuses example switches and edits, so the guide matches them.
+    const slot = p.slot, runModel = model, runShot = shot(), abort = new AbortController();
     runStarted = Date.now();
     setRunning(abort);
     const here = () => p.slot === slot;
@@ -176,14 +179,15 @@ export function bindGenerate(p: Page) {
     $("generateSlot").replaceChildren(noteRow, bar);
     spin.start();
     try {
-      // The page is busy (playback paused) only while the guide renders in the shared viewport.
+      // The page is busy only while the guide renders in the shared viewport: playback stops first, as for the zip export.
+      p.setPlaying(false);
       p.busy = true;
       const bundle = await exportGuideInMemory((d, t) => { fill.style.width = `${Math.round(d / t * 40)}%`; }).finally(() => { p.busy = false; });
       if (abort.signal.aborted) throw Object.assign(new Error("Stopped. Nothing was submitted."), { code: "aborted" });
       fakeResult = URL.createObjectURL(bundle.files["guide.mp4"]);
-      const r = refStore.blobs(slot);
+      const r = bundle.references;
       const result = await arena.generateFromGuide({
-        guide: bundle.files, model: runModel, shot: shot(), signal: abort.signal, references: { character: r.character, environment: r.environment }, maxPrice: MAX_PRICE,
+        guide: bundle.files, model: runModel, shot: runShot, signal: abort.signal, references: { character: r.character, environment: r.environment }, maxPrice: MAX_PRICE,
         key: key?.connected ? key : "local-preview-key-0000000000000000", confirm: confirmCost,
         onProgress: (g: { stage: string; message: string; progress?: number }) => { if (!here()) return; note.textContent = g.message; fill.style.width = `${40 + Math.round((g.progress ?? ({ plan: 5, confirm: 10, upload: 30, submit: 40, poll: 60, done: 100 } as Record<string, number>)[g.stage] ?? 50) * 0.6)}%`; },
         fetch: logged(fake && !key?.connected ? fakeFetch(() => fakeResult) : null, labelOf(runModel), fake && !key?.connected, slot),
