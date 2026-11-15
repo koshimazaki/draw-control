@@ -53,12 +53,22 @@ scenery: street                                    # NEVER "none" when you place
 box: -10 2.5 2 2 3.2                               # x z width depth height (metres)
 ```
 
-- `scenery: none` silently deletes every `box:` line. Any preset works: placed boxes replace it.
+- `scenery: none` **and** `landmarks: off` each silently delete every `box:` line (the script
+  applies cleanly and the field is empty). Keep `landmarks: on seed 7` and any preset
+  (`scenery: street`): placed boxes replace the preset's own placement.
 - Placed boxes are **never moved** out of the camera's way. Keep them lower than the camera
   (a hovering subject at 2.5 m between 3–3.5 m pillars, camera at 5 m+) or out of its arc.
 - Path: `walk on path (x,z,height) … corners 0.9` in the first row's action; x right, z towards
-  the front camera; height for a hovering subject. Weave by alternating z around the boxes,
-  keeping ~1 m clear of each box edge. `corners 0.8–0.9` gives smooth curves.
+  the front camera; height for a hovering subject. `corners 0.8–0.9` gives smooth curves.
+- Use `walk on path` for anything that travels. `glide on path` **holds the figure's opening
+  facing** (yaw 0, towards +z) and slides it sideways along the path, which also changes what
+  `follow side` means (side of the facing, not of the travel). Use glide only for a path that
+  runs along +z, or for a deliberate slide.
+- Weave by alternating z around the boxes. Clearance is from the **figure's edge**, not the path
+  centre: the flyer's wingspan is about 3.8 m, so keep the path centre ~2 m from each box edge.
+- Placed boxes have no collision with the camera, only the line of sight matters to you: a box
+  in the camera's arc fills a corner of the frame or puts the camera on its roof. Check the
+  camera's track (`camera.json`) against each box before you settle the layout.
 - `shot subject|environment|action|legend:` lines describe what the model should draw.
 
 ## 3. Camera: views
@@ -83,7 +93,7 @@ rig: distance 8m height 5m fov 30 yaw 45           # the opening framing (frame 
 | --- | --- | --- |
 | Isometric (3/4 from above) | `three-quarter distance 8m height 5m fov 30` + matching `rig:` | narrow fov flattens it; height ≈ 0.6 × distance |
 | Pan round | `orbit 70 slow lock snare 1 hold` | keeps the rig's distance/height: set the rig high for a high pan |
-| Top | `above fov 70` | the preset is 1.4 m from the subject: a wide fov makes it readable |
+| Top | `above fov 70` | the preset is 1.4 m from the subject: a wide fov makes it readable. Over a hovering subject the 8 m ceiling makes it a steep oblique (~80°), not straight down |
 | Side | `follow side distance 6m height 1.6m fov 35` (left) / `follow side right …` | `right` = the other side |
 | Behind / front | `follow behind …` / `follow front …` | |
 
@@ -95,7 +105,9 @@ rig: distance 8m height 5m fov 30 yaw 45           # the opening framing (frame 
 
 ## 4. Camera: smooth transitions
 
-- Each block eases into its framing over its first beat; a follow swing (e.g. top → side) arcs round.
+- A shot or offset eases in over the block's first beat, but a **follow swing** (top → side,
+  behind → front) is a spring: a 150–180° swing takes about **2 s**. Give a follow block at least
+  2 s plus a settled tail (start the final side block ~3 s before the end).
 - `slow` arrives late, `fast` early, `even` in between. A `slow` block that starts in the last
   ~1.5 s barely shows: start it earlier or use `even`.
 - `lock snare 1 hold` on a moving block pauses it on each snare (stations), still ending on its amount.
@@ -117,7 +129,12 @@ ffmpeg -v error -y -i out/x/v1/guide.mp4 -vf "select='not(mod(n\,16))',scale=320
 - To check where the camera really is: `out/x/v1/camera.json` → `track[n].position` and
   `.target` in metres (y up; the subject faces +Z at yaw 0). "Side view" means the camera is
   level with the subject along its direction of travel and offset sideways.
-- Iterate: one change per render, note what it fixed. Seven renders is normal for a new shot.
+- Iterate: one change per render, note what it fixed. Six or seven renders is normal for a new shot.
+- Fast loop for one stretch: `--start 6 --length 2 --unit seconds` renders just that tail (it warns
+  it is under a model's 3 s minimum; fine for checking). Its `camera.json` track starts at
+  `startFrame`, so add that offset when you match frame numbers.
+- `describe --script` prints the script back in canonical form (`above` → `top`, `follow side
+  right` → `side right`, settings reordered): the same shot, not the same text.
 
 ## 6. Ship it as a page example
 
