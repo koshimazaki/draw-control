@@ -23,6 +23,8 @@ export type CameraWord = (typeof CAMERA_WORDS)[number];
 export type Block<W extends string> = { from: number; to: number; word: W; phrase?: string; follow?: FollowOffset; fov?: number; shot?: "-"; at?: HopAnchor };
 /** Where a hop lands when not on its row's first kick: the Nth hit of a band, or (beat) N beats after the block's start. */
 export type HopAnchor = { band: "kick" | "snare" | "hat" | "beat"; n: number };
+/** One rule for a hop's @beat offset everywhere (script, setup file, printing): inside its block, 0 to its last half beat. */
+export const hopOffset = (n: number, len: number) => Math.round(Math.min(Math.max(n, 0), Math.max(0, len - 0.5)) * 1000) / 1000;
 /** The page's follow words and the rig mode each prints as. */
 export const FOLLOW_WORDS = { behind: "chase", side: "side" } as const;
 export const isFollowWord = (w: string): w is keyof typeof FOLLOW_WORDS => w in FOLLOW_WORDS;
@@ -191,7 +193,7 @@ export function toScript(state: BeatPathState): string {
       if (c === glide && state.subject.length >= 2) action = `walk on path ${pts(state.subject)} corners ${f(state.subjectCorners)}${lock}`;
       else if (c.word === "spin" || c.word === "jump") action = `rest, ${c.word} @beat ${f(mid)}`;
       // A hop jumps on the first kick of its row while the travel carries on through it (the walk block runs on).
-      else if (c.word === "hop") action = `continue, jump ${!c.at ? "@kick 1" : c.at.band === "beat" ? `@beat ${f(c.from + c.at.n)}` : `@${c.at.band} ${c.at.n}`}`;
+      else if (c.word === "hop") action = `continue, jump ${!c.at ? "@kick 1" : c.at.band === "beat" ? `@beat ${f(c.from + hopOffset(c.at.n, c.to - c.from))}` : `@${c.at.band} ${c.at.n}`}`;
       else if (c.word === "freeze") action = "freeze";
       else action = "rest";
     }
@@ -276,7 +278,10 @@ export function fromScript(text: string, base: BeatPathState, grid: { bpm: numbe
         // The anchor the row was written with is kept, so it prints back where it was ("@kick 1", the default, is not stored).
         word = "hop";
         const m = /\b(?:jump|kick)\s*@(kick|snare|hat|beat)\s+([\d.]+)/.exec(a);
-        if (m && !(m[1] === "kick" && m[2] === "1")) at = { band: m[1] as HopAnchor["band"], n: m[1] === "beat" ? Math.round((Number(m[2]) - row.from) * 1000) / 1000 : Number(m[2]) };
+        if (m && !(m[1] === "kick" && m[2] === "1")) {
+          // A beat is kept as an offset from the block's start; it is held inside the block once the block's end is known (below).
+          at = { band: m[1] as HopAnchor["band"], n: m[1] === "beat" ? Math.round((Number(m[2]) - row.from) * 1000) / 1000 : Number(m[2]) };
+        }
       }
       else if (/^freeze\b/.test(a)) word = "freeze";
       else if (/\bspin\s*@/.test(a)) word = "spin";
@@ -337,6 +342,12 @@ export function fromScript(text: string, base: BeatPathState, grid: { bpm: numbe
     if (!lane.length) lane.push({ from: 0, to: rows.at(-1)!.to, word: lane === state.character ? "hover" : "behind" });
     if (lane[0].from > 0) lane[0].from = 0;
     for (let i = 1; i < lane.length; i++) lane[i].from = lane[i - 1].to;
+  }
+  // A hop's @beat outside its block lands inside it (hopOffset, as a setup file and printing hold it).
+  for (const b of state.character) if (b.at?.band === "beat") {
+    const n = hopOffset(b.at.n, b.to - b.from);
+    if (n !== b.at.n) notes.push(`the hop at beats ${f(b.from)}-${f(b.to)}: @beat ${f(b.from + b.at.n)} is outside it, so it lands on beat ${f(b.from + n)}`);
+    b.at = { band: "beat", n };
   }
   return { state, notes };
 }

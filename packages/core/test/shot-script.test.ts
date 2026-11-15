@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  DEFAULT_CAMERA, DEFAULT_RECIPE, RIGGED_CHARACTER, applyMotionCommand, applyScript, beatAtSeconds, printScript, validateRecipe,
+  DEFAULT_CAMERA, DEFAULT_RECIPE, RIGGED_CHARACTER, applyMotionCommand, applyScript, beatAtSeconds, describeRecipe, moveMarker, printScript, validateRecipe,
   type BandAnalysis, type Recipe,
 } from "../src/internal";
 
@@ -69,7 +69,12 @@ describe("shot script", () => {
     expect(() => applyScript(base(), { script: "beats 0-4 | action: run | camera: orbit | shot: extreme" })).toThrow(/wide, medium, close, low, top/);
     expect(() => applyScript(base(), { script: "beats 0-2 | action: jump @kick 5" }, { bands })).toThrow(/have 2 kicks/);
     // No kick to land on (no track analysed): the accent lands on its row's start, as a camera start with hits does.
-    expect(applyScript(base(), { script: "beats 2-4 | action: jump @kick 1" }).reactive!.markers!.map(m => m.accent)).toEqual(["jump"]);
+    expect(applyScript(base(), { script: "beats 2-4 | action: jump @kick 1" }).reactive!.markers!.map(m => [m.accent, m.fellBack])).toEqual([["jump", "@kick 1"]]);
+    // A mistyped index on a row with no such hit falls back too, and describe says which anchor it asked for.
+    const typo = applyScript(base(), { script: "beats 0-2 | action: rest\nbeats 2-4 | action: jump @hat 5" }, { bands });
+    expect(describeRecipe(typo, bands)).toMatch(/\(@hat 5: no such hit in its row, on the row's start\)/);
+    expect(moveMarker(typo, undefined, 0, 1).reactive!.markers![0].fellBack).toBeUndefined();
+    expect(() => validateRecipe({ ...typo, reactive: { ...typo.reactive!, markers: [{ ...typo.reactive!.markers![0], fellBack: "@kick" }] } })).toThrow(/fellBack/);
     expect(() => applyScript(base(), { script: "beats 0-2 | camera: top\nbeats 2-4 | camera: orbit @kick 1" })).toThrow(/analyse a track first/);
   });
 });

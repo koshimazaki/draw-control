@@ -394,9 +394,11 @@ export function applyScript(recipe: Recipe, args: { script: string }, ctx: { ban
   if (hits.length || recipe.reactive?.markers) {
     r = validateRecipe({ ...r, reactive: { ...(r.reactive ?? { ...DEFAULT_REACTIVE, accents: [] }), markers: [] } });
     for (const { row, hit } of hits) {
-      // An accent with no hit of its band in the row lands on the row's start, so the shot still builds.
-      const beat = resolveAnchor(r, bands, row, hit.band, hit.index) ?? row.from;
-      r = addMarker(r, ctx.drive, secondsAtBeat(r.beatGrid, beat), hit.accent);
+      // An accent with no hit of its band in the row lands on the row's start, so the shot still builds; the marker
+      // keeps the anchor it asked for (fellBack), so describe shows it (a mistyped "@kick 5" stays visible).
+      const found = resolveAnchor(r, bands, row, hit.band, hit.index), seconds = secondsAtBeat(r.beatGrid, found ?? row.from);
+      r = addMarker(r, ctx.drive, seconds, hit.accent);
+      if (found === undefined) r = validateRecipe({ ...r, reactive: { ...r.reactive!, markers: r.reactive!.markers!.map(m => Math.abs(m.seconds - seconds) < 1e-3 && m.accent === hit.accent ? { ...m, fellBack: `@${hit.band} ${hit.index}` } : m) } });
     }
   }
   // Camera track.
