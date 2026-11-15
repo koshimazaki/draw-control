@@ -5,7 +5,7 @@
  * cause is unknown.
  */
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { COPY_DELAYS_MS, LINK_ALIVE_MS, copyErrorText, saveAsset, shouldCopy, withRetry } from "../src/beat-path/run-assets";
+import { COPY_DELAYS_MS, LINK_ALIVE_MS, copyErrorText, saveAsset, shouldCopy, storeErrorText, withRetry } from "../src/beat-path/run-assets";
 import { RunLog, type RunEntry } from "../src/beat-path/run-log";
 
 const memory = () => { const m = new Map<string, string>(); return { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => void m.set(k, v) }; };
@@ -76,6 +76,25 @@ describe("saveAsset", () => {
     const after = log.get("t1")!;
     expect(after.saved).toBe(false);
     expect(after.saveError).toMatch(/not copied after 4 tries/);
+    expect(shouldCopy(after, NOW, START, false)).toBe(true);
+  });
+  it("counts the tries it made, not the most it could", async () => {
+    const log = new RunLog(memory()), e = done();
+    log.add(e);
+    await saveAsset(log, e, { load: async () => { throw new Error("HTTP 404"); }, delays: [1], wait: async () => {} });
+    expect(log.get("t1")!.saveError).toBe("not copied after 2 tries: the provider answered HTTP 404");
+  });
+  it("a storage failure is said as such, after one try, and stays retryable", async () => {
+    let puts = 0, loads = 0;
+    (globalThis as { caches?: unknown }).caches = { open: async () => ({ put: async () => { puts++; throw new DOMException("Quota exceeded", "QuotaExceededError"); } }) };
+    const log = new RunLog(memory()), e = done();
+    log.add(e);
+    const ok = await saveAsset(log, e, { load: async () => { loads++; return new Blob([new Uint8Array(4)], { type: "video/mp4" }); }, wait: async () => {} });
+    expect(ok).toBe(false);
+    expect([loads, puts]).toEqual([1, 1]);
+    const after = log.get("t1")!;
+    expect(after.saveError).toBe(storeErrorText(new DOMException("Quota exceeded", "QuotaExceededError")));
+    expect(after.saveError).not.toMatch(/tries/);
     expect(shouldCopy(after, NOW, START, false)).toBe(true);
   });
 });

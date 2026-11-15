@@ -35,6 +35,11 @@ export function copyErrorText(err: unknown, tries: number): string {
     : /^HTTP \d+/.test(msg) ? `the provider answered ${msg}` : msg || "unknown error";
   return `not copied after ${tries} ${tries === 1 ? "try" : "tries"}: ${why}`;
 }
+/** Why a downloaded copy was not kept: the browser's storage refused it (full, or off in this window). Tried once: it is not a blip, and a later visit tries again. */
+export function storeErrorText(err: unknown): string {
+  const msg = err instanceof Error ? err.message : String(err ?? "");
+  return `downloaded, but this browser did not keep the copy (its storage may be full or off)${msg ? `: ${msg}` : ""}`;
+}
 
 /**
  * Whether a done run's file is to be copied now (at most once per page load, `tried`): never
@@ -51,16 +56,16 @@ export function shouldCopy(e: RunEntry, now: number, pageStart: number, tried: b
 export async function saveAsset(log: RunLog, e: RunEntry, o: { load?: (url: string) => Promise<Blob>; delays?: readonly number[]; wait?: (ms: number) => Promise<void> } = {}): Promise<boolean> {
   if (!supported() || !e.url) return false;
   const url = e.url, load = o.load ?? results.get, delays = o.delays ?? COPY_DELAYS_MS;
+  // The download is tried again (the tries counted as made); keeping it in the browser's storage is tried once.
+  let tries = 0, blob: Blob;
+  try { blob = await withRetry(() => { tries++; return load(url); }, delays, o.wait); }
+  catch (err) { log.update(e.taskUUID, { saved: false, saveError: copyErrorText(err, tries) }); return false; }
   try {
-    const blob = await withRetry(() => load(url), delays, o.wait);
     const type = blob.type || (e.kind === "video" ? "video/mp4" : "image/png");
     await (await caches.open(CACHE)).put(keyOf(e.taskUUID), new Response(blob, { headers: { "Content-Type": type } }));
-    log.update(e.taskUUID, { saved: true, saveError: undefined });
-    return true;
-  } catch (err) {
-    log.update(e.taskUUID, { saved: false, saveError: copyErrorText(err, delays.length + 1) });
-    return false;
-  }
+  } catch (err) { log.update(e.taskUUID, { saved: false, saveError: storeErrorText(err) }); return false; }
+  log.update(e.taskUUID, { saved: true, saveError: undefined });
+  return true;
 }
 
 /** The run's file from the browser's copy, or null when there is none. */
