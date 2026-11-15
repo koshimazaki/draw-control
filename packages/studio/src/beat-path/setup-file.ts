@@ -135,7 +135,7 @@ export function readState(s: Rec, notes: string[]): BeatPathState {
     if (lane) {
       (out as Rec)[key] = lane.list;
       if (lane.dropped) notes.push(`${key === "character" ? "character" : "camera"} lane: ${lane.dropped} unreadable blocks dropped`);
-      if (lane.capped) notes.push(`camera lane: kept ${LIMIT.cameraBlocks} blocks (the rig's most), the last one runs to the end`);
+      if (lane.capped) notes.push(`camera lane: ${lane.capped} blocks past the rig's ${LIMIT.cameraBlocks} dropped${lane.phrases ? `, with ${lane.phrases} typed camera direction${lane.phrases > 1 ? "s" : ""}` : ""}; the last block kept runs to the end`);
     }
     else drop(`${key === "character" ? "character" : "camera"} lane`);
   }
@@ -234,7 +234,7 @@ function points(v: unknown, camera: boolean): { list: PathPt[]; cut?: string } |
 }
 
 /** A lane: readable blocks in order, edges joined (each block starts where the last ends, the first at 0). */
-function blocks(v: unknown, words: readonly string[], camera: boolean): { list: Block<string>[]; dropped: number; capped?: number } | null {
+function blocks(v: unknown, words: readonly string[], camera: boolean): { list: Block<string>[]; dropped: number; capped?: number; phrases?: number } | null {
   if (!Array.isArray(v)) return null;
   const list = v.slice(0, LIMIT.blocks).flatMap(b => {
     if (!isRec(b)) return [];
@@ -250,8 +250,13 @@ function blocks(v: unknown, words: readonly string[], camera: boolean): { list: 
   for (let i = 1; i < list.length; i++) { list[i].from = list[i - 1].to; if (list[i].to <= list[i].from) list[i].to = list[i].from + 1; }
   const read = list.length;
   // The camera rig holds at most 32 ranges (camera.ts): the 32nd block runs on to the lane's end.
-  if (camera && list.length > LIMIT.cameraBlocks) { const end = list.at(-1)!.to; list.length = LIMIT.cameraBlocks; list[list.length - 1].to = end; }
-  return { list, dropped: v.length - read, ...(read > list.length ? { capped: read - list.length } : {}) };
+  let phrases = 0;
+  if (camera && list.length > LIMIT.cameraBlocks) {
+    const end = list.at(-1)!.to;
+    phrases = list.slice(LIMIT.cameraBlocks).filter(b => b.phrase).length;
+    list.length = LIMIT.cameraBlocks; list[list.length - 1].to = end;
+  }
+  return { list, dropped: v.length - read, ...(read > list.length ? { capped: read - list.length, phrases } : {}) };
 }
 
 function follow(f: Rec): FollowOffset | undefined {

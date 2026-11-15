@@ -8,15 +8,21 @@ import { download } from "../shared/download";
 import type { Page } from "./page";
 import { SETUP_DOWNLOAD, SETUP_FILE, readSetup, setupJson } from "./setup-file";
 import { fromZip, musicKind, pickFromFolder, tooBig, type SetupSource } from "./setup-source";
-import { beatPathRecipe } from "./recipe-map";
 
 /** The setup as a file for the guide zip. */
 export const setupFiles = (p: Page) => ({ [SETUP_FILE]: strToU8(setupJson(p.state, p.info)) });
 
-/** The hits of the track loaded, as the page builds its recipe with them. */
-const hitsOf = (p: Page) => (p.drive ? { drive: p.drive, bands: p.drive.bands } : {});
-/** Does the page's state build now, with the music loaded (the camera's next move on each hit needs its hits)? */
-const buildsNow = (p: Page) => { try { beatPathRecipe(p.state, p.info, hitsOf(p)); return true; } catch { return false; } };
+/**
+ * Export and Generate refuse a shot whose recipe did not build (`p.unbuilt`: page.ts keeps the last
+ * recipe on screen then, so a guide would be the old shot with this one's clip, prompt and audio).
+ */
+export function notBuilt(unbuilt: string | null, advance: boolean): string | null {
+  if (!unbuilt) return null;
+  // The engine's words without its plumbing (the command and script line, the CLI's hint).
+  const why = unbuilt.replace(/^.*?script line \d+: /, "").replace(/\s*\(analyse a track first: --analysis\)/, "").replace(/\.$/, "");
+  return `The shot is not built yet: ${why}. ${advance ? "Load its track, or turn off Next move on each hit (Settings, Camera…)." : "Undo, or change what that names."}`;
+}
+export const shotRefusal = (p: Pick<Page, "unbuilt" | "state">) => notBuilt(p.unbuilt, p.state.camLock.advance);
 
 export function bindSetup(p: Page) {
   const $ = p.$, input = (id: string) => $<HTMLInputElement>(id);
@@ -30,15 +36,16 @@ export function bindSetup(p: Page) {
 
   async function load(source: SetupSource, from: string) {
     if ("error" in source) { p.say(`Not loaded: ${source.error}`); return; }
-    // Checked against the track loaded now; a wait for other hits never refuses the file (setup-file.ts).
-    const read = readSetup(source.text, hitsOf(p));
+    // Read without any track's hits: a wait for its own track's hits never refuses the file (setup-file.ts).
+    const read = readSetup(source.text);
     if (!read.ok) { p.say(`Not loaded: ${read.error}`); return; }
     if (p.busy) { p.say(BUSY); return; }
     const done = await p.loadSetup(read.state, read.music, source.audio);
     if (!done) return;
-    const notes = [...(done.note ? [done.note] : []), ...read.notes,
-      ...(read.waitsForHits && !buildsNow(p) ? ["the camera's next move on each hit lands once its track is loaded"] : []), ...(done.music ? ["Undo puts back the page, not the music"] : [])];
-    p.say(`Loaded the setup from ${from}${notes.length ? ` · ${notes.join(" · ")}` : ""}`);
+    const notes = [...(done.note ? [done.note] : []), ...read.notes, ...(done.music ? ["Undo puts back the page, not the music"] : [])];
+    // A shot that does not build (the music loaded lacks the hits it anchors on) is said first, never hidden behind "Loaded".
+    const refusal = shotRefusal(p);
+    p.say(`${refusal ? `${refusal} · the preview shows the last shot that built · ` : ""}Loaded the setup from ${from}${notes.length ? ` · ${notes.join(" · ")}` : ""}`);
   }
   const fail = (e: unknown) => p.say(`Not loaded: ${(e as Error).message}`);
 

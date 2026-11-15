@@ -28,11 +28,11 @@ export async function smokeBeatPathSetup(browser, base, { fail, OUT }) {
   const loaded = async (what, input, path) => {
     await page.evaluate(() => { document.getElementById("status").textContent = ""; });
     await page.setInputFiles(input, path);
-    await page.waitForFunction(() => /^(Loaded the setup|Not loaded)/.test(document.getElementById("status").textContent), null, { timeout: 60_000 })
+    await page.waitForFunction(() => /^(Loaded the setup|Not loaded|The shot is not built yet: .* · Loaded the setup)/.test(document.getElementById("status").textContent), null, { timeout: 60_000 })
       .catch(() => fail(`${what}: the page said nothing after loading`));
     const l = await look();
     console.log(`beat path setup: ${what}: "${l.status}"`);
-    if (!l.status.startsWith("Loaded the setup")) fail(`${what} did not load`);
+    if (!/^(The shot is not built yet: .* · )?Loaded the setup/.test(l.status)) fail(`${what} did not load`);
     return l;
   };
   const save = async name => {
@@ -52,16 +52,18 @@ export async function smokeBeatPathSetup(browser, base, { fail, OUT }) {
   };
   const undo = async redo => { await page.evaluate(() => document.activeElement?.blur()); await page.keyboard.press(redo ? "Control+Shift+z" : "Control+z"); };
 
-  await page.click("#settings summary");
+  /** Settings open (a click elsewhere may have closed it). */
+  const settings = async () => { if (!(await page.isVisible("#saveSetup"))) await page.click("#settings summary"); };
+  await settings();
   // 0. Example 1 with "Next move on each hit" on (its camera anchors on snares): saved, it loads back as it was.
-  const advance = async () => { await page.click("#setCamLock"); await page.click('#menu button:has-text("Next move on each hit")'); };
+  const advance = async () => { await settings(); await page.click("#setCamLock"); await page.click('#menu button:has-text("Next move on each hit")'); };
   await advance();
   if (!(await state()).camLock.advance) fail("Next move on each hit did not turn on");
   const withAdvance = await state();
   await save("advance-setup.json");
   await page.selectOption("#scenery", "none");
   const la = await loaded("a setup with next move on each hit", "#setupFile", `${dir}advance-setup.json`);
-  if (canon(await state()) !== canon(withAdvance) || /lands once/.test(la.status)) fail(`a setup with next move on each hit did not load as saved ("${la.status}")`);
+  if (canon(await state()) !== canon(withAdvance) || /not built/.test(la.status)) fail(`a setup with next move on each hit did not load as saved ("${la.status}")`);
   await advance();
   if ((await state()).camLock.advance) fail("Next move on each hit did not turn off");
 
@@ -135,6 +137,50 @@ export async function smokeBeatPathSetup(browser, base, { fail, OUT }) {
   const kept = await page.evaluate(() => ({ slice: window.__beatPath.state().slice, clip: window.__beatPath.state().clip, length: window.__beatPath.trackLength() }));
   if (kept.slice !== undefined && kept.slice + kept.clip > (kept.length ?? 0) + 0.05) fail(`a bad guide audio left a slice past the music's end (slice ${kept.slice}, ${kept.length} s of music)`);
   if (!/slice cleared/.test(l.status)) fail("a bad guide audio cleared the slice without saying so");
+
+  // 4. A shot that cannot build (next move on each hit, its track not loaded): Generate and Download guide
+  //    refuse up front, with nothing sent; once its track is loaded the shot builds and Generate asks again.
+  await page.setInputFiles("#trackFile", `${dir}own.wav`);
+  await page.waitForFunction(() => window.__beatPath.trackName() === "own.wav", null, { timeout: 120_000 });
+  await advance();
+  if (!(await state()).camLock.advance) fail("Next move on each hit did not turn on over own.wav");
+  await settings();
+  await save("own-advance.json");
+  await page.click("#removeTrack");
+  l = await loaded("own-advance.json with no track", "#setupFile", `${dir}own-advance.json`);
+  const NOT_BUILT = /^The shot is not built yet: .+\. Load its track, or turn off Next move on each hit/;
+  if (!NOT_BUILT.test(l.status)) fail(`loading a setup that cannot build did not say so first ("${l.status}")`);
+  await page.waitForFunction(() => document.querySelector("#keySlot arena-key"), null, { timeout: 30_000 });
+  const videoTasks = () => page.evaluate(() => (globalThis.__fakeTasks ?? []).filter(t => t.taskType === "videoInference").length);
+  const tasks0 = await videoTasks();
+  const say = () => page.textContent("#status");
+  await page.click("#runGenerate");
+  await page.waitForTimeout(800);
+  const genStatus = await say(), asked = await page.isVisible("#costDialog"), rendering = await page.evaluate(() => window.__beatPath.busy());
+  console.log(`beat path setup: Generate on a shot that does not build: "${genStatus}" (cost question ${asked}, rendering ${rendering})`);
+  if (!NOT_BUILT.test(genStatus) || asked || rendering || (await videoTasks()) !== tasks0) fail("Generate did not refuse a shot that does not build before anything else");
+  let downloaded = false;
+  const onDownload = () => { downloaded = true; };
+  page.on("download", onDownload);
+  await settings();
+  await page.click("#exportGuide");
+  await page.waitForTimeout(1500);
+  page.off("download", onDownload);
+  const dlStatus = await say();
+  console.log(`beat path setup: Download guide on it: "${dlStatus}" (downloaded ${downloaded})`);
+  if (!NOT_BUILT.test(dlStatus) || downloaded || (await page.evaluate(() => window.__beatPath.busy()))) fail("Download guide did not refuse a shot that does not build");
+  const inMemory = await page.evaluate(() => window.beatPath.exportGuideInMemory().then(() => "rendered", e => e.message));
+  if (!/^The shot is not built yet/.test(inMemory)) fail(`the in-memory guide rendered a shot that does not build (${inMemory})`);
+  // Its track: the hits are there, the shot builds, Generate gets as far as the cost question (cancelled: nothing sent).
+  await page.setInputFiles("#trackFile", `${dir}own.wav`);
+  await page.waitForFunction(() => window.__beatPath.trackName() === "own.wav", null, { timeout: 120_000 });
+  if ((await say()).startsWith("The shot is not built")) fail("loading its track did not build the shot");
+  await page.click("#runGenerate");
+  await page.waitForSelector("#costDialog:not([hidden])", { timeout: 120_000 }).catch(() => fail("Generate did not ask once the shot built"));
+  await page.click("#costCancel");
+  await page.waitForFunction(() => document.querySelector("#runGenerate .btn-label")?.textContent === "Generate", null, { timeout: 30_000 });
+  if ((await videoTasks()) !== tasks0) fail("a cancelled Generate sent a video task");
+  console.log(`beat path setup: with its track loaded the shot builds; Generate asked, cancelled, ${(await videoTasks()) - tasks0} video tasks sent`);
 
   if (errors.length) fail(`setup page errors: ${errors.join(" | ")}`);
   await page.close();

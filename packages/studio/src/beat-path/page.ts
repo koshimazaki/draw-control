@@ -52,7 +52,7 @@ export function startBeatPath(root: HTMLElement) {
   const past: BeatPathState[] = [], future: BeatPathState[] = [];
   let dragBase: BeatPathState | null = null;
   /** A setup whose own track is not loaded: loading that file again brings back its slice and markers. Undo, a switch or another load forgets it. */
-  let awaiting: Awaited | null = null;
+  let awaiting: Awaited | null = null, unbuilt: string | null = null;
   const player = new Player();
   const live = () => (track ? drive : undefined);
   const bpm = () => info?.bpm ?? 120;
@@ -219,8 +219,9 @@ export function startBeatPath(root: HTMLElement) {
   /** Rebuild the recipe, the camera plan and every view from the state. */
   function rebuild() {
     if (busy) { rebuildAfter = true; return; }
-    try { recipe = beatPathRecipe(state, info, ctx()); }
-    catch (e) { say(`Not applied: ${(e as Error).message}`); return; }
+    // A state whose recipe does not build keeps the last recipe on screen; `unbuilt` says why, and Export and Generate refuse until it builds (page-setup.ts).
+    try { recipe = beatPathRecipe(state, info, ctx()); unbuilt = null; }
+    catch (e) { unbuilt = (e as Error).message.replace(/^Recipe: /, ""); say(`Not applied: ${unbuilt} · the preview shows the last shot that built`); return; }
     const frames = Math.ceil((window1() + 0.2) * recipe.fps) + 1;
     plan = planCamera(recipe, live(), frames);
     viewport.setRig(plan, recipe, live(), frames);
@@ -467,7 +468,7 @@ export function startBeatPath(root: HTMLElement) {
     $, map, menu, viewport, strip, player,
     get state() { return state; }, get recipe() { return recipe; }, get tool() { return tool; }, get view() { return view; },
     get track() { return track; }, get drive() { return live(); }, get info() { return info; }, get busy() { return busy; }, set busy(v: boolean) { if (v && !busy) endLaneDrags(); busy = v; dirty = true; lockShot(v); if (!v && rebuildAfter) { rebuildAfter = false; rebuild(); } },
-    get head() { return head; }, get playing() { return player.playing && !busy; }, get shown() { return shown; }, get slot() { return slot; }, get followSegs() { return followSegs; }, get slice() { return hooks.slice; }, blocks, snapLane, seek, removeTrack, totalBeats, window0, window1, update, undo, rebuild, setPlaying, switchSlot, useFile, useCut, loadSetup, say,
+    get head() { return head; }, /** Why the state's recipe does not build (null: it does). */ get unbuilt() { return unbuilt; }, get playing() { return player.playing && !busy; }, get shown() { return shown; }, get slot() { return slot; }, get followSegs() { return followSegs; }, get slice() { return hooks.slice; }, blocks, snapLane, seek, removeTrack, totalBeats, window0, window1, update, undo, rebuild, setPlaying, switchSlot, useFile, useCut, loadSetup, say,
     setTool(t: Tool) { tool = t; if (pen === "draw") map.startNew(); map.refresh(); actions.sync(); },
     setView(v: View) { view = v; map.refresh(); actions.sync(); },
     get pen() { return pen; },

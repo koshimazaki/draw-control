@@ -9,6 +9,7 @@ import { BLANK_STATE, toScript, type BeatPathState } from "../src/beat-path/scri
 import { SETUP_KIND, SETUP_VERSION, buildSetup, readSetup, setupJson } from "../src/beat-path/setup-file";
 import { awaitFor, fromZip, keepSliceIn, matchAwaited, musicKind, pickFromFolder, planMusic, restoreAwaited, tooBig } from "../src/beat-path/setup-source";
 import { EXAMPLE_TRACKS } from "../src/beat-path/tracks";
+import { notBuilt, shotRefusal } from "../src/beat-path/page-setup";
 
 const flyerMusic = { name: EXAMPLE_TRACKS.flyer.name, licence: EXAMPLE_TRACKS.flyer.licence, bpm: 120, offsetSeconds: 0.1, lengthSeconds: 18.6 };
 const own = { name: "song.mp3", licence: "unspecified", bpm: 128, offsetSeconds: 0.32, lengthSeconds: 201.4 };
@@ -42,11 +43,20 @@ describe("round trip", () => {
       expect(r.waitsForHits).toBe(true);
     });
   });
+  it("a shot that did not build: Export and Generate refuse with the reason and the way out", () => {
+    const why = 'command 0 ("applyScript"): script line 14: no snares in beats 5-17 (analyse a track first: --analysis)';
+    expect(notBuilt(null, true)).toBeNull();
+    expect(notBuilt(why, true)).toBe("The shot is not built yet: no snares in beats 5-17. Load its track, or turn off Next move on each hit (Settings, Camera…).");
+    expect(notBuilt("the camera holds up to 32 ranges.", false)).toBe("The shot is not built yet: the camera holds up to 32 ranges. Undo, or change what that names.");
+    // The page's guard reads its flag and the state's lock (page.ts `unbuilt`).
+    expect(shotRefusal({ unbuilt: why, state: { ...exampleState(0), camLock: { ...exampleState(0).camLock, advance: true } } })).toMatch(/^The shot is not built yet: no snares/);
+    expect(shotRefusal({ unbuilt: null, state: exampleState(0) })).toBeNull();
+  });
   it("a camera lane past the rig's 32 ranges keeps the first 32", () => {
-    const lane = Array.from({ length: 40 }, (_, i) => ({ from: i * 0.5, to: (i + 1) * 0.5, word: i % 2 ? "behind" : "top" }));
+    const lane = Array.from({ length: 40 }, (_, i) => ({ from: i * 0.5, to: (i + 1) * 0.5, word: i % 2 ? "behind" : "top", ...(i >= 32 ? { phrase: "go above" } : {}) }));
     const r = ok(file({ ...exampleState(0), clip: 30, cameraLane: lane }));
     expect(r.state.cameraLane.length).toBeLessThanOrEqual(32);
-    expect(r.notes.join(" ")).toMatch(/32/);
+    expect(r.notes.join(" ")).toMatch(/8 blocks past the rig.s 32 dropped, with 8 typed camera directions/);
   });
   it("a hand-edited page: user markers, slice, follow offsets, phrases and boxes survive", () => {
     const s: BeatPathState = {

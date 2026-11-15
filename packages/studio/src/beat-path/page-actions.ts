@@ -17,7 +17,7 @@ import { beatPathRecipe, exportRange } from "./recipe-map";
 import { HIT_CHOICES, LABELS, LOCK_CHOICES, clampClip, clipLabel, fitLanes, setWord, toScript, type BeatPathState, type Block, type CameraWord } from "./script";
 import { bindFader, setFader } from "./ui/fader";
 import { dragHasImage } from "./page-refs";
-import { bindSetup, setupFiles } from "./page-setup";
+import { bindSetup, setupFiles, shotRefusal } from "./page-setup";
 import { isTyping } from "./drag";
 import { bindFollowFields, followProbe, parallelStreet } from "./page-follow";
 import { canSmooth, smoothPoints, SMOOTH_STEP } from "./map-select";
@@ -327,6 +327,8 @@ export function bindActions(p: Page) {
   // Export
   $("exportGuide").onclick = async () => {
     if (p.busy) return;
+    const unbuilt = shotRefusal(p);
+    if (unbuilt) { p.say(unbuilt); return; }
     p.busy = true;
     p.setPlaying(false);
     const button = $<HTMLButtonElement>("exportGuide");

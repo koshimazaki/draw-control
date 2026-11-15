@@ -13,6 +13,7 @@ import { ARENA_THEME, fakeFetch, loadArena, type ArenaKeyElement, type ArenaModu
 import { clipRefusal, composePrompt, runErrorText, MAX_PRICE, MODELS, type ModelId, type References, type RunError } from "./generate";
 import type { Page } from "./page";
 import { exportRange } from "./recipe-map";
+import { shotRefusal } from "./page-setup";
 import { clipLabel, legendFor } from "./script";
 import { setFader } from "./ui/fader";
 import { RunLog, loggingFetch } from "./run-log";
@@ -56,6 +57,9 @@ export function bindGenerate(p: Page) {
   // Everything the bundle carries is read before the first await: the render awaits between frames.
   // A signal stops the render between frames (Stop while the guide renders): it throws an error with code "aborted".
   async function exportGuideInMemory(onProgress?: (done: number, total: number) => void, signal?: AbortSignal) {
+    // A shot that did not build would render the last recipe that did, under this one's clip and prompt.
+    const unbuilt = shotRefusal(p);
+    if (unbuilt) throw new Error(unbuilt);
     const recipe = p.recipe, range = exportRange(recipe, p.state.clip), references = refStore.blobs(p.slot) as References, prompt = currentPrompt();
     const result = await exportBundle({ recipe, range, viewport: p.viewport, ...EXPORT, audio: p.track?.buffer ?? null, drive: p.drive, onProgress, signal });
     const type = (name: string) => (name.endsWith(".mp4") ? "video/mp4" : name.endsWith(".png") ? "image/png" : name.endsWith(".wav") ? "audio/wav" : "application/json");
@@ -160,6 +164,9 @@ export function bindGenerate(p: Page) {
   runButton.onclick = async () => {
     if (running) { running.abort(); p.say("Stopping…"); return; }
     if (p.busy) return;
+    // Before anything else (the cost question, the render, any request): the shot must have built.
+    const unbuilt = shotRefusal(p);
+    if (unbuilt) { p.say(unbuilt); return; }
     if (!arena) { p.say("Generate needs the Model Arena embed in vendor/ (npm run vendor:arena)."); return; }
     if (!key?.connected && !fake) { p.say("Add your Runware API key first (top right)."); return; }
     // An empty shot is refused by every model: say so before rendering the guide, and point at the field.
