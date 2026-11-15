@@ -1,10 +1,16 @@
 /**
  * The shot script's `rig:` settings line: the camera rig's start framing, `rig: distance 8m
- * height 5m fov 30 yaw 45` (every field optional, any order, `m` optional). Frame 0 of a clip
- * is this framing, and a camera block without its own distance or height falls back to it;
- * fov carries on from the last block that set one. A script without the line leaves the rig
+ * height 5m fov 30 yaw 45` (every field optional, any order, `m` optional).
+ * Frame 0 is the rig start. Each block starts where the block before it ended: a follow offset
+ * (distance, height; it wins over a shot preset), a shot preset, a fov and the end of a
+ * programmed dolly, push, pull or rise carry on into every later block until another block
+ * changes them; a block that sets none of them keeps what it started with. The camera word top
+ * (or above) is the exception: it lifts the camera overhead from those values without changing
+ * them, so the block after it comes back to the distance and height from before it (a fov set
+ * on it carries on). Pinned by test/camera-carry.test.ts. A script without the line leaves the rig
  * as it was. `printScript` prints the line only where the rig differs from its base (the Draw
- * Control base for the glider, the default camera otherwise), so existing scripts print unchanged.
+ * Control base for the glider, the default camera otherwise): scripts at the base rig print
+ * unchanged, a rig set earlier (startYaw -20 in examples/recipes/C.json) now prints as a rig line.
  */
 import { BEAT_PATH_RIG } from "./beat-path";
 import { DEFAULT_CAMERA, RIG_LIMITS } from "./camera";
@@ -25,11 +31,12 @@ export function parseRig(words: string, line: number): ScriptRig {
   const out: ScriptRig = {};
   for (let i = 0; i < list.length; i += 2) {
     const word = list[i].toLowerCase();
-    if (!(word in WORDS)) bad(`${JSON.stringify(list[i])} is not a rig field`);
+    if (!Object.hasOwn(WORDS, word)) bad(`${JSON.stringify(list[i])} is not a rig field`);
     const key = WORDS[word as keyof typeof WORDS];
     if (out[key] !== undefined) bad(`${word} is given twice`);
     const unit = key === "distance" || key === "height" ? /m$/i : /(°|deg)$/i;
-    const v = Number(list[i + 1].replace(unit, ""));
+    const value = list[i + 1].replace(unit, "");
+    const v = value ? Number(value) : NaN;   // a bare unit ("yaw deg") is not 0
     const [lo, hi] = RIG_LIMITS[key];
     if (!Number.isFinite(v)) bad(`${word} must be a number (got ${JSON.stringify(list[i + 1])})`);
     if (v < lo || v > hi) bad(`${word} ${v} is outside ${lo} to ${hi}`);
