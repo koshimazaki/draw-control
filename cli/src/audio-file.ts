@@ -1,9 +1,13 @@
 /**
  * Decode a music file to float samples for the analysis: WAV (PCM 16/24/32-bit or 32-bit
  * float) is read directly; anything else (MP3, M4A, FLAC, OGG) goes through ffmpeg when
- * it is installed. Local only: nothing leaves the machine.
+ * it is installed. Local only: nothing leaves the machine. The path must name an existing
+ * regular file (not a URL or an ffmpeg protocol string such as `concat:` or `https://`), and
+ * ffmpeg is held to the `file` protocol (`-protocol_whitelist file`), so a playlist inside
+ * the file cannot fetch over the network either.
  */
-import { readFileSync } from "node:fs";
+import { readFileSync, statSync } from "node:fs";
+import { resolve } from "node:path";
 import { execFileSync } from "node:child_process";
 
 export type Decoded = { channels: Float32Array[]; sampleRate: number };
@@ -36,11 +40,23 @@ export function readWav(bytes: Uint8Array): Decoded {
   return { channels: out, sampleRate: rate };
 }
 
+/** The absolute path of an existing regular local file, or an error naming `path`. */
+export function localAudioPath(path: string): string {
+  const abs = resolve(path);
+  let isFile = false;
+  try { isFile = statSync(abs).isFile(); } catch { /* reported below */ }
+  if (isFile) return abs;
+  if (/^[a-z][a-z0-9+.-]*:/i.test(path)) throw new Error(`${path} is not a local file: give a path on this machine, not a URL or an ffmpeg protocol`);
+  throw new Error(`${path} is not an existing file`);
+}
+
 export function decodeAudioFile(path: string): Decoded {
-  if (/\.wav$/i.test(path)) return readWav(new Uint8Array(readFileSync(path)));
+  const abs = localAudioPath(path);
+  if (/\.wav$/i.test(abs)) return readWav(new Uint8Array(readFileSync(abs)));
   let raw: Buffer;
   try {
-    raw = execFileSync("ffmpeg", ["-v", "error", "-i", path, "-f", "f32le", "-ac", "1", "-ar", "44100", "-"], { maxBuffer: 1 << 30 });
+    // `file:` + the absolute path: ffmpeg never reads a protocol prefix out of the name, and the whitelist keeps every nested open local.
+    raw = execFileSync("ffmpeg", ["-v", "error", "-protocol_whitelist", "file", "-i", `file:${abs}`, "-f", "f32le", "-ac", "1", "-ar", "44100", "-"], { maxBuffer: 1 << 30, stdio: ["ignore", "pipe", "pipe"] });
   } catch (e) {
     throw new Error(`could not decode ${path}: use a WAV file, or install ffmpeg for MP3/M4A/FLAC/OGG (${(e as Error).message.split("\n")[0]})`, { cause: e });
   }

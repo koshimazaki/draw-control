@@ -10,13 +10,13 @@
  *   npm run smoke
  */
 import { mkdirSync, writeFileSync } from "node:fs";
-import { execFileSync } from "node:child_process";
 import { createServer } from "vite";
 import { chromium } from "playwright-core";
 import { unzipSync, strFromU8 } from "fflate";
 import { smokeBands, smokeBlocks, smokeCameraPath, smokeEnvelope } from "./smoke-features.mjs";
 import { smokeCameraTrack, smokeDemo } from "./smoke-camera.mjs";
 import { smokeBeatPath } from "./smoke-beat-path.mjs";
+import { probeStreams, runFfmpeg } from "./probe-guide.mjs";
 
 const OUT = new URL("../out/smoke/", import.meta.url).pathname;
 mkdirSync(OUT, { recursive: true });
@@ -77,18 +77,19 @@ function checkBundle(zipBytes, label, expect) {
   const dir = `${OUT}${label}/`;
   mkdirSync(dir, { recursive: true });
   for (const [k, v] of Object.entries(files)) writeFileSync(dir + k, v);
-  try {
-    const probe = JSON.parse(execFileSync("ffprobe", ["-v", "error", "-count_frames", "-show_entries", "stream=codec_name,codec_type,width,height,r_frame_rate,nb_read_frames,duration", "-of", "json", dir + "guide.mp4"]).toString());
-    for (const s of probe.streams) console.log(`${label} ffprobe: ${JSON.stringify(s)}`);
-    const v = probe.streams.find(s => s.codec_type === "video");
+  // Only a missing ffprobe is a warning; an empty or unreadable guide.mp4 fails the run (probe-guide.mjs).
+  const streams = probeStreams(dir + "guide.mp4", label, fail);
+  if (streams) {
+    for (const s of streams) console.log(`${label} ffprobe: ${JSON.stringify(s)}`);
+    const v = streams.find(s => s.codec_type === "video");
     if (v?.codec_name !== "h264") fail(`${label} video codec ${v?.codec_name}`);
     if (Number(v?.nb_read_frames) !== meta.frames) fail(`${label} decoded ${v?.nb_read_frames} frames, meta says ${meta.frames}`);
     if (expect.width && (v?.width !== expect.width || v?.height !== expect.height)) fail(`${label} ffprobe size ${v?.width}x${v?.height}`);
-    const a = probe.streams.find(s => s.codec_type === "audio");
+    const a = streams.find(s => s.codec_type === "audio");
     if (expect.audio && !a) console.warn(`${label}: no audio stream in MP4 (WAV beside it)`);
     if (a && Math.abs(Number(a.duration) - meta.durationSeconds) > 0.1) fail(`${label} MP4 audio ${a.duration}s vs clip ${meta.durationSeconds}s`);
-    if (expect.sheet) execFileSync("ffmpeg", ["-v", "error", "-y", "-i", dir + "guide.mp4", "-vf", `select='${expect.sheet.map(n => `eq(n\\,${n})`).join("+")}',scale=426:-1,tile=4x2`, "-frames:v", "1", dir + "sheet.png"]);
-  } catch (e) { console.warn(`ffprobe unavailable or failed: ${e.message}`); }
+    if (expect.sheet) runFfmpeg(["-v", "error", "-y", "-i", dir + "guide.mp4", "-vf", `select='${expect.sheet.map(n => `eq(n\\,${n})`).join("+")}',scale=426:-1,tile=4x2`, "-frames:v", "1", dir + "sheet.png"], label, fail);
+  }
   return meta;
 }
 

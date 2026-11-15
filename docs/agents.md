@@ -64,7 +64,9 @@ Register it with any MCP client as a stdio server with that command (absolute pa
 | `set` | `path`, `value` |
 | `render` | `out`, `audio?`, `view?`, `size?`, `start?`, `length?`, `unit?`, `grid?` |
 
-A refused command comes back as a tool error and leaves the recipe as it was.
+A refused command comes back as a tool error and leaves the recipe as it was (and adds no undo step; undo keeps the last 100 changes).
+
+**Which files the server touches.** `save_recipe`, `analyse_audio`'s `out` and `render`'s `out` write, and `load_recipe` and `load_analysis` read, only under the server's working directory, the motion-studio repo, the OS temp directory, or a folder listed in `MOTION_STUDIO_ROOTS` (separated like `PATH`: `:` on macOS and Linux, `;` on Windows) in the server's environment. Each path is resolved through its real path, so `..` and symlinks cannot leave those folders. Anything else is a tool error naming the path and the folders allowed; a file that is not valid JSON is reported without quoting it. Audio (`analyse_audio`'s `path`, `render`'s `audio`) may be any existing file on the machine, never a URL or an ffmpeg protocol string (`https://…`, `concat:…`), and ffmpeg runs with `-protocol_whitelist file`. The CLI run by a person is not confined. `render` also checks `start`, `length`, `size` and `view` before it starts a browser, and fails at once with the page's message if the export is refused.
 
 ## Worked example
 

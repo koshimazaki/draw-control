@@ -9,10 +9,10 @@
  *   npm run examples            (all)       npm run examples -- D   (one)
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { execFileSync } from "node:child_process";
 import { createServer } from "vite";
 import { chromium } from "playwright-core";
 import { strFromU8, unzipSync } from "fflate";
+import { probeStreams, runFfmpeg } from "./probe-guide.mjs";
 
 const ROOT = new URL("../examples/", import.meta.url).pathname;
 const only = process.argv.slice(2);
@@ -55,13 +55,15 @@ function exampleTrack() {
 
 const server = await createServer({ root: new URL("../packages/studio/", import.meta.url).pathname, server: { port: 5183, host: "127.0.0.1" }, logLevel: "warn" });
 await server.listen();
+// The port Vite actually took (it moves on when 5183 is busy), so the run never drives someone else's server.
+const BASE = server.resolvedUrls.local[0].replace(/\/$/, "");
 const browser = await chromium.launch(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : { channel: "chrome", headless: true });
 try {
   const page = await browser.newPage({ viewport: { width: 1400, height: 900 }, acceptDownloads: true });
   const errors = [];
   page.on("pageerror", e => errors.push(e.message));
   page.on("console", m => { if (m.type() === "error") errors.push(m.text()); });
-  await page.goto("http://127.0.0.1:5183/");
+  await page.goto(`${BASE}/`);
   await page.waitForSelector("#viewport canvas");
   await page.waitForFunction(() => document.querySelector("#clipPalette button"), null, { timeout: 30_000 });
   const track = exampleTrack();
@@ -111,13 +113,15 @@ try {
       console.log(`${ex.id}: camera ${camera.track.length} frames, LTX ${camera.ltx.settings.cameraMovement} (approximate), scores ${JSON.stringify(camera.ltx.scores)}`);
     }
     if (meta.schemaVersion !== "0.2.0") fail(`${ex.id} schema ${meta.schemaVersion}`);
-    try {
-      const probe = JSON.parse(execFileSync("ffprobe", ["-v", "error", "-count_frames", "-select_streams", "v", "-show_entries", "stream=codec_name,width,height,nb_read_frames", "-of", "json", dir + "guide.mp4"]).toString()).streams[0];
+    // Only a missing ffprobe/ffmpeg is a warning; an empty or unreadable guide.mp4 fails the run.
+    const streams = probeStreams(dir + "guide.mp4", ex.id, fail, ["-select_streams", "v", "-show_entries", "stream=codec_name,width,height,nb_read_frames"]);
+    if (streams) {
+      const probe = streams[0];
       console.log(`${ex.id} ffprobe: ${JSON.stringify(probe)}`);
-      if (Number(probe.nb_read_frames) !== meta.frames) fail(`${ex.id} decoded ${probe.nb_read_frames} frames, meta ${meta.frames}`);
+      if (Number(probe?.nb_read_frames) !== meta.frames) fail(`${ex.id} decoded ${probe?.nb_read_frames} frames, meta ${meta.frames}`);
       const picks = Array.from({ length: 8 }, (_, i) => Math.round(i * (meta.frames - 1) / 7));
-      execFileSync("ffmpeg", ["-v", "error", "-y", "-i", dir + "guide.mp4", "-vf", `select='${picks.map(p => `eq(n\\,${p})`).join("+")}',scale=426:-1,tile=4x2`, "-frames:v", "1", dir + "sheet.png"]);
-    } catch (e) { console.warn(`ffprobe/ffmpeg unavailable or failed: ${e.message}`); }
+      runFfmpeg(["-v", "error", "-y", "-i", dir + "guide.mp4", "-vf", `select='${picks.map(p => `eq(n\\,${p})`).join("+")}',scale=426:-1,tile=4x2`, "-frames:v", "1", dir + "sheet.png"], ex.id, fail);
+    }
   }
   if (errors.length) fail(`page errors: ${errors.join(" | ")}`);
   for (const ex of written) {
