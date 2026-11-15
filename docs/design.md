@@ -23,6 +23,10 @@ Lineage, in three lines:
 - **Smooth** (`.btn.ghost`, no icon) sits beside Corners on the map's tool row for the Subject and Camera tools: each press moves the picked points (two or more, a dragged box), else the whole path, half way towards the midpoint of their neighbours; the ends stay. One undo step a press.
 - **Where messages go now.** The status line (`#status`, the notification row's green dot) is one line under the Generate row, the whole text on hover. The map's own hints (what a click on the map did) go to the line under the map (`#mapHint`) and stay there until the tool, view or pen changes or 8 s pass; where that line is hidden (a narrow map, the follow fields) they go to the status line.
 
+## Moving a lane block (15 November)
+
+A Character or Camera block is moved the way a clip is in a video editor: drag its body sideways (or Alt+Left/Right with it focused). It keeps its length and its word; the blocks it passes change places with it as soon as its leading edge crosses their middle, so the lane rearranges live while the moved block rides under the pointer, lifted (`.block.moving`, `--shadow-lg`), over a dashed slot (`.lane-slot`) where it will land. Release is one undo step; Escape puts everything back. A press that travels under 4 px is still a click (the menu), and the edge between two blocks still moves the cut. No new control: the block's tooltip says "drag to move". The reordering is `moveBlock` in `lane-cuts.ts`.
+
 ## Round 8 (13 November): selection corrections
 
 - **Generate** is a normal primary button sized to its label (bolt + "Generate"); the model choice and Settings sit beside it.

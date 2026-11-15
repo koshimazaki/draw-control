@@ -179,6 +179,10 @@ select:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
 #wave { display: block; width: 100%; height: 100%; cursor: pointer; }
 .block.w-glide { --block-mark: var(--subject); } .block.w-spin, .block.w-jump { --block-mark: var(--kick); }
 .block.w-behind, .block.w-side, .block.w-orbit, .block.w-top, .block.w-path, .block.w-push { --block-mark: var(--camera); }
+/* Moving a block (lanes.ts): it rides under the pointer, lifted; a dashed slot shows where it lands. */
+.block.moving { z-index: 3; cursor: grabbing; border-color: var(--border-strong); background: var(--block-hover); box-shadow: var(--shadow-lg); }
+.block.moving .edge { display: none; }
+.lane-slot { position: absolute; top: 2px; bottom: 2px; border: 1px dashed var(--border-strong); border-radius: calc(var(--radius-sm) - 1px); pointer-events: none; }
 .audio-info { display: grid; gap: var(--s-1); font-size: var(--text-sm); min-width: 0; }
 .audio-info p { margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* The track name wraps (a long file name is never cut off). */

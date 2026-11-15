@@ -2,7 +2,8 @@
  * Cutting a lane on the beat: split a block at the playhead (snapped like an edge drag, by the
  * page), at every hit inside it, or every
  * 1, 2 or 4 beats; and "Moves on hits", which cuts the whole Camera lane at each hit and gives
- * the blocks a sequence of moves in order, cycling. Blocks stay at least MIN_BEATS long. Pure:
+ * the blocks a sequence of moves in order, cycling. Blocks stay at least MIN_BEATS long. And moving
+ * a block to another place in its lane (the body drag and Alt+arrows in lanes.ts). Pure:
  * page-actions.ts wires the menus and the S key.
  */
 import { MIN_BEATS } from "./lanes";
@@ -39,6 +40,45 @@ export function everyBeats(from: number, to: number, step: number): number[] {
 export function blockAt(blocks: readonly { from: number; to: number }[], beat: number): number {
   const i = blocks.findIndex(b => beat >= b.from - 1e-9 && beat < b.to - 1e-9);
   return i >= 0 ? i : blocks.length && beat >= blocks[blocks.length - 1].to - 1e-9 ? blocks.length - 1 : -1;
+}
+
+/**
+ * Block `i` moved to place `to` (0 is first): it keeps its length, word and settings, the blocks it
+ * passes slide the other way keeping theirs, and the lane tiles again from beat 0 to its end.
+ * Null when nothing would change (its own place, a place off the lane, a lane of one block).
+ * Every word stays as it was, so the lane keeps its rules: still at most one Glide, and the first
+ * "My path" block in the new order is the one the script prints the drawn points on (toScript).
+ */
+export function moveBlock<W extends string>(blocks: Block<W>[], i: number, to: number): Block<W>[] | null {
+  if (blocks.length < 2 || to === i || i < 0 || i >= blocks.length || to < 0 || to >= blocks.length) return null;
+  const order = blocks.slice(), [b] = order.splice(i, 1), end = blocks[blocks.length - 1].to;
+  order.splice(to, 0, b);
+  let from = 0;
+  return order.map((x, k) => {
+    const len = x.to - x.from, next = k === order.length - 1 ? end : r3(from + len);
+    const out = { ...x, from, to: next };
+    from = next;
+    return out;
+  });
+}
+
+/**
+ * The place block `i` lands on when its left edge is dragged to `left`: once its leading edge
+ * passes a neighbour's middle (its left edge going left, its right edge going right), the two change places.
+ */
+export function dropIndex(blocks: readonly { from: number; to: number }[], i: number, left: number): number {
+  const right = left + blocks[i].to - blocks[i].from, mid = (x: { from: number; to: number }) => (x.from + x.to) / 2;
+  let to = i;
+  blocks.forEach((x, k) => { if (k < i && left < mid(x)) to--; else if (k > i && right > mid(x)) to++; });
+  return to;
+}
+
+/** Where an index (a selection) points after block `from` moved to place `to`. */
+export function movedIndex(index: number, from: number, to: number): number {
+  if (index === from) return to;
+  if (from < index && index <= to) return index - 1;
+  if (to <= index && index < from) return index + 1;
+  return index;
 }
 
 /** The whole Camera lane cut at each hit, the moves given out in order, cycling. */

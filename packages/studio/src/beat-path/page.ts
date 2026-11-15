@@ -18,6 +18,7 @@ import { Viewport } from "../viewport";
 import { GRID_LOOKS } from "../ground-grid";
 import { exampleState, ownState } from "./examples";
 import { bindGenerate } from "./page-generate";
+import { movedIndex } from "./lane-cuts";
 import { LaneView, Menu } from "./lanes";
 import { LAYOUT } from "./layout";
 import { MapView, type Tool, type View } from "./map";
@@ -166,6 +167,7 @@ export function startBeatPath(root: HTMLElement) {
       snap: b => snapLane(b),
       commit: (blocks, final) => update({ ...state, [key]: blocks }, final),
       open: (anchor, i, beat) => actions.openBlock(key, view, anchor, i, beat, labels, words, single),
+      moved: (from, to) => { if (selection?.kind === "block" && selection.lane === key) selection = { ...selection, index: movedIndex(selection.index, from, to) }; },
     });
     return view;
   };
