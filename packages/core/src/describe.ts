@@ -13,6 +13,7 @@ import { recipeSeconds, type Recipe } from "./recipe";
 import { cameraWords } from "./shot-script";
 import { CAMERA_MAX_HEIGHT } from "./camera";
 import { planCamera } from "./camera-rig";
+import { travelRange } from "./root-travel";
 
 const f2 = (x: number) => (Math.round(x * 100) / 100).toString();
 const list = (xs: number[], max = 16) => xs.slice(0, max).map(f2).join(", ") + (xs.length > max ? `, … (${xs.length} in all)` : "");
@@ -70,10 +71,9 @@ export function describeRecipe(r: Recipe, bands?: BandAnalysis): string {
   if (p.length > 1) {
     let len = 0;
     for (let i = 1; i < p.length; i++) len += Math.hypot(p[i].x - p[i - 1].x, p[i].z - p[i - 1].z);
-    const moving = p.filter((q, i) => i === 0 || q.x !== p[i - 1].x || q.z !== p[i - 1].z);
     const lock = r.travelLock ? `, travel locked to ${r.travelLock.lock} at strength ${r.travelLock.strength ?? 1}` : "";
     const high = Math.max(...p.map(q => q.y ?? 0));
-    out.push(`Walk path${high > 0 ? ` (rises to ${f2(high)} m)` : ""}${lock}: ${p.length} points, travels beats ${f2(moving[1]?.beat ?? p[0].beat)}–${f2(p[p.length - 1].beat)}, ${f2(len)} m from (${f2(p[0].x)}, ${f2(p[0].z)}) to (${f2(p[p.length - 1].x)}, ${f2(p[p.length - 1].z)}).`);
+    out.push(`Walk path${high > 0 ? ` (rises to ${f2(high)} m)` : ""}${lock}: ${p.length} points, travels beats ${f2(travelRange(p)?.from ?? p[0].beat)}–${f2(p[p.length - 1].beat)}, ${f2(len)} m from (${f2(p[0].x)}, ${f2(p[0].z)}) to (${f2(p[p.length - 1].x)}, ${f2(p[p.length - 1].z)}).`);
   } else out.push(`Walk path: stands at (${f2(p[0].x)}, ${f2(p[0].z)}), facing ${p[0].yaw}°.`);
   if (r.jumps.length) out.push(`Scheduled jumps: ${r.jumps.map(j => `${f2(j.atBeat)} (${j.height} m)`).join(", ")}.`);
   if (bands) {
