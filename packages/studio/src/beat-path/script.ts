@@ -5,7 +5,7 @@
  * the global lock and "on each hit" are its `lock …` words. A script with words outside the
  * page's vocabulary is read to the nearest page word, and `notes` says what changed.
  */
-import { parseRows, parseSettings, type FollowOffset } from "@motion-studio/core";
+import { FOV_RANGE, parseRows, parseSettings, type FollowOffset } from "@motion-studio/core";
 import { followWords, parseFollowArgs } from "@motion-studio/core/internal";
 import { EXAMPLE_TRACKS, type ExampleId } from "./tracks";
 
@@ -16,15 +16,18 @@ export const CAMERA_WORDS = ["behind", "side", "orbit", "top", "path", "push"] a
 export type CameraWord = (typeof CAMERA_WORDS)[number];
 /**
  * A lane block; a camera block may carry a typed phrase (the script's camera words, e.g. "go above then dolly in 2m fast"),
- * and a follow block (behind, side) its offset: distance, height, angle (180 on side = the subject's right).
+ * and a follow block (behind, side) its offset: distance, height, angle (180 on side = the subject's right), and its own `fov`.
  * A camera block read with `shot: -` where the page would print a framing preset keeps `shot: "-"`: no preset, its own
  * distance, height and fov frame it (a preset would pull the camera to the preset's framing).
  */
-export type Block<W extends string> = { from: number; to: number; word: W; phrase?: string; follow?: FollowOffset; shot?: "-" };
+export type Block<W extends string> = { from: number; to: number; word: W; phrase?: string; follow?: FollowOffset; fov?: number; shot?: "-" };
 /** The page's follow words and the rig mode each prints as. */
 export const FOLLOW_WORDS = { behind: "chase", side: "side" } as const;
 export const isFollowWord = (w: string): w is keyof typeof FOLLOW_WORDS => w in FOLLOW_WORDS;
-const followTail = (word: keyof typeof FOLLOW_WORDS, f?: FollowOffset) => { const t = followWords(FOLLOW_WORDS[word], f); return t ? ` ${t}` : ""; };
+const followTail = (word: keyof typeof FOLLOW_WORDS, f?: FollowOffset, fov?: number) => {
+  const t = [followWords(FOLLOW_WORDS[word], f), fov !== undefined ? `fov ${Math.round(fov * 1000) / 1000}` : ""].filter(Boolean).join(" ");
+  return t ? ` ${t}` : "";
+};
 export const LOCK_CHOICES = ["off", "beat", "kick", "snare", "hat"] as const;
 export type LockChoice = (typeof LOCK_CHOICES)[number];
 export const HIT_CHOICES = ["move", "hold", "punch"] as const;
@@ -71,8 +74,12 @@ export type BeatPathState = {
   /** The example's music (tracks.ts), when it ships its own. */
   track?: ExampleId;
   /**
-   * The camera rig's start framing (the script's `rig:` line): frame 0 is this view, and a camera block without its own
-   * distance or height falls back to it. Absent fields (or no rig) keep the Draw Control base: 7 m, 1.6 m, fov 40, yaw 0.
+   * The camera rig's start framing (the script's `rig:` line). Frame 0 is the rig start. Each block starts where the block
+   * before it ended: a follow offset (distance, height; it wins over a shot preset), a shot preset, a fov and the end of a
+   * programmed dolly, push, pull or rise carry on into every later block until another block changes them; a block that sets
+   * none of them keeps what it started with. The camera word top (or above) is the exception: it lifts the camera overhead
+   * from those values without changing them, so the block after it comes back to the distance and height from before it (a
+   * fov set on it carries on). Absent fields (or no rig) keep the Draw Control base: 7 m, 1.6 m, fov 40, yaw 0.
    */
   rig?: { distance?: number; height?: number; fov?: number; yaw?: number };
   /** The shot description that travels with the guide (the legend line is built from the figure's colours). */
@@ -189,7 +196,7 @@ export function toScript(state: BeatPathState): string {
         shot = /\bpath\b/.test(k.phrase) ? "-" : /^(go )?(top|above)\b/.test(k.phrase) ? "top" : "wide";
       } else {
         camera = {
-          behind: `follow behind${followTail("behind", k.follow)}`, side: `follow side${followTail("side", k.follow)}`, orbit: `orbit ${f(CAMERA_AMOUNTS.orbitPerBeat * len)}`, top: "top",
+          behind: `follow behind${followTail("behind", k.follow, k.fov)}`, side: `follow side${followTail("side", k.follow, k.fov)}`, orbit: `orbit ${f(CAMERA_AMOUNTS.orbitPerBeat * len)}`, top: "top",
           path: pathPrinted ? "path" : `path ${pts(state.camera)} corners ${f(state.cameraCorners)}`, push: `push in to ${f(CAMERA_AMOUNTS.pushTo)}m`,
         }[word] + camLock + (k.from > 0 ? advance : "");
         if (word === "path") pathPrinted = true;
@@ -285,12 +292,17 @@ export function fromScript(text: string, base: BeatPathState, grid: { bpm: numbe
     const bare = c.replace(/\s*@(kick|snare|hat)\s+1\b/, "").replace(/\s*\block\s+(beat|kick|snare|hat)(\s+[\d.]+)?(\s+(hold|punch(\s+[\d.]+m?)?))?\s*$/, "").trim();
     // A follow word with its offset words stays a plain follow block (the offset rides on it).
     const followed = /^follow (behind|side)\s+(.+)$/.exec(bare);
-    let follow: FollowOffset | undefined, followOk = false;
+    let follow: FollowOffset | undefined, fov: number | undefined, followOk = false;
     if (followed && !/\b(then|over|shoulder)\b/.test(followed[2])) {
-      try { follow = parseFollowArgs(followed[1] === "side" ? "side" : "chase", followed[2].split(/\s+/), msg => { throw new Error(msg); }); followOk = true; } catch { followOk = false; }
+      // A fov rides on the follow block beside its offset ("follow side right distance 6m height 1.6m fov 35").
+      const fm = /(?:^|\s)fov\s+(\d+(?:\.\d+)?)(?:°|deg)?(?=\s|$)/.exec(followed[2]);
+      const tail = fm ? followed[2].replace(fm[0], " ") : followed[2];
+      const fovOk = !fm || (Number(fm[1]) >= FOV_RANGE[0] && Number(fm[1]) <= FOV_RANGE[1]);
+      try { follow = parseFollowArgs(followed[1] === "side" ? "side" : "chase", tail.split(/\s+/).filter(Boolean), msg => { throw new Error(msg); }); followOk = fovOk; } catch { followOk = false; }
+      if (followOk && fm) fov = Number(fm[1]); else if (!followOk) follow = undefined;
     }
     const plain = followOk || /^(follow behind|follow side|top|push in to 2\.6m|orbit\s+-?[\d.]+)$/.test(bare) || /^path\b/.test(bare) && !/\bthen\b/.test(bare);
-    const block: Block<CameraWord> = { from: row.from, to: row.to, word, ...(follow ? { follow } : {}) };
+    const block: Block<CameraWord> = { from: row.from, to: row.to, word, ...(follow ? { follow } : {}), ...(fov !== undefined ? { fov } : {}) };
     if (!plain) block.phrase = bare.replace(/\(([^)]*)\)\s*/g, "").replace(/\s*corners\s+[\d.]+/, "").trim();
     // "shot: -" on a block the page would give a preset: kept, so the block frames itself.
     if (row.shot === "-" && block.word !== "path" && !/\bpath\b/.test(block.phrase ?? "")) block.shot = "-";
@@ -332,7 +344,10 @@ export function fitLanes(state: BeatPathState, beats: number): BeatPathState {
 /** Only one glide block (the script has one walk path): making one glide turns the others to hover. */
 export function setWord<W extends string>(lane: Block<W>[], index: number, word: W, single?: W): Block<W>[] {
   // A follow offset stays only on a follow word (a block turned into Orbit or Top drops it); a new word takes its own framing preset.
-  const next = (b: Block<W>): Block<W> => { const { follow, shot: _shot, ...rest } = b; void _shot; return isFollowWord(word) && follow ? { ...rest, word, follow } : { ...rest, word }; };
+  const next = (b: Block<W>): Block<W> => {
+    const { follow, fov, shot: _shot, ...rest } = b; void _shot;
+    return isFollowWord(word) ? { ...rest, word, ...(follow ? { follow } : {}), ...(fov !== undefined ? { fov } : {}) } : { ...rest, word };
+  };
   return lane.map((b, i) => (i === index ? next(b) : single && word === single && b.word === single ? { ...b, word: "hover" as W } : b));
 }
 

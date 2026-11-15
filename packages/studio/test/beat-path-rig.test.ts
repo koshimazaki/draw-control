@@ -40,6 +40,28 @@ describe("the page's camera start (the rig: line)", () => {
   });
 });
 
+describe("a follow block keeps its fov", () => {
+  const cell = "follow side right distance 6m height 1.6m fov 35";
+  it("fromScript keeps the side word, its offset and its fov, and prints the same cell back", () => {
+    const { state, notes } = fromScript(`beats 0-4 | action: rest | camera: ${cell} | shot: -\n`, BLANK_STATE);
+    expect(notes).toEqual([]);
+    const b = state.cameraLane[0];
+    expect(b).toMatchObject({ word: "side", follow: { distance: 6, height: 1.6, angle: 180 }, fov: 35, shot: "-" });
+    expect(b.phrase).toBeUndefined();
+    expect(toScript(state)).toContain(`camera: ${cell} | shot: -`);
+  });
+  it("Example 4's last block is a plain side block with fov 35", () => {
+    expect(exampleState(drone).cameraLane.at(-1)).toMatchObject({ word: "side", follow: { distance: 6, height: 1.6, angle: 180 }, fov: 35 });
+    expect(exampleState(drone).cameraLane.at(-1)!.phrase).toBeUndefined();
+  });
+  it("a fov outside the camera's range stays a typed direction; a setup file clamps it", () => {
+    expect(fromScript("beats 0-4 | action: rest | camera: follow side fov 200 | shot: -\n", BLANK_STATE).state.cameraLane[0].phrase).toBe("follow side fov 200");
+    const r = readSetup(file({ ...BLANK_STATE, cameraLane: [{ from: 0, to: 17, word: "side", fov: 300 }] }));
+    if (!r.ok) throw new Error(r.error);
+    expect(r.state.cameraLane[0].fov).toBe(110);
+  });
+});
+
 describe("setup file: the camera start", () => {
   it("comes back as saved, and is clamped to the camera's limits with a note", () => {
     const r = readSetup(file({ ...BLANK_STATE, rig: { distance: 20, height: 0.1, fov: 30, yaw: 900 } }));

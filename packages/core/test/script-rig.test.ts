@@ -30,6 +30,9 @@ describe("the rig: script line", () => {
     expect(() => applyScript(base(), { script: `rig: distance\n${ROWS}` })).toThrow(/rig reads/);
     expect(() => applyScript(base(), { script: `rig: distance 4 distance 5\n${ROWS}` })).toThrow(/distance is given twice/);
     expect(() => applyScript(base(), { script: `rig: fov wide\n${ROWS}` })).toThrow(/fov must be a number/);
+    for (const line of ["rig: toString 3", "rig: constructor 3", "rig: __proto__ 3"]) expect(() => applyScript(base(), { script: `${line}\n${ROWS}` })).toThrow(/is not a rig field; rig reads/);
+    expect(() => applyScript(base(), { script: `rig: yaw deg\n${ROWS}` })).toThrow(/yaw must be a number \(got "deg"\); rig reads/);
+    expect(() => applyScript(base(), { script: `rig: distance m\n${ROWS}` })).toThrow(/distance must be a number \(got "m"\); rig reads/);
   });
   it("prints first, only the fields off the base, and reads back to the same recipe", () => {
     const r = applyScript(base(), { script: `rig: distance 8m height 5m fov 30 yaw 45\n${ROWS}` });

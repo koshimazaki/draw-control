@@ -14,7 +14,7 @@
  * `readSetup` never throws: a field it cannot use falls back to the blank page's value (BLANK_STATE)
  * on its own, with a note, rather than refusing the whole file; values are clamped as the page clamps them.
  */
-import { CAMERA_MAX_HEIGHT, FOLLOW_LIMITS, RIG_LIMITS, clipBeats, type CommandContext, type FollowOffset } from "@motion-studio/core";
+import { CAMERA_MAX_HEIGHT, FOLLOW_LIMITS, FOV_RANGE, RIG_LIMITS, clipBeats, type CommandContext, type FollowOffset } from "@motion-studio/core";
 import { beatPathRecipe, type TrackInfo } from "./recipe-map";
 import {
   BLANK_STATE, CAMERA_WORDS, CHARACTER_WORDS, HIT_CHOICES, LOCK_CHOICES, clampClip, fitLanes, toScript,
@@ -244,6 +244,8 @@ function blocks(v: unknown, words: readonly string[], camera: boolean): { list: 
     const block: Block<string> = { from, to, word };
     if (camera && typeof b.phrase === "string" && line(b.phrase, LIMIT.phrase)) block.phrase = line(b.phrase, LIMIT.phrase);
     if (camera && (word === "behind" || word === "side") && isRec(b.follow)) { const f = follow(b.follow); if (f) block.follow = f; }
+    const fov = num(b.fov);
+    if (camera && (word === "behind" || word === "side") && fov !== undefined) block.fov = clamp(fov, FOV_RANGE[0], FOV_RANGE[1]);
     if (camera && b.shot === "-") block.shot = "-";
     return [block];
   }).sort((a, b) => a.from - b.from);
