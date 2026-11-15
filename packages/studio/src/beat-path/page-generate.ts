@@ -189,7 +189,7 @@ export function bindGenerate(p: Page) {
       if (fake && !key?.connected) {
         const before = fakeResult;
         fakeResult = URL.createObjectURL(bundle.files["guide.mp4"]);
-        if (before && ![...outputs.values()].some(o => o.url === before) && !runs.some(r => r.url === before)) URL.revokeObjectURL(before);
+        if (before && !inUse(before)) URL.revokeObjectURL(before);
       }
       const r = bundle.references;
       const result = await arena.generateFromGuide({
@@ -222,6 +222,8 @@ export function bindGenerate(p: Page) {
 
   // The Gallery: one row per example (path, guide, references, shot, outputs per model), then the visitor's runs.
   const runs: Run[] = [];
+  /** A link the page still shows: an example's output pane, or the gallery. */
+  const inUse = (url: string) => [...outputs.values()].some(o => o.url === url) || runs.some(r => r.url === url);
   const gallery = bindGallery({ root: $("gallerySlot"), load: slot => void p.switchSlot(slot), refs: slot => ({ character: refStore.get(slot, "character"), environment: refStore.get(slot, "environment") }), runs: () => runs,
     attach: (host, get, what) => refUi.attach(host, get, what) });
   // Reference images made with an image model, from the Generate buttons beside the drops (page-image.ts).
@@ -233,7 +235,7 @@ export function bindGenerate(p: Page) {
   // Runs: every generation's task id and result, kept in this browser so a reload never loses one (run-log.ts, page-history.ts).
   bindHistory({
     $, log: runLog, key: () => (key?.connected ? key.getKey() ?? null : null), say: t => p.say(t),
-    live: e => !!running && e.kind === "video" && e.at >= runStarted,
+    live: e => !!running && e.kind === "video" && e.at >= runStarted, inUse,
     show: (e, url) => {
       outputs.set(e.slot, { url, record: null, model: e.model, prompt: "" });
       if (p.slot === e.slot) showResult(url); else void p.switchSlot(e.slot);

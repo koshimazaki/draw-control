@@ -365,6 +365,24 @@ async function smokePaidRuns(browser, base, { fail }) {
   await press("#runGenerate");
   await idle().catch(() => fail("Stop did not end a run waiting on its question"));
   if (!(await page.evaluate(() => document.getElementById("costDialog").hidden))) fail("Stop left the run's question on screen");
+
+  // 4. Runs: a local preview's link is the page's own (it is released), so a run is offered only through its kept copy; Show plays it.
+  await page.waitForFunction(() => window.__beatPath.slot() === "0");
+  await page.click("#runsButton");
+  const rows = await page.evaluate(() => [...document.querySelectorAll("#runsList .run-row.done")].map(r => ({
+    kept: /kept in this browser/.test(r.textContent ?? ""), offers: [...r.querySelectorAll("button, a")].map(b => b.textContent).filter(t => t === "Show" || t === "Download" || /^Open/.test(t ?? "")),
+  })));
+  console.log(`beat path paid runs: Runs rows ${JSON.stringify(rows)}`);
+  if (rows.some(r => !r.kept && r.offers.length)) fail(`Runs offers a local preview's released link: ${JSON.stringify(rows)}`);
+  const shows = page.locator("#runsList .run-row.done button", { hasText: "Show" });
+  if ((await shows.count()) < 2) fail(`Runs has fewer than two kept videos to show (${await shows.count()})`);
+  else for (const k of [0, 1]) {
+    if (k) await page.click("#runsButton");
+    await shows.nth(k).click();
+    await page.waitForFunction(() => /shown from Runs/.test(document.getElementById("status").textContent ?? "") && !!document.querySelector("#generateSlot arena-player, #generateSlot video"), null, { timeout: 15_000 })
+      .catch(() => fail(`Show on kept run ${k + 1} did not put it in the output pane`));
+    await page.evaluate(() => { document.getElementById("status").textContent = ""; });
+  }
   if (errors.length) fail(`paid-run pass logged: ${errors.join(" | ")}`);
   console.log("beat path paid runs: render lock, question queue, progress on return, Stop on a waiting question checked");
   await page.close();

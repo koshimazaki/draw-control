@@ -22,6 +22,8 @@ type Deps = {
   say(text: string): void;
   /** A run this page is polling itself right now (the embed's own poll fills it in): not asked for twice. */
   live(entry: RunEntry): boolean;
+  /** Whether a link is still held by the page (an output pane of some example, or the gallery): its copy is not released. */
+  inUse(url: string): boolean;
 };
 
 const RESUME_MS = 15_000, RESUME_FOR_MS = 60 * 60_000;
@@ -31,7 +33,15 @@ const stateWord = (e: RunEntry) => e.status === "done" ? "done" : e.status === "
 
 export function bindHistory(d: Deps) {
   const button = d.$("runsButton"), pop = d.$("runsPop"), list = d.$("runsList"), count = d.$("runsCount");
+  /** The links made for Show from the browser's copy, per run; released once nothing holds them (`release`). */
   const shown = new Map<string, string>();
+  /**
+   * Release every Show link no output pane or gallery holds any more (replaced, or its run left the log),
+   * except the run `keep`'s; a later Show makes it again from the browser's copy.
+   */
+  function release(keep?: string) {
+    for (const [id, url] of shown) if (id !== keep && !d.inUse(url)) { URL.revokeObjectURL(url); shown.delete(id); }
+  }
   const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls = "", text = "") => { const n = document.createElement(tag); if (cls) n.className = cls; if (text) n.textContent = text; return n; };
 
   async function check(e: RunEntry, quiet = false) {
@@ -61,8 +71,9 @@ export function bindHistory(d: Deps) {
       foot.append(id);
       if (typeof r.cost === "number") foot.append(el("span", "muted mono", `${r.cost.toFixed(2)} USD`));
       if (r.error) foot.append(el("span", "run-error", r.error));
-      // A local preview's result is an in-page link, gone after a reload: reachable then only through the browser's copy.
-      const linkAlive = !!r.url && (!r.url.startsWith("blob:") || r.at >= performance.timeOrigin), reachable = r.saved || linkAlive;
+      // A local preview's result is an in-page link: the page releases it (a newer run, a reload), so Runs never
+      // offers it and reaches that run only through the browser's copy.
+      const linkAlive = !!r.url && !r.url.startsWith("blob:"), reachable = r.saved || linkAlive;
       if (r.status === "done" && reachable) {
         if (r.kind === "video") {
           const show = el("button", "link-act", "Show"); show.type = "button";
@@ -70,7 +81,10 @@ export function bindHistory(d: Deps) {
           show.onclick = async () => {
             let url = shown.get(r.taskUUID);
             if (!url) { const b = await savedBlob(r); if (b) { url = URL.createObjectURL(b); shown.set(r.taskUUID, url); } }
-            d.show(r, url ?? r.url!); pop.hidden = true;
+            url ??= linkAlive ? r.url! : undefined;
+            if (!url) { d.say(`${r.model}: this browser no longer has the copy, and the run's link was only for that page`); return; }
+            d.show(r, url); pop.hidden = true;
+            release(r.taskUUID);
           };
           foot.append(show);
         }
@@ -100,7 +114,7 @@ export function bindHistory(d: Deps) {
   };
   // A result kept here is played and downloaded from here, not fetched again (result-fetch.ts).
   results.setStored(storedLookup(d.log));
-  d.log.onChange(() => { render(); keep(); });
+  d.log.onChange(() => { render(); keep(); release(); });
   render(); keep(); void pruneAssets(d.log);
 
   // Runs left processing (a reload, a closed tab): asked for again while the key is connected.
