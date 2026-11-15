@@ -9,6 +9,7 @@ Status: working studio, CLI and MCP server, 11 November 2026. What is not done i
 ## Beat Path (start here)
 
 The lean demo: **draw a path on a map, add music, and the movement and the camera lock to the beat; export a guide clip for video models.** One screen, an abstract figure, a handful of controls.
+Changing the page (developers and agents): [docs/beat-path.md](docs/beat-path.md) says how to run and check it and which file owns each control.
 
 ```bash
 nvm use && npm install && npm run dev   # open http://127.0.0.1:5180/path.html  (Runware look: /path.html?theme=runware)
