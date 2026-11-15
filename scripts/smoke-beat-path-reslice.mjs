@@ -114,7 +114,6 @@ export async function smokeBeatPathReslice(browser, base, { fail, OUT }) {
   });
   console.log(`draw control reslice: after 1.5 s idle, ${once.lines} playhead line(s) over the lanes; a lane click seeked ${once.seeks} time(s)`);
   if (once.lines !== 1 || once.seeks !== 1) fail(`the playhead is bound more than once (${once.lines} lines, a lane click seeked ${once.seeks} times)`);
-  if (await bp(() => window.__beatPath.playing())) await page.click("#play");
 
   // The playhead, paused: a click at 50% of the strip, then the playhead dragged to 25%.
   if (await bp(() => window.__beatPath.playing())) await page.click("#play");
