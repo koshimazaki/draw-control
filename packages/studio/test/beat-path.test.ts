@@ -1,9 +1,10 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { analyseSamples, buildDrive, frameAt, planCamera, travelStations, type Recipe } from "@motion-studio/core";
 import { patternTimes, synthDrums } from "@motion-studio/core/internal";
 import { beatPathRecipe, exportRange, type TrackInfo } from "../src/beat-path/recipe-map";
 import { fitLanes, fromScript, setWord, toScript, type BeatPathState } from "../src/beat-path/script";
-import { BLANK_STATE, EXAMPLES, exampleState } from "../src/beat-path/examples";
+import { BLANK_STATE, EXAMPLES, exampleState, scriptState } from "../src/beat-path/examples";
 import { avenueState } from "./avenue";
 
 const samples = synthDrums(patternTimes(120, 8, 0.1), 16.6);
@@ -19,8 +20,10 @@ const cams = (r: Recipe) => planCamera(r, drive, 200).samples.slice(0, 193).map(
 
 describe("Draw Control: the page state is a shot script", () => {
   it("every example reads back to the same state and the same script", () => {
-    for (let i = 0; i < EXAMPLES.length; i++) {
-      const s = exampleState(i), printed = toScript(s);
+    // The page's two, and the script-only car and drone (Examples 3 and 4 until 15 Nov 2026) on their 100 BPM grooves.
+    const scriptOnly = ["beat-path-ex3-car.txt", "beat-path-ex4-drone.txt"].map(n => scriptState(readFileSync(new URL(`../../../examples/scripts/${n}`, import.meta.url), "utf8"), 100));
+    for (const s of [...EXAMPLES.map((_, i) => exampleState(i)), ...scriptOnly]) {
+      const printed = toScript(s);
       const again = fromScript(printed, BLANK_STATE);
       expect(again.notes).toEqual([]);
       expect(again.state).toEqual(s);

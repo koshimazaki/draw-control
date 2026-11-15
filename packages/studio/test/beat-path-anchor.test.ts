@@ -7,12 +7,12 @@
 import { describe, expect, it } from "vitest";
 import { analyseSamples, applyScript, beatPathBase, buildDrive, onsetBeats } from "@motion-studio/core";
 import { synthDrums } from "@motion-studio/core/internal";
-import { EXAMPLE_TRACKS } from "../src/beat-path/tracks";
+import { TRACKS } from "../src/beat-path/tracks";
 import { exampleState } from "../src/beat-path/examples";
 import { beatPathRecipe } from "../src/beat-path/recipe-map";
 import { toScript } from "../src/beat-path/script";
 
-const t = EXAMPLE_TRACKS.flyer, beat = 60 / t.grid!.bpm;
+const t = TRACKS.flyer, beat = 60 / t.grid!.bpm;
 // Example 1's music hits, as the page finds them in neon-rain-loop.mp3: a kick every two beats from 2.31 s
 // (2.31, 3.43, 4.56 s ...: beats 4.14, 6.15, 8.17), a snare on the beats between.
 const kicks = Array.from({ length: 10 }, (_, k) => 2.31 + k * 2 * beat), snares = kicks.map(s => s - beat).filter(s => s > 0);

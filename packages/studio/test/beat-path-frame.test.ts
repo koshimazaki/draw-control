@@ -9,7 +9,7 @@ import { analyseSamples, applyScript, beatPathBase, buildDrive, frameAt, planCam
 import { grooveTimes, patternTimes, synthDrums } from "@motion-studio/core/internal";
 import { BLANK_STATE, fromScript, toScript, type BeatPathState, type CameraWord } from "../src/beat-path/script";
 import { beatPathRecipe } from "../src/beat-path/recipe-map";
-import { EXAMPLE_TRACKS } from "../src/beat-path/tracks";
+import { TRACKS } from "../src/beat-path/tracks";
 
 const drumsDrive = (p: ReturnType<typeof patternTimes>, seconds = 16.6) => {
   const f = analyseSamples([synthDrums(p, seconds)], 44100);
@@ -55,7 +55,7 @@ describe("the subject stays in frame", () => {
   for (const file of readdirSync(scripts).filter(f => f.startsWith("beat-path-"))) it(file, () => {
     const text = readFileSync(new URL(file, scripts), "utf8"), g = grooveDrive(text);
     // A file track's given grid (tracks.ts), as the page uses it; else the groove's estimate.
-    const name = /^#\s*track:\s*file\s+(\S+)/m.exec(text)?.[1], given = Object.values(EXAMPLE_TRACKS).find(t => t.file && t.name === name)?.grid;
+    const name = /^#\s*track:\s*file\s+(\S+)/m.exec(text)?.[1], given = Object.values(TRACKS).find(t => t.file && t.name === name)?.grid;
     const grid = given ?? { bpm: g.f.estimatedBpm!, offsetSeconds: g.f.estimatedOffsetSeconds };
     const s = fromScript(text, BLANK_STATE, grid).state;
     const base = beatPathBase({ seconds: s.clip, ...grid });

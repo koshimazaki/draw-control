@@ -12,12 +12,12 @@ import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, realpat
 import { extname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { MODELS } from "../packages/studio/src/beat-path/generate.ts";
-import { EXAMPLE_TRACKS } from "../packages/studio/src/beat-path/tracks.ts";
+import { EXAMPLE_IDS } from "../packages/studio/src/beat-path/tracks.ts";
 import { checkClip, emptyIndex, isRecord, withClip } from "../packages/studio/src/beat-path/published.ts";
 
 const PAGES_LIMIT = 25 * 1024 * 1024;
 const VIDEO_EXT = new Set([".mp4", ".webm"]);
-const examples = Object.keys(EXAMPLE_TRACKS), models = MODELS.map(m => m.id);
+const examples = [...EXAMPLE_IDS], models = MODELS.map(m => m.id);
 const usage = "usage: npm run publish:clip -- <example-id> <model-id> <file-or-url> [--prompt \"…\"] [--cost 0.42] [--seconds 8] [--force]";
 
 function fail(msg) { console.error(`publish:clip: ${msg}`); process.exit(1); }
@@ -67,6 +67,10 @@ if (existsSync(indexFile)) {
   const unusable = Object.entries(raw.clips).flatMap(([e, byModel]) => Object.entries(byModel).filter(([, c]) => !checkClip(c, "https://example.invalid/")).map(([m]) => `${e}/${m}`));
   if (unusable.length) fail(`${indexFile} has entries the page would not show (${unusable.join(", ")}); fix or remove it first`);
   index = raw;
+  // Entries under an id the page no longer shows (car and drone left with Examples 3 and 4, 15 Nov 2026) are kept, never
+  // shown: said, so they can be removed by hand (their files too) rather than deleted here.
+  const stale = Object.entries(index.clips).filter(([e]) => !examples.includes(e)).flatMap(([e, byModel]) => Object.keys(byModel).map(m => `${e}/${m}`));
+  if (stale.length) console.warn(`publish:clip: ${indexFile} keeps entries under example ids the page no longer shows (${stale.join(", ")}): the page drops them; remove them (and their files) when they are not needed`);
 }
 
 let url;

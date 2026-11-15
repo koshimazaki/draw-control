@@ -78,7 +78,7 @@ export async function smokeBeatPathMap(browser, base, { fail, SHOTS }) {
     for (const id of ["zoomIn", "zoomIn", "zoomIn", "zoomOut", "zoomFit"]) { await page.click(`#${id}`); await check(`after ${id}`); }
 
     // Camera → Draw new → drag, on every example and on Your own.
-    for (const slot of ["0", "1", "2", "own"]) {
+    for (const slot of ["0", "1", "own"]) {
       await page.click(`[data-control="example"] [data-value="${slot}"]`);
       await page.waitForTimeout(300);
       await page.click('[data-control="tool"] [data-value="camera"]');

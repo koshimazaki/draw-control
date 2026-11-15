@@ -18,7 +18,7 @@ import { exampleMusic, musicIdentity } from "./example-music";
 import { composePrompt, MODELS } from "./generate";
 import { beatPathRecipe, exportRange, type TrackInfo } from "./recipe-map";
 import { fitLanes, legendFor } from "./script";
-import { EXAMPLE_TRACKS } from "./tracks";
+import { TRACKS } from "./tracks";
 import { PLAY_GLYPH } from "./ui/glyph";
 import { icon } from "./ui/icons";
 import type { Ref } from "./ref-store";
@@ -34,7 +34,7 @@ const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls = "", text = "") 
 
 /** An example's recipe on its own music (its file or the synth groove, analysed here, as the page does). */
 export async function exampleRecipe(i: number) {
-  const id = EXAMPLES[i].id, t = EXAMPLE_TRACKS[id], music = await exampleMusic(id);
+  const id = EXAMPLES[i].id, t = TRACKS[id], music = await exampleMusic(id);
   const f = analyseSamples(music.channels, music.sampleRate);
   const drive = buildDrive(f, 24, Math.ceil(f.lengthSeconds * 24) + 1);
   // The file's grid only with the file: the fallback groove goes out under its own name and its own tempo, as in the editor.
@@ -158,7 +158,7 @@ export function bindGallery(opts: {
   };
 
   function exampleRow(i: number): HTMLElement {
-    const ex = EXAMPLES[i], s = exampleState(i), row = el("article", "gallery-row panel"), t = EXAMPLE_TRACKS[ex.id];
+    const ex = EXAMPLES[i], s = exampleState(i), row = el("article", "gallery-row panel"), t = TRACKS[ex.id];
     const head = el("header", "row-head"), player = rowPlayer(row, media.get(i)?.audio ?? null, live());
     const open = el("button", "link-act", "Load into the editor"); open.type = "button"; open.insertAdjacentHTML("beforeend", icon("arrow-right")); open.onclick = () => { opts.load(String(i)); window.scrollTo({ top: 0 }); };
     const badge = el("span", "badge", s.figure.shape);

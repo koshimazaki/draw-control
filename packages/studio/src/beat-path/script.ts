@@ -7,7 +7,7 @@
  */
 import { FOV_RANGE, parseRows, parseSettings, type FollowOffset } from "@motion-studio/core";
 import { followWords, parseFollowArgs } from "@motion-studio/core/internal";
-import { EXAMPLE_TRACKS, type ExampleId } from "./tracks";
+import { TRACKS, type TrackId } from "./tracks";
 
 export type PathPt = { x: number; z: number; y?: number };
 export const CHARACTER_WORDS = ["glide", "hover", "spin", "jump", "hop", "freeze"] as const;
@@ -76,7 +76,7 @@ export type BeatPathState = {
   /** Scenery boxes once edited on the map (they replace the preset's placement). */
   boxes?: { x: number; z: number; w: number; d: number; h: number; yaw?: number }[];
   /** The example's music (tracks.ts), when it ships its own. */
-  track?: ExampleId;
+  track?: TrackId;
   /**
    * The camera rig's start framing (the script's `rig:` line). Frame 0 is the rig start. Each block starts where the block
    * before it ended: a follow offset (distance, height; it wins over a shot preset), a shot preset, a fov and the end of a
@@ -128,21 +128,21 @@ const rigWords = (rig?: BeatPathState["rig"]) => !rig ? "" : [
   rig.fov !== undefined ? `fov ${f(rig.fov)}` : "", rig.yaw !== undefined ? `yaw ${f(rig.yaw)}` : "",
 ].filter(Boolean).join(" ");
 /** An example's "# track:" words: its file ("file neon-rain-loop.mp3"), else its groove, and its bars when an earlier example has the same groove ("laidback 6 bars"). */
-const trackWords = (id: ExampleId) => {
-  const t = EXAMPLE_TRACKS[id];
+const trackWords = (id: TrackId) => {
+  const t = TRACKS[id];
   if (t.file) return `file ${t.name}`;
-  const first = Object.values(EXAMPLE_TRACKS).find(o => !o.file && o.groove === t.groove)!;
+  const first = Object.values(TRACKS).find(o => !o.file && o.groove === t.groove)!;
   return first === t ? t.groove : `${t.groove} ${t.bars} bars`;
 };
 /** The example a "# track:" comment names: the file, or the groove with the bars picking between examples that share it. */
-const trackFrom = (text: string): ExampleId | undefined => {
-  const ids = Object.keys(EXAMPLE_TRACKS) as ExampleId[];
+const trackFrom = (text: string): TrackId | undefined => {
+  const ids = Object.keys(TRACKS) as TrackId[];
   const file = /^#\s*track:\s*file\s+(\S+)/im.exec(text);
-  if (file) return ids.find(id => EXAMPLE_TRACKS[id].file && EXAMPLE_TRACKS[id].name === file[1]);
+  if (file) return ids.find(id => TRACKS[id].file && TRACKS[id].name === file[1]);
   const m = /^#\s*track:\s*(straight|drive|laidback)(?:\s+(\d+)\s*bars?)?/im.exec(text);
   if (!m) return undefined;
-  const list = ids.filter(id => !EXAMPLE_TRACKS[id].file && EXAMPLE_TRACKS[id].groove === m[1]);
-  return (m[2] ? list.find(id => EXAMPLE_TRACKS[id].bars === Number(m[2])) : undefined) ?? list[0];
+  const list = ids.filter(id => !TRACKS[id].file && TRACKS[id].groove === m[1]);
+  return (m[2] ? list.find(id => TRACKS[id].bars === Number(m[2])) : undefined) ?? list[0];
 };
 const pts = (list: PathPt[]) => list.map(p => `(${f(p.x)},${f(p.z)}${p.y ? `,${f(p.y)}` : ""})`).join(" ");
 

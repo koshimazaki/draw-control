@@ -22,7 +22,7 @@ export const LAYOUT = `
 <div class="editor" id="editor">
 <header class="top">
   <div class="brand">${MARK}<h1>${APP_NAME}</h1></div>
-  ${seg("example", ["0", "1", "2", "3", "own"], { 0: "Example 1", 1: "Example 2", 2: "Example 3", 3: "Example 4", own: "Your own" }, "Example")}
+  ${seg("example", ["0", "1", "own"], { 0: "Example 1", 1: "Example 2", own: "Your own" }, "Example")}
   <div class="top-right">
     <a class="btn ghost" href="#gallery">${icon("gallery")}Gallery</a>
     <a class="btn ghost oss tip-below" href="${REPO_URL}" target="_blank" rel="noopener" data-tip="Open source (${LICENCE}). Runs in your browser with your own Runware key">${icon("code")}Get the code${icon("arrow-up-right", "trail")}</a>

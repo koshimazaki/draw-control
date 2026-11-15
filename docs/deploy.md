@@ -5,7 +5,7 @@ summary: How the Draw Control page is built as plain static files (Cloudflare Pa
 
 # Deploying Draw Control as static files
 
-Draw Control needs no server: no API routes, no backend. Everything it uses is inside the build (the four examples and their presets are bundled from `examples/scripts/`; Example 1 plays `public/tracks/neon-rain-loop.mp3`, copied into the build, and Examples 2 to 4 generate their music in the browser). Generation runs in the visitor's browser with their own Runware key once the key and generate module is vendored (`packages/studio/public/vendor/`).
+Draw Control needs no server: no API routes, no backend. Everything it uses is inside the build (the two examples and their presets are bundled from `examples/scripts/`; they play `public/tracks/neon-rain-loop.mp3` and `public/tracks/drum-n-bass.mp3`, copied into the build, and fall back to music generated in the browser). Generation runs in the visitor's browser with their own Runware key once the key and generate module is vendored (`packages/studio/public/vendor/`).
 
 ## Build
 
@@ -50,7 +50,7 @@ A visitor without a Runware key still sees real model outputs in the Gallery: ea
 }
 ```
 
-Keys are example ids (`flyer`, `runner`, `car`, `drone`) and model ids (`kling-4`, `seedance-2.5`, `h3`). `url` is an http(s) link (Cloudflare R2, say) or a path relative to the page; `costUsd` and `seconds` (the clip's length) are optional. To add one:
+Keys are example ids (`flyer`, `runner`; `car` and `drone` left the page with Examples 3 and 4 on 15 Nov 2026, and an entry under them is dropped) and model ids (`kling-4`, `seedance-2.5`, `h3`). `url` is an http(s) link (Cloudflare R2, say) or a path relative to the page; `costUsd` and `seconds` (the clip's length) are optional. To add one:
 
 ```bash
 npm run publish:clip -- flyer kling-4 ~/Downloads/take.mp4 --prompt "…" --cost 0.42 --seconds 8   # copies to public/published/flyer-kling-4.mp4

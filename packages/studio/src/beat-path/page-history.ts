@@ -9,6 +9,7 @@
  * page-generate.ts.
  */
 import { checkRun, type RunEntry, type RunLog } from "./run-log";
+import { pageSlot } from "./examples";
 import { download, pruneAssets, saveAsset, savedBlob, shouldCopy, storedLookup } from "./run-assets";
 import { results } from "./result-fetch";
 
@@ -27,7 +28,8 @@ type Deps = {
 };
 
 const RESUME_MS = 15_000, RESUME_FOR_MS = 60 * 60_000;
-const exampleName = (slot: string) => (slot === "own" ? "Your own" : `Example ${Number(slot) + 1}`);
+/** A slot that left the page (a run made on Example 3 or 4) reads as Your own, where Show opens it. */
+const exampleName = (slot: string) => (pageSlot(slot) === "own" ? "Your own" : `Example ${Number(slot) + 1}`);
 const time = (ms: number) => new Date(ms).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 const stateWord = (e: RunEntry) => e.status === "done" ? "done" : e.status === "failed" ? "failed" : e.local ? "local" : "processing";
 

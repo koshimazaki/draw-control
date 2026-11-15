@@ -11,10 +11,10 @@ import { cameraAtFrame, clipBeats, planCamera } from "@motion-studio/core";
 import { EXAMPLES, exampleState } from "../src/beat-path/examples";
 import { beatPathRecipe } from "../src/beat-path/recipe-map";
 import { BLANK_STATE, fitLanes, fromScript, toScript } from "../src/beat-path/script";
-import { EXAMPLE_TRACKS } from "../src/beat-path/tracks";
+import { TRACKS } from "../src/beat-path/tracks";
 
 const i = EXAMPLES.findIndex(e => e.id === "flyer");
-const t = EXAMPLE_TRACKS.flyer;
+const t = TRACKS.flyer;
 const info = { name: t.name, licence: t.licence, bpm: t.grid!.bpm, offsetSeconds: t.grid!.offsetSeconds, lengthSeconds: 13.488 };
 
 describe("Example 1: the ship on the owner's loop", () => {
@@ -34,7 +34,7 @@ describe("Example 1: the ship on the owner's loop", () => {
     const text = toScript(exampleState(i));
     expect(text).toMatch(/^# track: file neon-rain-loop\.mp3$/m);
     expect(fromScript(text, BLANK_STATE).state.track).toBe("flyer");
-    expect(fromScript("# track: laidback 6 bars\nbeats 0-4 | action: rest\n", BLANK_STATE).state.track).toBe("drone");
+    expect(fromScript("# track: laidback 6 bars\nbeats 0-4 | action: rest\n", BLANK_STATE).state.track).toBe("laidback-6");
     expect(fromScript("# track: file other.mp3\nbeats 0-4 | action: rest\n", BLANK_STATE).state.track).toBeUndefined();
   });
   it("its lanes already end where the page fits a 14 s clip, so loading the music moves no edge", () => {
