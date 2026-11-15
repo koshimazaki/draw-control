@@ -1,15 +1,15 @@
-# Draw Control example 2: one street guide for any travelling subject, a person or a vehicle. It opens low and close on the subject's feet (a shoe, a skateboard, a forklift's wheel) on the first kick, pulls back alongside it as it passes behind the row of blocks and shows through the gaps (on the snare at beat 9), and rises to a high three-quarter view of the whole street (on the snare at beat 21). The subject keeps one steady speed. The figure is a runner shape.
+# Draw Control example 2: one street guide for any travelling subject, a person or a vehicle. It opens low and close on the subject's feet (a shoe, a skateboard, a forklift's wheel) on the first kick, pulls back alongside it as it passes behind the row of blocks and shows through the gaps (on the snare at beat 9), with one small hop on the kick at 6.64 s (beat 19.24) in the gap between the first two blocks, and rises to a high three-quarter view of the whole street (on the snare at beat 21). The subject keeps one steady speed. The figure is a runner shape.
 # track: file drum-n-bass.mp3
 # clip: 12 s · figure: runner · Draw Control
 # The same guide serves three subjects: swap only the three shot lines below (and the references); the legend line stays (the page builds it from the figure's colours). This file carries the New York runner.
 # Anime skater:
 #   shot subject: an anime-style skateboarder in a loose hoodie and sneakers, drawn with clean outlines and flat colours (the orange figure; white marks the chest)
 #   shot environment: an anime city street in the afternoon, shops and cafés along the pavement, cel-shaded, soft sky
-#   shot action: close on the skateboard's wheels and deck as they push along, then alongside them as they pass behind the shopfronts and show through the gaps, then a high view of the whole street
+#   shot action: close on the skateboard's wheels and deck as they push along, then alongside them as they pass behind the shopfronts and show through the gaps, an ollie in a gap, then a high view of the whole street
 # Factory forklift:
 #   shot subject: an industrial forklift carrying a pallet, yellow and black (the orange figure; white marks its front)
 #   shot environment: a car factory floor, the grey blocks are its steel pillars and machines, car bodies on the line, robot arms, overhead lights
-#   shot action: close on its front wheel as it drives along, then alongside it as it passes behind the factory pillars and between the stations, then a high view of the whole factory floor
+#   shot action: close on its front wheel as it drives along, then alongside it as it passes behind the factory pillars and between the stations, a bump over a floor plate in a gap, then a high view of the whole factory floor
 rig: distance 2.5m height 0.3m fov 32 yaw 90
 landmarks: on seed 7
 figure: shape runner body #ff6a13 head #f2a35e
@@ -24,8 +24,9 @@ box: 10 8 8 6 14
 box: 20 8 8 6 12
 shot subject: a young woman running, athletic, in black running kit and white trainers, shot like a running-shoe advert (the orange figure; white marks her chest)
 shot environment: a New York street in the morning, shops and cafés along the pavement, yellow cabs, shot on film with visible grain
-shot action: close on her trainers as she runs, then alongside her as she passes behind the shopfronts and shows through the gaps, then a high view of the whole street
+shot action: close on her trainers as she runs, then alongside her as she passes behind the shopfronts and shows through the gaps, a quick hop over a puddle in a gap, then a high view of the whole street
 shot legend: the orange figure is the character; grey blocks are placeholders for the environment
 beats 0-9   | action: walk on path (-24,0) (24,0) corners 0 | camera: follow side distance 2.5m height 0.3m aim 0.3m fov 32 | shot: -
-beats 9-21  | action: continue | camera: follow side height 1.6m aim 1m fov 36 + pull out to 13m | shot: -
+beats 9-19  | action: continue | camera: follow side height 1.6m aim 1m fov 36 + pull out to 13m | shot: -
+beats 19-21 | action: continue, jump @kick 1 | camera: continue
 beats 21-35 | action: continue | camera: three-quarter distance 13m aim 1m fov 42 + rise to 8m | shot: -

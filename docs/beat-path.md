@@ -101,7 +101,7 @@ Example 2 (`examples/scripts/beat-path-ex2-runner.txt`) is one street guide made
 
 What makes it work for a person and a vehicle alike:
 - **A neutral, person-sized figure** (the runner shape: an upright capsule 1.55 m tall with a white chest marker). It reads as a runner or a skater, and as a forklift's upright mast and cab; a car shape would push a model towards a vehicle in the two people versions.
-- **One steady travelling path**: a straight line down the street at 4 m/s, no turn, jump, trick or travel lock, a speed a runner, a skater and a forklift can all hold.
+- **One steady travelling path**: a straight line down the street at 4 m/s, no turn, trick or travel lock, a speed a runner, a skater and a forklift can all hold. One small **hop** (0.28 m) lands on the kick at 6.636 s (beat 19.24) while the travel runs on, in the gap between the first two blocks, so it is seen; each action line names it (a hop over a puddle, an ollie, a bump over a floor plate). It is the Character lane's **Hop** block (beats 19–35; the script row `continue, jump @kick 1`): a small jump on the first kick of the block's first row, without ending the glide. With no kick there (before the track is analysed) it lands on the row's start.
 - **Three camera blocks, each starting on a hit, unbroken between them** (no `lock … hold`): low and close on the feet on the first kick (`follow side distance 2.5m height 0.3m aim 0.3m fov 32`: the shoe, the board, the wheel); a pull back alongside as the subject passes behind the row of blocks and shows through the gaps, on the snare at beat 9 (`follow side height 1.6m aim 1m fov 36 + pull out to 13m`); a rise to a high three-quarter view of the whole street (the factory floor), on the snare at beat 21 (`three-quarter distance 13m aim 1m fov 42 + rise to 8m`), held to the end. The two later moves ease over their whole block, so nothing jumps at 174 BPM, where an offset's one-beat ease is only 0.34 s.
 - **The blocks are generic**: three low blocks between camera and subject (shopfronts, cafés, the factory's pillars and machines) and a row of tall ones beyond it (buildings across the street, the factory wall).
 
@@ -111,12 +111,12 @@ The runner is the example's default shot. The other two, ready to paste over the
 # Anime skater
 shot subject: an anime-style skateboarder in a loose hoodie and sneakers, drawn with clean outlines and flat colours (the orange figure; white marks the chest)
 shot environment: an anime city street in the afternoon, shops and cafés along the pavement, cel-shaded, soft sky
-shot action: close on the skateboard's wheels and deck as they push along, then alongside them as they pass behind the shopfronts and show through the gaps, then a high view of the whole street
+shot action: close on the skateboard's wheels and deck as they push along, then alongside them as they pass behind the shopfronts and show through the gaps, an ollie in a gap, then a high view of the whole street
 
 # Factory forklift
 shot subject: an industrial forklift carrying a pallet, yellow and black (the orange figure; white marks its front)
 shot environment: a car factory floor, the grey blocks are its steel pillars and machines, car bodies on the line, robot arms, overhead lights
-shot action: close on its front wheel as it drives along, then alongside it as it passes behind the factory pillars and between the stations, then a high view of the whole factory floor
+shot action: close on its front wheel as it drives along, then alongside it as it passes behind the factory pillars and between the stations, a bump over a floor plate in a gap, then a high view of the whole factory floor
 ```
 
 The same lines are comments at the top of the script. Give each subject its own character and environment references; the guide is the same file for all three. After each generation, `npm run finish` (above) trims the 12 s clip to the music's 11.04 s.

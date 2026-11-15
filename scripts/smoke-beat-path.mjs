@@ -343,7 +343,8 @@ const EX2_CLI_FRAME0 = [-24, 0.3, -2.5];
 /**
  * Example 2: one street guide for any subject, on the owner's 11.04 s drum and bass loop under a 12 s clip. The recipe builds
  * on the file's given grid (174 BPM, beat 0 at 0 s), the three camera blocks start on the first kick and the snares at beats 9
- * and 21 with no stations, the lane edges stay where the script put them, frame 0 is the CLI render's, and the music plays.
+ * and 21 with no stations, the lane edges stay where the script put them, frame 0 is the CLI render's, the one hop lands on
+ * the kick at 6.636 s while the travel runs on, and the music plays.
  */
 async function smokeExample2(page, fail) {
   await page.waitForFunction(() => window.__beatPath.trackName() === "drum-n-bass.mp3", null, { timeout: 30_000 }).catch(() => {});
@@ -359,6 +360,11 @@ async function smokeExample2(page, fail) {
   if (ex2.r.beatGrid.bpm !== 174 || ex2.r.beatGrid.offsetSeconds !== 0) fail(`Example 2 is not on its given grid (${ex2.r.beatGrid.bpm} BPM, ${ex2.r.beatGrid.offsetSeconds} s)`);
   if (off > 0.05) fail(`Example 2's frame 0 camera is ${off.toFixed(3)} m from the CLI render's`);
   if (!(Math.abs(ex2.length - 11.04) < 0.02)) fail(`Example 2's track is ${ex2.length} s, not the 11.04 s loop`);
+  // One hop on the kick at 6.636 s (beat 19.24), in the gap between the first two blocks; the walk runs the whole clip.
+  const hops = (ex2.r.reactive?.markers ?? []).filter(m => m.accent === "jump"), lanes = ex2.s.character.map(b => `${b.from}-${b.to} ${b.word}`).join(", ");
+  console.log(`draw control: Example 2's character lane ${lanes}; hop at ${hops.map(m => m.seconds.toFixed(3)).join(", ")} s; walk ${ex2.r.moves[0]?.lengthBeats} beats`);
+  if (hops.length !== 1 || Math.abs(hops[0].seconds - 6.636) > 0.03) fail(`Example 2 should hop once on the kick at 6.636 s (got ${JSON.stringify(hops)})`);
+  if (lanes !== "0-19 glide, 19-35 hop" || ex2.r.moves[0]?.lengthBeats !== 35) fail(`Example 2's hop broke the travel (lanes ${lanes}, walk ${ex2.r.moves[0]?.lengthBeats} beats)`);
   const head0 = await page.evaluate(() => window.__beatPath.head());
   await page.click("#play");
   await page.waitForTimeout(600);

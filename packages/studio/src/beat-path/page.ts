@@ -208,7 +208,7 @@ export function startBeatPath(root: HTMLElement) {
     const hits = track ? [...onsetBeats(recipe, live()?.bands, "kick"), ...onsetBeats(recipe, live()?.bands, "snare")] : [];
     return [snapBeat(recipe, b, "beat"), ...hits].reduce((best, x) => (Math.abs(x - b) < Math.abs(best - b) ? x : best));
   }
-  const characterLane = lane<CharacterWord>("laneCharacter", "character", LABELS.character, ["glide", "hover", "spin", "jump", "freeze"], "glide");
+  const characterLane = lane<CharacterWord>("laneCharacter", "character", LABELS.character, ["glide", "hover", "spin", "jump", "hop", "freeze"], "glide");
   const cameraLane = lane<CameraWord>("laneCamera", "cameraLane", LABELS.camera, ["behind", "side", "orbit", "top", "path", "push"]);
   /** The status line under Generate (the whole text on hover when it is cut). Map hints go to the map's own line (page-actions.ts). */
   const say = (text: string) => { const el = $("status"); el.textContent = text; el.title = text; };
