@@ -17,6 +17,12 @@ Lineage, in three lines:
 
 **Since 13 November the Runware theme is dark** (the site's own dark look), with the map as a light paper surface; the neutral theme stays the repo default and stays dark (the studio's palette): one set of tokens, two palettes, and a third small set (`--map-*`) for the map's surface so it can differ from the page.
 
+## Round 10 (15 November): Slice, Export, Smooth
+
+- **Slice** and **Export** (`.track-acts`, two small `.btn.outline` with icons) sit under Sensitivity in the track panel, where the status line was. Slice makes the music inside the clip window the track (analysed again for hits, on the same beat grid: beat 0 at the cut's start, so the lanes stay on their music; not an undo step, as loading a track is not one). Export saves that music as a 16-bit WAV through the browser's download, named from the track and the range, ready for *Your track*.
+- **Smooth** (`.btn.ghost`, no icon) sits beside Corners on the map's tool row for the Subject and Camera tools: each press moves the picked points (two or more, a dragged box), else the whole path, half way towards the midpoint of their neighbours; the ends stay. One undo step a press.
+- **Where messages go now.** The status line (`#status`, the notification row's green dot) is one line under the Generate row, the whole text on hover. The map's own hints (what a click on the map did) go to the line under the map (`#mapHint`) and stay there until the tool, view or pen changes or 8 s pass; where that line is hidden (a narrow map, the follow fields) they go to the status line.
+
 ## Round 8 (13 November): selection corrections
 
 - **Generate** is a normal primary button sized to its label (bolt + "Generate"); the model choice and Settings sit beside it.
@@ -32,8 +38,8 @@ The component set follows Runware's dashboard as a complement to it (dark, panel
 | Component | Class | Treatment | Used for |
 | --- | --- | --- | --- |
 | Primary button | `.btn.primary` | accent fill, near-black text, medium weight, a line icon at the left | Generate (sized to its label since round 8, a bolt; a stop square while running), the cost dialog's Generate |
-| Secondary button | `.btn`, `.btn.outline` | panel fill or none, 1 px border, white text, icon left | Your track, Download guide, lock buttons, Cancel |
-| Ghost button | `.btn.ghost` | no border, white text, icon left; disabled grey | Gallery, Get the code, Settings, No music, Clear, zoom |
+| Secondary button | `.btn`, `.btn.outline` | panel fill or none, 1 px border, white text, icon left | Your track, Download guide, lock buttons, Cancel, Slice, Export |
+| Ghost button | `.btn.ghost` | no border, white text, icon left; disabled grey | Gallery, Get the code, Settings, No music, Clear, Smooth, zoom |
 | Link that acts | `.link-act` | accent text and an arrow | Load into the editor, Reset markers |
 | Segmented control | `.seg` | 1 px bordered container; selected = accent text on a quiet pill (round 8; the example switcher an accent pill) | examples, Subject/Camera/Blocks, Top/Side, Edit/Draw new, 5 s/8 s, the model, Left/Right |
 | Toggle | `.toggle` | on = accent pill, "ON" in small dark capitals, a dark knob | Snap, Ground grid, Pass in front |
@@ -42,10 +48,10 @@ The component set follows Runware's dashboard as a complement to it (dark, panel
 | Section heading | `.lab` | mono capitals, dim | Settings rows (Clip, Locks, Guide, Figure, Guide file) |
 | Input | `.field`, `.unit-field` | a shade lighter than the panel, 1 px border, the unit in grey inside | shot fields, follow distance / height / angle, box height |
 | Card | `.panel`, `.gallery-row` | 1 px border, 12 px radius | map pane, gallery rows, menus, popovers |
-| Notification row | `.audio-info .status` | a small green dot, then the text | the status line |
+| Notification row | `.compose .status` | a small green dot, then the text, one line under Generate (round 10) | the status line |
 | Icons | `ui/icons.ts` | 16 px line icons, 1.5 px stroke, the control's colour | the actions above |
 
-**Icons** are Lucide's shapes (lucide.dev), ISC licence: "Copyright (c) for portions of Lucide are held by Cole Bemis 2013-2022 as part of Feather (MIT). All other copyright (c) for Lucide are held by Lucide Contributors 2022." Permission to use, copy, modify and distribute with or without fee is granted under the ISC terms. The set: zap, plus, download, upload, layout-grid (gallery), code, key-round, chevron-down/right, trash-2, undo-2, sliders-horizontal, arrow-right, arrow-up-right, music, film, image, x, arrow-left-right (swap), square. No Runware icon, logo or wordmark is used.
+**Icons** are Lucide's shapes (lucide.dev), ISC licence: "Copyright (c) for portions of Lucide are held by Cole Bemis 2013-2022 as part of Feather (MIT). All other copyright (c) for Lucide are held by Lucide Contributors 2022." Permission to use, copy, modify and distribute with or without fee is granted under the ISC terms. The set: zap, plus, download, upload, layout-grid (gallery), code, key-round, chevron-down/right, trash-2, undo-2, sliders-horizontal, arrow-right, arrow-up-right, music, film, image, x, arrow-left-right (swap), square, scissors. No Runware icon, logo or wordmark is used.
 
 **On the paper map** the accent lime has too little contrast (1.2:1 on `#f2f2f2`), so the map's own selection (the selected scenery block and its corner handles) uses `--map-select`: a deep green `#2f6b23` (5.9:1) in the Runware theme, the accent in the neutral theme's dark map. Paths keep their own colours.
 

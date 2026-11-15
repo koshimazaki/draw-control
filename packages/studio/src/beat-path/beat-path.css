@@ -1,5 +1,5 @@
 /* Beat Path page layout: one screen, no scrolling; tokens and components only (ui/components.css, themes/). */
-:root { --top: 52px; --dock: 136px; --compose: calc(3 * var(--control-h) + 2 * var(--s-2)); --gap: var(--s-4); --pad: var(--s-5); }
+:root { --top: 52px; --dock: 136px; --compose: calc(3 * var(--control-h) + 3 * var(--s-2) + var(--status-h)); --status-h: 16px; --gap: var(--s-4); --pad: var(--s-5); }
 html, body { height: auto; overflow: visible; }
 .editor { display: grid; grid-template-rows: var(--top) minmax(0, 1fr) var(--dock); height: 100vh; }
 html { scroll-behavior: smooth; }
@@ -181,9 +181,11 @@ select:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
 .block.w-behind, .block.w-side, .block.w-orbit, .block.w-top, .block.w-path, .block.w-push { --block-mark: var(--camera); }
 .audio-info { display: grid; gap: var(--s-1); font-size: var(--text-sm); min-width: 0; }
 .audio-info p { margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-/* The track name wraps (a long file name is never cut off); the status clamps to two lines. */
+/* The track name wraps (a long file name is never cut off). */
 .audio-info .track-row { white-space: normal; overflow-wrap: anywhere; line-height: 1.3; }
-.audio-info .status { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.3; }
+/* Slice and Export, under Sensitivity: the music inside the clip window. */
+.audio-info .track-acts { display: flex; gap: var(--s-2); }
+.audio-info .track-acts .btn { height: 26px; padding: 0 var(--s-2); font-size: var(--text-xs); }
 .legend i { display: inline-block; width: 2px; height: 10px; border-radius: 1px; margin: 0 var(--s-1) 0 0; vertical-align: -1px; }
 .legend i.k { background: var(--kick); } .legend i.s { background: var(--snare); } .legend i.h { background: var(--hat); }
 /* The legend picks the kind of marker Alt-click adds; each shows its count in the clip. */
@@ -207,8 +209,9 @@ select:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
 .sound[aria-pressed="false"] { color: var(--danger); }
 .track-row { display: flex; gap: var(--s-2); align-items: baseline; }
 .audio-info .link-act { justify-self: start; font-size: var(--text-xs); }
-/* The status line reads as a notification row: a small accent dot, then the text. */
-.audio-info .status:not(:empty)::before { content: ""; display: inline-block; width: 6px; height: 6px; margin-right: 6px; border-radius: 50%; background: var(--rail-fill); vertical-align: 1px; }
+/* The status line, under Generate: one line (the whole text on hover), a small accent dot, then the text. */
+.compose .status { margin: 0; height: var(--status-h); font-size: var(--text-xs); line-height: var(--status-h); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.compose .status:not(:empty)::before { content: ""; display: inline-block; width: 6px; height: 6px; margin-right: 6px; border-radius: 50%; background: var(--rail-fill); vertical-align: 1px; }
 .chip { display: flex; flex-direction: column; align-items: flex-end; justify-content: center; height: var(--lane-h); padding: 0 var(--s-2); border: 1px solid transparent; border-radius: var(--radius-sm);
   background: transparent; color: var(--text-muted); cursor: pointer; line-height: 1.05; transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease); }
 .chip:hover { background: var(--surface-hover); color: var(--text); }

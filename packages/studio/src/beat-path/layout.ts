@@ -55,6 +55,7 @@ export const LAYOUT = `
         </div>
         <label class="pick" id="boxHeightRow" hidden>Height <span class="unit-field"><input id="boxHeight" class="field num" type="number" min="0.2" max="60" step="0.5" /><i>m</i></span></label>
         <label class="slider tip-end" id="cornersRow" data-tip="From sharp corners (hard turns) to a round curve"><span>Corners</span><input id="corners" type="range" min="0" max="1" step="0.05" /><output id="cornersOut"></output></label>
+        <button type="button" id="smoothPath" class="btn ghost tip-end" data-tip="Even out the picked points (drag a box), or the whole path · press again for more">Smooth</button>
         <button type="button" id="wholeClip" class="btn ghost" hidden data-tip="Your drawn camera path flies the whole clip (one Camera block)">Whole clip</button>
         <button type="button" id="clearPath" class="btn ghost">${icon("trash")}Clear</button>
       </div>
@@ -110,6 +111,7 @@ export const LAYOUT = `
           </div>
         </details>
       </div>
+      <p id="status" class="status muted" aria-live="polite"></p>
     </div>
   </section>
 </main>
@@ -129,7 +131,8 @@ export const LAYOUT = `
     <button type="button" class="chip" id="chipCharacter" aria-haspopup="menu" data-tip="The character's lock: what its travel lands on"><span class="chip-name">Character</span><span class="chip-lock" id="chipCharacterLock"></span></button>
     <button type="button" class="chip" id="chipCamera" aria-haspopup="menu" data-tip="The camera's lock: its own source, what it does on each hit"><span class="chip-name">Camera</span><span class="chip-lock" id="chipCameraLock"></span></button>
   </div>
-  <div class="audio-info"><p class="track-row"><span id="trackName">No track</span></p><button type="button" id="resetMarkers" class="link-act" hidden>Reset markers</button><p class="legend muted" role="radiogroup" aria-label="Kind of marker Alt-click adds"><button type="button" class="kind on" data-band="low" role="radio" data-tip="Kicks in the clip · Alt-click the strip to add one"><i class="k"></i>kick <b id="countLow">0</b></button><button type="button" class="kind" data-band="mid" role="radio" data-tip="Snares in the clip · Alt-click adds one when chosen"><i class="s"></i>snare <b id="countMid">0</b></button><button type="button" class="kind tip-end" data-band="high" role="radio" data-tip="Hats in the clip · Alt-click adds one when chosen"><i class="h"></i>hat <b id="countHigh">0</b></button></p><label class="sens" data-tip="How many hits the locks land on: lower keeps fewer, stronger, spaced hits (a busy arpeggio collapses to its accents). Your own markers always count"><span>Sensitivity</span><input id="sensitivity" type="range" min="0" max="100" step="5" aria-label="Hit sensitivity" /><output id="sensitivityOut" class="mono" for="sensitivity"></output></label><p id="status" class="status muted" aria-live="polite"></p></div>
+  <div class="audio-info"><p class="track-row"><span id="trackName">No track</span></p><button type="button" id="resetMarkers" class="link-act" hidden>Reset markers</button><p class="legend muted" role="radiogroup" aria-label="Kind of marker Alt-click adds"><button type="button" class="kind on" data-band="low" role="radio" data-tip="Kicks in the clip · Alt-click the strip to add one"><i class="k"></i>kick <b id="countLow">0</b></button><button type="button" class="kind" data-band="mid" role="radio" data-tip="Snares in the clip · Alt-click adds one when chosen"><i class="s"></i>snare <b id="countMid">0</b></button><button type="button" class="kind tip-end" data-band="high" role="radio" data-tip="Hats in the clip · Alt-click adds one when chosen"><i class="h"></i>hat <b id="countHigh">0</b></button></p><label class="sens" data-tip="How many hits the locks land on: lower keeps fewer, stronger, spaced hits (a busy arpeggio collapses to its accents). Your own markers always count"><span>Sensitivity</span><input id="sensitivity" type="range" min="0" max="100" step="5" aria-label="Hit sensitivity" /><output id="sensitivityOut" class="mono" for="sensitivity"></output></label>
+    <div class="track-acts"><button type="button" id="sliceTrack" class="btn outline tip-end" data-tip="Keep only the music inside the clip window (it is analysed again)">${icon("scissors")}Slice</button><button type="button" id="exportTrack" class="btn outline tip-end" data-tip="Save the music inside the clip window as a WAV file">${icon("download")}Export</button></div></div>
 </footer>
 </div>
 <section class="page-section" id="gallery" aria-labelledby="galleryTitle">

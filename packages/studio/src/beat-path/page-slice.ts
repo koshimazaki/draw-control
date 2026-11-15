@@ -3,10 +3,14 @@
  * its typed start, the beat snap and nudges, your own markers on the music strip (add with
  * Alt-click in the chosen kind, drag, Delete), and the hit counts in the legend. Everything
  * is page state (`slice`, `markers`), so undo and the shot script cover it. Split from page.ts.
+ * Slice and Export under Sensitivity: the music inside the window becomes the track, or a WAV
+ * file (track-cut.ts).
  */
 import type { AudioDrive, Recipe } from "@motion-studio/core";
 import { clipBeats, sensitiveBands, sliceStart } from "@motion-studio/core/internal";
-import type { Track } from "../audio";
+import { trackFromSamples, type Track } from "../audio";
+import { download } from "../shared/download";
+import { cutChannels, exportName, moveOntoCut, slicedName, windowWav } from "./track-cut";
 import { TrackOverview } from "./overview";
 import type { TrackInfo } from "./recipe-map";
 import { clampClip, fitLanes, type BeatPathState } from "./script";
@@ -19,7 +23,13 @@ type Page = {
   update(next: BeatPathState, final?: boolean): void;
   seek(seconds: number): void;
   say(text: string): void;
+  /** Load a cut as the track, on the same beat grid, every state moved by `move` (false when refused). */
+  useCut(next: Track, move: (s: BeatPathState) => BeatPathState): boolean;
 };
+
+/** A sliced track's original: its name and where the cut starts in it (so a second slice still names the original's seconds). */
+const origins = new WeakMap<Track, { name: string; offset: number }>();
+const originOf = (t: Track) => origins.get(t) ?? { name: t.name, offset: 0 };
 
 /** The window's start for a wanted time: snapped to the track's beats (snap on) and kept inside the track. */
 export function sliceFor(at: number, info: TrackInfo, clip: number, snap: boolean): number {
@@ -111,9 +121,29 @@ export function bindSlice(p: Page) {
     return true;
   }
 
-  /** After a rebuild: the overview's track and window, the typed start, the counts in the clip. */
+  // Slice: the track becomes the music inside the window, analysed again; Export: that music as a WAV file.
+  const sliceButton = $<HTMLButtonElement>("sliceTrack"), exportButton = $<HTMLButtonElement>("exportTrack");
+  sliceButton.onclick = () => {
+    const track = p.track, info = p.info;
+    if (!track || !sliceable(info, p.state.clip)) return;
+    const start = p.window0(), clip = p.state.clip, origin = originOf(track);
+    const cut = trackFromSamples(slicedName(origin.name, origin.offset + start, origin.offset + start + clip), cutChannels(track.buffer, start, clip), track.buffer.sampleRate);
+    origins.set(cut, { name: origin.name, offset: origin.offset + start });
+    if (p.useCut(cut, s => moveOntoCut(s, start, clip))) p.say(`Sliced to ${clip.toFixed(1)} s. Load the file again to get the whole track back`);
+  };
+  exportButton.onclick = () => {
+    const track = p.track;
+    if (!track) return;
+    const start = p.window0(), clip = p.state.clip, origin = originOf(track), name = exportName(origin.name, origin.offset + start, origin.offset + start + clip);
+    download(windowWav(track.buffer, start, clip), name, "audio/wav");
+    p.say(`Saved ${name} (${clip.toFixed(1)} s) to your downloads · load it again with Your track`);
+  };
+
+  /** After a rebuild: the overview's track and window, the typed start, the counts in the clip, Slice and Export. */
   function sync() {
     const info = p.info, on = sliceable(info, p.state.clip);
+    sliceButton.disabled = !p.track || !on;
+    exportButton.disabled = !p.track;
     document.querySelector(".editor")?.classList.toggle("with-overview", on);
     overview.setTrack(on ? p.track : null);
     if (on) overview.setWindow(p.window0(), p.state.clip);

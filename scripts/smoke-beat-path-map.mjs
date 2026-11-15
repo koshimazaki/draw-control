@@ -5,6 +5,7 @@
  * - the map's +/− zoom the map and not the timeline, and the timeline's +/− zoom the timeline;
  * - Camera → Draw new → drag draws the camera path on every example and on Your own, a block flies it,
  *   and a second stroke draws again (the pen stays armed);
+ * - Smooth (at 1280 px): a hand-drawn zig-zag subject path gets flatter, keeps its ends and point count, undo restores it;
  * - any console error or warning fails the run.
  */
 
@@ -98,6 +99,8 @@ export async function smokeBeatPathMap(browser, base, { fail, SHOTS }) {
       await page.keyboard.press("Escape");
     }
 
+    if (width === 1280) await smokeSmooth(page, fail, SHOTS);
+
     // A (fake) result beside the preview, then the divider to both extremes.
     await page.click('[data-control="example"] [data-value="0"]');
     await page.waitForFunction(() => document.querySelector("#keySlot arena-key"), null, { timeout: 30_000 });
@@ -114,4 +117,31 @@ export async function smokeBeatPathMap(browser, base, { fail, SHOTS }) {
     console.log(`beat path map: ${width} px tool row and camera drawing checked`);
     await page.close();
   }
+}
+
+/** Smooth on the map's tool row: a zig-zag drawn by hand gets flatter with one press (ends and count kept); undo restores it. */
+async function smokeSmooth(page, fail, SHOTS) {
+  const at = q => page.evaluate(q => window.__beatPath.mapPoint(q), q);
+  const subject = async () => (await page.evaluate(() => window.__beatPath.state())).subject;
+  const wobble = pts => { const a = pts[0], b = pts.at(-1), dx = b.x - a.x, dz = b.z - a.z, L = Math.hypot(dx, dz); return Math.max(...pts.slice(1, -1).map(p => Math.abs(((p.x - a.x) * dz - (p.z - a.z) * dx) / L))); };
+  await page.click('[data-control="example"] [data-value="0"]');
+  await page.click('[data-control="tool"] [data-value="subject"]');
+  await page.click("#clearPath");
+  if (!(await page.isDisabled("#smoothPath"))) fail("Smooth is enabled with no subject path");
+  await page.click('[data-control="pen"] [data-value="draw"]');
+  const zig = [[-6, 0], [-4, 3], [-2, -3], [0, 3], [2, -3], [4, 3], [6, 0]].map(([x, z]) => ({ x, z }));
+  const first = await at(zig[0]);
+  await page.mouse.move(first.x, first.y); await page.mouse.down();
+  for (const q of zig.slice(1)) { const s = await at(q); await page.mouse.move(s.x, s.y, { steps: 6 }); }
+  await page.mouse.up();
+  await page.keyboard.press("Escape");
+  const drawn = await subject();
+  if (drawn.length < 5 || await page.isDisabled("#smoothPath")) { fail(`the zig-zag did not draw a path Smooth can work on (${drawn.length} points)`); return; }
+  await page.click("#smoothPath");
+  const smoothed = await subject();
+  console.log(`beat path map: Smooth: ${drawn.length} points, off the line by ${wobble(drawn).toFixed(2)} m → ${wobble(smoothed).toFixed(2)} m (${smoothed.length} points)`);
+  if (!(wobble(smoothed) < wobble(drawn) * 0.8) || smoothed.length !== drawn.length || JSON.stringify([smoothed[0], smoothed.at(-1)]) !== JSON.stringify([drawn[0], drawn.at(-1)])) fail("Smooth did not flatten the zig-zag with its ends and point count kept");
+  await page.screenshot({ path: `${SHOTS}beat-path-smooth.png` });
+  await page.keyboard.press("ControlOrMeta+z");
+  if (JSON.stringify(await subject()) !== JSON.stringify(drawn)) fail("undo did not restore the path before Smooth");
 }
