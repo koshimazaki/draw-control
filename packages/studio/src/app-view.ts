@@ -4,6 +4,7 @@
  * the rig panel. Split from app.ts; every recipe change still goes through `ctx.edit`.
  */
 import { addMarker, setMarkerAccent, setMoveAtBeat, type AudioDrive, type FrameState, type MotionCommand, type Recipe } from "@motion-studio/core/internal";
+import { fillBoneSelect } from "./bone-select";
 import { updateExportPanel, exportSize } from "./export/panel";
 import { MoveGizmo, previewState } from "./move-gizmo";
 import { PathDrawer } from "./path-draw";
@@ -70,10 +71,7 @@ export function bindViewControls(host: ViewHost): ViewControls {
     host.render();
   };
   $<HTMLSelectElement>("boneSelect").onchange = () => { viewport.setAids({ bone: $<HTMLSelectElement>("boneSelect").value || null }); host.render(); };
-  function fillBones() {
-    const names = boneList(viewport.getCharacter()).map(b => b.name);
-    $("boneSelect").innerHTML = `<option value="">none</option>` + names.map(n => `<option value="${n}">${n}</option>`).join("");
-  }
+  function fillBones() { fillBoneSelect($<HTMLSelectElement>("boneSelect"), boneList(viewport.getCharacter()).map(b => b.name)); }
   let previewing = false, previewStart = performance.now();
   const gizmo: MoveGizmo = new MoveGizmo(() => {
     previewStart = performance.now();

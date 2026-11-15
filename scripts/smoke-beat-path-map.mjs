@@ -2,6 +2,7 @@
  * Map checks for the Beat Path page, called from smoke-beat-path.mjs:
  * - the map's tool row stays visible and clickable after every tool and view switch, after zooming,
  *   after dragging the divider to both extremes, and at 1100 and 1280 px wide;
+ * - the map's +/− zoom the map and not the timeline, and the timeline's +/− zoom the timeline;
  * - Camera → Draw new → drag draws the camera path on every example and on Your own, a block flies it,
  *   and a second stroke draws again (the pen stays armed);
  * - any console error or warning fails the run.
@@ -49,6 +50,30 @@ export async function smokeBeatPathMap(browser, base, { fail, SHOTS }) {
       await page.click(`[data-control="${control}"] [data-value="${value}"]`);
       await check(`after ${control} → ${value}`);
     }
+    // Each zoom pair drives its own view: the map's +/− the map, the timeline's +/− the timeline.
+    const zooms = () => page.evaluate(() => {
+      const a = window.__beatPath.mapPoint({ x: 0, z: 0 }), b = window.__beatPath.mapPoint({ x: 1, z: 0 });
+      return { map: Math.hypot(b.x - a.x, b.y - a.y), timeline: window.__beatPath.timelineZoom() };
+    });
+    const zoomStep = async (id, expect) => {
+      const before = await zooms();
+      await page.click(`#${id}`);
+      const after = await zooms();
+      const mapMoved = Math.abs(after.map - before.map) > 1e-3, tlMoved = after.timeline !== before.timeline;
+      if ((expect === "map") !== mapMoved || (expect === "timeline") !== tlMoved)
+        fail(`at ${width} px #${id} should zoom the ${expect} only (map ${before.map.toFixed(2)} → ${after.map.toFixed(2)} px/m, timeline ${before.timeline} → ${after.timeline}×)`);
+      return { before, after };
+    };
+    if (await page.isDisabled("#zoomOut")) fail(`at ${width} px the map's zoom-out button is disabled on load`);
+    if (!(await page.isDisabled("#tlZoomOut"))) fail(`at ${width} px the timeline's zoom-out button is enabled at 1×`);
+    const mapIn = await zoomStep("zoomIn", "map");
+    if (!(mapIn.after.map > mapIn.before.map)) fail(`at ${width} px the map's + did not zoom the map in`);
+    const mapOut = await zoomStep("zoomOut", "map");
+    if (!(mapOut.after.map < mapOut.before.map)) fail(`at ${width} px the map's − did not zoom the map out`);
+    const tlIn = await zoomStep("tlZoomIn", "timeline");
+    if (tlIn.after.timeline !== 2) fail(`at ${width} px the timeline's + went to ${tlIn.after.timeline}× instead of 2×`);
+    const tlOut = await zoomStep("tlZoomOut", "timeline");
+    if (tlOut.after.timeline !== 1) fail(`at ${width} px the timeline's − went to ${tlOut.after.timeline}× instead of 1×`);
     for (const id of ["zoomIn", "zoomIn", "zoomIn", "zoomOut", "zoomFit"]) { await page.click(`#${id}`); await check(`after ${id}`); }
 
     // Camera → Draw new → drag, on every example and on Your own.
