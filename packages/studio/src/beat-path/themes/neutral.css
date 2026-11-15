@@ -1,4 +1,4 @@
-/* Neutral theme (the default): unbranded, the studio's calm dark palette. Tokens only. */
+/* Neutral theme (?theme=neutral): unbranded, the studio's calm dark palette. Tokens only. */
 :root {
   color-scheme: dark;
   --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;

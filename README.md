@@ -14,7 +14,7 @@ The lean demo: **draw a path on a map, add music, and the movement and the camer
 Changing the page (developers and agents): [docs/beat-path.md](docs/beat-path.md) says how to run and check it and which file owns each control.
 
 ```bash
-nvm use && npm install && npm run dev   # open http://127.0.0.1:5180/path.html  (Runware look: /path.html?theme=runware)
+nvm use && npm install && npm run dev   # open http://127.0.0.1:5180/path.html  (the Runware look; /path.html?theme=neutral for the neutral palette)
 ```
 
 It opens on **Example 1** (a flying car among city towers) with its own music: press **Play**. *Example 2* is a runner on a city street filmed from beyond a colonnade (the columns pass between camera and runner for a moment at a time), *Example 3* a car on a coastal bend, *Example 4* a drone weaving between pillars (the camera opens isometric, pans round, rises to the top view and ends on the side view from the other side), *Your own* starts from a plain path; each keeps its edits and brings its own figure shape, scenery, camera and generated track (100, 120 or 140 BPM; the example-to-track table is `packages/studio/src/beat-path/tracks.ts`, your own files go in `packages/studio/public/tracks/`).

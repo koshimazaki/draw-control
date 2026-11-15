@@ -27,7 +27,8 @@ export async function smokeBeatPath(browser, base, { fail, OUT, SHOTS }) {
   const errors = [];
   page.on("pageerror", e => errors.push(e.message));
   page.on("console", m => { if (m.type() === "error" || m.type() === "warning") errors.push(`${m.type()}: ${m.text()}`); });
-  await page.goto(`${base}/path.html`);
+  // The first pass is the neutral palette (no external requests); the bare URL (the Runware default) has its own pass below.
+  await page.goto(`${base}/path.html?theme=neutral`);
   await page.waitForFunction(() => window.__beatPath?.recipe().audio?.name === "generated-straight-120.wav", null, { timeout: 30_000 })
     .catch(async e => {
       const seen = await page.evaluate(() => ({ probe: !!window.__beatPath, audio: window.__beatPath?.recipe().audio ?? null, status: document.getElementById("status")?.textContent, url: window.location.href })).catch(x => x.message);
@@ -267,9 +268,10 @@ export async function smokeBeatPath(browser, base, { fail, OUT, SHOTS }) {
   await page.click('[data-control="example"] [data-value="0"]');
   await page.waitForFunction(() => window.__beatPath.recipe().audio, null, { timeout: 30_000 });
 
-  // Themes and sizes.
-  await page.goto(`${base}/path.html?theme=runware`);
+  // Themes and sizes: the bare URL must open in the Runware theme (the page's default).
+  await page.goto(`${base}/path.html`);
   await page.waitForFunction(() => window.__beatPath?.recipe().audio, null, { timeout: 30_000 });
+  if (await page.evaluate(() => document.documentElement.dataset.theme) !== "runware") fail("the page does not open in the Runware theme by default");
   await page.click("#barPlay"); await page.waitForTimeout(1200); await page.click("#play");
   await page.screenshot({ path: `${SHOTS}beat-path-runware.png` });
   await page.setViewportSize({ width: 1440, height: 900 });

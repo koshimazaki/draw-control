@@ -18,7 +18,7 @@ nvm use && npm install     # Node 24 (.nvmrc)
 npm run dev                # then open http://127.0.0.1:5180/path.html
 ```
 
-`/` on the same server is the full studio, a different page; Draw Control is `path.html`. If port 5180 is taken, Vite moves to the next free port and prints it. `?theme=runware` switches to the Runware look. The page opens on Example 1 with its own generated music: press Play, or click the picture.
+`/` on the same server is the full studio, a different page; Draw Control is `path.html`. If port 5180 is taken, Vite moves to the next free port and prints it. It opens in the Runware look (green accent, light grey map); `?theme=neutral` switches to the neutral palette. The page opens on Example 1 with its own generated music: press Play, or click the picture.
 
 **No key and no charge in development.** While `npm run dev` serves the page (or with `?fake=1` on any build), Generate uses a local fake provider (`fakeFetch` in `arena.ts`) as long as no Runware key is connected. It answers the Runware API locally and hands back the guide itself as the "result", so the whole flow (cost question, progress, the output beside the preview, Runs, the gallery) can be tried with nothing sent and nothing charged. **Connecting a real key switches the fake off, in development too:** from then on Generate is a paid call. Do not connect one unless the owner has approved the spend (see [plan.md](plan.md#agent-rules) and [costs.md](costs.md)).
 
