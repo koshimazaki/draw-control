@@ -318,7 +318,14 @@ neutral on purpose:
 - **Figure**: a person-sized, upright, neutral shape (`runner`: a 1.55 m capsule with a chest marker).
   It reads as a person or a skater, and as a forklift's upright mast and cab; a `car` shape would pull
   the people versions towards a vehicle, and a `flyer` reads as aircraft.
-- **Path**: straight and steady, no jump, trick, ramp, rail or travel lock, at a speed every subject can
+- **One accent on the music, without breaking the travel**: the owner wanted "a little more movement
+  with the audio". A hop on one kick (`beats 19-21 | action: continue, jump @kick 1`; the page's
+  Character lane **Hop** block) lifts 0.28 m and lands on the kick while the walk runs on. A page
+  `jump` block is `rest, jump @beat mid`, which ends the travel: use Hop. Put it where it is seen (a
+  gap between blocks in the running view, not in the close detail, where it leaves the frame) and
+  name it in every subject's action line (a hop, an ollie, a bump over a floor plate). Check the
+  marker's seconds in the recipe and the lift with `frameAt` against `camera.json`.
+- **Path**: straight and steady, no ramp, rail, trick or travel lock, at a speed every subject can
   hold (4 m/s: a jog, a push on a board, a brisk forklift). A ramp was dropped because it would crash
   the runner and the forklift.
 - **Blocks**: generic boxes that each version can name (shopfronts and cafés; the factory's pillars and
