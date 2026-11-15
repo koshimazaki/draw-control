@@ -4,7 +4,8 @@
  * - `left` / `right`: which side of the subject's heading follow side sits on (left, the
  *   rig's own side, when neither is given; right is the rig turned 180°);
  * - `distance Nm`, `height Nm`: metres from the subject and above the ground;
- * - `angle N`: degrees turned around the subject from the rig's angle (+ towards its left).
+ * - `angle N`: degrees turned around the subject from the rig's angle (+ towards its left);
+ * - `aim Nm`: the height on the subject the camera looks at (metres; `aim 0.3m` frames the feet).
  * Printing gives the same words back, so a script round-trips.
  */
 import { FOLLOW_LIMITS, type CameraMode, type FollowOffset } from "./camera";
@@ -29,17 +30,19 @@ export function parseFollowArgs(mode: CameraMode, args: string[], fail: (msg: st
     } else if (w === "distance") out.distance = num(args[++i], "follow distance");
     else if (w === "height") out.height = num(args[++i], "follow height");
     else if (w === "angle") out.angle = num(args[++i], "follow angle");
-    else fail(`a follow camera takes left, right, distance Nm, height Nm or angle N (got ${JSON.stringify(w)})`);
+    else if (w === "aim") out.aim = num(args[++i], "follow aim");
+    else fail(`a follow camera takes left, right, distance Nm, height Nm, angle N or aim Nm (got ${JSON.stringify(w)})`);
   }
   if (side || out.angle !== undefined) out.angle = foldDegrees((out.angle ?? 0) + side);
-  const [dLo, dHi] = FOLLOW_LIMITS.distance, [hLo, hHi] = FOLLOW_LIMITS.height;
+  const [dLo, dHi] = FOLLOW_LIMITS.distance, [hLo, hHi] = FOLLOW_LIMITS.height, [aLo, aHi] = FOLLOW_LIMITS.aim;
   if (out.distance !== undefined && !(out.distance >= dLo && out.distance <= dHi)) fail(`follow distance runs ${dLo}–${dHi} m`);
   if (out.height !== undefined && !(out.height >= hLo && out.height <= hHi)) fail(`follow height runs ${hLo}–${hHi} m`);
+  if (out.aim !== undefined && !(out.aim >= aLo && out.aim <= aHi)) fail(`follow aim runs ${aLo}–${aHi} m`);
   if (out.angle === 0) delete out.angle;
   return Object.keys(out).length ? out : undefined;
 }
 
-/** The words after a follow mode's own word: "right distance 14m height 2.5m angle 10" (empty without an offset). */
+/** The words after a follow mode's own word: "right distance 14m height 2.5m angle 10 aim 0.3m" (empty without an offset). */
 export function followWords(mode: CameraMode, f: FollowOffset | undefined): string {
   if (!f) return "";
   const parts: string[] = [];
@@ -48,5 +51,6 @@ export function followWords(mode: CameraMode, f: FollowOffset | undefined): stri
   if (f.distance !== undefined) parts.push(`distance ${fmt(f.distance)}m`);
   if (f.height !== undefined) parts.push(`height ${fmt(f.height)}m`);
   if (Math.abs(angle) > 1e-9) parts.push(`angle ${fmt(angle)}`);
+  if (f.aim !== undefined) parts.push(`aim ${fmt(f.aim)}m`);
   return parts.join(" ");
 }

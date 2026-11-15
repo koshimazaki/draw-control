@@ -264,10 +264,11 @@ function blocks(v: unknown, words: readonly string[], camera: boolean): { list: 
 }
 
 function follow(f: Rec): FollowOffset | undefined {
-  const out: FollowOffset = {}, d = num(f.distance), h = num(f.height), a = num(f.angle);
+  const out: FollowOffset = {}, d = num(f.distance), h = num(f.height), a = num(f.angle), aim = num(f.aim);
   if (d !== undefined) out.distance = clamp(d, FOLLOW_LIMITS.distance[0], FOLLOW_LIMITS.distance[1]);
   if (h !== undefined) out.height = clamp(h, FOLLOW_LIMITS.height[0], Math.min(FOLLOW_LIMITS.height[1], CAMERA_MAX_HEIGHT));
   if (a !== undefined) out.angle = clamp(a, FOLLOW_LIMITS.angle[0], FOLLOW_LIMITS.angle[1]);
+  if (aim !== undefined) out.aim = clamp(aim, FOLLOW_LIMITS.aim[0], FOLLOW_LIMITS.aim[1]);
   return Object.keys(out).length ? out : undefined;
 }
 

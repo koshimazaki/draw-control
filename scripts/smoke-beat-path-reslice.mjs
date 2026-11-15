@@ -20,9 +20,9 @@ export async function smokeBeatPathReslice(browser, base, { fail, OUT }) {
   page.on("console", m => { if (m.type() === "error" || m.type() === "warning") errors.push(`${m.type()}: ${m.text()}`); });
   await page.goto(`${base}/path.html`);
   await page.waitForFunction(() => window.__beatPath?.recipe().audio, null, { timeout: 30_000 });
-  // On Example 2, an 8 s clip (Example 1 runs 14 s).
-  await page.click('[data-control="example"] [data-value="1"]');
-  await page.waitForFunction(() => window.__beatPath.slot() === "1" && window.__beatPath.trackName() === "generated-drive-140.wav", null, { timeout: 30_000 });
+  // On Example 3, an 8 s clip (Example 1 runs 14 s, Example 2 12 s).
+  await page.click('[data-control="example"] [data-value="2"]');
+  await page.waitForFunction(() => window.__beatPath.slot() === "2" && window.__beatPath.trackName() === "generated-laidback-100.wav", null, { timeout: 30_000 });
   await page.setInputFiles("#trackFile", wav);
   await page.waitForFunction(() => window.__beatPath.trackName() === "minute-track.wav", null, { timeout: 120_000 });
   const bp = fn => page.evaluate(fn);

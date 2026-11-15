@@ -73,7 +73,9 @@ export type CameraSegment = {
   /**
    * A follow rig's offset (chase, lead, side, threeQuarter), eased in like a shot: `distance` from the subject (metres,
    * FOLLOW_LIMITS), `height` (metres, up to CAMERA_MAX_HEIGHT), `angle` turned around the subject from the rig's own
-   * angle (degrees; 180 puts follow side on the subject's right). It stays a follow: the line is the subject's path offset.
+   * angle (degrees; 180 puts follow side on the subject's right), `aim` the height on the subject the camera looks at
+   * (metres above its feet; 1 by default, a shot preset sets its own; 0.3 frames the feet, wheels or board, for a detail).
+   * It stays a follow: the line is the subject's path offset.
    */
   follow?: FollowOffset;
   /** The block's lens: vertical field of view in degrees (FOV_RANGE), eased in like a shot; 100+ reads as a very wide, fisheye-like lens. */
@@ -81,9 +83,9 @@ export type CameraSegment = {
 };
 /** The range a block's lens may take, degrees of vertical field of view. */
 export const FOV_RANGE = [15, 110] as const;
-export type FollowOffset = { distance?: number; height?: number; angle?: number };
+export type FollowOffset = { distance?: number; height?: number; angle?: number; aim?: number };
 /** The range a follow offset may take: far enough to film past a row of street or city blocks (BUILDINGS.block is 14 m). */
-export const FOLLOW_LIMITS = { distance: [1, 30], height: [0.2, 8], angle: [-180, 180] } as const;
+export const FOLLOW_LIMITS = { distance: [1, 30], height: [0.2, 8], angle: [-180, 180], aim: [0, 3] } as const;
 export const PACES = ["slow", "fast"] as const;
 export type Pace = (typeof PACES)[number];
 export type CameraConfig = {
@@ -210,12 +212,13 @@ function validateSegmentExtras(s: Record<string, unknown>, where: string, seg: C
   if (s.follow !== undefined) {
     if (!isObject(s.follow)) fail(`${where}.follow must be an object`);
     const fo = s.follow as Record<string, unknown>;
-    only(fo, ["distance", "height", "angle"], `${where}.follow`);
+    only(fo, ["distance", "height", "angle", "aim"], `${where}.follow`);
     if (!seg.modes.some(m => FOLLOW_MODES.includes(m))) fail(`${where}.follow goes with a follow rig (chase, lead, side, threeQuarter)`);
     const out: FollowOffset = {};
     if (fo.distance !== undefined) out.distance = num(fo.distance, FOLLOW_LIMITS.distance[0], FOLLOW_LIMITS.distance[1], `${where}.follow.distance`);
     if (fo.height !== undefined) out.height = num(fo.height, FOLLOW_LIMITS.height[0], Math.min(FOLLOW_LIMITS.height[1], CAMERA_MAX_HEIGHT), `${where}.follow.height`);
     if (fo.angle !== undefined) out.angle = num(fo.angle, FOLLOW_LIMITS.angle[0], FOLLOW_LIMITS.angle[1], `${where}.follow.angle`);
+    if (fo.aim !== undefined) out.aim = num(fo.aim, FOLLOW_LIMITS.aim[0], FOLLOW_LIMITS.aim[1], `${where}.follow.aim`);
     if (Object.keys(out).length) seg.follow = out;
   }
   if (s.fov !== undefined) seg.fov = num(s.fov, FOV_RANGE[0], FOV_RANGE[1], `${where}.fov`);

@@ -10,7 +10,7 @@ import { followWords, parseFollowArgs } from "@motion-studio/core/internal";
 import { EXAMPLE_TRACKS, type ExampleId } from "./tracks";
 
 export type PathPt = { x: number; z: number; y?: number };
-export const CHARACTER_WORDS = ["glide", "hover", "spin", "jump", "freeze"] as const;
+export const CHARACTER_WORDS = ["glide", "hover", "spin", "jump", "hop", "freeze"] as const;
 export type CharacterWord = (typeof CHARACTER_WORDS)[number];
 export const CAMERA_WORDS = ["behind", "side", "orbit", "top", "path", "push"] as const;
 export type CameraWord = (typeof CAMERA_WORDS)[number];
@@ -91,7 +91,7 @@ export type BeatPathState = {
 };
 
 export const LABELS = {
-  character: { glide: "Glide", hover: "Hover", spin: "Spin", jump: "Jump", freeze: "Freeze" },
+  character: { glide: "Glide", hover: "Hover", spin: "Spin", jump: "Jump", hop: "Hop", freeze: "Freeze" },
   camera: { behind: "Follow behind", side: "Follow side", orbit: "Orbit", top: "Top", path: "My path", push: "Push in" },
   lock: { off: "Off", beat: "Beat", kick: "Kick", snare: "Snare", hat: "Hat" },
   hit: { move: "Keeps moving", hold: "Holds", punch: "Punches in" },
@@ -188,6 +188,8 @@ export function toScript(state: BeatPathState): string {
       const mid = Math.round((c.from + c.to)) / 2;
       if (c === glide && state.subject.length >= 2) action = `walk on path ${pts(state.subject)} corners ${f(state.subjectCorners)}${lock}`;
       else if (c.word === "spin" || c.word === "jump") action = `rest, ${c.word} @beat ${f(mid)}`;
+      // A hop jumps on the first kick of its row while the travel carries on through it (the walk block runs on).
+      else if (c.word === "hop") action = "continue, jump @kick 1";
       else if (c.word === "freeze") action = "freeze";
       else action = "rest";
     }
@@ -268,7 +270,8 @@ export function fromScript(text: string, base: BeatPathState, grid: { bpm: numbe
         const c = cornersIn(a);
         state.subjectCorners = c ?? 0;
         if (readLock(a, state.charLock)) charSeen = true;
-      } else if (/^freeze\b/.test(a)) word = "freeze";
+      } else if (/^continue\b/.test(a) && /\b(jump|kick)\s*@/.test(a)) word = "hop";
+      else if (/^freeze\b/.test(a)) word = "freeze";
       else if (/\bspin\s*@/.test(a)) word = "spin";
       else if (/\b(jump|kick)\s*@/.test(a)) word = "jump";
       else if (!/^(rest|idle)\b/.test(a)) notes.push(`line ${row.line}: "${a}" reads as hover`);
