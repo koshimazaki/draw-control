@@ -23,6 +23,13 @@ npm run hermes                    # starts hermes -p beat-path with the key
 
 **Where the key comes from.** `npm run hermes` and `npm run review` use `RUNWARE_API_KEY` when it is set, and otherwise, on macOS, the Keychain item `runware-api-key`. `hermes -p beat-path` on its own reads only `RUNWARE_API_KEY`. The key is never written to a file, but it is in the environment of Hermes, of both MCP servers and of **every command the agent's terminal tool runs**, so anything the agent runs there can use it.
 
+**Keeping the key safe.**
+
+- **Keychain, not a file.** There is no `.env` for this key (the repository ignores `.env` and `.env.*`). The `security` line above asks for the key with hidden input, so it is never an argument and never reaches shell history. Add `-U` to replace an existing item. `security find-generic-password -s runware-api-key >/dev/null && echo saved` checks it without printing it.
+- **Do not export it in a shell profile.** `npm run hermes` reads the Keychain and passes the key to Hermes alone; `export RUNWARE_API_KEY=…` in `~/.zshrc` would hand it to every program started from that shell. Set the variable only on machines without a Keychain (CI, Linux), from that system's secret store.
+- **Give the agent its own key.** The agent's terminal can read this key (see above), so use a Runware key made for Hermes, not the one the studio or the Draw Control page uses, and revoke it if a session misbehaves. Rotate a key that has been on screen or in a log.
+- **What the Keychain does not stop:** a program running as you can read the item through `security`. It protects against leaked files, not against code you run.
+
 **What setup does.** It uses Hermes's own `profile install`, so other profiles are untouched and an update keeps the profile's memory and sessions. It copies the three skills into the profile and writes two machine paths into its `config.yaml`: the Node that ran the setup and the checkout it ran from. It makes no model call. `npm run hermes:setup -- --dry` only stages the files and says which paths it would write. `HERMES_HOME=<folder>` installs into another Hermes home.
 
 **An update replaces the profile's `config.yaml`, `SOUL.md` and skills** (`profile install --force`). That drops your own edits there, and any "always" approvals, which Hermes keeps in the profile's `config.yaml`. Setup first copies the old `config.yaml` and `SOUL.md` to `config.yaml.bak-<time>` and `SOUL.md.bak-<time>` beside them and prints where.
