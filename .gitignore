@@ -27,3 +27,6 @@ examples/bundles/
 assets-local/
 # published model clips ship with the Beat Path build (npm run publish:clip, docs/deploy.md)
 !packages/studio/public/published/*.mp4
+
+# Example 1's music ships (the owner's track, glitchcandies, made with Suno, used with permission)
+!packages/studio/public/tracks/neon-rain-loop.mp3

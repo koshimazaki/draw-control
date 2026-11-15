@@ -8,6 +8,8 @@ What the three models Draw Control offers take and give back, checked 14 Novembe
 | Seedance 2.5 | 4–30 s, or auto | up to 30 s | **Not published** for 2.5 |
 | MiniMax H3 | 4–15 s | 2–15 s (15 s total), 23.976–60 fps | **24 fps**, apparently fixed |
 
+Example 1 runs 14 s: all three take that length (MiniMax H3 is the tightest, at 15 s), but the page's 3 USD limit refuses Seedance 2.5 at 14 s (its estimate is over it; Kling 4.0 is up to 2.63 USD, MiniMax H3 up to 2.95 USD in the fake-provider dev run).
+
 The lengths and guide limits come from the vendored Model Arena spec (built from Runware's schemas), which marks the output fps of all three as "not stated". None of the three takes an fps setting, and Runware returns no fps field.
 
 ## Sources

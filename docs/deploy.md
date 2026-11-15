@@ -5,7 +5,7 @@ summary: How the Draw Control page is built as plain static files (Cloudflare Pa
 
 # Deploying Draw Control as static files
 
-Draw Control needs no server: no API routes, no backend. Everything it uses is inside the build (the four examples and their presets are bundled from `examples/scripts/`, the music is generated in the browser). Generation runs in the visitor's browser with their own Runware key once the key and generate module is vendored (`packages/studio/public/vendor/`).
+Draw Control needs no server: no API routes, no backend. Everything it uses is inside the build (the four examples and their presets are bundled from `examples/scripts/`; Example 1 plays `public/tracks/neon-rain-loop.mp3`, copied into the build, and Examples 2 to 4 generate their music in the browser). Generation runs in the visitor's browser with their own Runware key once the key and generate module is vendored (`packages/studio/public/vendor/`).
 
 ## Build
 
@@ -61,4 +61,4 @@ The script refuses unknown example or model ids and only ever writes inside `pub
 
 ## Your own music
 
-Put files in `packages/studio/public/tracks/` and set `file` for the example in `packages/studio/src/beat-path/tracks.ts`; they are copied into the build as they are.
+Put files in `packages/studio/public/tracks/` and set `file` for the example in `packages/studio/src/beat-path/tracks.ts`; they are copied into the build as they are. Example 1 does this with the owner's loop (`neon-rain-loop.mp3`, 540 KB at 320 kbps): keep such a file compressed (MP3 or OGG).

@@ -10,6 +10,7 @@ import { SETUP_KIND, SETUP_VERSION, buildSetup, readSetup, setupJson } from "../
 import { awaitFor, fromZip, keepSliceIn, matchAwaited, musicKind, pickFromFolder, planMusic, restoreAwaited, tooBig } from "../src/beat-path/setup-source";
 import { EXAMPLE_TRACKS } from "../src/beat-path/tracks";
 import { notBuilt, shotRefusal } from "../src/beat-path/page-setup";
+import { avenueState } from "./avenue";
 
 const flyerMusic = { name: EXAMPLE_TRACKS.flyer.name, licence: EXAMPLE_TRACKS.flyer.licence, bpm: 120, offsetSeconds: 0.1, lengthSeconds: 18.6 };
 const own = { name: "song.mp3", licence: "unspecified", bpm: 128, offsetSeconds: 0.32, lengthSeconds: 201.4 };
@@ -19,15 +20,15 @@ const file = (state: unknown, extra: Record<string, unknown> = {}) => JSON.strin
 describe("round trip", () => {
   it.each(EXAMPLES.map((e, i) => [e.id, i] as const))("example %s comes back as it was saved", (_, i) => {
     // Each example's music at its own tempo (examples.ts).
-    const id = EXAMPLES[i].id, music = { ...flyerMusic, name: EXAMPLE_TRACKS[id].name, bpm: { flyer: 120, runner: 140, car: 100, drone: 100 }[id] };
+    const id = EXAMPLES[i].id, music = { ...flyerMusic, name: EXAMPLE_TRACKS[id].name, bpm: { flyer: 107.5, runner: 140, car: 100, drone: 100 }[id] };
     const state = exampleState(i), r = ok(setupJson(state, music));
     expect(r.state).toEqual(state);
     expect(r.notes).toEqual([]);
     expect(r.music).toEqual(music);
   });
   describe("the camera's next move on each hit (anchors that need the track's hits)", () => {
-    // Example 1: camera locked to the snare; with advance on, the script anchors its second block on "@snare 1".
-    const s: BeatPathState = { ...exampleState(0), camLock: { ...exampleState(0).camLock, advance: true } };
+    // The avenue shot (Example 1 until 15 Nov): camera locked to the snare; with advance on, the script anchors its second block on "@snare 1".
+    const s: BeatPathState = { ...avenueState(), camLock: { ...avenueState().camLock, advance: true } };
     const snares = (every: number) => ({ hopSeconds: 0.01, low: [], high: [], peaks: [], mid: Array.from({ length: 40 }, (_, i) => ({ seconds: 0.09 + i * every, strength: 1 })) });
     it("with the track's hits: loads as saved, no wait", () => {
       const r = readSetup(setupJson(s, flyerMusic), { bands: snares(0.5) as never });

@@ -22,7 +22,7 @@ export async function smokeBeatPathSetup(browser, base, { fail, OUT }) {
   page.on("pageerror", e => errors.push(e.message));
   page.on("console", m => { if (m.type() === "error" || m.type() === "warning") errors.push(`${m.type()}: ${m.text()}`); });
   await page.goto(`${base}/path.html`);
-  await page.waitForFunction(() => window.__beatPath?.recipe().audio?.name === "generated-straight-120.wav", null, { timeout: 30_000 });
+  await page.waitForFunction(() => window.__beatPath?.recipe().audio?.name === "neon-rain-loop.mp3", null, { timeout: 30_000 });
   const state = () => page.evaluate(() => window.__beatPath.state());
   const look = () => page.evaluate(() => ({ track: window.__beatPath.trackName(), length: window.__beatPath.trackLength(), status: document.getElementById("status").textContent }));
   const loaded = async (what, input, path) => {
@@ -55,7 +55,7 @@ export async function smokeBeatPathSetup(browser, base, { fail, OUT }) {
   /** Settings open (a click elsewhere may have closed it). */
   const settings = async () => { if (!(await page.isVisible("#saveSetup"))) await page.click("#settings summary"); };
   await settings();
-  // 0. Example 1 with "Next move on each hit" on (its camera anchors on snares): saved, it loads back as it was.
+  // 0. Example 1 with "Next move on each hit" on (its camera anchors on hits): saved, it loads back as it was.
   const advance = async () => { await settings(); await page.click("#setCamLock"); await page.click('#menu button:has-text("Next move on each hit")'); };
   await advance();
   if (!(await state()).camLock.advance) fail("Next move on each hit did not turn on");
@@ -71,7 +71,7 @@ export async function smokeBeatPathSetup(browser, base, { fail, OUT }) {
   await page.selectOption("#scenery", "street");
   await page.selectOption("#figureShape", "car");
   const before = await state(), file = await save("setup.json");
-  if (file.kind !== "beat-path-setup" || file.version !== 1 || canon(file.state) !== canon(before) || !/^beats /m.test(file.script) || file.music?.name !== "generated-straight-120.wav")
+  if (file.kind !== "beat-path-setup" || file.version !== 1 || canon(file.state) !== canon(before) || !/^beats /m.test(file.script) || file.music?.name !== "neon-rain-loop.mp3")
     fail(`the saved setup is not the page: ${JSON.stringify({ kind: file.kind, version: file.version, music: file.music })}`);
   await page.selectOption("#scenery", "none");
   await page.selectOption("#figureShape", "runner");

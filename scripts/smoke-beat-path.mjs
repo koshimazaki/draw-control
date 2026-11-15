@@ -29,12 +29,13 @@ export async function smokeBeatPath(browser, base, { fail, OUT, SHOTS }) {
   page.on("console", m => { if (m.type() === "error" || m.type() === "warning") errors.push(`${m.type()}: ${m.text()}`); });
   // The first pass is the neutral palette (no external requests); the bare URL (the Runware default) has its own pass below.
   await page.goto(`${base}/path.html?theme=neutral`);
-  await page.waitForFunction(() => window.__beatPath?.recipe().audio?.name === "generated-straight-120.wav", null, { timeout: 30_000 })
+  await page.waitForFunction(() => window.__beatPath?.recipe().audio?.name === "neon-rain-loop.mp3", null, { timeout: 30_000 })
     .catch(async e => {
       const seen = await page.evaluate(() => ({ probe: !!window.__beatPath, audio: window.__beatPath?.recipe().audio ?? null, status: document.getElementById("status")?.textContent, url: window.location.href })).catch(x => x.message);
       throw new Error(`Draw Control did not load the demo (${e.message}); page: ${JSON.stringify(seen)}; page errors: ${errors.join(" | ") || "none"}`);
     });
   const probe = () => page.evaluate(() => ({ recipe: window.__beatPath.recipe(), state: window.__beatPath.state(), playing: window.__beatPath.playing(), head: window.__beatPath.head() }));
+  await smokeExample1(page, fail, SHOTS);
   let p = await probe();
   console.log(`draw control: first run ${p.recipe.character.kind}, ${p.recipe.durationBeats} beats, travel lock ${JSON.stringify(p.recipe.travelLock)}, camera ${p.recipe.camera.segments.map(s => s.modes.join("+")).join(" / ")}`);
   if (p.recipe.character.kind !== "glider" || p.recipe.travelLock?.lock !== "kick") fail("Draw Control did not open on the glider locked to the kicks");
@@ -188,9 +189,9 @@ export async function smokeBeatPath(browser, base, { fail, OUT, SHOTS }) {
   await page.click("#play");
   await page.screenshot({ path: `${SHOTS}beat-path-example-4.png` });
   await page.click('[data-control="example"] [data-value="0"]');
-  await page.waitForFunction(() => window.__beatPath.recipe().figure?.shape === "flyer" && window.__beatPath.recipe().camera?.startYaw === 0 && window.__beatPath.recipe().beatGrid.bpm > 110, null, { timeout: 30_000 });
+  await page.waitForFunction(() => window.__beatPath.recipe().figure?.shape === "flyer" && window.__beatPath.recipe().camera?.startYaw === 145 && window.__beatPath.recipe().beatGrid.bpm === 107.5, null, { timeout: 30_000 });
   p = await probe();
-  console.log(`draw control: examples switch: runner 140, car 100, drone 100, back to flyer (${p.recipe.beatGrid.bpm} BPM), edits kept ${JSON.stringify(p.state.subject) === JSON.stringify(edited)}`);
+  console.log(`draw control: examples switch: runner 140, car 100, drone 100, back to flyer on its file (${p.recipe.beatGrid.bpm} BPM), edits kept ${JSON.stringify(p.state.subject) === JSON.stringify(edited)}`);
   if (JSON.stringify(p.state.subject) !== JSON.stringify(edited)) fail("switching examples lost the edits of Example 1");
   // Scenery: the Settings chevron, scenery none and back to city.
   await page.click("#settings summary");
@@ -212,7 +213,8 @@ export async function smokeBeatPath(browser, base, { fail, OUT, SHOTS }) {
     && ajv.validate("guide-bundle.schema.json#/$defs/beats", JSON.parse(strFromU8(zip["beats.json"]))) && ajv.validate("guide-bundle.schema.json#/$defs/camera", JSON.parse(strFromU8(zip["camera.json"])));
   console.log(`draw control export: ${Object.keys(zip).sort().join(", ")}; ${meta.width}x${meta.height} ${meta.frames} frames, ${meta.character.kind}, schema ${meta.schemaVersion} ${ok ? "validates" : `does NOT validate: ${ajv.errorsText()}`}`);
   const exported = JSON.parse(strFromU8(zip["recipe.json"]));
-  if (!ok || meta.frames !== 193 || meta.width !== 1280 || meta.character.kind !== "glider" || meta.schemaVersion !== "0.5.0" || !exported.landmarks?.on || exported.figure?.shape !== "flyer" || !exported.shot?.subject) fail("the Draw Control bundle is wrong");
+  const bundleClip = (await probe()).state.clip;
+  if (!ok || meta.frames !== 24 * bundleClip + 1 || meta.width !== 1280 || meta.character.kind !== "glider" || meta.schemaVersion !== "0.5.0" || !exported.landmarks?.on || exported.figure?.shape !== "flyer" || !exported.shot?.subject) fail("the Draw Control bundle is wrong");
   await page.click("#settings summary");
   mkdirSync(`${OUT}beat-path/`, { recursive: true });
   for (const [k, v] of Object.entries(zip)) writeFileSync(`${OUT}beat-path/${k}`, v);
@@ -259,7 +261,10 @@ export async function smokeBeatPath(browser, base, { fail, OUT, SHOTS }) {
   if (!playingAfterOne || (await probe()).playing) fail("clicking the video did not toggle play twice");
   await page.screenshot({ path: `${SHOTS}beat-path-generated.png` });
   if (!(await page.isVisible("#gallery h2"))) fail("no gallery section");
-  // Export and Slice in the track panel: the music inside the clip window as a WAV, then as the track itself.
+  // Export and Slice in the track panel: the music inside the clip window as a WAV, then as the track itself. On Example 2,
+  // whose music is longer than its clip (Example 1's loop is shorter than its 14 s clip: smokeExample1 checks that case).
+  await page.click('[data-control="example"] [data-value="1"]');
+  await page.waitForFunction(() => window.__beatPath.trackName() === "generated-drive-140.wav", null, { timeout: 30_000 });
   await smokeTrackActions(page, fail, SHOTS);
   // No track: a plain timed clip that still plays and exports.
   await page.click("#removeTrack");
@@ -324,6 +329,43 @@ async function smokeTrackActions(page, fail, SHOTS) {
   const back = await look();
   console.log(`draw control track: loaded back ${back.length.toFixed(3)} s at ${back.bpm} BPM`);
   if (Math.abs(back.length - before.clip) > 1 / 24 || Math.abs(back.bpm - before.bpm) > 0.5) fail(`the exported WAV did not load back alike (${back.length} s, ${back.bpm} BPM vs ${before.clip} s, ${before.bpm} BPM)`);
+}
+
+/** Example 1's frame 0 camera in the CLI render (out/ex5/final/camera.json, track[0].position). */
+const EX1_CLI_FRAME0 = [-21.484, 8, -4.015];
+
+/**
+ * Example 1: the ship on the owner's loop, a 13.488 s file under a 14 s clip. The recipe builds on the file's given
+ * grid (107.5 BPM, beat 0 at 0 s), the camera ranges are isometric, right behind and top, the lane edges stay where
+ * the script put them, frame 0 is the CLI render's, and playback runs to the clip's end (the last half second of the
+ * 14 s window is silent, as in the guide) and wraps to its start.
+ */
+async function smokeExample1(page, fail, SHOTS) {
+  const ex1 = await page.evaluate(() => ({ r: window.__beatPath.recipe(), s: window.__beatPath.state(), cam0: window.__beatPath.cameraAt(0), length: window.__beatPath.trackLength(), track: window.__beatPath.trackName() }));
+  const ranges = ex1.r.camera.segments.map(s => s.modes.join("+")).join(" "), edges = ex1.s.cameraLane.map(b => b.from).concat(ex1.s.cameraLane.at(-1).to);
+  const off = Math.max(...ex1.cam0.position.map((v, i) => Math.abs(v - EX1_CLI_FRAME0[i])));
+  console.log(`draw control: Example 1 builds: ranges ${ranges}; edges ${edges.join(" ")}; ${ex1.r.beatGrid.bpm} BPM, beat 0 at ${ex1.r.beatGrid.offsetSeconds} s; frame 0 camera at ${ex1.cam0.position.map(v => v.toFixed(2)).join(", ")} (CLI ${EX1_CLI_FRAME0.map(v => v.toFixed(3)).join(", ")}, off ${off.toFixed(3)} m); track ${ex1.track} ${ex1.length?.toFixed(3)} s, clip ${ex1.s.clip} s`);
+  if (ranges !== "threeQuarter chase top") fail(`Example 1's camera ranges are ${ranges}, not threeQuarter chase top`);
+  if (edges.join(" ") !== "0 8 16 26") fail(`Example 1's camera edges moved when its music loaded: ${edges.join(" ")}`);
+  if (ex1.r.beatGrid.bpm !== 107.5 || ex1.r.beatGrid.offsetSeconds !== 0) fail(`Example 1 is not on its given grid (${ex1.r.beatGrid.bpm} BPM, ${ex1.r.beatGrid.offsetSeconds} s)`);
+  if (off > 0.05) fail(`Example 1's frame 0 camera is ${off.toFixed(3)} m from the CLI render's`);
+  if (!(Math.abs(ex1.length - 13.488) < 0.01)) fail(`Example 1's track is ${ex1.length} s, not the 13.488 s loop`);
+  // Past the music's end (13.488 s) the clock runs on in silence to the clip's end (14 s), then wraps to the start.
+  await page.click("#play");
+  await page.evaluate(() => { const s = document.getElementById("scrub"); s.value = "0.955"; s.dispatchEvent(new window.Event("input")); });
+  await page.waitForTimeout(250);
+  const tail = await page.evaluate(() => ({ head: window.__beatPath.head(), playing: window.__beatPath.playing() }));
+  await page.waitForTimeout(700);
+  const looped = await page.evaluate(() => ({ head: window.__beatPath.head(), playing: window.__beatPath.playing() }));
+  await page.click("#play");
+  console.log(`draw control: Example 1 plays past the music's end (head ${tail.head.toFixed(2)} s) and wraps (head ${looped.head.toFixed(2)} s)`);
+  if (!tail.playing || !(tail.head > 13.488)) fail(`Example 1 stopped before the clip's end (head ${tail.head} s)`);
+  if (!looped.playing || !(looped.head < 1)) fail(`Example 1 did not wrap at the clip's end (head ${looped.head} s, playing ${looped.playing})`);
+  // The track panel with music shorter than the clip: Export still saves the 14 s window (silence after the music), Slice has no
+  // shorter window to cut until the clip is shortened, and the status says what the window holds.
+  const panel = await page.evaluate(() => ({ slice: !document.getElementById("sliceTrack").disabled, export: !document.getElementById("exportTrack").disabled, status: document.getElementById("status").textContent, tip: document.getElementById("sliceTrack").title || document.getElementById("sliceTrack").dataset.tip || "" }));
+  console.log(`draw control: Example 1's track panel (13.488 s of music, 14 s clip): Slice ${panel.slice ? "enabled" : "disabled"}, Export ${panel.export ? "enabled" : "disabled"}; "${panel.tip}"`);
+  await page.screenshot({ path: `${SHOTS}beat-path-example-1.png` });
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

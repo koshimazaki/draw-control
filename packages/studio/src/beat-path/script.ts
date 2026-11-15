@@ -123,16 +123,21 @@ const rigWords = (rig?: BeatPathState["rig"]) => !rig ? "" : [
   rig.distance !== undefined ? `distance ${f(rig.distance)}m` : "", rig.height !== undefined ? `height ${f(rig.height)}m` : "",
   rig.fov !== undefined ? `fov ${f(rig.fov)}` : "", rig.yaw !== undefined ? `yaw ${f(rig.yaw)}` : "",
 ].filter(Boolean).join(" ");
-/** An example's "# track:" words: its groove, and its bars when an earlier example has the same groove ("laidback 6 bars"). */
+/** An example's "# track:" words: its file ("file neon-rain-loop.mp3"), else its groove, and its bars when an earlier example has the same groove ("laidback 6 bars"). */
 const trackWords = (id: ExampleId) => {
-  const t = EXAMPLE_TRACKS[id], first = Object.values(EXAMPLE_TRACKS).find(o => o.groove === t.groove)!;
+  const t = EXAMPLE_TRACKS[id];
+  if (t.file) return `file ${t.name}`;
+  const first = Object.values(EXAMPLE_TRACKS).find(o => !o.file && o.groove === t.groove)!;
   return first === t ? t.groove : `${t.groove} ${t.bars} bars`;
 };
-/** The example a "# track:" comment names: the groove, the bars picking between examples that share it. */
+/** The example a "# track:" comment names: the file, or the groove with the bars picking between examples that share it. */
 const trackFrom = (text: string): ExampleId | undefined => {
+  const ids = Object.keys(EXAMPLE_TRACKS) as ExampleId[];
+  const file = /^#\s*track:\s*file\s+(\S+)/im.exec(text);
+  if (file) return ids.find(id => EXAMPLE_TRACKS[id].file && EXAMPLE_TRACKS[id].name === file[1]);
   const m = /^#\s*track:\s*(straight|drive|laidback)(?:\s+(\d+)\s*bars?)?/im.exec(text);
   if (!m) return undefined;
-  const list = (Object.keys(EXAMPLE_TRACKS) as ExampleId[]).filter(id => EXAMPLE_TRACKS[id].groove === m[1]);
+  const list = ids.filter(id => !EXAMPLE_TRACKS[id].file && EXAMPLE_TRACKS[id].groove === m[1]);
   return (m[2] ? list.find(id => EXAMPLE_TRACKS[id].bars === Number(m[2])) : undefined) ?? list[0];
 };
 const pts = (list: PathPt[]) => list.map(p => `(${f(p.x)},${f(p.z)}${p.y ? `,${f(p.y)}` : ""})`).join(" ");
