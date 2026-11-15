@@ -17,6 +17,7 @@ import { AMPLITUDE_MAX, type Recipe } from "./recipe";
 import { envelopeAt } from "./envelope";
 import { smoothNoise } from "./rng";
 import { frozenBeat } from "./freeze";
+import { BANK, glideBankAt, glideHeadingAt, rawHeadingAt } from "./glide-heading";
 
 /** Beats over which a tempo change cross-fades at a bar line. */
 const TEMPO_FADE_BEATS = 0.5;
@@ -91,17 +92,17 @@ export function humanisedPoseAt(recipe: Recipe, plan: ReactivePlan, seconds: num
  * The full state of frame n: the time-stretch path, the reactive layer or the rigged
  * mannequin's clips, then the amplitude envelope on top (it scales the move on every
  * character: pose angles on the procedural figures, clip amplitude on the rigged one).
+ * The glider's facing along its path is smoothed and, for a shape, it leans into turns
+ * (glide-heading.ts); every other character is as the engine gives it.
  */
-/** How far each glider shape leans into a turn: radians of bank per radian a second of turning, and the most it leans. */
-const BANK = { flyer: [0.45, 0.65], car: [0.05, 0.08], runner: [0.12, 0.2], glider: [0, 0] } as const;
-
 export function frameAt(recipe: Recipe, frame: number, drive?: AudioDrive): FrameState {
   const state = recipe.freezes?.length ? frozenFrameAt(recipe, frame, drive) : movedFrameAt(recipe, frame, drive);
-  if (recipe.character.kind === "glider" && recipe.figure?.shape) {
-    // Lean into a turn: from the path's turning rate around this frame (a pure function of the recipe and the frame).
-    const g = recipe.beatGrid, yaw = (n: number) => rootAt(recipe, frozenBeat(recipe, beatAtSeconds(g, n / recipe.fps)), drive).yaw * Math.PI / 180;
-    const rate = (yaw(frame + 2) - yaw(frame - 2)) / (4 / recipe.fps), [k, max] = BANK[recipe.figure.shape];
-    state.root = { ...state.root, bank: Math.max(-max, Math.min(max, -rate * k)) };
+  if (recipe.character.kind === "glider") {
+    // The path's facing, smoothed through the corners; spins and other yaw on top of it are kept.
+    const beat = beatAtSeconds(recipe.beatGrid, frame / recipe.fps);
+    const turn = (glideHeadingAt(recipe, beat, drive) - rawHeadingAt(recipe, beat, drive)) * Math.PI / 180;
+    state.root = { ...state.root, yawRadians: state.root.yawRadians + turn };
+    if (recipe.figure?.shape) state.root.bank = glideBankAt(recipe, frame, BANK[recipe.figure.shape], drive);
   }
   if (!recipe.envelope) return state;
   const env = envelopeAt(recipe.envelope, frame);

@@ -28,10 +28,14 @@ describe("corner rounding", () => {
     const printed = printScript(r);
     expect(printed).toMatch(/walk on path \(0,0\) \(4,0\) \(4,4,1\) corners 0\.6 lock beat 0\.5/);
     expect(applyScript(base(), { script: printed })).toEqual(r);
-    // sharp: the facing jumps by 90° across the corner; round: it turns over several frames
+    // sharp: the facing swings the 90° across the corner within the glider's half-second
+    // heading window (it used to jump in one frame, the jitter glide-heading.ts removes);
+    // round: it turns along the curve, several times more gently
     const yawSteps = (rr: Recipe) => { let worst = 0; for (let n = 1; n < 190; n++) worst = Math.max(worst, Math.abs(frameAt(rr, n).root.yawRadians - frameAt(rr, n - 1).root.yawRadians)); return worst; };
-    expect(yawSteps(applyScript(base(), { script: script(0) }))).toBeGreaterThan(1);
-    expect(yawSteps(applyScript(base(), { script: script(1) }))).toBeLessThan(0.3);
+    const sharp = yawSteps(applyScript(base(), { script: script(0) })), round = yawSteps(applyScript(base(), { script: script(1) }));
+    expect(sharp).toBeGreaterThan(0.15);
+    expect(round).toBeLessThan(0.3);
+    expect(sharp).toBeGreaterThan(4 * round);
   });
   it("the camera path's corners round-trip, and change only the path the camera flies", () => {
     const s = "beats 0-16 | action: rest | camera: path (6,3,1.8) (2,8,2.2) (-3,4,1.8) corners 0.4";
