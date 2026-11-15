@@ -14,7 +14,7 @@
  * `readSetup` never throws: a field it cannot use falls back to the blank page's value (BLANK_STATE)
  * on its own, with a note, rather than refusing the whole file; values are clamped as the page clamps them.
  */
-import { CAMERA_MAX_HEIGHT, FOLLOW_LIMITS, clipBeats, type CommandContext, type FollowOffset } from "@motion-studio/core";
+import { CAMERA_MAX_HEIGHT, FOLLOW_LIMITS, FOV_RANGE, RIG_LIMITS, clipBeats, type CommandContext, type FollowOffset } from "@motion-studio/core";
 import { beatPathRecipe, type TrackInfo } from "./recipe-map";
 import {
   BLANK_STATE, CAMERA_WORDS, CHARACTER_WORDS, HIT_CHOICES, LOCK_CHOICES, clampClip, fitLanes, toScript,
@@ -51,9 +51,9 @@ const BANDS = ["low", "mid", "high"] as const;
 const SHAPES = ["glider", "car", "flyer", "runner"] as const;
 const SCENERY = ["none", "scatter", "street", "city"] as const;
 const SIGHT = ["clear", "passes"] as const;
-const TRACKS = ["flyer", "runner", "car"] as const;
+const TRACKS = ["flyer", "runner", "car", "drone"] as const;
 /** The state's optional fields (BLANK_STATE leaves them out). */
-const OPTIONAL = ["sensitivity", "markers", "slice", "boxes", "track", "prompt"] as const;
+const OPTIONAL = ["sensitivity", "markers", "slice", "boxes", "track", "rig", "prompt"] as const;
 
 type Rec = Record<string, unknown>;
 const isRec = (v: unknown): v is Rec => typeof v === "object" && v !== null && !Array.isArray(v);
@@ -198,6 +198,7 @@ export function readState(s: Rec, notes: string[]): BeatPathState {
       out.boxes = list;
     }
   }
+  if (has("rig")) { const r = isRec(s.rig) ? rig(s.rig, notes) : undefined; if (r) out.rig = r; else drop("camera start"); }
   const track = pick(s.track, TRACKS);
   if (track) out.track = track; else if (has("track")) drop("example music");
   if (has("shot")) {
@@ -243,6 +244,9 @@ function blocks(v: unknown, words: readonly string[], camera: boolean): { list: 
     const block: Block<string> = { from, to, word };
     if (camera && typeof b.phrase === "string" && line(b.phrase, LIMIT.phrase)) block.phrase = line(b.phrase, LIMIT.phrase);
     if (camera && (word === "behind" || word === "side") && isRec(b.follow)) { const f = follow(b.follow); if (f) block.follow = f; }
+    const fov = num(b.fov);
+    if (camera && (word === "behind" || word === "side") && fov !== undefined) block.fov = clamp(fov, FOV_RANGE[0], FOV_RANGE[1]);
+    if (camera && b.shot === "-") block.shot = "-";
     return [block];
   }).sort((a, b) => a.from - b.from);
   if (!list.length) return null;
@@ -264,6 +268,18 @@ function follow(f: Rec): FollowOffset | undefined {
   if (d !== undefined) out.distance = clamp(d, FOLLOW_LIMITS.distance[0], FOLLOW_LIMITS.distance[1]);
   if (h !== undefined) out.height = clamp(h, FOLLOW_LIMITS.height[0], Math.min(FOLLOW_LIMITS.height[1], CAMERA_MAX_HEIGHT));
   if (a !== undefined) out.angle = clamp(a, FOLLOW_LIMITS.angle[0], FOLLOW_LIMITS.angle[1]);
+  return Object.keys(out).length ? out : undefined;
+}
+
+/** The rig's start framing, each field clamped to the camera's limits (RIG_LIMITS), with a note for each clamped one. */
+function rig(r: Rec, notes: string[]): NonNullable<BeatPathState["rig"]> | undefined {
+  const out: NonNullable<BeatPathState["rig"]> = {};
+  for (const [key, limit, unit] of [["distance", RIG_LIMITS.distance, " m"], ["height", RIG_LIMITS.height, " m"], ["fov", RIG_LIMITS.fov, "°"], ["yaw", RIG_LIMITS.startYaw, "°"]] as const) {
+    const v = num(r[key]);
+    if (v === undefined) { if (r[key] !== undefined) notes.push(`camera start ${key}: not readable, left as on a blank page`); continue; }
+    out[key] = clamp(v, limit[0], limit[1]);
+    if (out[key] !== v) notes.push(`camera start ${key} ${v}${unit} → ${out[key]}${unit} (the rig takes ${limit[0]} to ${limit[1]})`);
+  }
   return Object.keys(out).length ? out : undefined;
 }
 

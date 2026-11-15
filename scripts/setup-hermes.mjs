@@ -55,7 +55,7 @@ function main() {
   // The distribution as Hermes expects it: SOUL.md, config.yaml, distribution.yaml and skills/.
   const stage = mkdtempSync(join(tmpdir(), "beat-path-profile-"));
   cpSync(join(repo, "hermes", name), stage, { recursive: true });
-  for (const skill of ["beat-path", "runware-hermes", "runware-review"]) cpSync(join(repo, "skills", skill), join(stage, "skills", skill), { recursive: true });
+  for (const skill of ["beat-path", "draw-control-example", "runware-hermes", "runware-review"]) cpSync(join(repo, "skills", skill), join(stage, "skills", skill), { recursive: true });
   // Fail here, before anything is installed, if the config's placeholders are not fillable.
   fillPaths(readFileSync(join(stage, "config.yaml"), "utf8"), process.execPath, repo);
   if (dry) { console.log(`Staged ${name} at ${stage} (not installed). It would point at Node ${process.execPath} and the checkout ${repo}.`); return; }

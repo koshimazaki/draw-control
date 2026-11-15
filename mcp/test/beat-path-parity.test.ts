@@ -30,7 +30,7 @@ const examples = readdirSync(scriptsDir).filter(f => f.startsWith("beat-path-"))
 const cli = async (...argv: string[]) => { const err: string[] = []; const code = await main(argv, () => {}, s => err.push(s)); if (code) throw new Error(err.join("\n")); };
 
 describe("Draw Control scripts: page, CLI and MCP agree", () => {
-  it("has the examples", () => expect(examples.length).toBe(10));
+  it("has the examples", () => expect(examples.length).toBe(11));
   for (const file of examples) it(file, async () => {
     const text = readFileSync(new URL(file, scriptsDir), "utf8");
     const style = (/^#\s*track:\s*(straight|drive|laidback)/m.exec(text)?.[1] ?? "straight") as GrooveStyle;

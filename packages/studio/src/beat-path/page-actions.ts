@@ -5,7 +5,7 @@
  * Delete removes the selection, Escape cancels a stroke or clears it). Split from page.ts.
  * The shot script is the engine's format (CLI, MCP, examples/scripts); nothing about it shows here.
  */
-import { beatAtSeconds, clipBeats } from "@motion-studio/core";
+import { beatAtSeconds, cameraAtFrame, clipBeats, planCamera } from "@motion-studio/core";
 import { hitBands, lockHits } from "@motion-studio/core/internal";
 import { blockAt, everyBeats, movesOnHits, parseMoves, splitBlockAt } from "./lane-cuts";
 import { exportBundle } from "../export/bundle";
@@ -474,6 +474,7 @@ export function bindActions(p: Page) {
       kicks: () => (p.drive?.bands?.low ?? []).map(o => o.seconds),
       hits: () => ({ low: (p.drive?.bands?.low ?? []).map(o => o.seconds), mid: (p.drive?.bands?.mid ?? []).map(o => o.seconds), high: (p.drive?.bands?.high ?? []).map(o => o.seconds) }),
       exportRange: () => exportRange(p.recipe, p.state.clip),
+      cameraAt: (frame: number) => cameraAtFrame(planCamera(p.recipe, p.drive), frame),
     };
   }
   return { sync, openBlock, mapNote };

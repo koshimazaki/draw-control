@@ -18,6 +18,7 @@ Every edit in the page is a command an agent can run too, so the page, the CLI a
 Skills follow the open Agent Skills format (`SKILL.md` with `name` and `description`), so Claude Code, Codex, Hermes and other agents can load them:
 
 - [`skills/beat-path`](skills/beat-path/SKILL.md): draw and edit a Draw Control shot through the MCP server or the CLI, then render the guide.
+- [`skills/draw-control-example`](skills/draw-control-example/SKILL.md): make a new example or shot from a plain-language brief (subject, blocks, camera views such as isometric, top and side, smooth transitions on the music), step by step through the CLI, verified by render; the traps that cost a render each.
 - [`skills/runware-hermes`](skills/runware-hermes/SKILL.md): run Hermes on Runware, with text models, images and video on one key.
 - [`skills/runware-review`](skills/runware-review/SKILL.md): a second-opinion code review from another model family on Runware (`npm run review`: sends the diff and this file, paid, asks first), and quick GPT Image sketches.
 

@@ -17,6 +17,19 @@ const run = async (...argv: string[]) => {
 };
 
 describe("motion-studio CLI", () => {
+  it("a script on new --character glider (and mannequin) prints no rig line; rig: prints back after set", async () => {
+    const script = join(dir, "orbit.txt");
+    writeFileSync(script, "beats 0-4 | action: rest | camera: orbit 70 | shot: -\n");
+    for (const character of ["glider", "mannequin"]) {
+      const base = join(dir, `new-${character}.json`), out = join(dir, `new-${character}.out.json`);
+      expect((await run("new", "--character", character, "--clip", "8", "--out", base)).code).toBe(0);
+      expect((await run("script", base, script, "--out", out)).code).toBe(0);
+      expect((await run("describe", out, "--script")).out).not.toMatch(/^rig:/m);
+    }
+    const yawed = join(dir, "new-glider.yaw.json");
+    expect((await run("set", join(dir, "new-glider.out.json"), "camera.startYaw", "45", "--out", yawed)).code).toBe(0);
+    expect((await run("describe", yawed, "--script")).out.split("\n")[0]).toBe("rig: yaw 45");
+  });
   it("parses flags and values", () => {
     expect(parseArgs(["apply", "r.json", "--out", "x.json", "--grid"])).toEqual({ pos: ["apply", "r.json"], flags: { out: "x.json", grid: true } });
     expect(parseValue("2.5")).toBe(2.5);

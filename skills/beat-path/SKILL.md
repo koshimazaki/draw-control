@@ -32,7 +32,7 @@ The CLI equivalents are in `docs/agents.md` (`npm run cli -- commands`).
 ## Working order
 
 1. **Read the music first.** `analyse_audio` on the track. Without it, `@kick N`, `@snare N` and locks fail.
-2. **Start from an example.** `examples/scripts/beat-path-ex1-flyer.txt` (street flyer), `-ex2-runner.txt`, `-ex3-car.txt` (road bend). Change one thing at a time.
+2. **Start from an example.** `examples/scripts/beat-path-ex1-flyer.txt` (street flyer), `-ex2-runner.txt`, `-ex3-car.txt` (road bend), `-ex4-drone.txt` (hovering drone; opens isometric through the `rig:` line, then orbit, top and side). Change one thing at a time.
 3. **Paths in metres.** Give the subject path and the camera path as points in the script, so you never draw: see `examples/scripts/glide-path.txt`. Keep the camera path clear of the subject's.
 4. **Camera on the beat.** Camera words: follow behind, follow side, orbit, top, push in, my path. Lock a block to `kick`, `snare`, `hat` or `beat`. For "moves on the snare", cut the Camera lane at each snare and cycle the moves (the page's "Moves on hits"). Too many cuts read as robotic; use the `sensitivity:` line (0–1) to thin the hits first.
 5. **Clip length.** `new_recipe { clip }`, 3 to 30 s. Check the target model's limit in `docs/models.md` before going past 10 s (MiniMax H3 stops at 15 s, video and audio together).
@@ -41,6 +41,10 @@ The CLI equivalents are in `docs/agents.md` (`npm run cli -- commands`).
 ## Shot description
 
 The model gets the guide video, up to two reference images (character, environment) and the shot description: subject, action, setting. Describe what the guide shows in the words the model needs: the subject and how it moves, not the camera (the guide carries the camera). One guide serves many verticals: changing only the description and references turns a flying car in New Tokyo into a forklift in an engine factory.
+
+## Making a new example
+
+For a new example or shot from a brief (camera views such as isometric, top and side, and the transitions between them), follow [`skills/draw-control-example`](../draw-control-example/SKILL.md): the exact steps and the traps.
 
 ## Rules
 
