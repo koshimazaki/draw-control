@@ -84,6 +84,8 @@ export function tileClip<R extends { url: string }>(own: R | undefined, publishe
 
 /** The list with one entry set (replacing any for the same example and model). */
 export function withClip(index: PublishedIndex, example: string, model: string, clip: PublishedClip): PublishedIndex {
-  const clips = { ...index.clips, [example]: { ...(index.clips[example] ?? {}), [model]: clip } };
+  // A previous value that is not a plain object (a string, an array) is dropped, never spread into its characters.
+  const prev = index.clips[example];
+  const clips = { ...index.clips, [example]: { ...(isRecord(prev) ? prev : {}), [model]: clip } };
   return { version: 1, clips };
 }

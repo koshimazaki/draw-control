@@ -60,7 +60,10 @@ let index = emptyIndex();
 if (existsSync(indexFile)) {
   let raw;
   try { raw = JSON.parse(readFileSync(indexFile, "utf8")); } catch { fail(`${indexFile} is not valid JSON; fix or remove it first`); }
-  if (raw?.version !== 1 || typeof raw.clips !== "object" || raw.clips === null || Array.isArray(raw.clips)) fail(`${indexFile} is not a version 1 list; fix or remove it first`);
+  const isPlain = v => typeof v === "object" && v !== null && !Array.isArray(v);
+  if (raw?.version !== 1 || !isPlain(raw.clips)) fail(`${indexFile} is not a version 1 list; fix or remove it first`);
+  const bad = Object.keys(raw.clips).filter(k => !isPlain(raw.clips[k]));
+  if (bad.length) fail(`${indexFile} has clips that are not objects (${bad.join(", ")}); fix or remove it first`);
   index = raw;
 }
 

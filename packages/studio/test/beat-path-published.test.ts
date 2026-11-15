@@ -49,9 +49,12 @@ describe("Published clips: reading the list", () => {
     const offline = (async () => { throw new TypeError("offline"); }) as unknown as typeof fetch;
     for (const f of [missing, broken, offline]) expect(await loadPublished(ids, PAGE, f)).toEqual([]);
   });
-  it("ships an empty but valid list", () => {
+  it("ships a valid list whose every entry the page will show", () => {
     const shipped = JSON.parse(readFileSync(new URL("../public/published/index.json", import.meta.url), "utf8"));
-    expect(shipped).toEqual({ version: 1, clips: {} });
+    expect(shipped.version).toBe(1);
+    expect(typeof shipped.clips === "object" && shipped.clips !== null && !Array.isArray(shipped.clips)).toBe(true);
+    const committed = Object.values(shipped.clips as Record<string, object>).flatMap(o => Object.keys(o)).length;
+    expect(parsePublished(shipped, ids, PAGE)).toHaveLength(committed);
   });
 });
 
@@ -66,6 +69,13 @@ describe("Published clips: which clip a model tile shows", () => {
   it("setting an entry replaces the one for the same example and model only", () => {
     const a = withClip(withClip(emptyIndex(), "flyer", "h3", { url: "a.mp4", prompt: "" }), "flyer", "kling-4", { url: "b.mp4", prompt: "" });
     expect(withClip(a, "flyer", "h3", { url: "c.mp4", prompt: "x" }).clips.flyer).toEqual({ h3: { url: "c.mp4", prompt: "x" }, "kling-4": { url: "b.mp4", prompt: "" } });
+  });
+  it("setting an entry over a value that is not an object starts that example afresh", () => {
+    const clip = { url: "a.mp4", prompt: "" };
+    for (const prev of ["oops", ["x"], 3, null]) {
+      const broken = { version: 1, clips: { flyer: prev, car: { h3: clip } } } as unknown as Parameters<typeof withClip>[0];
+      expect(withClip(broken, "flyer", "h3", clip).clips).toEqual({ flyer: { h3: clip }, car: { h3: clip } });
+    }
   });
 });
 
@@ -104,6 +114,17 @@ describe("Published clips: npm run publish:clip", () => {
     writeFileSync(join(root, "packages/studio/public/published/index.json"), "{ not json");
     expect(run("flyer", "h3", clip).status).not.toBe(0);
     expect(readFileSync(join(root, "packages/studio/public/published/index.json"), "utf8")).toBe("{ not json");
+  });
+  it("refuses a list whose clips for an example are not an object, leaving it as it was", () => {
+    fresh(); mkdirSync(join(root, "packages/studio/public/published"), { recursive: true });
+    const file = join(root, "packages/studio/public/published/index.json");
+    for (const body of ['{"version":1,"clips":{"flyer":"oops"}}', '{"version":1,"clips":{"car":{},"flyer":["x"]}}', '{"version":1,"clips":{"flyer":null}}']) {
+      writeFileSync(file, body);
+      const r = run("flyer", "h3", "https://r2.example/f.mp4");
+      expect(r.status, body).not.toBe(0);
+      expect(r.stderr).toMatch(/fix or remove it first/);
+      expect(readFileSync(file, "utf8")).toBe(body);
+    }
   });
   it("refuses a local file over 25 MiB before copying it, unless --force", () => {
     fresh(); const clip = join(root, "big.mp4"); writeFileSync(clip, ""); truncateSync(clip, 26 * 1024 * 1024);
