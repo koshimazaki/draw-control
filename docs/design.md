@@ -17,6 +17,10 @@ Lineage, in three lines:
 
 **Since 13 November the Runware theme is dark** (the site's own dark look), with the map as a light paper surface; the neutral theme stays the repo default and stays dark (the studio's palette): one set of tokens, two palettes, and a third small set (`--map-*`) for the map's surface so it can differ from the page.
 
+## Moving a lane block (15 November)
+
+A Character or Camera block is moved the way a clip is in a video editor: drag its body sideways (or Alt+Left/Right with it focused). It keeps its length and its word; the blocks it passes change places with it as soon as its leading edge crosses their middle, so the lane rearranges live while the moved block rides under the pointer, lifted (`.block.moving`, `--shadow-lg`), over a dashed slot (`.lane-slot`) where it will land. Release is one undo step; Escape puts everything back. A press that travels under 4 px is still a click (the menu), and the edge between two blocks still moves the cut. No new control: the block's tooltip says "drag to move". The reordering is `moveBlock` in `lane-cuts.ts`.
+
 ## Round 8 (13 November): selection corrections
 
 - **Generate** is a normal primary button sized to its label (bolt + "Generate"); the model choice and Settings sit beside it.

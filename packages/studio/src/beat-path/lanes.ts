@@ -1,11 +1,18 @@
 /**
  * The Character and Camera lanes: blocks on the beat grid. Click a block (or Enter) for its
  * menu of words; drag the edge between two blocks to move the cut, snapped to half beats
- * by the core's `snapBeat` (the studio timeline's snap), every block at least one beat.
+ * by the core's `snapBeat` (the studio timeline's snap), every block at least one beat. Drag a
+ * block's body to move it along the lane (it keeps its length; the blocks it passes change places
+ * with it), or Alt+Left/Right with it focused; Escape during the drag puts it back.
  */
+import { dropIndex, moveBlock } from "./lane-cuts";
 import type { Block } from "./script";
 
 export const MIN_BEATS = 1;
+/** How far a press on a block travels before it is a drag (a move) rather than a click (the menu). */
+const DRAG_PX = 4;
+/** Fired on the window when a block drag starts; an open menu closes on it. */
+const LANE_DRAG = "lanedragstart";
 
 export type MenuItem = { label: string; on?: boolean; disabled?: boolean; run(): void } | "-";
 /** A one-line text field at the top of a menu: Enter applies it; a refusal shows inline. */
@@ -19,6 +26,8 @@ export type LaneHost<W extends string> = {
   /** The lane changed; `final` when a drag ended. */
   commit(blocks: Block<W>[], final: boolean): void;
   open(anchor: HTMLElement, index: number, beat: number): void;
+  /** Block `from` was moved to place `to` (a selection by index follows it). */
+  moved?(from: number, to: number): void;
 };
 
 const el = (tag: string, className = "", text = "") => { const e = document.createElement(tag); if (className) e.className = className; if (text) e.textContent = text; return e; };
@@ -32,19 +41,29 @@ export class LaneView<W extends string> {
   }
 
   render(openIndex = -1) {
-    const blocks = this.host.blocks(), total = this.host.total();
+    const blocks = this.host.blocks(), total = this.host.total(), drag = this.moving;
+    const pct = (beats: number) => `${beats / total * 100}%`;
     this.root.replaceChildren(...blocks.map((b, i) => {
-      const d = el("div", `block w-${b.word}${i === openIndex ? " open" : ""}`);
-      d.style.left = `calc(${b.from / total * 100}% + 1px)`;
-      d.style.width = `calc(${(b.to - b.from) / total * 100}% - 2px)`;
+      const d = el("div", `block w-${b.word}${i === openIndex ? " open" : ""}${drag?.at === i ? " moving" : ""}`);
+      // The block being moved rides under the pointer; the others sit in their new places.
+      d.style.left = `calc(${pct(drag?.at === i ? drag.left : b.from)} + 1px)`;
+      d.style.width = `calc(${pct(b.to - b.from)} - 2px)`;
       d.tabIndex = 0;
       d.setAttribute("role", "listitem");
       const text = b.phrase ?? this.host.label(b.word);
-      d.setAttribute("aria-label", `${text}, beats ${b.from} to ${b.to}`);
-      d.title = text;   // the full words when the block is too short to show them
+      d.setAttribute("aria-label", `${text}, beats ${b.from} to ${b.to}${blocks.length > 1 ? ". Alt+Left or Alt+Right moves it" : ""}`);
+      d.title = blocks.length > 1 ? `${text} · drag to move` : text;   // the full words when the block is too short to show them
       d.append(el("i"), el("span", "", text));
       d.addEventListener("click", e => { if (!(e.target as HTMLElement).classList.contains("edge")) this.host.open(d, i, this.beatAt(e.clientX)); });
-      d.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); this.host.open(d, i, (b.from + b.to) / 2); } });
+      d.addEventListener("pointerdown", e => this.press(e, i));
+      d.addEventListener("keydown", e => {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); this.host.open(d, i, (b.from + b.to) / 2); }
+        else if (e.altKey && (e.key === "ArrowLeft" || e.key === "ArrowRight")) {
+          e.preventDefault(); e.stopPropagation();
+          this.place(i, i + (e.key === "ArrowLeft" ? -1 : 1));
+          (this.root.children[Math.max(0, Math.min(blocks.length - 1, i + (e.key === "ArrowLeft" ? -1 : 1)))] as HTMLElement | undefined)?.focus();
+        }
+      });
       if (i < blocks.length - 1) {
         const edge = el("div", "edge");
         edge.addEventListener("pointerdown", e => this.dragEdge(e, edge, i));
@@ -53,6 +72,82 @@ export class LaneView<W extends string> {
       }
       return d;
     }));
+    // Where the moved block lands when released: a dashed slot under it.
+    if (drag && blocks[drag.at]) {
+      const slot = el("div", "lane-slot"), b = blocks[drag.at];
+      slot.style.left = `calc(${pct(b.from)} + 1px)`;
+      slot.style.width = `calc(${pct(b.to - b.from)} - 2px)`;
+      this.root.prepend(slot);
+    }
+  }
+
+  /** The block being dragged by its body: where it sits now, its left edge under the pointer (beats). */
+  private moving: { at: number; left: number } | null = null;
+
+  /** Move block `i` to place `to` as one undo step (Alt+Left/Right); false when it cannot move. */
+  place(i: number, to: number): boolean {
+    const next = moveBlock(this.host.blocks(), i, to);
+    if (!next) return false;
+    this.host.commit(next, true);
+    this.host.moved?.(i, to);
+    return true;
+  }
+
+  /**
+   * A press on a block's body: a click unless it travels more than a few pixels, then a drag that
+   * moves the block along the lane. The others change places live; Escape puts everything back.
+   * Listens on the window, so the lane re-rendering under the drag never drops it.
+   */
+  private press(e: PointerEvent, i: number) {
+    if (e.button !== 0 || (e.target as HTMLElement).classList.contains("edge")) return;
+    const start = this.host.blocks().map(b => ({ ...b }));
+    if (start.length < 2) return;   // one block: nothing to move, the press stays a click
+    const x0 = e.clientX, id = e.pointerId, len = start[i].to - start[i].from, total = this.host.total();
+    let at = i, dragging = false;
+    const end = (keep: boolean) => {
+      window.removeEventListener("pointermove", move, true); window.removeEventListener("pointerup", up, true);
+      window.removeEventListener("pointercancel", cancel, true); window.removeEventListener("keydown", key, true);
+      if (!dragging) return;
+      // The click that follows the release is the drag's, not a request for the menu.
+      const eat = (ev: Event) => { ev.stopPropagation(); ev.preventDefault(); };
+      window.addEventListener("click", eat, true);
+      setTimeout(() => window.removeEventListener("click", eat, true), 0);
+      this.moving = null;
+      const next = keep ? moveBlock(start, i, at) : null;
+      if (next) { this.host.commit(next, true); this.host.moved?.(i, at); }
+      else if (at !== i) this.host.commit(start, false);   // back as it was: no undo step
+      this.render();
+    };
+    const move = (ev: PointerEvent) => {
+      if (ev.pointerId !== id) return;
+      if (!dragging) {
+        if (Math.abs(ev.clientX - x0) < DRAG_PX) return;
+        dragging = true;
+        window.dispatchEvent(new Event(LANE_DRAG));   // an open block menu closes: its block is on the move
+      }
+      ev.preventDefault();
+      const left = Math.max(0, Math.min(total - len, start[i].from + (ev.clientX - x0) / this.root.getBoundingClientRect().width * total));
+      const to = dropIndex(start, i, left);
+      this.moving = { at: to, left };
+      if (to !== at) {
+        const next = moveBlock(start, i, to) ?? start;
+        this.host.commit(next, false);
+        if (this.host.blocks() !== next) { at = i; dragging = false; this.moving = null; end(false); this.render(); return; }   // the page refused it (busy)
+        at = to;
+        this.render();
+      } else {
+        const d = this.root.querySelector<HTMLElement>(".block.moving");
+        if (d) d.style.left = `calc(${left / total * 100}% + 1px)`;
+        else this.render();
+      }
+    };
+    const up = (ev: PointerEvent) => { if (ev.pointerId === id) end(true); };
+    const cancel = (ev: PointerEvent) => { if (ev.pointerId === id) end(false); };
+    const key = (ev: KeyboardEvent) => { if (ev.key === "Escape" && dragging) { ev.preventDefault(); ev.stopImmediatePropagation(); end(false); } };
+    window.addEventListener("pointermove", move, true);
+    window.addEventListener("pointerup", up, true);
+    window.addEventListener("pointercancel", cancel, true);
+    window.addEventListener("keydown", key, true);
   }
 
   private dragEdge(e: PointerEvent, edge: HTMLElement, i: number) {
@@ -141,11 +236,14 @@ export class Menu {
       else if ((e.key === "ArrowDown" || e.key === "ArrowUp") && document.activeElement !== input) { e.preventDefault(); buttons[(k + (e.key === "ArrowDown" ? 1 : -1) + buttons.length) % buttons.length]?.focus(); }
     };
     const outside = (e: PointerEvent) => { if (!this.root.contains(e.target as Node) && !anchor.contains(e.target as Node)) this.hide(); };
+    const drag = () => this.hide();
     window.addEventListener("keydown", key, true);
     window.addEventListener("pointerdown", outside, true);
+    window.addEventListener(LANE_DRAG, drag);
     this.close = () => {
       window.removeEventListener("keydown", key, true);
       window.removeEventListener("pointerdown", outside, true);
+      window.removeEventListener(LANE_DRAG, drag);
       if (this.root.contains(document.activeElement)) (document.activeElement as HTMLElement).blur();
       this.root.hidden = true;
       anchor.setAttribute("aria-expanded", "false");
