@@ -252,14 +252,14 @@ export function bindActions(p: Page) {
   function setZoom(z: number) {
     zoom = Math.max(ZOOMS[0], Math.min(ZOOMS[ZOOMS.length - 1], z));
     timeline.style.setProperty("--zoom", String(zoom));
-    $<HTMLButtonElement>("zoomOut").disabled = zoom === ZOOMS[0]; $<HTMLButtonElement>("zoomIn").disabled = zoom === ZOOMS[ZOOMS.length - 1];
+    $<HTMLButtonElement>("tlZoomOut").disabled = zoom === ZOOMS[0]; $<HTMLButtonElement>("tlZoomIn").disabled = zoom === ZOOMS[ZOOMS.length - 1];
     requestAnimationFrame(() => { scroller.scrollLeft = headFraction() * scroller.scrollWidth - scroller.clientWidth / 2; });
     p.say(zoom === 1 ? "Timeline: the whole clip" : `Timeline ${zoom}× · scroll sideways to move along it`);
   }
   const step = (dir: 1 | -1) => setZoom(ZOOMS[Math.max(0, Math.min(ZOOMS.length - 1, ZOOMS.indexOf(zoom) + dir))]);
-  $("zoomIn").onclick = () => step(1); $("zoomOut").onclick = () => step(-1);
+  $("tlZoomIn").onclick = () => step(1); $("tlZoomOut").onclick = () => step(-1);
   scroller.addEventListener("wheel", e => { if (e.ctrlKey || e.metaKey) { e.preventDefault(); step(e.deltaY < 0 ? 1 : -1); } }, { passive: false });
-  $<HTMLButtonElement>("zoomOut").disabled = true;
+  $<HTMLButtonElement>("tlZoomOut").disabled = true;
   const followHead = () => {
     if (zoom > 1 && p.player.playing) {
       const x = headFraction() * scroller.scrollWidth, v0 = scroller.scrollLeft, v1 = v0 + scroller.clientWidth;
@@ -403,6 +403,7 @@ export function bindActions(p: Page) {
       boxes: () => p.blocks.host.boxes(), boxSelected: () => p.blocks.selected, slot: () => p.slot, trackName: () => p.info?.name ?? null, trackLength: () => p.info?.lengthSeconds ?? null,
       followSegs: () => p.followSegs.map(s => ({ block: s.block, word: s.word, points: s.points, anchors: s.anchors })),
       followProbe: (k: number) => followProbe(p.recipe, p.drive, p.state.cameraLane[k]),
+      timelineZoom: () => zoom,
     };
   }
   return { sync, openBlock };
