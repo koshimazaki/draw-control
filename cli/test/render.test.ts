@@ -22,6 +22,10 @@ describe("render: options are checked before anything starts", () => {
     expect(() => checkRenderOptions(recipe, { out, size: "0x720" })).toThrow(/--size/);
     expect(() => checkRenderOptions(recipe, { out, view: "fisheye" })).toThrow(/--view must be one of rig, front/);
     expect(() => checkRenderOptions(recipe, { out, unit: "bars" as "beats" })).toThrow(/--unit/);
+    // The page refuses the rig view without a camera rig and would export another view instead.
+    expect(recipe.camera).toBeUndefined();
+    expect(() => checkRenderOptions(recipe, { out, view: "rig" })).toThrow(/--view rig needs the recipe's camera rig/);
+    expect(checkRenderOptions({ ...recipe, camera: { enabled: true } as unknown as typeof recipe.camera }, { out, view: "rig" })).toBeUndefined();
     expect(checkRenderOptions(recipe, { out, size: "832x480", view: "iso", start: 2, length: 4, unit: "beats" })).toEqual({ width: 832, height: 480 });
   });
   it("render() rejects a bad range without starting a server or a browser", async () => {
@@ -45,6 +49,13 @@ describe("render: the export fails fast", () => {
     const t0 = Date.now();
     await expect(downloadOrFailure(never(), Promise.resolve("Export failed: encoder closed"))).rejects.toThrow("render: the studio did not export: Export failed: encoder closed");
     expect(Date.now() - t0).toBeLessThan(500);
+  });
+  it("a download that never comes (a hung encoder) says what it waited for, keeping the cause", async () => {
+    const timeout = Object.assign(new Error("page.waitForEvent: Timeout 1800000ms exceeded."), { name: "TimeoutError" });
+    const err = await downloadOrFailure(Promise.reject(timeout), never()).catch(e => e as Error);
+    expect(err.message).toMatch(/^render: the studio's export did not finish within 30 minutes/);
+    expect(err.message).toMatch(/Timeout 1800000ms exceeded/);
+    expect(err.cause).toBe(timeout);
   });
   it("returns the download when it comes first, and the loser's later rejection is swallowed", async () => {
     let rejectFailure!: (e: Error) => void;
