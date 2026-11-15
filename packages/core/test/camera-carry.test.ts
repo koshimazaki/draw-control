@@ -1,15 +1,20 @@
 /**
  * The carry-over rule (docs/recipe.md, "settings lines", rig): frame 0 is the rig start; each block starts where the block
  * before it ended, and a follow offset, a shot preset, a fov or a programmed dolly/rise carries on into every later block
- * until another block changes it. `top`/`above` is the exception: it lifts the camera overhead from the carried values
- * without changing them, so the block after it comes back to the distance and height from before it (its fov carries on).
+ * until another block changes it. `top`/`above` with `shot: -` is the exception: it lifts the camera overhead from the
+ * carried values without changing them, so the block after it comes back to the distance and height from before it (its fov
+ * carries on). With the `top` shot preset (`top | shot: top`, what the page prints) it sets 1.4 m, 6.5 m and fov 45 like
+ * any preset, and those carry on.
  */
 import { describe, expect, it } from "vitest";
 import { applyScript, beatPathBase, cameraAtFrame, frameAt, planCamera } from "../src/internal";
 
 /** Distance (ground plane) and height of the camera from the subject at a beat, and its fov (120 BPM, 24 fps). */
 function framing(first: string, second: string, beat: number) {
-  const script = `rig: distance 8m height 5m fov 30\nbeats 0-8 | action: walk on path (-10,0) (10,0) | camera: ${first}\nbeats 8-16 | action: continue | camera: ${second}\n`;
+  return framingOf(`beats 0-8 | action: walk on path (-10,0) (10,0) | camera: ${first}\nbeats 8-16 | action: continue | camera: ${second}\n`, beat);
+}
+function framingOf(rows: string, beat: number) {
+  const script = `rig: distance 8m height 5m fov 30\n${rows}`;
   const r = applyScript(beatPathBase({ seconds: 8 }), { script }), n = Math.round(beat / 2 * 24);
   const c = cameraAtFrame(planCamera(r), n), root = frameAt(r, n).root;
   return { d: Math.hypot(c.position[0] - root.x, c.position[2] - root.z), h: c.position[1] - root.y, fov: c.fov };
@@ -29,5 +34,10 @@ describe("camera carry-over between blocks", () => {
   it("top / above does not: the next block comes back to the framing from before it, with the top block's fov", () => {
     near(framing("above fov 70 | shot: -", "orbit 70 | shot: -", 15.9), 8, 5, 70);
     near(framing("top | shot: -", "follow side | shot: -", 15.9), 8, 5, 30);
+  });
+  it("the top shot preset (what the page prints for a top block) carries on like any preset: 1.4 m, 6.5 m, fov 45", () => {
+    const rows = "beats 0-4 | action: walk on path (-10,0) (10,0) | camera: orbit 70 | shot: -\nbeats 4-8 | action: continue | camera: top | shot: top\nbeats 8-12 | action: continue | camera: orbit 70 | shot: -\n";
+    near(framingOf(rows, 9), 1.4, 6.5, 45);
+    near(framingOf(rows, 11.9), 1.4, 6.5, 45);
   });
 });

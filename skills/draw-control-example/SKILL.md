@@ -82,7 +82,7 @@ z > 0 sits on the subject's right while it travels +x. Turn the rule round when 
 the other way. Check it on the map (the camera blocks are labelled there) or in `camera.json`.
 
 
-Frame 0 is the **rig start**, not the first block. Each block starts where the block before it ended: a follow offset (distance, height; it wins over a shot preset), a shot preset, a fov and the end of a programmed dolly, push, pull or rise carry on into every later block until another block changes them; a block that sets none of them keeps what it started with. The camera word top (or above) is the exception: it lifts the camera overhead from those values without changing them, so the block after it comes back to the distance and height from before it (a fov set on it carries on).
+Frame 0 is the **rig start**, not the first block. Each block starts where the block before it ended: a follow offset (distance, height; it wins over a shot preset), a shot preset, a fov and the end of a programmed dolly, push, pull or rise carry on into every later block until another block changes them; a block that sets none of them keeps what it started with. The camera word top (or above) with `shot: -` is the exception: it lifts the camera overhead from those values without changing them, so the block after it comes back to the distance and height from before it (a fov set on it carries on). With the `top` shot preset (`top | shot: top`, what the page prints for a top block) it sets 1.4 m, 6.5 m and fov 45 like any preset, and those carry on.
 (Pinned by `packages/core/test/camera-carry.test.ts`.) So set the rig to the opening view:
 
 ```
@@ -93,7 +93,7 @@ rig: distance 8m height 5m fov 30 yaw 45           # the opening framing (frame 
 | --- | --- | --- |
 | Isometric (3/4 from above) | `three-quarter distance 8m height 5m fov 30` + matching `rig:` | narrow fov flattens it; height ≈ 0.6 × distance |
 | Pan round | `orbit 70 slow lock snare 1 hold` | keeps the distance/height it starts with (the block before's offset or preset, else the rig): set those high for a high pan |
-| Top | `above fov 70` | the preset is 1.4 m from the subject: a wide fov makes it readable. Over a hovering subject the 8 m ceiling makes it a steep oblique (~80°), not straight down |
+| Top | `above fov 70 \| shot: -` | write `shot: -` when the next block should keep the framing from before the top: it lifts overhead from the carried values and the next block returns to them (the fov carries on); a wide fov makes it readable. `shot: top` instead sets the preset (1.4 m, 6.5 m, fov 45) and the next block keeps that; the page prints its own top blocks with `shot: top` unless the script gave `shot: -`. Over a hovering subject the 8 m ceiling makes it a steep oblique (~80°), not straight down |
 | Side | `follow side distance 6m height 1.6m fov 35` (left) / `follow side right …` | `right` = the other side |
 | Behind / front | `follow behind …` / `follow front …` | |
 
@@ -141,7 +141,7 @@ ffmpeg -v error -y -i out/x/v1/guide.mp4 -vf "select='not(mod(n\,16))',scale=320
 The page reads the script into its own state and prints it back, so write the file in the page's form:
 - block edges on half beats (see step 1);
 - every camera cell carries the camera lane's lock (`… lock snare 1 hold`), because the page applies one lock to all;
-- `shot: -` on camera blocks keeps the carried framing (a preset like `wide` overrides it, and carries on after);
+- `shot: -` on camera blocks keeps the carried framing (a preset like `wide` or `top` overrides it, and carries on after). The page prints a top block it made itself as `top | shot: top`, so a following orbit then runs at 1.4 m / 6.5 m / fov 45; write `shot: -` on the top block (the page keeps it) when the next block should come back to the earlier framing;
 - `# track: <groove> <bars> bars` names the music, e.g. `# track: laidback 6 bars`.
 
 1. `examples/scripts/beat-path-ex<N>-<id>.txt` with `# track:` and `# clip:` header lines.

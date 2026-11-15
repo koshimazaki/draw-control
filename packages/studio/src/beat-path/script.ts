@@ -77,9 +77,11 @@ export type BeatPathState = {
    * The camera rig's start framing (the script's `rig:` line). Frame 0 is the rig start. Each block starts where the block
    * before it ended: a follow offset (distance, height; it wins over a shot preset), a shot preset, a fov and the end of a
    * programmed dolly, push, pull or rise carry on into every later block until another block changes them; a block that sets
-   * none of them keeps what it started with. The camera word top (or above) is the exception: it lifts the camera overhead
-   * from those values without changing them, so the block after it comes back to the distance and height from before it (a
-   * fov set on it carries on). Absent fields (or no rig) keep the Draw Control base: 7 m, 1.6 m, fov 40, yaw 0.
+   * none of them keeps what it started with. The camera word top (or above) with `shot: -` is the exception: it lifts the
+   * camera overhead from those values without changing them, so the block after it comes back to the distance and height
+   * from before it (a fov set on it carries on). With the `top` shot preset (`top | shot: top`, what the page prints for a
+   * top block) it sets 1.4 m, 6.5 m and fov 45 like any preset, and those carry on. Absent fields (or no rig) keep the Draw
+   * Control base: 7 m, 1.6 m, fov 40, yaw 0.
    */
   rig?: { distance?: number; height?: number; fov?: number; yaw?: number };
   /** The shot description that travels with the guide (the legend line is built from the figure's colours). */
