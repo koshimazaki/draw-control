@@ -142,13 +142,15 @@ export function bindGenerate(p: Page) {
 
   // One run at a time; while it runs the Generate button stops it. The run belongs to the example it
   // started on: switching examples mid-run files the result there and never shows it on another.
-  let running: AbortController | null = null, runStarted = 0;
+  let running: AbortController | null = null, runStarted = 0, runSlot: string | null = null;
   // The note and the progress bar are held here: a shown result replaces them in the output frame,
   // and a second run looked them up by id and found nothing (it threw and left the button on Stop).
   const bar = $("genProgress"), note = $("outputNote"), spin = textSpinner(), noteRow = document.createElement("div");
   noteRow.className = "note-row"; noteRow.append(spin.el, note);
   const runButton = $<HTMLButtonElement>("runGenerate");
-  const setRunning = (c: AbortController | null) => { running = c; runButton.querySelector(".btn-label")!.textContent = c ? "Stop" : "Generate"; runButton.classList.toggle("running", !!c); };
+  /** The running job's note and progress bar in the output pane (its example showing again after a switch puts them back). */
+  const showProgress = () => { setOutputPane(true); $("addToGallery").hidden = true; bar.hidden = false; $("generateSlot").replaceChildren(noteRow, bar); };
+  const setRunning = (c: AbortController | null, slot: string | null = null) => { running = c; runSlot = c ? slot : null; runButton.querySelector(".btn-label")!.textContent = c ? "Stop" : "Generate"; runButton.classList.toggle("running", !!c); };
   runButton.onclick = async () => {
     if (running) { running.abort(); p.say("Stopping…"); return; }
     if (p.busy) return;
@@ -163,12 +165,11 @@ export function bindGenerate(p: Page) {
     // While the guide renders, page.ts refuses example switches and edits, so the guide matches them.
     const slot = p.slot, runModel = model, runShot = shot(), abort = new AbortController();
     runStarted = Date.now();
-    setRunning(abort);
+    setRunning(abort, slot);
     const here = () => p.slot === slot;
     const fill = bar.firstElementChild as HTMLElement;
-    setOutputPane(true); $("addToGallery").hidden = true;
-    bar.hidden = false; note.textContent = "Rendering the guide…"; fill.style.width = "0%";
-    $("generateSlot").replaceChildren(noteRow, bar);
+    note.textContent = "Rendering the guide…"; fill.style.width = "0%";
+    showProgress();
     spin.start();
     try {
       // The page is busy only while the guide renders in the shared viewport: playback stops first, as for the zip export.
@@ -181,7 +182,7 @@ export function bindGenerate(p: Page) {
       const result = await arena.generateFromGuide({
         guide: bundle.files, model: runModel, shot: runShot, signal: abort.signal, references: { character: r.character, environment: r.environment }, maxPrice: MAX_PRICE,
         key: key?.connected ? key : "local-preview-key-0000000000000000", confirm: (q: Parameters<typeof confirmCost>[0]) => confirmCost(q, abort.signal),
-        onProgress: (g: { stage: string; message: string; progress?: number }) => { if (!here()) return; note.textContent = g.message; fill.style.width = `${40 + Math.round((g.progress ?? ({ plan: 5, confirm: 10, upload: 30, submit: 40, poll: 60, done: 100 } as Record<string, number>)[g.stage] ?? 50) * 0.6)}%`; },
+        onProgress: (g: { stage: string; message: string; progress?: number }) => { note.textContent = g.message; fill.style.width = `${40 + Math.round((g.progress ?? ({ plan: 5, confirm: 10, upload: 30, submit: 40, poll: 60, done: 100 } as Record<string, number>)[g.stage] ?? 50) * 0.6)}%`; },
         fetch: logged(fake && !key?.connected ? fakeFetch(() => fakeResult) : null, labelOf(runModel), fake && !key?.connected, slot),
         ...(fake && !key?.connected ? { poll: { initialDelayMs: 100, intervalMs: 100, maxIntervalMs: 200 } } : {}),
       });
@@ -255,8 +256,9 @@ export function bindGenerate(p: Page) {
     /** A new slot: its references, its output (if any). */
     onSlot(slot: string) {
       refUi.sync();
-      // A run in progress on another example keeps going; this example shows its own output (or none).
-      showResult(outputs.get(slot)?.url ?? null);
+      // A run in progress on another example keeps going; this example shows its own output (or none),
+      // or, when the running job is this example's, its note and progress bar again.
+      if (running && runSlot === slot) showProgress(); else showResult(outputs.get(slot)?.url ?? null);
       sync();
     },
   };
