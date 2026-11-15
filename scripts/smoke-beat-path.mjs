@@ -27,7 +27,8 @@ export async function smokeBeatPath(browser, base, { fail, OUT, SHOTS }) {
   const errors = [];
   page.on("pageerror", e => errors.push(e.message));
   page.on("console", m => { if (m.type() === "error" || m.type() === "warning") errors.push(`${m.type()}: ${m.text()}`); });
-  await page.goto(`${base}/path.html`);
+  // The first pass is the neutral palette (no external requests); the Runware default has its own pass below.
+  await page.goto(`${base}/path.html?theme=neutral`);
   await page.waitForFunction(() => window.__beatPath?.recipe().audio?.name === "generated-straight-120.wav", null, { timeout: 30_000 })
     .catch(async e => {
       const seen = await page.evaluate(() => ({ probe: !!window.__beatPath, audio: window.__beatPath?.recipe().audio ?? null, status: document.getElementById("status")?.textContent, url: window.location.href })).catch(x => x.message);

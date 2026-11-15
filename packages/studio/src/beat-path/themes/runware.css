@@ -39,5 +39,5 @@
   --map-bg: #dcdde0; --map-minor: #cfd0d4; --map-major: #b9bbc0; --map-axis: #8a8d93; --map-text: #4f5257;
   --wave: #6b6b6b; --wave-bg: #1c1c1c; --beat-line: #292929; --bar-line: #454545; --playhead: #f2f2f2; --played: rgb(242 242 242 / .06);
 }
-/* The empty-map card sits on the light paper: give it the paper's look. */
-:root[data-theme="runware"] .map-pane .map-empty { color: #454545; background: #ffffff; border-color: #cfcfcf; }
+/* The empty-map card sits on the light grey sheet: a shade lighter than it, with a visible edge. */
+:root[data-theme="runware"] .map-pane .map-empty { color: #3f4246; background: #e9eaec; border-color: #75787e; }

@@ -4,7 +4,7 @@
  * (`npm run build:beat-path`, packages/studio/dist-beat-path/), serves the folder as plain
  * files from a sub-path (/some/sub/path/), opens it in headless Chrome, and fails on any
  * 404 or page error, or if the first example's music does not load. No deploy, no network
- * beyond localhost (the Google Fonts request of the Runware theme is not made: neutral theme).
+ * beyond localhost: it opens ?theme=neutral, so the Runware default's Google Fonts request is not made.
  *   npm run static-check
  */
 import { createServer } from "node:http";
@@ -36,7 +36,7 @@ try {
   const errors = [];
   page.on("pageerror", e => errors.push(e.message));
   page.on("response", r => { if (r.status() >= 400) missing.push(`${r.status()} ${r.url()}`); });
-  await page.goto(base);
+  await page.goto(`${base}?theme=neutral`);
   await page.waitForFunction(() => /generated-straight-120/.test(document.getElementById("trackName")?.textContent ?? ""), null, { timeout: 30_000 });
   const title = await page.title();
   console.log(`static: ${base} → "${title}", track ${await page.textContent("#trackName")}`);

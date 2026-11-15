@@ -15,7 +15,7 @@ Lineage, in three lines:
 - *Colour, type and radius* from Runware's public CSS (the dark theme below).
 - *New here*: the preview and output side by side on one playhead with a divider, the reference drops beside the shot fields, Settings as one closed chevron, the lane lock chips, the scenery outlines on the map.
 
-**Since 13 November the Runware theme is dark** (the site's own dark look), with the map as a light paper surface; the neutral theme stays the repo default and stays dark (the studio's palette): one set of tokens, two palettes, and a third small set (`--map-*`) for the map's surface so it can differ from the page.
+**Since 13 November the Runware theme is dark** (the site's own dark look), with the map as a light paper surface; since 15 November the Runware theme is the page's default (`?theme=neutral` gives the neutral palette, which stays dark: the studio's palette): one set of tokens, two palettes, and a third small set (`--map-*`) for the map's surface so it can differ from the page.
 
 ## Round 10 (15 November): Slice, Export, Smooth
 
@@ -57,7 +57,7 @@ The component set follows Runware's dashboard as a complement to it (dark, panel
 
 **Icons** are Lucide's shapes (lucide.dev), ISC licence: "Copyright (c) for portions of Lucide are held by Cole Bemis 2013-2022 as part of Feather (MIT). All other copyright (c) for Lucide are held by Lucide Contributors 2022." Permission to use, copy, modify and distribute with or without fee is granted under the ISC terms. The set: zap, plus, download, upload, layout-grid (gallery), code, key-round, chevron-down/right, trash-2, undo-2, sliders-horizontal, arrow-right, arrow-up-right, music, film, image, x, arrow-left-right (swap), square, scissors. No Runware icon, logo or wordmark is used.
 
-**On the paper map** the accent lime has too little contrast (1.2:1 on `#f2f2f2`), so the map's own selection (the selected scenery block and its corner handles) uses `--map-select`: a deep green `#2f6b23` (5.9:1) in the Runware theme, the accent in the neutral theme's dark map. Paths keep their own colours.
+**On the paper map** the accent lime has too little contrast (1.2:1 on the paper), so the map's own selection (the selected scenery block and its corner handles) uses `--map-select`: a deep green `#2f6b23` (4.8:1 on the `#dcdde0` sheet) in the Runware theme, the accent in the neutral theme's dark map. Paths keep their own colours.
 
 **Type.** One sans face for all interface text (the header's: Figtree in the Runware theme, the system face in neutral); mono for numbers, readouts (HUD, time, lock values), badges and the Settings section headings.
 
@@ -102,8 +102,8 @@ The `runware` theme now follows **the owner's post draft** (a private blog draft
 | File | What |
 | --- | --- |
 | `packages/studio/src/beat-path/ui/components.css` | Scales (type, spacing, motion) and the components: button (`.btn`, `.primary`, `.ghost`, `.outline`, `.overlay`), play button (`.play-btn`, `.quiet`; glyphs in `ui/glyph.ts`), segmented control (`.seg`), slider (`.slider`), toggle (`.toggle`), menu (`.menu`), lane and lane block (`.lane`, `.block`), panel (`.panel`), tooltip (`[data-tip]`), dialog. Every state: hover, `:focus-visible` (a 2 px ring in `--ring`), active (1 px press), disabled (45 % opacity). Transitions 120–200 ms on one easing. |
-| `themes/neutral.css` | The default: unbranded, the studio's dark palette. |
-| `themes/runware.css` | `?theme=runware`: dark, the owner's post draft's tokens (above), lime for Generate only, Figtree. Loads Figtree and JetBrains Mono from Google Fonts only in this theme. |
+| `themes/neutral.css` | `?theme=neutral`: unbranded, the studio's dark palette. |
+| `themes/runware.css` | The default since 15 November (`?theme=runware` still works): dark, the owner's post draft's tokens (above), lime for Generate only, Figtree. Loads Figtree and JetBrains Mono from Google Fonts only in this theme. |
 | `beat-path.css` | The page layout; tokens and components only. |
 
 Switch: since 15 November the Runware theme is the default (`data-theme="runware"` on `<html>`), because the page is a demo for Runware; `path.html?theme=neutral` gives the neutral palette. Both theme files are bundled. The map sheet is light grey (`#dcdde0`, owner's call: not white), so it reads apart from the dark page without glare. The Runware theme adds the footer-style line "Built on Runware · unofficial demo" in the header; there is no Runware logo, wordmark or favicon anywhere.
@@ -127,8 +127,8 @@ From `https://runware.ai/` `:root` custom properties (its dark site theme), read
 | `--accent-hover` | `#90f77c` | `--rw-green-mid` |
 | `--on-accent` | `#1c1c1c` | `--primary-foreground` |
 | kick, snare, paths on the dark page | `oklch(82% .12 20 / 300 / 40 / 240)` | docs.runware.ai `--color-red`, `--color-violet`, `--color-orange`, `--color-sky` |
-| `--map-bg` (paper) | `#f2f2f2` | `--rw-neutral-5` (slightly greyer than white) |
-| map grid | `#e1e1e1`, `#c9c9c9`, axes `#9a9a9a`, labels `#6b6b6b` | `#c9c9c9` `--rw-neutral-20`, `#9a9a9a` `--rw-neutral-30`, `#6b6b6b` `--rw-neutral-40`; `#e1e1e1` between neutral-10 and -15 |
+| `--map-bg` (paper) | `#dcdde0` | light grey, the owner's call on 15 November (was `#f2f2f2`, `--rw-neutral-5`) |
+| map grid | `#cfd0d4`, `#b9bbc0`, axes `#8a8d93`, labels `#4f5257` (15 November) | `#c9c9c9` `--rw-neutral-20`, `#9a9a9a` `--rw-neutral-30`, `#6b6b6b` `--rw-neutral-40`; `#e1e1e1` between neutral-10 and -15 |
 | paths on the paper | `oklch(52% .12 40 / 240 / 20)` | docs `--color-orange-deep`, `--color-sky-deep`, `--color-red-deep` |
 
 Contrast on dark: body text `#f2f2f2` on `#1a1a1a` 15.5; muted `#9a9a9a` on `#1a1a1a` 6.2; text `#1c1c1c` on the green `#afff9f` 14.3. On the paper: labels `#6b6b6b` on `#f2f2f2` 4.8, deep path colours about 5.
