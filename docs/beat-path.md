@@ -28,9 +28,9 @@ The Model Arena embed that draws the key panel and runs the generation is vendor
 | --- | --- | --- |
 | `npm run check` | TypeScript in core, studio, CLI and MCP; ESLint; every vitest unit test (the page's pure parts: script round trips, lane cuts and moves, the cost dialog queue, the run log, result playback, Slice) | about 30 s |
 | `node scripts/smoke-beat-path.mjs` | The Beat Path page alone in headless Chrome against its own dev server: drawing, locks, lane menus and drags, examples, the guide export validated against the schema, Slice and Export, Generate with the fake provider (cancel, Stop, a switch refused during the render, two questions in turn), the gallery; any console error or warning fails it | 1 min 45 s |
-| `npm run smoke` | The studio first, then the same Beat Path step | longer than the line above; see the note below |
+| `npm run smoke` | The studio first, then the same Beat Path step | about 2 min on a quiet machine |
 
-Both smoke commands need Google Chrome (or `CHROME_PATH`) and write screenshots to `out/`. On 15 November one full `npm run smoke` stopped after 65 s inside the lane-drag step (`smoke-beat-path-hunt.mjs`, a block's bounding box was null); the Beat Path step run alone straight after passed. Treat that step as possibly flaky, and run `node scripts/smoke-beat-path.mjs` again before blaming your change.
+Both smoke commands need Google Chrome (or `CHROME_PATH`) and write screenshots to `out/`. The times grow when the machine is busy; the clip-rendering steps are the slow part.
 
 The smoke scripts find most controls by element id, so renaming a button's text does not break them. A few lane-menu items are found by their visible text (`git grep -n "has-text" scripts`), and some steps match status messages (for example "Sliced to" after Slice): change those words and update the script in the same commit.
 
