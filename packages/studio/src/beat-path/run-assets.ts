@@ -9,6 +9,7 @@
  */
 import type { RunEntry, RunLog } from "./run-log";
 import { download as saveFile } from "../shared/download";
+import { results } from "./result-fetch";
 
 const CACHE = "beat-path-runs";
 const keyOf = (taskUUID: string) => new URL(`/__beat-path-runs/${taskUUID}`, location.origin).href;
@@ -46,12 +47,10 @@ export function shouldCopy(e: RunEntry, now: number, pageStart: number, tried: b
   return e.saved === undefined || now - e.at < LINK_ALIVE_MS;
 }
 
-const fetchBlob = async (url: string) => { const res = await fetch(url, { mode: "cors" }); if (!res.ok) throw new Error(`HTTP ${res.status}`); return res.blob(); };
-
 /** Copy a done run's file into the browser, trying again a few times; the log records whether it worked. */
 export async function saveAsset(log: RunLog, e: RunEntry, o: { load?: (url: string) => Promise<Blob>; delays?: readonly number[]; wait?: (ms: number) => Promise<void> } = {}): Promise<boolean> {
   if (!supported() || !e.url) return false;
-  const url = e.url, load = o.load ?? fetchBlob, delays = o.delays ?? COPY_DELAYS_MS;
+  const url = e.url, load = o.load ?? results.get, delays = o.delays ?? COPY_DELAYS_MS;
   try {
     const blob = await withRetry(() => load(url), delays, o.wait);
     const type = blob.type || (e.kind === "video" ? "video/mp4" : "image/png");
@@ -69,6 +68,12 @@ export async function savedBlob(e: RunEntry): Promise<Blob | null> {
   if (!supported() || !e.saved) return null;
   try { const r = await (await caches.open(CACHE)).match(keyOf(e.taskUUID)); return r ? await r.blob() : null; } catch { return null; }
 }
+
+/** Where the page's result fetch looks first (result-fetch.ts): a run's file kept here is read from here, not downloaded again. */
+export const storedLookup = (log: RunLog) => async (url: string): Promise<Blob | null> => {
+  const e = log.list().find(x => x.url === url && x.saved);
+  return e ? savedBlob(e) : null;
+};
 
 /** Drop the copies of runs no longer in the log. */
 export async function pruneAssets(log: RunLog) {
@@ -91,7 +96,7 @@ export function fileName(e: RunEntry, type: string) {
 /** Save the run's file to the computer: the browser's copy, else the link if it may be read, else open the link. */
 export async function download(e: RunEntry): Promise<"saved" | "fetched" | "opened"> {
   let blob = await savedBlob(e), how: "saved" | "fetched" | "opened" = "saved";
-  if (!blob && e.url) { try { const r = await fetch(e.url, { mode: "cors" }); if (r.ok) { blob = await r.blob(); how = "fetched"; } } catch { /* opened below */ } }
+  if (!blob && e.url) { try { blob = await results.get(e.url); how = "fetched"; } catch { /* opened below */ } }
   if (!blob) { if (e.url) window.open(e.url, "_blank", "noopener"); return "opened"; }
   saveFile(blob, fileName(e, blob.type), blob.type);
   return how;

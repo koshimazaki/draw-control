@@ -1,13 +1,16 @@
 /**
  * Smooth playback of a generated clip beside the preview.
  *
- * - Local copies: a result is fetched once into this tab (a blob URL), so the player
- *   reads from memory, not from the provider's link. A link the page may not read (no CORS)
- *   is played as it is.
+ * - Local copies: a result is fetched once into this tab (a blob URL; the same download as the
+ *   browser's kept copy, or read from that copy, result-fetch.ts), so the player reads from
+ *   memory, not from the provider's link. A link the page may not read (no CORS) is played as
+ *   it is. A copy no element shows any more is released.
  * - Following the page's clock: while the page plays, the clip plays too and is only
  *   corrected when it drifts; while paused, it is set to the page's frame. (Setting its time
  *   on every animation frame makes it seek 60 times a second and never actually play.)
  */
+
+import { results } from "./result-fetch";
 
 /** How far a playing clip may drift from the page's clock before it is put back (seconds). */
 export const DRIFT = 0.15;
@@ -40,29 +43,65 @@ export function applyStep(v: HTMLVideoElement, s: FollowStep) {
   if (s.pause) v.pause();
 }
 
-const copies = new Map<string, Promise<string>>();
-/** A blob URL holding the clip at `url` (fetched once per tab), or `url` itself when it cannot be read. */
-export function localCopy(url: string, fetcher: typeof fetch = (...a) => globalThis.fetch(...a)): Promise<string> {
-  if (!/^https?:/i.test(url)) return Promise.resolve(url);
-  let p = copies.get(url);
-  if (!p) {
-    p = fetcher(url, { mode: "cors" })
-      .then(async r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return URL.createObjectURL(await r.blob()); })
-      .catch(() => { copies.delete(url); return url; });
-    copies.set(url, p);
+/** An element that may be showing a copy: still in the page, and its source. */
+export type Viewer = { readonly isConnected: boolean; readonly src: string };
+type Copy = { promise: Promise<string>; blob?: string; users: Set<Viewer>; touched: number };
+/** A copy just made or just handed out is kept this long even with no viewer yet (its element is being set up). */
+export const COPY_GRACE_MS = 5000;
+
+/**
+ * The blob URLs made for results, one per link, with the elements showing each. A copy no element
+ * shows any more (replaced, or its row re-rendered) is released when the next copy is asked for;
+ * asked for again later, it is made again from the bytes the browser keeps (result-fetch.ts).
+ */
+export class Copies {
+  private copies = new Map<string, Copy>();
+  constructor(private urls: { create(b: Blob): string; revoke(u: string): void } = { create: b => URL.createObjectURL(b), revoke: u => URL.revokeObjectURL(u) },
+    private now: () => number = () => Date.now()) {}
+
+  /** A blob URL holding the file at `url`, or `url` itself when the page may not read it. */
+  get(url: string, load: (url: string) => Promise<Blob>): Promise<string> {
+    this.sweep(url);
+    const known = this.copies.get(url);
+    if (known) { known.touched = this.now(); return known.promise; }
+    const c: Copy = { users: new Set(), touched: this.now(), promise: Promise.resolve(url) };
+    c.promise = load(url).then(b => { c.blob = this.urls.create(b); c.touched = this.now(); return c.blob; }, () => { this.copies.delete(url); return url; });
+    this.copies.set(url, c);
+    return c.promise;
   }
-  return p;
+  /** `v` now shows the copy of `url`. */
+  use(url: string, v: Viewer) { const c = this.copies.get(url); if (c) { c.users.add(v); c.touched = this.now(); } }
+  /** Release every finished copy no element shows (except `keep`). */
+  sweep(keep?: string) {
+    for (const [url, c] of this.copies) {
+      if (url === keep || !c.blob) continue;
+      for (const v of c.users) if (!v.isConnected || v.src !== c.blob) c.users.delete(v);
+      if (!c.users.size && this.now() - c.touched > COPY_GRACE_MS) { this.urls.revoke(c.blob); this.copies.delete(url); }
+    }
+  }
+  get size() { return this.copies.size; }
 }
 
-/** Point a video at the local copy of `url` (the link meanwhile, so nothing waits on the fetch). */
-export function playLocal(v: HTMLVideoElement, url: string, fetcher?: typeof fetch) {
+const copies = new Copies();
+/** A blob URL holding the clip at `url` (one download, shared with the browser's copy), or `url` itself when it cannot be read. */
+export function localCopy(url: string, load: (url: string) => Promise<Blob> = results.get): Promise<string> {
+  if (!/^https?:/i.test(url)) return Promise.resolve(url);
+  return copies.get(url, load);
+}
+
+/**
+ * Point a video at the local copy of `url`. The link is not streamed meanwhile (that was a second
+ * download of the same file): the video waits for the copy, and gets the link itself only when
+ * the page may not read it. Resolves with the source it got (a blob URL can be drawn on a canvas).
+ */
+export function playLocal(v: HTMLVideoElement, url: string, load?: (url: string) => Promise<Blob>): Promise<string> {
   v.preload = "auto";
-  v.src = url;
-  if (!/^https?:/i.test(url)) return;
-  void localCopy(url, fetcher).then(local => {
-    if (local === url || v.getAttribute("src") !== url) return;
-    const t = v.currentTime, wasPlaying = !v.paused;
-    v.src = local;
-    v.addEventListener("loadedmetadata", () => { v.currentTime = t; if (wasPlaying) void v.play().catch(() => {}); }, { once: true });
+  v.dataset.result = url;
+  if (!/^https?:/i.test(url)) { v.src = url; return Promise.resolve(url); }
+  return localCopy(url, load).then(src => {
+    if (v.dataset.result !== url) return src;   // pointed at another result meanwhile
+    v.src = src;
+    copies.use(url, v);
+    return src;
   });
 }

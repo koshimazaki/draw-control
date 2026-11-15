@@ -9,7 +9,8 @@
  * page-generate.ts.
  */
 import { checkRun, type RunEntry, type RunLog } from "./run-log";
-import { download, pruneAssets, saveAsset, savedBlob, shouldCopy } from "./run-assets";
+import { download, pruneAssets, saveAsset, savedBlob, shouldCopy, storedLookup } from "./run-assets";
+import { results } from "./result-fetch";
 
 type Deps = {
   $: <T extends HTMLElement = HTMLElement>(id: string) => T;
@@ -91,6 +92,8 @@ export function bindHistory(d: Deps) {
       void saveAsset(d.log, r);
     }
   };
+  // A result kept here is played and downloaded from here, not fetched again (result-fetch.ts).
+  results.setStored(storedLookup(d.log));
   d.log.onChange(() => { render(); keep(); });
   render(); keep(); void pruneAssets(d.log);
 

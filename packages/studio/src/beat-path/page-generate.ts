@@ -76,13 +76,14 @@ export function bindGenerate(p: Page) {
     if (arena) { player.setAttribute("controls", "none"); player.setAttribute("label", "Output"); }
     else Object.assign(player, { muted: true, playsInline: true });
     player.className = "output-video";
-    player.setAttribute("src", url);
+    // No src on the player itself: it would stream the provider's link beside the copy (a second download).
     $("generateSlot").replaceChildren(player);
     // Played from a copy in this tab, not streamed from the provider's link (result-sync.ts).
+    // A remote result (another origin, served without CORS) would taint a canvas, so its frames cannot be taken:
+    // the control shows once the local copy is in, and stays hidden when the page may only play the link.
     const v = resultVideo();
-    if (v) playLocal(v, url);
-    // A remote result (another origin, served without CORS) would taint a canvas, so its frames cannot be taken: no control for it.
     refUi.showControl($("screenOutput"), readableVideo(url));
+    if (v) void playLocal(v, url).then(src => { if (resultVideo() === v) refUi.showControl($("screenOutput"), readableVideo(src)); });
   }
   const divider = $("divider");
   divider.addEventListener("pointerdown", e => {

@@ -15,6 +15,7 @@ import { sourceLabel, type RefKind, type RefSource, type RefStore } from "./ref-
 import type { ArenaKeyElement, ArenaModule, CostQuestion, ImageFamilyInfo } from "./arena";
 import type { Run } from "./gallery";
 import { runErrorText, type RunError } from "./generate";
+import { results } from "./result-fetch";
 
 type Deps = {
   $: <T extends HTMLElement = HTMLElement>(id: string) => T;
@@ -182,7 +183,8 @@ export function bindImages(d: Deps) {
       // The image as a Blob for the store; if the browser may not fetch it (CORS), keep its URL: an image model takes
       // a URL reference, a video model (Blobs only) then does not get it, and the status line says so.
       let image: Blob | string = r.imageURL;
-      try { const res = await fetch(r.imageURL); if (res.ok) image = await res.blob(); } catch { /* remote and not readable here: keep the URL */ }
+      // The same download as the run log's kept copy (result-fetch.ts).
+      try { image = await results.get(r.imageURL); } catch { /* remote and not readable here: keep the URL */ }
       d.store.set(slot, kind, image, { kind: "generated", model: m.name, prompt: words });
       d.runs.push({ slot, model: m.key, modelName: m.name, url: typeof image === "string" ? image : URL.createObjectURL(image), prompt: words, kind: "image", costUsd: r.costUsd, for: kind, blob: typeof image === "string" ? null : image });
       d.renderGallery();

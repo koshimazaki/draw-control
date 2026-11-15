@@ -103,7 +103,7 @@ function rowPlayer(row: HTMLElement, audioUrl: string | null) {
 }
 
 const tile = (label: string, content: HTMLElement | string) => { const t = el("figure", "row-tile"); const cap = el("figcaption", "", label); const body = typeof content === "string" ? el("div", "row-empty muted", content) : content; t.append(body, cap); return t; };
-const video = (src: string) => { const v = el("video"); v.muted = true; v.playsInline = true; v.loop = true; playLocal(v, src); return v; };
+const video = (src: string) => { const v = el("video"); v.muted = true; v.playsInline = true; v.loop = true; void playLocal(v, src); return v; };
 
 export function bindGallery(opts: {
   root: HTMLElement; load(slot: string): void; refs(slot: string): { character?: Ref; environment?: Ref } | undefined; runs(): Run[];
