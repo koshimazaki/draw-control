@@ -21,6 +21,7 @@ import { bindSetup, setupFiles, shotRefusal } from "./page-setup";
 import { isTyping } from "./drag";
 import { bindFollowFields, followProbe, parallelStreet } from "./page-follow";
 import { canSmooth, smoothPoints, SMOOTH_STEP } from "./map-select";
+import { bindPlayhead } from "./playhead";
 
 /** What each block's shape on the map is, said in its popover. */
 const CAMERA_NOTES: Record<CameraWord, string> = {
@@ -293,19 +294,31 @@ export function bindActions(p: Page) {
   }
 
   // Timeline zoom: the music strip and both lanes stretch together (1×–8×), centred on the playhead; it follows the playhead while playing.
+  // The track overview (a long track, sliced or not) zooms with it, its window kept in view; Cmd/Ctrl-scroll zooms over either.
   const ZOOMS = [1, 2, 4, 8], scroller = $("tlScroll"), timeline = scroller.closest<HTMLElement>(".timeline")!;
   let zoom = 1;
   const headFraction = () => Math.max(0, Math.min(1, (p.head - p.window0()) / Math.max(0.001, p.state.clip)));
   function setZoom(z: number) {
     zoom = Math.max(ZOOMS[0], Math.min(ZOOMS[ZOOMS.length - 1], z));
     timeline.style.setProperty("--zoom", String(zoom));
+    p.slice?.overview.setZoom(zoom);
     $<HTMLButtonElement>("tlZoomOut").disabled = zoom === ZOOMS[0]; $<HTMLButtonElement>("tlZoomIn").disabled = zoom === ZOOMS[ZOOMS.length - 1];
     requestAnimationFrame(() => { scroller.scrollLeft = headFraction() * scroller.scrollWidth - scroller.clientWidth / 2; });
     p.say(zoom === 1 ? "Timeline: the whole clip" : `Timeline ${zoom}× · scroll sideways to move along it`);
   }
   const step = (dir: 1 | -1) => setZoom(ZOOMS[Math.max(0, Math.min(ZOOMS.length - 1, ZOOMS.indexOf(zoom) + dir))]);
   $("tlZoomIn").onclick = () => step(1); $("tlZoomOut").onclick = () => step(-1);
-  scroller.addEventListener("wheel", e => { if (e.ctrlKey || e.metaKey) { e.preventDefault(); step(e.deltaY < 0 ? 1 : -1); } }, { passive: false });
+  // A pinch or Cmd/Ctrl-scroll sends many wheel events: one zoom step per gesture (a pause of 150 ms ends it), and never the browser's page zoom.
+  let wheelAt = 0;
+  const zoomWheel = (e: WheelEvent) => {
+    if (!(e.ctrlKey || e.metaKey)) return;
+    e.preventDefault();
+    const now = performance.now(), fresh = now - wheelAt > 150;
+    wheelAt = now;
+    if (fresh && e.deltaY) step(e.deltaY < 0 ? 1 : -1);
+  };
+  scroller.addEventListener("wheel", zoomWheel, { passive: false });
+  $("overview").addEventListener("wheel", zoomWheel, { passive: false });
   $<HTMLButtonElement>("tlZoomOut").disabled = true;
   const followHead = () => {
     if (zoom > 1 && p.player.playing) {
@@ -315,6 +328,7 @@ export function bindActions(p: Page) {
     requestAnimationFrame(followHead);
   };
   requestAnimationFrame(followHead);
+  bindPlayhead(p);
 
   // The shot description: three fields, stored in the recipe (recipe.json in the bundle) and the script.
   for (const k of ["subject", "environment", "action"] as const) {
@@ -458,6 +472,8 @@ export function bindActions(p: Page) {
       followProbe: (k: number) => followProbe(p.recipe, p.drive, p.state.cameraLane[k]),
       timelineZoom: () => zoom, busy: () => p.busy,
       kicks: () => (p.drive?.bands?.low ?? []).map(o => o.seconds),
+      hits: () => ({ low: (p.drive?.bands?.low ?? []).map(o => o.seconds), mid: (p.drive?.bands?.mid ?? []).map(o => o.seconds), high: (p.drive?.bands?.high ?? []).map(o => o.seconds) }),
+      exportRange: () => exportRange(p.recipe, p.state.clip),
       cameraAt: (frame: number) => cameraAtFrame(planCamera(p.recipe, p.drive), frame),
     };
   }

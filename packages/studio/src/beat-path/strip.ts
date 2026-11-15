@@ -1,7 +1,8 @@
 /**
  * The audio strip: the clip's waveform (the slice of the track), its beat grid, three tick
  * rows for the analysed hits (kick low, snare mid, hat high), the locked hits brighter, your
- * own markers hollow, and the playhead. Click or drag to seek; a click on a detected hit mutes
+ * own markers hollow, and the playhead. Click or drag to seek, playing or paused (the playhead line
+ * itself grabs over a detected hit too, so it can always be dragged); a click on a detected hit mutes
  * it, and dragging one moves it (the hit is switched off where it was detected and a marker of
  * its kind lands where it is dropped, one undo step); Alt-click adds a marker of the chosen
  * kind; drag your marker to move it (select it and Delete removes it).
@@ -48,7 +49,7 @@ export class AudioStrip {
     this.ctx = canvas.getContext("2d")!;
     new ResizeObserver(() => this.resize()).observe(canvas);
     const at = (e: PointerEvent) => { const r = canvas.getBoundingClientRect(), s = this.scene; return s.start + Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * (s.end - s.start); };
-    canvas.addEventListener("pointermove", e => { if (!e.buttons) canvas.style.cursor = this.addedAt(e) >= 0 || this.markerAt(e) ? "grab" : e.altKey ? "copy" : "pointer"; });
+    canvas.addEventListener("pointermove", e => { if (!e.buttons) canvas.style.cursor = e.altKey ? "copy" : this.addedAt(e) >= 0 ? "grab" : Math.abs(e.clientX - canvas.getBoundingClientRect().left - this.x(this.head)) <= 5 ? "ew-resize" : this.markerAt(e) ? "grab" : "pointer"; });
     canvas.addEventListener("pointerdown", e => {
       // Alt-click adds your own marker; your marker drags; a click on a detected hit switches it off (or back on); anywhere else seeks.
       if (e.altKey) { this.markers.add(at(e)); return; }
@@ -60,6 +61,12 @@ export class AudioStrip {
         return;
       }
       this.markers.select(-1);
+      // The playhead line (within 5 px) scrubs, even over a detected hit; anywhere else on the hit rows the hit wins.
+      if (Math.abs(e.clientX - canvas.getBoundingClientRect().left - this.x(this.head)) <= 5) {
+        seek(at(e));
+        captureDrag(canvas, e, ev => seek(at(ev)));
+        return;
+      }
       // A detected hit: a click switches it off or on; a drag past a few pixels moves it (off here, a marker of its kind there).
       const hit = this.markerAt(e);
       if (hit) {

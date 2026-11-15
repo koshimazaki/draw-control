@@ -338,6 +338,9 @@ select:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
 .tl-scroll { grid-column: 2; grid-row: span 3; align-self: stretch; min-width: 0; overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; }
 .tl-inner { width: calc(100% * var(--zoom, 1)); height: 100%; display: grid; grid-template-rows: 44px var(--lane-h) var(--lane-h); row-gap: var(--s-1); align-items: center; }
 .tl-inner .wave-wrap { height: 100%; }
+/* The playhead over the lanes (playhead.ts); the strip draws its own. Clicks pass through to the blocks. */
+.tl-inner { position: relative; }
+.tl-head { position: absolute; top: 0; bottom: 0; width: 1px; margin-left: -0.5px; background: var(--playhead); opacity: .55; pointer-events: none; z-index: 2; }
 .tl-lab { display: flex; align-items: center; justify-content: flex-end; gap: var(--s-1); }
 .zoom-btns { display: inline-flex; gap: 2px; }
 .zoom-btn { width: 18px; height: 18px; padding: 0; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text-muted); font: var(--weight-medium) 12px/1 var(--font-mono); cursor: pointer; }
