@@ -1,0 +1,11 @@
+name: beat-path
+version: 0.1.0
+description: Beat Path on Runware - draws and edits shots through the motion-studio MCP, thinks with a Runware text model and generates through the Runware MCP behind approval.
+hermes_requires: ">=0.21.4"
+author: Koshi
+license: MIT
+distribution_owned:
+  - SOUL.md
+  - config.yaml
+  - skills/
+  - distribution.yaml
