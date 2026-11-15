@@ -7,7 +7,7 @@ summary: The first file to open for the Draw Control page - what it is for, how 
 
 Draw Control is a one-screen page in this repo, "draw control of camera and character": **draw a path on the map, set it to music, generate a video.** You draw where the subject travels, the movement and the camera lock to the beat of a track, and the page renders a guide clip (a plain orange figure among grey blocks) that a video model follows when it makes the real shot.
 
-What a user sees and does is in the [README](../README.md#draw-control-start-here). The design system and the log of UI rounds are in [design.md](design.md), the shot script grammar in [recipe.md](recipe.md#shot-script), the CLI and the MCP server in [agents.md](agents.md), the static build in [deploy.md](deploy.md), the models' limits in [models.md](models.md). This file does not repeat them.
+What a user sees and does is in [the full tour](studio.md#the-draw-control-page). The design system and the log of UI rounds are in [design.md](design.md), the shot script grammar in [recipe.md](recipe.md#shot-script), the CLI and the MCP server in [agents.md](agents.md), the static build in [deploy.md](deploy.md), the models' limits in [models.md](models.md). This file does not repeat them.
 
 The page was first called Beat Path, and the code keeps that name: the folder `packages/studio/src/beat-path/`, the `beat-path` build mode and npm scripts, the CSS classes, the TypeScript symbols (`BeatPathState`, `beatPathBase`), the Hermes profile and the skill (`beat-path`), and this file's name. Only what a user reads says Draw Control.
 

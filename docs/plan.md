@@ -269,3 +269,16 @@ Everything above is the first milestone. **Below the line, not in the first mile
 - A claim about a third-party model or API is written only after its schema or docs show it.
 - No paid call without the owner's approval. Every real run is a row in `docs/costs.md`; every platform friction is a row in `docs/friction.md`.
 - Hand-back: branch, head SHA, what was verified by which command, what was not run, open questions.
+
+## Not done yet
+
+Moved here from the README on 16 November 2026.
+
+- No foot locking or IK: feet can slide, most with the procedural walk and run (a rigged gait plays at the path's speed).
+- Recipe poses do not drive a loaded GLB/FBX rig (no rest-pose retargeting); a loaded character plays its own clips.
+- There is no fall move; facial expressions are stored, not rendered.
+- Drum detection is tested on synthetic patterns only, not on real mixes.
+- Recording a camera lane by dragging the camera in the viewport; driving the figure from the keyboard; voice input.
+- Previous/new comparison with accept or revert; range preview and looping in the player.
+- MotionBricks, pose input from video and the provider interface (see [plan](docs/plan.md)).
+- The bundle schema 0.5.0 (0.4.0's camera modes, 0.5.0's character kind `glider`) still has to be taken into model-arena.

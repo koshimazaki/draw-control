@@ -4,161 +4,50 @@
 
 <!-- DEMO VIDEO: on github.com, edit this file and drag the screen recording onto this line; GitHub uploads it and inserts a link that plays inline. -->
 
-Draw Control is an open-source, in-browser tool for directing AI video. You literally draw the camera's path and the subject's path on a map, block out the scene with simple primitives (grey blocks for towers, shop fronts, pillars), and the page renders a guide clip: an orange stand-in figure, the camera move and the blockout, timed to your music. A video model (Kling 4.0, Seedance 2.5 or MiniMax H3, through Runware) follows the guide for motion and framing, while your prompt and reference images decide what it looks like.
+Draw Control turns a drawing into a camera move for AI video. Draw the subject's path and the camera's path on a map, block out the scene with simple grey primitives, and drop in your music. The page renders a guide clip (a stand-in figure, the camera move and the blockout, timed to the beat), and a video model follows it for motion and framing, while your prompt and reference images decide the look.
 
-- **Draw, don't describe.** Camera and subject paths drawn on a map; views (isometric, behind, side, top), orbits, push-ins and pull-outs placed on two lanes, Character and Camera.
-- **Primitives and blockouts drive the motion.** The grey blocks stand in for anything, so one guide serves many subjects: Example 2 is one street guide for a runner, an anime skater and a factory forklift.
-- **Beat-synced, audio-reactive.** Drop in your music: the page finds the tempo, kicks, snares and hats. Moves start on hits, locks land on them, your own markers drive them, and the timed prompt tells the model what happens on which hit.
-- **Agents built in.** The page, a CLI and an MCP server run the same commands, so your own agent harness (Claude Code, Hermes, Codex and others), typed or spoken to, can draw, edit and render shots. The skills in [`skills/`](skills/) teach an agent the whole process, from a brief to a finished example.
-- **Your key, your browser.** It runs locally; generation uses your own Runware key, and every run shows its estimated cost and waits for your OK before anything is sent.
+**Runs on [Runware](https://runware.ai).** Generation goes through Runware with your own API key, straight from your browser: Kling VIDEO 4.0, Seedance 2.5 and MiniMax H3 for video, and GPT Image, Seedream, FLUX and MiniMax image models for character and environment references. Every run shows its estimated cost and waits for your OK.
 
-```bash
-nvm use && npm install && npm run dev   # then open http://127.0.0.1:5180/path.html
-```
+## What it does
 
-How it works, step by step, is below. This repository is named `motion-studio` because it also holds the engine and the full studio underneath Draw Control: the recipe format, the CLI, the MCP server and the guide export ([more below](#motion-studio-the-engine-underneath)).
+- **Drawing controls the camera.** Paths drawn on a map; views (isometric, behind, side, top), orbits, push-ins and pull-outs placed on a Character lane and a Camera lane.
+- **Audio-reactive.** It finds the tempo, kicks, snares and hats in your track. Moves start on hits, locks land on them, your own markers drive them, and a loop can be sliced to the clip.
+- **Agent control.** The page, a CLI and an MCP server run the same commands, so your own agent (Claude Code, Hermes, Codex and others), typed or spoken to, can draw, edit and render shots.
+- **One guide, many subjects.** The grey blocks stand in for anything: Example 2 is one street guide for a runner, an anime skater or a factory forklift.
 
-## Draw Control (start here)
+## Quick start
 
-Draw control of camera and character: you draw, and the drawing controls the camera and the figure. (In the code the page is still `beat-path`: the folder, the build mode, the npm scripts.)
-
-The lean demo: **draw a path on a map, add music, and the movement and the camera lock to the beat; export a guide clip for video models.** One screen, an abstract figure, a handful of controls.
-Changing the page (developers and agents): [docs/beat-path.md](docs/beat-path.md) says how to run and check it and which file owns each control.
+Node 24 and Chrome or Edge (the guide export uses WebCodecs).
 
 ```bash
-nvm use && npm install && npm run dev   # open http://127.0.0.1:5180/path.html  (the Runware look; /path.html?theme=neutral for the neutral palette)
-```
-
-It opens on **Example 1**, a flying car (the ship) down a city avenue on the owner's own music (a 13.488 s loop of "Neon Rain, Empty Streets" by glitchcandies, made with Suno, used with permission), in three moves that start on the music's hits: isometric down the avenue, right behind as it turns left into a gap between the towers and starts to land, then from the top, pushing in, as it comes down between the buildings, with one zoom accent on a kick as it passes the first towers; press **Play**. *Example 2* is one street guide for any travelling subject (a New York runner by default; an anime skater and a factory forklift are ready-to-paste shot lines, [docs/beat-path.md](docs/beat-path.md#one-guide-three-subjects-example-2)) on the owner's drum and bass loop: low and close on the feet, alongside as it passes behind the blocks, then a high view of the whole street, and *Your own* starts from a plain path; each keeps its edits, and each example brings its own figure shape, scenery, camera and music file (107.5 and 174 BPM; the example-to-track table is `packages/studio/src/beat-path/tracks.ts`, your own files go in `packages/studio/public/tracks/`). More shots are shot scripts in `examples/scripts/`, off the page: a car on a coastal bend (`beat-path-ex3-car.txt`) and a drone weaving between pillars (`beat-path-ex4-drone.txt`: the camera opens isometric, pans round, rises to the top view and ends on the side view from the other side) were Examples 3 and 4 until 15 Nov 2026, on a generated groove at 100 BPM; a setup saved on either loads as *Your own*. Example 1's clip is 14 s and its music 13.488 s, Example 2's 12 s and 11.04 s: after a model has made the clip, `npm run finish` lays the original music over it and cuts it to the music's length ([docs/beat-path.md](docs/beat-path.md#finishing-a-generated-clip)).
-
-- **Map** (left): *Subject*, *Camera* or *Blocks*; *Top* or *Side* (heights); *Edit* (default; a stray click never draws) or *Draw new* (drag a stroke or click points; Escape stops); *Corners*. Pan with a scroll, a middle-button drag or a drag with Space held; zoom with ctrl/cmd + wheel or a pinch; *+*, *−*, *Fit* (every example loads framed). The camera's track is drawn block by block with labels, beat dots and hit rings; with no camera path the map says the camera follows the Camera lane, and a path drawn new flies the selected camera block. **Blocks**: click to select, drag to move, drag a corner to resize, a height field, *Draw new* drags a rectangle, Cmd/Ctrl-D duplicates, Cmd/Ctrl-C and -V copy and paste at the pointer, Delete removes; a block that would swallow the path is nudged off it.
-- **Preview** (right), and once something is generated, the **output** beside it on the same playhead and music: drag the divider (double-click resets), swap the sides.
-- **Shot**: subject, environment, action; optional *Character* and *Environment* images; the prompt the chosen model will get is shown beneath. **Model** (Kling 4.0, Seedance 2.5, MiniMax H3) and **Generate**: with your Runware key (*Add your Runware API key*, top right) it renders the guide in memory, asks you to confirm the estimated cost, and shows progress and the result beside the preview; *Add to gallery* keeps it. Swapping the asset and generating your own is two clicks from any example.
-- **Music strip and lanes** (bottom): click a kick or snare marker to switch it off for every lock; *Sound on/off*, *Your track*, *No music*. *Character* lane (glide, hover, spin, jump, freeze) and *Camera* lane (follow behind, follow side, orbit, top, my path, push in, or a typed direction such as `over shoulder then go above`); their lock chips set what each lands on.
-- **Settings** (closed): clip length (whole seconds, 3 to 30), locks, snap, ground grid, scenery (none, scatter, street, city), figure shape and colours, *Download guide (.zip)*.
-- **The camera never loses the subject**: a framing guard turns the aim towards the figure only when it nears the frame's edge (tested on every frame).
-- **Gallery** (scroll down): one row per example: its path, its guide (rendered in the browser when the row comes into view), the reference images, the shot description and prompt, and a clip per model, on one playhead with the example's music; your added runs form a last row. **Open source**: the footer links the code (MIT); it runs in your browser with your own Runware key.
-
-Generation uses the vendored Model Arena embed (`npm run vendor:arena` copies it into `packages/studio/public/vendor/`); in development, or with `?fake=1`, a local fake provider answers instead of Runware so the layout can be judged with no key and no cost. A model receives only the guide video (with its music), the reference images and the prompt from the shot description, never the script. Agents still drive everything through the shot script (CLI, MCP, `examples/scripts/`), which does not show on the page. Static deploy (Cloudflare Pages or any host): [docs/deploy.md](docs/deploy.md). The page's name is one constant, `packages/studio/src/beat-path/name.ts`.
-
-**Colours in the guide** (so a prompt can name them; the figure's colours can be changed, the legend line follows): the **orange figure** is the subject, shaped like it (a flyer, a runner, a car, or a pyramid with a sphere); **white** marks its front (nose, chest marker, headlights); the **dark ground with lighter grid lines** is the floor (1 m cells, bolder every 4 m, fading into a dark horizon; *Grid* turns it off); the **grey blocks** are the scenery (a scatter of boxes, a street of buildings, or a city grid), placed clear of both paths and the line of sight so travel and parallax read in every still. Nothing else is in frame. Design tokens, the two themes and the sources of the Runware values: [docs/design.md](docs/design.md).
-
-## Motion Studio (the engine underneath)
-
-A browser studio where a neutral figure moves to your music, beat by beat, under a camera that moves with it.
-You (or an agent, by command or by a plain-text shot script) edit the moves and the camera on a timeline.
-The result exports as a guide clip, with its beats and camera path, for video models to follow.
-
-Status: working studio, CLI and MCP server, 11 November 2026. What is not done is [at the end](#not-done). Detail: [PRD](docs/PRD.md) · [plan and current state](docs/plan.md) · [agents: CLI and MCP](docs/agents.md) · [Hermes on Runware](docs/hermes.md) · [recipe and shot script format](docs/recipe.md) · [video models: length and frame rate](docs/models.md).
-
-## Five-minute quickstart
-
-You need Node 24 (`.nvmrc`) and Google Chrome or Edge (the export uses WebCodecs). Everything runs locally; nothing is uploaded.
-
-```bash
-git clone <this repo> motion-studio && cd motion-studio
+git clone https://github.com/koshimazaki/draw-control && cd draw-control
 nvm use && npm install
-npm run check          # typecheck, lint, unit tests (about 30 s)
-npm run dev            # open http://127.0.0.1:5180
+npm run dev        # open http://127.0.0.1:5180/path.html
 ```
 
-**Load demo** (top of the page) needs nothing else: it generates a drum track in the browser (8 bars at 120 BPM, the same synth as `npm run drums`), applies [`examples/scripts/glide-path.txt`](examples/scripts/glide-path.txt) (a figure glides an L-shaped path, stopping on each kick, while the camera follows and then flies its own path) and switches to the *Camera rig* view. Press *Play*. Everything the quickstart uses is in the repo or generated: the character (`assets/characters/`), the demo track, the example scripts. No download, no file from another project.
+Add your Runware API key (top right) to generate. Without one, the page still draws, plays and exports the guide. It opens on **Example 1**, a ship over a city on a Neon Rain loop; **Example 2** is the street guide on a drum and bass loop; **Your own** starts from a plain path.
 
-With your own music (or `npm run drums`, which writes the same generated track to `out/drums-120.wav`):
-
-1. **Track.** Drop a music file (WAV, MP3, M4A, OGG, FLAC) anywhere on the page. The studio finds the tempo, the first beat and the kicks, snares and hats. Press *Fit to track*.
-2. **Script.** Open *Shot script* in the side panel, paste [`examples/scripts/glide-path.txt`](examples/scripts/glide-path.txt) and press *Apply script*. The rows land on the timeline as the **Action** track (what the figure does) and the **Camera** track (how the camera moves).
-3. **Fine-tune.** Drag blocks and their edges on either track (they snap to beats, kicks or snares), pick a camera block to edit its shot, amount and beat lock, or open a camera lane (*Show: Distance, Height, Yaw, FOV*) and draw on it. Cmd/Ctrl-Z undoes.
-4. **Export.** Pick the *Camera rig* view, set a size (1280×720 by default) and optionally a range, and press *Export bundle (.zip)*: `guide.mp4`, `frame0.png`, `audio.wav`, `beats.json`, `camera.json`, `recipe.json`, `meta.json`.
-
-## CLI
-
-`cli/`, run with `npm run cli -- <command>` or `node cli/bin/motion-studio.mjs <command>`. No build step.
+## Agents
 
 ```bash
-npm run drums                                                   # out/drums-120.wav, a generated drum track
-M() { node cli/bin/motion-studio.mjs "$@"; }
-M analyse out/drums-120.wav --out out/analysis.json            # tempo, kicks, snares, hats, peaks
-M new --analysis out/analysis.json --out out/recipe.json        # rigged mannequin, fitted to the track
-M script out/recipe.json examples/scripts/glide-path.txt --analysis out/analysis.json --out out/shot.json
-M describe out/shot.json --analysis out/analysis.json --script  # the tracks as a shot script again
-M render out/shot.json --audio out/drums-120.wav --out out/bundle --start 0 --length 16 --unit beats
+npm run cli -- commands     # every command (analyse, new, script, describe, render, …)
+npm run mcp                 # the MCP server on stdio: mcp/bin/motion-studio-mcp.mjs
 ```
 
-Also `apply` (a list of JSON commands), `set` (any field by path) and `commands` (every command with its arguments). `render` drives the studio in headless Chrome.
+Point any MCP-capable harness at the server, or call the CLI from its terminal. The skills in [`skills/`](skills/) teach an agent the whole process, from a brief to a finished example, and [`hermes/`](hermes/) is a ready Hermes profile that runs on Runware's own text models.
 
-## MCP server
+## Docs
 
-`mcp/`, an MCP server over stdio (official TypeScript SDK). Register it with any MCP client as:
-
-```json
-{ "mcpServers": { "motion-studio": { "command": "node", "args": ["/absolute/path/to/motion-studio/mcp/bin/motion-studio-mcp.mjs"] } } }
-```
-
-Tools: `analyse_audio`, `new_recipe`, `load_recipe`, `save_recipe`, `get_recipe`, `describe`, `get_script`, `apply_script`, `apply`, `set`, `undo`, `list_commands`, `render`. A session holds one recipe and one analysis. `npm run mcp-check` starts the server over stdio, applies `glide-path.txt` and renders a bundle to `out/mcp-check/`.
-
-## Folders
-
-```
-packages/core/     the engine: recipe format and validator, frameAt, beat and drum analysis, edit commands,
-                   shot script, describe, camera rig, bundle builders. Pure TypeScript, no DOM, no dependencies.
-packages/studio/   the Vite + Three.js app (timeline, viewport, characters, export). Not imported by anything else.
-cli/               the motion-studio CLI (imports the core's public entry; `render` serves the studio to headless Chrome)
-mcp/               the MCP server (the same commands; reuses the CLI's analysis and render)
-schema/            guide-bundle JSON Schema 0.5.0 (pinned copy; the owner is the model-arena repo)
-examples/          recipes/ (example sequences), scripts/ (shot scripts); bundles/ is generated, not committed
-scripts/           smoke (real headless Chrome), mcp-check, examples, peek (screenshots), drums, mixamo-check, analyse-clips
-docs/              PRD, plan, agents (CLI, MCP, worked examples), recipe format, costs, friction log
-assets/characters/ the bundled rigged mannequin (licences below)
-```
-
-| `npm run` | What it does |
+| | |
 | --- | --- |
-| `dev`, `build` | the studio on http://127.0.0.1:5180, or a static build in `packages/studio/dist/` |
-| `check` | `typecheck` (core, studio, CLI, MCP) + `lint` + `test` (vitest) |
-| `smoke` | real headless Chrome through the studio: tracks, drags, lanes, a script, recording, four exports checked with ffprobe; then the Draw Control page (a drawn path, lock on kick, a lane menu, a pasted script, an export validated against the schema); `out/smoke/` |
-| `mcp-check` | the MCP server over stdio: `apply_script` and `render`; `out/mcp-check/` |
-| `drums` | a generated 120 BPM drum track, `out/drums-120.wav` |
-| `examples` | regenerate the example bundles in `examples/bundles/` |
-| `peek`, `mixamo-check` | screenshots of the views; a check of your own Mixamo clips in `assets-local/mixamo/` |
-| `cli`, `mcp` | the CLI, or the MCP server on stdio |
+| [The full tour](docs/studio.md) | every control on the page, the studio underneath, the folders, the licences |
+| [Developing the page](docs/beat-path.md) | how to run and check it, and which file owns each control |
+| [Agents: CLI and MCP](docs/agents.md) | every command, with worked examples |
+| [Shot script and recipe](docs/recipe.md) | the format agents and the page share |
+| [Video models](docs/models.md) | clip lengths, frame rates and prompt limits per model |
+| [Hermes on Runware](docs/hermes.md) | the agent profile, the key in the Keychain, what guards the spend |
+| [Deploy](docs/deploy.md) | a static build for Cloudflare Pages or any host |
 
-## Using `packages/core` from another app
+## Licence
 
-`@motion-studio/core` is TypeScript source with an `exports` map: `.` is the public entry ([`src/index.ts`](packages/core/src/index.ts), the recipe types and validator, `frameAt`, commands, the shot script, `describeRecipe`, beats and onsets, the camera rig, the bundle builders); `./internal` is every module, for the studio. It has no runtime dependencies and needs no Three.js. In a Vite or React Three Fiber app, link it and import it; Vite compiles the TypeScript:
-
-```bash
-npm install ../motion-studio/packages/core      # or "@motion-studio/core": "file:../motion-studio/packages/core"
-```
-
-```ts
-import { validateRecipe, frameAt, planCamera, cameraAtSeconds } from "@motion-studio/core";
-const recipe = validateRecipe(json), plan = planCamera(recipe);   // planCamera(recipe, drive) for the music-driven camera
-useFrame(({ clock, camera }) => {
-  const t = clock.elapsedTime, f = frameAt(recipe, Math.floor(t * recipe.fps));
-  figure.current.position.set(f.root.x, f.root.y, f.root.z); figure.current.rotation.y = f.root.yawRadians;
-  // f.pose: joint angles (procedural figures); f.layers: clip name, time and weight for an AnimationMixer (rigged mannequin)
-  const c = cameraAtSeconds(plan, t); camera.position.set(...c.position); camera.lookAt(...c.target);
-});
-```
-
-Every frame is a pure function of (recipe, audio drive, frame), so it can be seeked and rendered out of order. The figures themselves (the procedural mannequin and the rigged mannequin's clip mixer) are drawn by the studio in `packages/studio/src/characters/`; copy what you need. Plain Node needs a loader for the extensionless TypeScript imports (Node 24 strips types): see `cli/bin/motion-studio.mjs`. `packages/core/test/public-api.test.ts` imports only the public entry by package name and computes frames and a camera with no DOM.
-
-## Licences
-
-- Code: MIT ([LICENSE](LICENSE)).
-- `assets/characters/AnimationLibrary.glb`: from Ecctrl, MIT (copyright Erdong Chen, [ECCTRL-LICENSE.txt](assets/characters/ECCTRL-LICENSE.txt)); animations based on the Quaternius Universal Animation Library, CC0. See [NOTICE.md](assets/characters/NOTICE.md). Every export lists the character's licence in `meta.json`.
-- The ground grid shader (`packages/studio/src/ground-grid.ts`) adapts the `Grid` shader of [@react-three/drei](https://github.com/pmndrs/drei) (MIT, copyright (c) 2020 react-spring); the licence text is in that file.
-- Libraries: Three.js (MIT), mp4-muxer (MIT), fflate (MIT), the MCP TypeScript SDK (MIT), zod (MIT); dev only: Vite, vitest, ESLint, TypeScript, Playwright core, ajv.
-- Test and demo tracks are generated (`packages/core/test/drum-synth.ts`). No Mixamo files, motion datasets or body models ship; your own Mixamo clips stay in `assets-local/` (git-ignored).
-
-## Not done
-
-- No foot locking or IK: feet can slide, most with the procedural walk and run (a rigged gait plays at the path's speed).
-- Recipe poses do not drive a loaded GLB/FBX rig (no rest-pose retargeting); a loaded character plays its own clips.
-- There is no fall move; facial expressions are stored, not rendered.
-- Drum detection is tested on synthetic patterns only, not on real mixes.
-- Recording a camera lane by dragging the camera in the viewport; driving the figure from the keyboard; voice input.
-- Previous/new comparison with accept or revert; range preview and looping in the player.
-- MotionBricks, pose input from video and the provider interface (see [plan](docs/plan.md)).
-- The bundle schema 0.5.0 (0.4.0's camera modes, 0.5.0's character kind `glider`) still has to be taken into model-arena.
+MIT ([LICENSE](LICENSE)). The music files in `packages/studio/public/tracks/` are the owner's tracks, used with permission, and are not covered by the MIT licence.
