@@ -452,7 +452,8 @@ export function bindActions(p: Page) {
       boxes: () => p.blocks.host.boxes(), boxSelected: () => p.blocks.selected, slot: () => p.slot, trackName: () => p.info?.name ?? null, trackLength: () => p.info?.lengthSeconds ?? null,
       followSegs: () => p.followSegs.map(s => ({ block: s.block, word: s.word, points: s.points, anchors: s.anchors })),
       followProbe: (k: number) => followProbe(p.recipe, p.drive, p.state.cameraLane[k]),
-      timelineZoom: () => zoom,
+      timelineZoom: () => zoom, busy: () => p.busy,
+      kicks: () => (p.drive?.bands?.low ?? []).map(o => o.seconds),
     };
   }
   return { sync, openBlock, mapNote };

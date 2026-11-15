@@ -6,6 +6,8 @@
  * - typing in the API key's password field or the box height keeps Backspace and Cmd/Ctrl-Z for the field;
  * - undo after deleting points never leaves a selection pointing past the path;
  * - a Camera block dragged by its body changes places with its neighbour (Escape cancels, a click stays a click, one undo);
+ * - an edge dragged in small steps across several beats follows all the way (one undo); a block drag
+ *   held while Generate starts the guide render goes back, with no undo step of its own;
  * - Generate: Escape cancels the cost dialog, Stop ends a run, a run started on one example files
  *   its result there (never on the example switched to), a second run works, Add to gallery once per clip;
  * - the gallery re-rendered keeps one playing row at most; no-track mode plays;
@@ -75,6 +77,8 @@ export async function smokeBeatPathHunt(browser, base, { fail }) {
   // 5. Generate on every model: Escape at the cost dialog, Stop mid-run, switch example mid-run, run twice.
   await page.waitForFunction(() => document.querySelector("#keySlot arena-key"), null, { timeout: 30_000 });
   await ex("0");
+  await smokeLaneEdge(page, { fail });
+  await smokeLaneInterrupted(page, { fail });
   for (const model of await page.$$eval('[data-control="model"] button', bs => bs.map(b => b.dataset.value))) {
     await page.click(`[data-control="model"] [data-value="${model}"]`);
     await page.click("#runGenerate"); await page.waitForSelector("#costDialog:not([hidden])");
@@ -173,6 +177,56 @@ async function smokeLaneMove(page, { fail }) {
   await page.keyboard.press("ControlOrMeta+z");
   if (shape(await lane()) !== shape(before)) fail(`undo after a block move did not restore the order: ${shape(await lane())}`);
   console.log(`beat path lanes: block drag ${shape(before)} → ${shape(after)}, Escape, click, undo checked`);
+}
+
+const cameraLane = page => page.evaluate(() => JSON.stringify(window.__beatPath.state().cameraLane.map(b => [b.word, b.from, b.to])));
+
+/** The edge between two Camera blocks dragged in small steps over four beats: the cut follows to the end (the lane re-renders each step), one undo. */
+async function smokeLaneEdge(page, { fail }) {
+  const before = await cameraLane(page), total = await page.evaluate(() => window.__beatPath.state().cameraLane.at(-1).to);
+  const lane = await page.locator("#laneCamera").boundingBox(), edge = await page.locator("#laneCamera .edge").first().boundingBox();
+  const x0 = edge.x + 2, y = edge.y + edge.height / 2, cut0 = JSON.parse(before)[0][2];
+  await page.mouse.move(x0, y); await page.mouse.down();
+  const cuts = [];
+  for (let k = 1; k <= 40; k++) { await page.mouse.move(x0 + k / 40 * 4 * lane.width / total, y); cuts.push(JSON.parse(await cameraLane(page))[0][2]); }
+  await page.mouse.up();
+  const after = JSON.parse(await cameraLane(page))[0][2], steps = new Set(cuts).size;
+  console.log(`beat path lanes: edge drag in 40 small steps, cut ${cut0} → ${after} through ${steps} positions`);
+  if (!(after >= cut0 + 3) || steps < 3) fail(`an edge drag lost the pointer after the first step (cut ${cut0} → ${after}, ${steps} positions: ${cuts.join(",")})`);
+  if (!(await page.evaluate(() => document.getElementById("menu").hidden))) fail("releasing an edge drag opened the menu");
+  await page.keyboard.press("ControlOrMeta+z");
+  if (await cameraLane(page) !== before) fail(`one undo after an edge drag did not restore the lane: ${await cameraLane(page)} vs ${before}`);
+}
+
+/**
+ * A block drag still held when Generate (pressed with the keyboard) starts the guide render: the lane goes
+ * back to its order before the drag, the release changes nothing, and the drag leaves no undo step (one
+ * undo takes back the edit before it, a lane-free one).
+ */
+async function smokeLaneInterrupted(page, { fail }) {
+  const sight = () => page.evaluate(() => window.__beatPath.state().sight);
+  const sight0 = await sight();
+  await page.evaluate(() => document.getElementById("sightPasses").click());   // the last undo step: no lane in it
+  const before = await cameraLane(page);
+  const a = await page.locator("#laneCamera .block").nth(0).boundingBox(), b = await page.locator("#laneCamera .block").nth(1).boundingBox(), y = a.y + a.height / 2;
+  await page.mouse.move(a.x + a.width / 2, y); await page.mouse.down();
+  const dx = b.x + b.width / 2 - (a.x + a.width) + 12;
+  for (let k = 1; k <= 8; k++) await page.mouse.move(a.x + a.width / 2 + dx * k / 8, y);
+  const moved = await cameraLane(page);
+  await page.focus("#runGenerate"); await page.keyboard.press("Enter");
+  await page.waitForFunction(() => document.getElementById("outputNote").textContent === "Rendering the guide…", null, { timeout: 15_000 }).catch(() => fail("Generate from the keyboard did not start the guide render"));
+  const during = { lane: await cameraLane(page), moving: await page.evaluate(() => !!document.querySelector("#laneCamera .block.moving, #laneCamera .lane-slot")) };
+  await page.mouse.move(a.x + a.width / 2 + dx + 30, y); await page.mouse.up();
+  const released = await cameraLane(page);
+  await page.waitForSelector("#costDialog:not([hidden])", { timeout: 120_000 }); await page.keyboard.press("Escape");
+  await page.waitForFunction(() => document.getElementById("runGenerate").textContent === "Generate" && !window.__beatPath.busy(), null, { timeout: 15_000 }).catch(() => fail("the run did not end after Escape at its question"));
+  console.log(`beat path lanes: a block drag interrupted by the guide render: ${before} → mid-drag ${moved} → render ${during.lane}, released ${released}`);
+  if (moved === before) fail("the block drag did not rearrange the lane before the render (the step proves nothing)");
+  if (during.lane !== before || during.moving) fail(`the render started with the lane mid-drag: ${JSON.stringify(during)} (before ${before})`);
+  if (released !== before) fail(`releasing a block drag the render ended changed the lane: ${released} vs ${before}`);
+  await page.keyboard.press("ControlOrMeta+z");
+  const undone = { lane: await cameraLane(page), sight: await sight() };
+  if (undone.lane !== before || undone.sight !== sight0) fail(`one undo after the interrupted drag did not take back the edit before it, and only it: ${JSON.stringify(undone)} (lane before ${before}, sight ${sight0})`);
 }
 
 /**

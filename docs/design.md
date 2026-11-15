@@ -25,7 +25,7 @@ Lineage, in three lines:
 
 ## Moving a lane block (15 November)
 
-A Character or Camera block is moved the way a clip is in a video editor: drag its body sideways (or Alt+Left/Right with it focused). It keeps its length and its word; the blocks it passes change places with it as soon as its leading edge crosses their middle, so the lane rearranges live while the moved block rides under the pointer, lifted (`.block.moving`, `--shadow-lg`), over a dashed slot (`.lane-slot`) where it will land. Release is one undo step; Escape puts everything back. A press that travels under 4 px is still a click (the menu), and the edge between two blocks still moves the cut. No new control: the block's tooltip says "drag to move". The reordering is `moveBlock` in `lane-cuts.ts`.
+A Character or Camera block is moved the way a clip is in a video editor: drag its body sideways (or Alt+Left/Right with it focused). It keeps its length and its word; the blocks it passes change places with it as soon as its leading edge crosses their middle, so the lane rearranges live while the moved block rides under the pointer, lifted (`.block.moving`, `--shadow-lg`), over a dashed slot (`.lane-slot`) where it will land. Release is one undo step; Escape, a drop back on its own place, or a guide render starting while it is held (Generate, Download guide) puts everything back with no undo step. A press that travels under 4 px is still a click (the menu), and the edge between two blocks still moves the cut. No new control: the block's tooltip says "drag to move". The reordering is `moveBlock` in `lane-cuts.ts`.
 
 ## Round 8 (13 November): selection corrections
 

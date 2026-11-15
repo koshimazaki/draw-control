@@ -18,6 +18,7 @@ import { Viewport } from "../viewport";
 import { GRID_LOOKS } from "../ground-grid";
 import { exampleState, ownState } from "./examples";
 import { bindGenerate } from "./page-generate";
+import { editStep, endDrag } from "./drag-edit";
 import { movedIndex } from "./lane-cuts";
 import { LaneView, Menu } from "./lanes";
 import { LAYOUT } from "./layout";
@@ -81,13 +82,25 @@ export function startBeatPath(root: HTMLElement) {
   /** Every edit: the new state; history on a final edit (a drag records where it began). */
   function update(next: BeatPathState, final = true) {
     if (refused()) return;
-    if (!dragBase) dragBase = structuredClone(state);
-    state = next;
-    if (final) { past.push(dragBase); if (past.length > 200) past.shift(); future.length = 0; dragBase = null; }
+    const r = editStep({ state, base: dragBase }, next, final);
+    state = r.state; dragBase = r.base;
+    if (r.step) { past.push(r.step); if (past.length > 200) past.shift(); future.length = 0; }
     schedule(final);
   }
+  /** A drag that ended without a change: the state goes back to where it began, no undo step (drag-edit.ts). */
+  function restoreDrag() {
+    const r = endDrag({ state, base: dragBase });
+    state = r.state; dragBase = r.base;
+    if (r.restored) schedule(true);
+  }
+  /**
+   * A lane drag still held when something else takes over (a guide render starting, undo, an example
+   * switch) is put back first: never left half done with no undo step, or with its base kept.
+   */
+  function endLaneDrags() { characterLane.abort(); cameraLane.abort(); }
   function undo(redo = false) {
     if (refused()) return;
+    endLaneDrags();
     const from = redo ? future : past, to = redo ? past : future;
     const s = from.pop();
     if (!s) return;
@@ -166,6 +179,7 @@ export function startBeatPath(root: HTMLElement) {
       label: w => labels[w],
       snap: b => snapLane(b),
       commit: (blocks, final) => update({ ...state, [key]: blocks }, final),
+      cancel: () => restoreDrag(),
       open: (anchor, i, beat) => actions.openBlock(key, view, anchor, i, beat, labels, words, single),
       moved: (from, to) => { if (selection?.kind === "block" && selection.lane === key) selection = { ...selection, index: movedIndex(selection.index, from, to) }; },
     });
@@ -359,6 +373,7 @@ export function startBeatPath(root: HTMLElement) {
     if (next === slot && slots.size) return;
     if (refused()) return;
     if (map.busy) map.cancelStroke();
+    endLaneDrags();
     slots.set(slot, structuredClone(state));
     slot = next;
     const ticket = ++switching;
@@ -392,7 +407,7 @@ export function startBeatPath(root: HTMLElement) {
   const page = {
     $, map, menu, viewport, strip, player,
     get state() { return state; }, get recipe() { return recipe; }, get tool() { return tool; }, get view() { return view; },
-    get track() { return track; }, get drive() { return live(); }, get info() { return info; }, get busy() { return busy; }, set busy(v: boolean) { busy = v; dirty = true; lockShot(v); if (!v && rebuildAfter) { rebuildAfter = false; rebuild(); } },
+    get track() { return track; }, get drive() { return live(); }, get info() { return info; }, get busy() { return busy; }, set busy(v: boolean) { if (v && !busy) endLaneDrags(); busy = v; dirty = true; lockShot(v); if (!v && rebuildAfter) { rebuildAfter = false; rebuild(); } },
     get head() { return head; }, get playing() { return player.playing && !busy; }, get shown() { return shown; }, get slot() { return slot; }, get followSegs() { return followSegs; }, get slice() { return hooks.slice; }, blocks, snapLane, seek, removeTrack, totalBeats, window0, window1, update, undo, rebuild, setPlaying, switchSlot, useFile, useCut, say,
     setTool(t: Tool) { tool = t; if (pen === "draw") map.startNew(); map.refresh(); actions.sync(); },
     setView(v: View) { view = v; map.refresh(); actions.sync(); },
