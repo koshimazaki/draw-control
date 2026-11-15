@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  ACCENT_MOVES, proceduralAccent, DEFAULT_REACTIVE, DEFAULT_RECIPE, POSES, detectOnsets, frameAt, makeMove, planReactive, poseDistance,
+  ACCENT_MOVES, proceduralAccent, DEFAULT_REACTIVE, DEFAULT_RECIPE, POSES, detectOnsets, effectiveDrive, frameAt, makeMove, planReactive, poseDistance,
   validateRecipe, type AudioDrive, type ReactiveConfig, type Recipe,
 } from "../src/internal";
 
@@ -124,5 +124,36 @@ describe("hit markers", () => {
     }
     expect(Math.abs(landed * DT - 6.03)).toBeLessThanOrEqual(DT);
     expect(() => reactiveRecipe({ markers: [{ seconds: 2, accent: "nope" as never, source: "manual" }] })).toThrow(/accent/);
+  });
+});
+
+describe("a hand-drawn energy curve drives the reactive layer (docs/recipe.md `energyCurve`)", () => {
+  const hits = [5.13, 7.4, 9.92, 12.61];
+  const quietThenLoud = drive(hits);
+  // The same onsets, loud throughout: under the curve only the onsets may matter.
+  const loud: AudioDrive = { ...quietThenLoud, energy: new Float32Array(quietThenLoud.energy.length).fill(0.8) };
+  const cfg: Partial<ReactiveConfig> = { accents: ["hit", "strike", "jump", "kick"], accentOn: "both", accentGapBeats: 1.5 };
+  const plain = reactiveRecipe(cfg);
+  const curved = validateRecipe({ ...plain, energyCurve: { rate: 4, values: new Array(80).fill(0.3) } });
+  const frames = (r: Recipe, d: AudioDrive) => Array.from({ length: 300 }, (_, n) => JSON.stringify(frameAt(r, n, d).pose));
+
+  it("replaces the analysed energy for tempo and amplitude: the track's loudness no longer shows", () => {
+    expect(frames(curved, quietThenLoud)).toEqual(frames(curved, loud));
+    expect(frames(plain, quietThenLoud)).not.toEqual(frames(plain, loud));
+    expect(frames(curved, loud)).not.toEqual(frames(plain, loud));
+    expect(frameAt(curved, 150, loud).energy).toBeCloseTo(0.3, 6);
+  });
+
+  it("keeps the track's onsets, so the hits land where they did", () => {
+    const at = (r: Recipe) => planReactive(r, effectiveDrive(r, loud)).hits.map(h => h.seconds);
+    expect(at(curved)).toEqual(at(plain));
+  });
+
+  it("switching between a recipe with and without the curve re-plans each time (the plan's memo)", () => {
+    const n = 40;
+    const a = JSON.stringify(frameAt(plain, n, quietThenLoud)), b = JSON.stringify(frameAt(curved, n, quietThenLoud));
+    expect(b).not.toBe(a);
+    expect(JSON.stringify(frameAt(plain, n, quietThenLoud))).toBe(a);
+    expect(JSON.stringify(frameAt(curved, n, quietThenLoud))).toBe(b);
   });
 });

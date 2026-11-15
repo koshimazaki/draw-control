@@ -18,4 +18,6 @@ registerHooks({
 process.removeAllListeners("warning");
 const { StdioServerTransport } = await import("@modelcontextprotocol/sdk/server/stdio.js");
 const { createServer } = await import("../src/server.ts");
+const { rootsNotice } = await import("../src/paths.ts");
+process.stderr.write(rootsNotice());   // stderr: stdout carries the protocol
 await createServer().connect(new StdioServerTransport());

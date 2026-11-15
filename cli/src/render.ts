@@ -24,6 +24,8 @@ const EXPORT_TIMEOUT = 30 * 60_000;
 export function checkRenderOptions(recipe: Recipe, o: RenderOptions): { width: number; height: number } | undefined {
   if (recipe.character.kind === "file") throw new Error("render: a loaded GLB/FBX character is not available headless; use rigged, mannequin or block");
   if (o.view !== undefined && !(RENDER_VIEWS as readonly string[]).includes(o.view)) throw new Error(`render: --view must be one of ${RENDER_VIEWS.join(", ")}`);
+  // The page's rule (studio app-view.ts): without a camera rig it refuses the click and the export would run from another view.
+  if (o.view === "rig" && !recipe.camera) throw new Error("render: --view rig needs the recipe's camera rig (recipe.camera, the studio's Camera rig section); use front, side, top, orbit or iso");
   if (o.unit !== undefined && o.unit !== "beats" && o.unit !== "seconds") throw new Error("render: --unit must be beats or seconds");
   let size: { width: number; height: number } | undefined;
   if (o.size !== undefined) {
@@ -39,11 +41,22 @@ export function checkRenderOptions(recipe: Recipe, o: RenderOptions): { width: n
   return size;
 }
 
-/** The download, or an error as soon as the page reports the export failed; the loser never surfaces as an unhandled rejection. */
-export async function downloadOrFailure<T>(download: Promise<T>, failure: Promise<string>): Promise<T> {
+/**
+ * The download, or an error as soon as the page reports the export failed; the loser never
+ * surfaces as an unhandled rejection. A wait that ends with neither (a hung encoder: the
+ * download wait times out) says what it waited for, with the browser's error as the cause.
+ */
+export async function downloadOrFailure<T>(download: Promise<T>, failure: Promise<string>, waitMs = EXPORT_TIMEOUT): Promise<T> {
   download.catch(() => {});
   failure.catch(() => {});
-  const first = await Promise.race([download.then(d => ({ ok: true as const, d })), failure.then(m => ({ ok: false as const, m }))]);
+  let first: { ok: true; d: T } | { ok: false; m: string };
+  try { first = await Promise.race([download.then(d => ({ ok: true as const, d })), failure.then(m => ({ ok: false as const, m }))]); }
+  catch (e) {
+    const why = (e as Error)?.message ?? String(e);
+    if ((e as Error)?.name === "TimeoutError" || /Timeout \d+ms exceeded/.test(why))
+      throw new Error(`render: the studio's export did not finish within ${Math.round(waitMs / 60_000)} minutes (no download and no failure message; the encoder may be stuck): ${why}`, { cause: e });
+    throw new Error(`render: the studio's export stopped before a download: ${why}`, { cause: e });
+  }
   if (!first.ok) throw new Error(`render: the studio did not export: ${first.m}`);
   return first.d;
 }

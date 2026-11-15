@@ -18,6 +18,7 @@ import { envelopeAt } from "./envelope";
 import { smoothNoise } from "./rng";
 import { frozenBeat } from "./freeze";
 import { BANK, glideBankAt, glideHeadingAt, rawHeadingAt } from "./glide-heading";
+import { effectiveDrive } from "./energy-curve";
 
 /** Beats over which a tempo change cross-fades at a bar line. */
 const TEMPO_FADE_BEATS = 0.5;
@@ -31,9 +32,13 @@ const DRIFT: Partial<Record<JointName, number>> = { spine: 0.05, head: 0.07, lef
 const ease = (t: number) => 0.5 - 0.5 * Math.cos(Math.PI * Math.max(0, Math.min(1, t)));
 
 let memo: { recipe: Recipe; drive?: AudioDrive; plan: ReactivePlan } | null = null;
-/** The reactive plan for a recipe and drive, cached for the last pair seen. */
+/**
+ * The reactive plan for a recipe and drive, cached for the last pair seen. A hand-drawn
+ * `energyCurve` replaces the analysed energy (energy-curve.ts); the curve is part of the
+ * recipe, so the recipe key covers it.
+ */
 export function reactivePlanFor(recipe: Recipe, drive?: AudioDrive): ReactivePlan {
-  if (!memo || memo.recipe !== recipe || memo.drive !== drive) memo = { recipe, drive, plan: planReactive(recipe, drive) };
+  if (!memo || memo.recipe !== recipe || memo.drive !== drive) memo = { recipe, drive, plan: planReactive(recipe, effectiveDrive(recipe, drive)) };
   return memo.plan;
 }
 
@@ -139,7 +144,7 @@ function movedFrameAt(recipe: Recipe, frame: number, drive?: AudioDrive): FrameS
     root.yawRadians += s.spinRadians;
     accent = { key: hit.key, hitSeconds: hit.seconds, weight: s.weight };
   }
-  const state: FrameState = { frame, seconds, beat, root, pose, layers: base.layers, active: base.active, energy: energyAtSeconds(drive, seconds) };
+  const state: FrameState = { frame, seconds, beat, root, pose, layers: base.layers, active: base.active, energy: energyAtSeconds(plan.drive, seconds) };
   if (accent) state.accent = accent;
   return state;
 }

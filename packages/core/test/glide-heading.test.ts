@@ -123,3 +123,38 @@ describe("the glider turns and leans smoothly along a drawn path", () => {
     for (let n = 0; n < m.roots.length; n += 5) expect(subjectAt(r, frameAt(r, n, track()).beat, track()).heading).toBeCloseTo(m.roots[n].yawRadians, 9);
   });
 });
+
+/**
+ * A path drawn toward -Z faces ±180°, where the stored yaw can wrap. On main the heading
+ * averaged the yaw numbers, so a path whose stored yaw went -179.8, 179.9, -179.8 was
+ * smoothed through 0°: the flyer (and the follow camera) swung ~180° the wrong way and back,
+ * up to 30° in one frame. "Draw a path, then write `walk on path`" stored exactly that,
+ * because the script's retime recomputed the facing without unwrapping it.
+ */
+describe("a path facing ±180° does not swing the glider round", () => {
+  const off180 = (v: number) => Math.abs(((v % 360) + 360) % 360 - 180);
+  const toward = (n: number) => Array.from({ length: n }, (_, i) => ({ x: Math.round(Math.sin(i * 2.3) * 100) / 10000, z: 10 - 20 * i / (n - 1) }));
+  const withFigure = () => scripted("figure: shape flyer body #ff6a13 head #ffb27a\nbeats 0-17 | action: rest | camera: follow behind\n");
+  function check(r: Recipe) {
+    const m = measure(r);
+    expect(Math.max(...m.yaw.map(off180))).toBeLessThan(5);
+    const steps = m.yaw.slice(1).map((v, i) => Math.abs(v - m.yaw[i]));
+    expect(Math.max(...steps)).toBeLessThan(1);
+    expect(m.bankMax).toBeLessThan(2);
+    for (let n = 0; n < m.roots.length; n += 7) expect(off180(subjectAt(r, frameAt(r, n, track()).beat, track()).heading * 180 / Math.PI)).toBeLessThan(5);
+    return m;
+  }
+
+  it("draw a path toward -Z, then `walk on path`: the stored yaw stays unwrapped and the heading stays at 180°", () => {
+    const drawn = applyMotionCommand(withFigure(), { type: "setRootPath", points: toward(24), smooth: false, gait: "glide", face: "path" });
+    const r = applyMotionCommand(drawn, { type: "applyScript", script: "figure: shape flyer body #ff6a13 head #ffb27a\nbeats 0-8 | action: walk on path | camera: follow behind\nbeats 8-17 | action: continue\n" }, { drive: track(), bands: track().bands });
+    const yaws = r.rootPath.map(p => p.yaw);
+    for (let i = 1; i < yaws.length; i++) expect(Math.abs(yaws[i] - yaws[i - 1])).toBeLessThan(10);
+    check(r);
+  });
+
+  it("a hand-written path whose yaw wraps between points is smoothed the short way round", () => {
+    const rootPath = toward(24).map((p, i) => ({ ...p, beat: i * 8 / 23, yaw: i % 2 ? 179.88 : -179.76 }));
+    check({ ...withFigure(), rootPath });
+  });
+});

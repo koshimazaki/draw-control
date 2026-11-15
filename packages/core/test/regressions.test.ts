@@ -118,6 +118,20 @@ describe("line breaks in the shot fields (shot-script.ts)", () => {
     const r = { ...DEFAULT_RECIPE, shot: { subject: "a\nb", environment: "", action: "", legend: "" } } as Recipe;
     expect(printScript(r)).toMatch(/shot subject: a b\n/);
   });
+  it("a break at either end leaves no stray space, and a field of only breaks is empty", () => {
+    const r = applyMotionCommand(DEFAULT_RECIPE, { type: "setShot", subject: "\na fox\n", environment: "\n", action: " \r\n ", legend: "snow" });
+    expect(r.shot).toEqual({ subject: "a fox", environment: "", action: "", legend: "snow" });
+    const printed = printScript(r);
+    expect(printed).toMatch(/shot subject: a fox\n/);
+    expect(printed).not.toMatch(/shot (environment|action):/);
+    expect(applyScript(r, { script: printed }).shot).toEqual(r.shot);
+  });
+  it("printScript skips a whitespace-only field of an unvalidated recipe and trims the rest", () => {
+    const r = { ...DEFAULT_RECIPE, shot: { subject: "\n", environment: "  \n a street \n", action: "", legend: "" } } as Recipe;
+    const printed = printScript(r);
+    expect(printed).not.toMatch(/shot subject:/);
+    expect(printed).toMatch(/shot environment: a street\n/);
+  });
 });
 
 describe("walk paths with corners up to the validator's 63 points (corners.ts)", () => {
