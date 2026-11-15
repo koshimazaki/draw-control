@@ -1,3 +1,4 @@
+import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, realpathSync, symlinkSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
@@ -5,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { decodeAudioFile } from "../../cli/src/audio-file.ts";
-import { REPO_ROOT, allowedRoots, canonicalPath, confine } from "../src/paths.ts";
+import { REPO_ROOT, allowedRoots, canonicalPath, confine, rootsNotice } from "../src/paths.ts";
 import { Session, createServer } from "../src/server.ts";
 
 const tmp = realpathSync(mkdtempSync(join(tmpdir(), "ms-paths-")));
@@ -133,4 +134,29 @@ describe("MCP undo history", () => {
     for (let i = 0; i < 10; i++) session.apply([{ type: "set", path: "beatGrid.bpm", value: 120 }]);
     expect(session.undoDepth).toBe(Session.UNDO_LIMIT);
   });
+});
+
+describe("the server says its roots at start-up, on stderr only", () => {
+  it("rootsNotice lists every root and how to add one", () => {
+    const roots = allowedRoots({}, tmp), line = rootsNotice(roots);
+    for (const r of roots) expect(line).toContain(r);
+    expect(line).toMatch(/MOTION_STUDIO_ROOTS/);
+    expect(line.endsWith("\n")).toBe(true);
+    expect(line.trimEnd()).not.toContain("\n");
+  });
+  it("the stdio server prints it to stderr once and leaves stdout to the protocol", async () => {
+    const child = spawn(process.execPath, [join(REPO_ROOT, "mcp", "bin", "motion-studio-mcp.mjs")], { cwd: tmp, stdio: ["pipe", "pipe", "pipe"] });
+    let out = "", err = "";
+    child.stdout.on("data", d => { out += d; });
+    child.stderr.on("data", d => { err += d; });
+    try {
+      const t0 = Date.now();
+      while (!err.includes("\n") && Date.now() - t0 < 15_000) await new Promise(r => setTimeout(r, 50));
+      await new Promise(r => setTimeout(r, 200));
+      expect(err).toMatch(/reads and writes JSON only under/);
+      expect(err).toContain(tmp);
+      expect(err.match(/reads and writes JSON only under/g)).toHaveLength(1);
+      expect(out).toBe("");
+    } finally { child.kill(); }
+  }, 20_000);
 });

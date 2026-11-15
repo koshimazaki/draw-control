@@ -3,8 +3,15 @@
  * motion-studio repo, the OS temp directory, or a directory listed in MOTION_STUDIO_ROOTS
  * (separated like PATH). A path is resolved segment by segment through the real path of
  * every part that exists, so neither `..` nor a symlink (dangling ones included) can leave
- * a root, and it must sit on a path-segment boundary under one. Tools then use that
- * resolved path, never the string they were given. The CLI run by a person is not confined.
+ * a root, and it must sit on a path-segment boundary under one. Tools then open that
+ * resolved path, never the string they were given.
+ * What this guarantees is the path as resolved at check time. The file is then opened by
+ * that path string, so a symlink planted inside a root between the check and the open
+ * (by another process of the same user) is followed. For a server one person runs on their
+ * own machine that is accepted rather than closed: Node has no openat, and anything that
+ * can plant the link can already write the target itself.
+ * The roots are printed to stderr once at start-up (`rootsNotice`), and every refusal
+ * lists them. The CLI run by a person is not confined.
  * Audio input is separate: any existing regular local file (cli/src/audio-file.ts).
  */
 import { lstatSync, readFileSync, realpathSync } from "node:fs";
@@ -68,4 +75,9 @@ export function readJsonConfined(path: string, roots?: string[]): unknown {
   catch (e) { throw new Error(`could not read ${path} (${(e as NodeJS.ErrnoException).code ?? "read error"})`, { cause: e }); }
   try { return JSON.parse(text); }
   catch { throw new Error(`${path} is not valid JSON`); }
+}
+
+/** The one line the server prints to stderr at start-up (never stdout: that carries the protocol). */
+export function rootsNotice(roots = allowedRoots()): string {
+  return `motion-studio MCP: reads and writes JSON only under ${roots.join(", ")} (the working directory, the repo, the temp directory and MOTION_STUDIO_ROOTS)\n`;
 }
