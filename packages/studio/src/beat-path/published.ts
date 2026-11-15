@@ -23,7 +23,8 @@ export type KnownIds = { examples: readonly string[]; models: readonly string[] 
 
 export const emptyIndex = (): PublishedIndex => ({ version: 1, clips: {} });
 
-const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
+/** A plain object: not null, not an array. */
+export const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 const MAX_URL = 2048, MAX_PROMPT = 4000;
 
 /** The url resolved against `base` (the page), or null when it is not http(s) or a plain relative path. */

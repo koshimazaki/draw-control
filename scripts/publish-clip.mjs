@@ -13,7 +13,7 @@ import { extname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { MODELS } from "../packages/studio/src/beat-path/generate.ts";
 import { EXAMPLE_TRACKS } from "../packages/studio/src/beat-path/tracks.ts";
-import { checkClip, emptyIndex, withClip } from "../packages/studio/src/beat-path/published.ts";
+import { checkClip, emptyIndex, isRecord, withClip } from "../packages/studio/src/beat-path/published.ts";
 
 const PAGES_LIMIT = 25 * 1024 * 1024;
 const VIDEO_EXT = new Set([".mp4", ".webm"]);
@@ -60,10 +60,12 @@ let index = emptyIndex();
 if (existsSync(indexFile)) {
   let raw;
   try { raw = JSON.parse(readFileSync(indexFile, "utf8")); } catch { fail(`${indexFile} is not valid JSON; fix or remove it first`); }
-  const isPlain = v => typeof v === "object" && v !== null && !Array.isArray(v);
-  if (raw?.version !== 1 || !isPlain(raw.clips)) fail(`${indexFile} is not a version 1 list; fix or remove it first`);
-  const bad = Object.keys(raw.clips).filter(k => !isPlain(raw.clips[k]));
+  if (raw?.version !== 1 || !isRecord(raw.clips)) fail(`${indexFile} is not a version 1 list; fix or remove it first`);
+  const bad = Object.keys(raw.clips).filter(k => !isRecord(raw.clips[k]));
   if (bad.length) fail(`${indexFile} has clips that are not objects (${bad.join(", ")}); fix or remove it first`);
+  // Every existing entry must pass the page's own check, or it would be written back and never shown.
+  const unusable = Object.entries(raw.clips).flatMap(([e, byModel]) => Object.entries(byModel).filter(([, c]) => !checkClip(c, "https://example.invalid/")).map(([m]) => `${e}/${m}`));
+  if (unusable.length) fail(`${indexFile} has entries the page would not show (${unusable.join(", ")}); fix or remove it first`);
   index = raw;
 }
 

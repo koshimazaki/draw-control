@@ -13,7 +13,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { EXAMPLES } from "../src/beat-path/examples";
 import { MODELS } from "../src/beat-path/generate";
 import { EXAMPLE_TRACKS } from "../src/beat-path/tracks";
-import { loadPublished, parsePublished, resolveClipUrl, tileClip, withClip, emptyIndex } from "../src/beat-path/published";
+import { checkClip, isRecord, loadPublished, parsePublished, resolveClipUrl, tileClip, withClip, emptyIndex } from "../src/beat-path/published";
 
 const ids = { examples: EXAMPLES.map(e => e.id), models: MODELS.map(m => m.id) };
 const PAGE = "https://demo.example/some/sub/path/index.html";
@@ -52,7 +52,12 @@ describe("Published clips: reading the list", () => {
   it("ships a valid list whose every entry the page will show", () => {
     const shipped = JSON.parse(readFileSync(new URL("../public/published/index.json", import.meta.url), "utf8"));
     expect(shipped.version).toBe(1);
-    expect(typeof shipped.clips === "object" && shipped.clips !== null && !Array.isArray(shipped.clips)).toBe(true);
+    expect(isRecord(shipped.clips)).toBe(true);
+    // Named per key first, so a bad entry fails with a readable diff rather than a TypeError or a bare count.
+    const notObjects = Object.entries(shipped.clips as Record<string, unknown>).filter(([, v]) => !isRecord(v)).map(([k]) => k);
+    expect(notObjects).toEqual([]);
+    const unusable = Object.entries(shipped.clips as Record<string, Record<string, unknown>>).flatMap(([e, byModel]) => Object.entries(byModel).filter(([, c]) => !checkClip(c, PAGE)).map(([m]) => `${e}/${m}`));
+    expect(unusable).toEqual([]);
     const committed = Object.values(shipped.clips as Record<string, object>).flatMap(o => Object.keys(o)).length;
     expect(parsePublished(shipped, ids, PAGE)).toHaveLength(committed);
   });
@@ -115,16 +120,23 @@ describe("Published clips: npm run publish:clip", () => {
     expect(run("flyer", "h3", clip).status).not.toBe(0);
     expect(readFileSync(join(root, "packages/studio/public/published/index.json"), "utf8")).toBe("{ not json");
   });
-  it("refuses a list whose clips for an example are not an object, leaving it as it was", () => {
+  it("refuses a list with a non-object example or an entry the page would not show, naming it and leaving the file as it was", () => {
     fresh(); mkdirSync(join(root, "packages/studio/public/published"), { recursive: true });
     const file = join(root, "packages/studio/public/published/index.json");
-    for (const body of ['{"version":1,"clips":{"flyer":"oops"}}', '{"version":1,"clips":{"car":{},"flyer":["x"]}}', '{"version":1,"clips":{"flyer":null}}']) {
+    for (const body of ['{"version":1,"clips":{"flyer":"oops"}}', '{"version":1,"clips":{"car":{},"flyer":["x"]}}', '{"version":1,"clips":{"flyer":null}}', '{"version":1,"clips":{"flyer":{"h3":"oops"}}}', '{"version":1,"clips":{"car":{"h3":{"url":"javascript:alert(1)"}}}}']) {
       writeFileSync(file, body);
       const r = run("flyer", "h3", "https://r2.example/f.mp4");
       expect(r.status, body).not.toBe(0);
       expect(r.stderr).toMatch(/fix or remove it first/);
       expect(readFileSync(file, "utf8")).toBe(body);
     }
+    const body = '{"version":1,"clips":{"car":{"h3":{"url":"c.mp4","prompt":""}},"flyer":{"h3":"oops","kling-4":{"url":"f.mp4","costUsd":-1}}}}';
+    writeFileSync(file, body);
+    const r = run("car", "h3", "https://r2.example/c.mp4");
+    expect(r.status).not.toBe(0);
+    expect(r.stderr).toMatch(/flyer\/h3, flyer\/kling-4\); fix or remove it first/);
+    expect(r.stderr).not.toMatch(/car\/h3/);
+    expect(readFileSync(file, "utf8")).toBe(body);
   });
   it("refuses a local file over 25 MiB before copying it, unless --force", () => {
     fresh(); const clip = join(root, "big.mp4"); writeFileSync(clip, ""); truncateSync(clip, 26 * 1024 * 1024);
