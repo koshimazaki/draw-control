@@ -25,3 +25,5 @@ examples/bundles/
 !assets/characters/AnimationLibrary.glb
 # the user's own Mixamo clips: never committed (not redistributable)
 assets-local/
+# published model clips ship with the Beat Path build (npm run publish:clip, docs/deploy.md)
+!packages/studio/public/published/*.mp4
