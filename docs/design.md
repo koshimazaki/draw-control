@@ -131,7 +131,7 @@ From `https://runware.ai/` `:root` custom properties (its dark site theme), read
 | map grid | `#cfd0d4`, `#b9bbc0`, axes `#8a8d93`, labels `#4f5257` (15 November) | `#c9c9c9` `--rw-neutral-20`, `#9a9a9a` `--rw-neutral-30`, `#6b6b6b` `--rw-neutral-40`; `#e1e1e1` between neutral-10 and -15 |
 | paths on the paper | `oklch(52% .12 40 / 240 / 20)` | docs `--color-orange-deep`, `--color-sky-deep`, `--color-red-deep` |
 
-Contrast on dark: body text `#f2f2f2` on `#1a1a1a` 15.5; muted `#9a9a9a` on `#1a1a1a` 6.2; text `#1c1c1c` on the green `#afff9f` 14.3. On the paper: labels `#6b6b6b` on `#f2f2f2` 4.8, deep path colours about 5.
+Contrast on dark: body text `#f2f2f2` on `#1a1a1a` 15.5; muted `#9a9a9a` on `#1a1a1a` 6.2; text `#1c1c1c` on the green `#afff9f` 14.3. On the light grey sheet (`#dcdde0`, 15 November): labels `#4f5257` 5.8, the map selection `#2f6b23` 4.8.
 
 ## Runware light values (12 November, superseded by the dark theme above)
 
