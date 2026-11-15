@@ -35,7 +35,7 @@ export function clipRefusal(model: ModelId, clip: number): string | null {
 }
 
 /** The most one generation may cost, USD: an estimate above it is refused before anything is sent. */
-export const MAX_PRICE = 3;
+export const MAX_PRICE = 10;
 
 /** A plain message for each of the embed's error codes. */
 export const ERROR_MESSAGES: Record<string, string> = {
