@@ -3,20 +3,22 @@
  * Publish one model clip to the Beat Path gallery (packages/studio/public/published/index.json,
  * read by src/beat-path/published.ts). A local file is copied into public/published/ as
  * <example>-<model>.<ext> and its entry written; an http(s) URL only writes the entry.
- * Example and model ids are checked against the real lists. Cloudflare Pages refuses files
- * over 25 MB: a larger local file is copied with a warning to host it on R2 and pass the URL.
- *   npm run publish:clip -- <example-id> <model-id> <file-or-url> [--prompt "…"] [--cost 0.42] [--seconds 8]
+ * Example and model ids are checked against the real lists. Cloudflare Pages refuses a whole
+ * deployment when any file is over 25 MiB, so a larger local file is refused (host it on R2 and
+ * publish the URL); --force copies it anyway. Only .mp4 and .webm, which every browser plays.
+ *   npm run publish:clip -- <example-id> <model-id> <file-or-url> [--prompt "…"] [--cost 0.42] [--seconds 8] [--force]
  */
-import { copyFileSync, existsSync, mkdirSync, readFileSync, realpathSync, statSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { extname, join, relative, resolve, sep } from "node:path";
+import { fileURLToPath } from "node:url";
 import { MODELS } from "../packages/studio/src/beat-path/generate.ts";
 import { EXAMPLE_TRACKS } from "../packages/studio/src/beat-path/tracks.ts";
 import { checkClip, emptyIndex, withClip } from "../packages/studio/src/beat-path/published.ts";
 
 const PAGES_LIMIT = 25 * 1024 * 1024;
-const VIDEO_EXT = new Set([".mp4", ".webm", ".mov"]);
+const VIDEO_EXT = new Set([".mp4", ".webm"]);
 const examples = Object.keys(EXAMPLE_TRACKS), models = MODELS.map(m => m.id);
-const usage = "usage: npm run publish:clip -- <example-id> <model-id> <file-or-url> [--prompt \"…\"] [--cost 0.42] [--seconds 8]";
+const usage = "usage: npm run publish:clip -- <example-id> <model-id> <file-or-url> [--prompt \"…\"] [--cost 0.42] [--seconds 8] [--force]";
 
 function fail(msg) { console.error(`publish:clip: ${msg}`); process.exit(1); }
 
@@ -26,6 +28,7 @@ function parseArgs(argv) {
     const a = argv[i];
     if (!a.startsWith("--")) { pos.push(a); continue; }
     const k = a.slice(2);
+    if (k === "force") { opt.force = true; continue; }
     if (!["prompt", "cost", "seconds", "root"].includes(k)) fail(`unknown option ${a}\n${usage}`);
     if (i + 1 >= argv.length) fail(`${a} needs a value`);
     opt[k] = argv[++i];
@@ -48,7 +51,7 @@ if (!models.includes(model)) fail(`unknown model "${model}"; one of: ${models.jo
 const prompt = opt.prompt ?? "", costUsd = number(opt.cost, "cost"), seconds = number(opt.seconds, "seconds");
 
 // --root is for tests: the repository whose public/published/ is written.
-const root = resolve(opt.root ?? new URL("..", import.meta.url).pathname);
+const root = resolve(opt.root ?? fileURLToPath(new URL("..", import.meta.url)));
 const dir = join(root, "packages/studio/public/published"), indexFile = join(dir, "index.json");
 mkdirSync(dir, { recursive: true });
 const realDir = realpathSync(dir);
@@ -74,11 +77,23 @@ if (/^https?:\/\//i.test(source)) {
   const name = `${example}-${model}${ext}`, target = resolve(realDir, name);
   const rel = relative(realDir, target);
   if (!rel || rel.startsWith("..") || rel.includes(sep)) fail(`refusing to write outside ${realDir}`);
-  if (existsSync(target) && realpathSync(target) === realpathSync(from)) { /* already in place */ }
-  else copyFileSync(from, target);
-  const size = statSync(target).size;
-  if (size > PAGES_LIMIT) console.warn(`publish:clip: WARNING ${name} is ${(size / 1024 / 1024).toFixed(1)} MB; Cloudflare Pages refuses files over 25 MB. Host it on R2 and publish the URL instead (npm run publish:clip -- ${example} ${model} https://…).`);
+  // Checked before the copy: one file over the limit makes Cloudflare Pages refuse the whole deployment.
+  const size = statSync(from).size;
+  if (size > PAGES_LIMIT) {
+    const msg = `${name} is ${(size / 1024 / 1024).toFixed(1)} MB; Cloudflare Pages refuses a deployment with any file over 25 MiB. Host it on R2 and publish the URL instead (npm run publish:clip -- ${example} ${model} https://…)`;
+    if (!opt.force) fail(`${msg}, or pass --force to copy it anyway`);
+    console.warn(`publish:clip: WARNING ${msg}`);
+  }
+  const replaced = existsSync(target);
+  if (replaced && realpathSync(target) === realpathSync(from)) { /* already in place */ }
+  else { copyFileSync(from, target); if (replaced) console.log(`publish:clip: replaced ${name}`); }
   url = `published/${name}`;
+}
+// One clip per tile: a copy under another extension (or a local copy now replaced by a URL) would ship unused.
+for (const f of readdirSync(realDir)) {
+  if (f !== url.replace(/^published\//, "") && VIDEO_EXT.has(extname(f).toLowerCase()) && f.slice(0, -extname(f).length) === `${example}-${model}`) {
+    rmSync(join(realDir, f)); console.log(`publish:clip: removed the old ${f}`);
+  }
 }
 
 const clip = { url, prompt, ...(costUsd !== undefined ? { costUsd } : {}), ...(seconds !== undefined ? { seconds } : {}) };

@@ -57,7 +57,7 @@ npm run publish:clip -- flyer kling-4 ~/Downloads/take.mp4 --prompt "…" --cost
 npm run publish:clip -- car h3 https://clips.example.com/car-h3.mp4 --prompt "…"                 # writes the entry only
 ```
 
-The script refuses unknown example or model ids and only ever writes inside `public/published/`. Cloudflare Pages refuses files over 25 MB: the script warns about a larger local file, so host that one on R2 and publish its URL instead. Commit `index.json` and any copied clip (`*.mp4` is allowed in that folder only). Run `npm run static-check` after adding a local clip: a listed file that is missing fails it.
+The script refuses unknown example or model ids and only ever writes inside `public/published/`. It takes `.mp4` and `.webm` only (what every browser plays) and keeps one file per tile: publishing a tile again under another extension, or as a URL, removes the old copy. Cloudflare Pages refuses the whole deployment when any file is over 25 MiB, so the script refuses a larger local file before copying it: host that one on R2 and publish its URL instead (`--force` copies it anyway). Published clips stream from their link; they are not downloaded whole when the page opens. Commit `index.json` and any copied clip (`*.mp4` is allowed in that folder only). Run `npm run static-check` after adding a local clip: a listed file that is missing fails it.
 
 ## Your own music
 

@@ -2,8 +2,9 @@
  * Published clips: the list shipped with the build is read without ever throwing (a missing,
  * broken or partly bad list shows what is usable and nothing else), relative links resolve
  * against the page, a visitor's own run wins over a published clip, and the publish script
- * checks its ids, copies only into public/published/ and warns above Cloudflare's 25 MB.
+ * checks its ids, copies only into public/published/, keeps one file per tile and refuses files over Cloudflare's 25 MiB.
  */
+import { fileURLToPath } from "node:url";
 import { execFileSync, spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, truncateSync, writeFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -69,7 +70,7 @@ describe("Published clips: which clip a model tile shows", () => {
 });
 
 describe("Published clips: npm run publish:clip", () => {
-  const script = new URL("../../../scripts/publish-clip.mjs", import.meta.url).pathname;
+  const script = fileURLToPath(new URL("../../../scripts/publish-clip.mjs", import.meta.url));
   let root = "";
   const fresh = () => { root = mkdtempSync(join(tmpdir(), "publish-clip-")); return root; };
   const run = (...args: string[]) => spawnSync(process.execPath, [script, ...args, "--root", root], { encoding: "utf8" });
@@ -104,11 +105,33 @@ describe("Published clips: npm run publish:clip", () => {
     expect(run("flyer", "h3", clip).status).not.toBe(0);
     expect(readFileSync(join(root, "packages/studio/public/published/index.json"), "utf8")).toBe("{ not json");
   });
-  it("warns that a local file over 25 MB belongs on R2", () => {
+  it("refuses a local file over 25 MiB before copying it, unless --force", () => {
     fresh(); const clip = join(root, "big.mp4"); writeFileSync(clip, ""); truncateSync(clip, 26 * 1024 * 1024);
     const r = run("flyer", "h3", clip);
-    expect(r.status).toBe(0);
-    expect(r.stderr).toMatch(/25 MB.*R2/s);
+    expect(r.status).not.toBe(0);
+    expect(r.stderr).toMatch(/25 MiB.*R2.*--force/s);
+    expect(existsSync(join(root, "packages/studio/public/published/flyer-h3.mp4"))).toBe(false);
+    const forced = run("flyer", "h3", clip, "--force");
+    expect(forced.status, forced.stderr).toBe(0);
+    expect(forced.stderr).toMatch(/WARNING/);
+    expect(existsSync(join(root, "packages/studio/public/published/flyer-h3.mp4"))).toBe(true);
+  });
+  it("takes only .mp4 and .webm", () => {
+    fresh(); const clip = join(root, "take.mov"); writeFileSync(clip, "fake");
+    expect(run("flyer", "h3", clip).status).not.toBe(0);
+  });
+  it("keeps one clip per tile: a new extension or a URL removes the old copy", () => {
+    fresh(); const dir = join(root, "packages/studio/public/published");
+    const mp4 = join(root, "take.mp4"), webm = join(root, "take.webm"); writeFileSync(mp4, "a"); writeFileSync(webm, "b");
+    expect(run("car", "h3", mp4).status).toBe(0);
+    const r = run("car", "h3", webm);
+    expect(r.stdout).toMatch(/removed the old car-h3\.mp4/);
+    expect(existsSync(join(dir, "car-h3.mp4"))).toBe(false);
+    expect(existsSync(join(dir, "car-h3.webm"))).toBe(true);
+    expect(run("car", "h3", webm).stdout).toMatch(/car-h3\.webm/);
+    expect(run("car", "h3", "https://r2.example/c.mp4").status).toBe(0);
+    expect(existsSync(join(dir, "car-h3.webm"))).toBe(false);
+    expect(index().clips.car.h3.url).toBe("https://r2.example/c.mp4");
   });
   it("runs as an npm script with no other setup", () => {
     fresh();

@@ -85,7 +85,7 @@ async function renderGuide(i: number): Promise<Media> {
 }
 
 /** One row's player: the music is the clock, every video in the row follows it. */
-function rowPlayer(row: HTMLElement, audioUrl: string | null) {
+function rowPlayer(row: HTMLElement, audioUrl: string | null, current: () => boolean) {
   const audio = el("audio"); audio.preload = "auto"; if (audioUrl) audio.src = audioUrl;
   const button = el("button", "play-btn quiet"); button.type = "button"; button.setAttribute("aria-label", "Play the row"); button.innerHTML = PLAY_GLYPH;
   button.onclick = () => { if (audio.paused) void audio.play().catch(() => {}); else audio.pause(); };
@@ -94,11 +94,12 @@ function rowPlayer(row: HTMLElement, audioUrl: string | null) {
   const scrub = el("input", "scrub row-scrub") as HTMLInputElement;
   scrub.type = "range"; scrub.min = "0"; scrub.max = "1"; scrub.step = "0.0001"; scrub.value = "0"; scrub.setAttribute("aria-label", "Time in this row");
   scrub.oninput = () => { if (audio.duration) audio.currentTime = Number(scrub.value) * audio.duration; };
-  // The loop ends with the row: a re-rendered gallery stops the old row's music and its frame loop.
+  // The loop ends with the row: a re-rendered gallery stops the old row's music and its frame loop,
+  // also when the row was replaced before it was ever on the page (a background tab runs no frames).
   let shown = false;
   const tick = () => {
     if (row.isConnected) shown = true;
-    else if (shown) { audio.pause(); audio.removeAttribute("src"); audio.load(); return; }
+    else if (shown || !current()) { audio.pause(); audio.removeAttribute("src"); audio.load(); return; }
     if (audio.duration) { const f = audio.currentTime / audio.duration; scrub.value = String(f); scrub.style.setProperty("--pos", `${f * 100}%`); } for (const v of row.querySelectorAll("video")) { if (v.readyState >= 1) applyStep(v, followStep({ time: v.currentTime, paused: v.paused, duration: v.duration }, { time: audio.currentTime, playing: !audio.paused })); } requestAnimationFrame(tick); };
   requestAnimationFrame(tick);
   return { button, audio, scrub, setAudio: (url: string) => { audio.src = url; } };
@@ -106,6 +107,8 @@ function rowPlayer(row: HTMLElement, audioUrl: string | null) {
 
 const tile = (label: string, content: HTMLElement | string) => { const t = el("figure", "row-tile"); const cap = el("figcaption", "", label); const body = typeof content === "string" ? el("div", "row-empty muted", content) : content; t.append(body, cap); return t; };
 const video = (src: string) => { const v = el("video"); v.muted = true; v.playsInline = true; v.loop = true; void playLocal(v, src); return v; };
+/** A published clip streams from its link (metadata first) instead of being downloaded whole before it shows, as playLocal does for a run's result. */
+const streamed = (src: string) => { const v = el("video"); v.muted = true; v.playsInline = true; v.loop = true; v.preload = "metadata"; v.src = src; return v; };
 
 export function bindGallery(opts: {
   root: HTMLElement; load(slot: string): void; refs(slot: string): { character?: Ref; environment?: Ref } | undefined; runs(): Run[];
@@ -120,14 +123,14 @@ export function bindGallery(opts: {
   /** An image or video in a box that carries the "Use as reference" control. */
   const box = (media: HTMLElement, get: RefGetter, what: string) => { const b = el("div", "row-media"); b.append(media); opts.attach?.(b, get, what); return b; };
   const guideBox = (src: string) => { const v = video(src); return box(v, frameOf(v, "guide"), "this frame of the guide"); };
-  const runBox = (src: string) => { const v = video(src); return box(v, frameOf(v, "result"), "this frame of the clip"); };
+  const runBox = (src: string, stream = false) => { const v = stream ? streamed(src) : video(src); return box(v, frameOf(v, "result"), "this frame of the clip"); };
   /** Clips published with the build (published.ts), shown until the visitor makes their own; filled in once the list loads. */
   let published: PublishedRun[] = [];
   /** A model's tile: the visitor's run, else the published clip (back to "No clip yet" if it fails to load), else "No clip yet". */
   const modelTile = (label: string, pick: ReturnType<typeof tileClip<Run>>) => {
     if (!pick) return tile(label, "No clip yet");
     if (pick.kind === "own") return tile(label, runBox(pick.run.url));
-    const b = runBox(pick.run.url), p = pick.run;
+    const b = runBox(pick.run.url, true), p = pick.run;
     b.querySelector("video")?.addEventListener("error", () => t.replaceWith(tile(label, "No clip yet")), { once: true });
     const t: HTMLElement = tile(`${label} · published${p.costUsd != null ? ` · ${p.costUsd.toFixed(2)} USD` : ""}${p.seconds != null ? ` · ${p.seconds} s` : ""}`, b);
     if (p.prompt) t.title = p.prompt;
@@ -147,7 +150,7 @@ export function bindGallery(opts: {
 
   function exampleRow(i: number): HTMLElement {
     const ex = EXAMPLES[i], s = exampleState(i), row = el("article", "gallery-row panel"), t = EXAMPLE_TRACKS[ex.id];
-    const head = el("header", "row-head"), player = rowPlayer(row, media.get(i)?.audio ?? null);
+    const head = el("header", "row-head"), player = rowPlayer(row, media.get(i)?.audio ?? null, live());
     const open = el("button", "link-act", "Load into the editor"); open.type = "button"; open.insertAdjacentHTML("beforeend", icon("arrow-right")); open.onclick = () => { opts.load(String(i)); window.scrollTo({ top: 0 }); };
     const badge = el("span", "badge", s.figure.shape);
     head.append(player.button, el("h3", "", `Example ${i + 1}: ${ex.label}`), badge, el("span", "muted", t.name), open);
@@ -186,7 +189,7 @@ export function bindGallery(opts: {
   function runsRow(): HTMLElement | null {
     const runs = opts.runs();
     if (!runs.length) return null;
-    const row = el("article", "gallery-row panel"), player = rowPlayer(row, null);
+    const row = el("article", "gallery-row panel"), player = rowPlayer(row, null, live());
     const head = el("header", "row-head"); head.append(player.button, el("h3", "", "Your runs"), el("span", "muted", `${runs.length} added this session`));
     const strip = el("div", "row-strip");
     const where = (slot: string) => `Example ${slot === "own" ? "yours" : Number(slot) + 1}`;
@@ -203,7 +206,11 @@ export function bindGallery(opts: {
     return row;
   }
 
+  /** Each render is a generation; a row's player stops once a newer render has replaced it. */
+  let generation = 0;
+  const live = () => { const mine = generation; return () => mine === generation; };
   function render() {
+    generation++;
     for (const io of watching) io.disconnect();
     watching.clear();
     const rows = EXAMPLES.map((_, i) => exampleRow(i)), own = runsRow();
