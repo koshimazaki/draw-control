@@ -184,6 +184,8 @@ export function startBeatPath(root: HTMLElement) {
   const cameraLane = lane<CameraWord>("laneCamera", "cameraLane", LABELS.camera, ["behind", "side", "orbit", "top", "path", "push"]);
   const say = (text: string) => { $("status").textContent = text; };
   const ctx = () => (track ? { drive, bands: drive.bands } : {});
+  /** While the guide renders the shot fields are disabled: an edit then is refused, and a typed word would show in a field but not in the shot. */
+  const lockShot = (on: boolean) => { for (const id of ["shotSubject", "shotEnvironment", "shotAction"]) $<HTMLInputElement>(id).disabled = on; };
 
   /** Rebuild the recipe, the camera plan and every view from the state. */
   function rebuild() {
@@ -372,7 +374,7 @@ export function startBeatPath(root: HTMLElement) {
   const page = {
     $, map, menu, viewport, strip, player,
     get state() { return state; }, get recipe() { return recipe; }, get tool() { return tool; }, get view() { return view; },
-    get track() { return track; }, get drive() { return live(); }, get info() { return info; }, get busy() { return busy; }, set busy(v: boolean) { busy = v; dirty = true; if (!v && rebuildAfter) { rebuildAfter = false; rebuild(); } },
+    get track() { return track; }, get drive() { return live(); }, get info() { return info; }, get busy() { return busy; }, set busy(v: boolean) { busy = v; dirty = true; lockShot(v); if (!v && rebuildAfter) { rebuildAfter = false; rebuild(); } },
     get head() { return head; }, get playing() { return player.playing && !busy; }, get shown() { return shown; }, get slot() { return slot; }, get followSegs() { return followSegs; }, get slice() { return hooks.slice; }, blocks, snapLane, seek, removeTrack, totalBeats, window0, window1, update, undo, rebuild, setPlaying, switchSlot, useFile, say,
     setTool(t: Tool) { tool = t; if (pen === "draw") map.startNew(); map.refresh(); actions.sync(); },
     setView(v: View) { view = v; map.refresh(); actions.sync(); },

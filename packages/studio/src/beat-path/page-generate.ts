@@ -54,9 +54,10 @@ export function bindGenerate(p: Page) {
 
   /** The guide bundle in memory: every file as a Blob (the same content as the zip), the references, the shot and the prompt. */
   // Everything the bundle carries is read before the first await: the render awaits between frames.
-  async function exportGuideInMemory(onProgress?: (done: number, total: number) => void) {
+  // A signal stops the render between frames (Stop while the guide renders): it throws an error with code "aborted".
+  async function exportGuideInMemory(onProgress?: (done: number, total: number) => void, signal?: AbortSignal) {
     const recipe = p.recipe, range = exportRange(recipe, p.state.clip), references = refStore.blobs(p.slot) as References, prompt = currentPrompt();
-    const result = await exportBundle({ recipe, range, viewport: p.viewport, ...EXPORT, audio: p.track?.buffer ?? null, drive: p.drive, onProgress });
+    const result = await exportBundle({ recipe, range, viewport: p.viewport, ...EXPORT, audio: p.track?.buffer ?? null, drive: p.drive, onProgress, signal });
     const type = (name: string) => (name.endsWith(".mp4") ? "video/mp4" : name.endsWith(".png") ? "image/png" : name.endsWith(".wav") ? "audio/wav" : "application/json");
     const files = Object.fromEntries(Object.entries(result.contents).map(([name, bytes]) => [name, new Blob([bytes as BlobPart], { type: type(name) })]));
     return { files, references, shot: recipe.shot ?? null, prompt };
@@ -83,7 +84,11 @@ export function bindGenerate(p: Page) {
     // the control shows once the local copy is in, and stays hidden when the page may only play the link.
     const v = resultVideo();
     refUi.showControl($("screenOutput"), readableVideo(url));
-    if (v) void playLocal(v, url).then(src => { if (resultVideo() === v) refUi.showControl($("screenOutput"), readableVideo(src)); });
+    if (!v) return;
+    // While the copy downloads the video has no source (a black box): a short note says so until it does.
+    const wait = /^https?:/i.test(url) ? Object.assign(document.createElement("p"), { className: "output-loading muted", textContent: "Loading the clip…" }) : null;
+    if (wait) $("generateSlot").append(wait);
+    void playLocal(v, url).then(src => { if (resultVideo() === v) refUi.showControl($("screenOutput"), readableVideo(src)); }).finally(() => wait?.remove());
   }
   const divider = $("divider");
   divider.addEventListener("pointerdown", e => {
@@ -176,7 +181,8 @@ export function bindGenerate(p: Page) {
       // The page is busy only while the guide renders in the shared viewport: playback stops first, as for the zip export.
       p.setPlaying(false);
       p.busy = true;
-      const bundle = await exportGuideInMemory((d, t) => { fill.style.width = `${Math.round(d / t * 40)}%`; }).finally(() => { p.busy = false; });
+      // Stop ends the render within a frame (the export's own error carries code "aborted": "Stopped. Nothing was submitted.").
+      const bundle = await exportGuideInMemory((d, t) => { fill.style.width = `${Math.round(d / t * 40)}%`; }, abort.signal).finally(() => { p.busy = false; });
       if (abort.signal.aborted) throw Object.assign(new Error("Stopped. Nothing was submitted."), { code: "aborted" });
       // The local preview's "result" is the guide itself: one link per run, and the last one released
       // unless an output pane or the gallery still shows it.

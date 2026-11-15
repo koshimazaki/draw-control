@@ -77,6 +77,7 @@ h1 { margin: 0; font-size: var(--text-lg); font-weight: var(--weight-semibold); 
 .divider[hidden], .screen[hidden] { display: none; }
 .output-frame { position: relative; width: min(100cqw, 100cqh * 16 / 9); aspect-ratio: 16 / 9; display: grid; place-content: center; justify-items: center; gap: var(--s-2); overflow: hidden; background: var(--surface-sunk); }
 .output-video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.output-loading { position: absolute; inset: 0; margin: 0; display: grid; place-items: center; font-size: var(--text-sm); pointer-events: none; }
 .output-video.fake { filter: saturate(1.6) hue-rotate(160deg) contrast(1.1); }
 .progress { width: 60%; height: 4px; border-radius: 2px; background: var(--track); overflow: hidden; }
 .progress span { display: block; width: 0; height: 100%; background: var(--rail-fill); transition: width var(--dur) var(--ease); }

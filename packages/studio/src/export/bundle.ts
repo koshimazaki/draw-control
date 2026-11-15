@@ -23,7 +23,15 @@ export type ExportOptions = {
   /** The audio drive for the reactive layer and the rig (same one the preview used). */
   drive?: AudioDrive;
   onProgress?: (done: number, total: number) => void;
+  /** Stops the render between frames: the export cleans up and throws an `ExportAborted` error. */
+  signal?: AbortSignal;
 };
+/** The error an aborted export throws (`code: "aborted"`, as a stopped run's). */
+export class ExportAborted extends Error {
+  readonly code = "aborted";
+  constructor() { super("The guide export was stopped"); this.name = "AbortError"; }
+}
+export const isExportAborted = (e: unknown): e is ExportAborted => e instanceof ExportAborted;
 export type ExportResult = { zip: Uint8Array; frames: number; mp4Bytes: number; audioInVideo: boolean; codec: string; files: string[];
   /** The bundle's files by name, the same bytes as in the zip (for in-memory use: a Generate panel). */
   contents: Record<string, Uint8Array> };
@@ -73,6 +81,7 @@ export async function exportBundle(o: ExportOptions, deps: ExportDeps = BROWSER)
     });
     try {
       for (let n = 0; n < frames; n++) {
+        if (o.signal?.aborted) throw new ExportAborted();
         // Again each frame: a view or grid switch mid-export resets what the preview shows.
         viewport.setExporting(true);
         viewport.pose(frameAt(recipe, startFrame + n, o.drive));
@@ -83,6 +92,7 @@ export async function exportBundle(o: ExportOptions, deps: ExportDeps = BROWSER)
         if (n % 8 === 0) o.onProgress?.(n, frames);
       }
     } finally { viewport.setExporting(false); }
+    if (o.signal?.aborted) throw new ExportAborted();
     mp4 = await writer.finish();
   } finally {
     writer?.close();
