@@ -37,6 +37,15 @@ const originOf = (t: Track) => origins.get(t) ?? { name: t.name, offset: 0 };
 const FIT = 0.05;
 /** The longest window, in whole seconds, from `from` to the track's end (a cut of 8.0 s holds an 8 s window). */
 export const roomFrom = (info: TrackInfo, from: number) => Math.floor(info.lengthSeconds - from + FIT);
+/**
+ * How long the window may run from `from` when its end bracket is dragged: the whole seconds left, or one more when over a
+ * quarter of a second is left past them (Example 1: 13.488 s of music under a 14 s clip keeps its clip, the last half second
+ * silent, and the bracket can bring 14 s back after shortening it). A track shorter than the shortest clip gets no extra second.
+ */
+export const endRoom = (info: TrackInfo, from: number) => {
+  const room = roomFrom(info, from);
+  return room >= CLIP_SECONDS.min && info.lengthSeconds - from - room > 0.25 ? room + 1 : room;
+};
 /** The window's start for a wanted time: snapped to the track's beats (snap on) and kept inside the track; a window as long as the track starts at 0. */
 export function sliceFor(at: number, info: TrackInfo, clip: number, snap: boolean): number {
   if (clip >= info.lengthSeconds - FIT) return 0;
@@ -54,13 +63,13 @@ export const overviewShows = (info: TrackInfo | null) => sliceable(info, CLIP_SE
 
 /**
  * A bracket dragged to `at` seconds: the window's new start and length. The length is whole
- * seconds, at least the shortest clip, at most what is left of the track (and the page's 30 s);
+ * seconds, at least the shortest clip, at most what is left of the track (`endRoom`; the page's 30 s);
  * the other end is held (the start snaps to the beat with snap on). Null: no window fits.
  */
 export function resizeWindow(edge: "start" | "end", at: number, from: { start: number; clip: number }, info: TrackInfo, snap: boolean): { start: number; clip: number } | null {
   const end0 = from.start + from.clip;
   let start = from.start, clip: number;
-  if (edge === "end") clip = Math.min(roomFrom(info, start), clampClip(at - start));
+  if (edge === "end") clip = Math.min(endRoom(info, start), clampClip(at - start));
   else { clip = clampClip(end0 - at); start = sliceFor(Math.max(0, end0 - clip), info, clip, snap); clip = Math.min(clip, roomFrom(info, start)); }
   return clip < CLIP_SECONDS.min ? null : { start, clip };
 }

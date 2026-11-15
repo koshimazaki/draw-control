@@ -10,10 +10,12 @@
  * 6. screenshots of both themes at 1280×720 and 1440×900 in out/;
  * 7. Settings › Setup: save, load back, the guide zip and folder, the user's own track (smoke-beat-path-setup.mjs).
  */
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { pathToFileURL } from "node:url";
 import { unzipSync, strFromU8 } from "fflate";
 import { smokeBeatPathMap } from "./smoke-beat-path-map.mjs";
 import { smokeBeatPathHunt } from "./smoke-beat-path-hunt.mjs";
+import { smokeBeatPathFallback } from "./smoke-beat-path-fallback.mjs";
 import { smokeBeatPathFollow } from "./smoke-beat-path-follow.mjs";
 import { smokeBeatPathParallel } from "./smoke-beat-path-parallel.mjs";
 import { smokeBeatPathSlice } from "./smoke-beat-path-slice.mjs";
@@ -38,7 +40,7 @@ export async function smokeBeatPath(browser, base, { fail, OUT, SHOTS }) {
   await smokeExample1(page, fail, SHOTS);
   let p = await probe();
   console.log(`draw control: first run ${p.recipe.character.kind}, ${p.recipe.durationBeats} beats, travel lock ${JSON.stringify(p.recipe.travelLock)}, camera ${p.recipe.camera.segments.map(s => s.modes.join("+")).join(" / ")}`);
-  if (p.recipe.character.kind !== "glider" || p.recipe.travelLock?.lock !== "kick") fail("Draw Control did not open on the glider locked to the kicks");
+  if (p.recipe.character.kind !== "glider" || p.recipe.travelLock) fail("Draw Control did not open on the glider travelling free (Example 1 has no travel lock)");
   const noScroll = await page.evaluate(() => document.getElementById("editor").offsetHeight <= window.innerHeight + 1 && document.documentElement.scrollWidth <= window.innerWidth + 1);
   if (!noScroll) fail("the Draw Control editor does not fit one screen at 1280×720");
   // A click on the picture plays (there is no overlay button any more).
@@ -86,7 +88,9 @@ export async function smokeBeatPath(browser, base, { fail, OUT, SHOTS }) {
   await page.click("#chipCharacter"); await page.click('#menu button:has-text("Lock to kick")');
   await page.click("#chipCamera"); await page.click('#menu button:has-text("Lock to snare")');
   p = await probe();
-  if (p.recipe.camera.segments.some(s => s.lock !== "snare") || (await probe()).state.charLock.lock !== "kick") fail("the lane lock chips did not set kick for the character and snare for the camera");
+  // Example 1 has no lock, so its camera keeps moving on each hit: the lane carries the snare, the blocks lock only when they hold or punch.
+  const holds = p.state.camLock.onHit !== "move";
+  if (p.state.camLock.lock !== "snare" || p.state.charLock.lock !== "kick" || p.recipe.camera.segments.some(s => (s.lock === "snare") !== holds)) fail("the lane lock chips did not set kick for the character and snare for the camera");
   const pts = p.recipe.rootShape?.points ?? [];
   console.log(`draw control: drawn path ${p.state.subject.length} points, from (${pts[0]?.x},${pts[0]?.z}) to (${pts.at(-1)?.x},${pts.at(-1)?.z}); lock ${p.recipe.travelLock?.lock}`);
   if (p.state.subject.length < 3 || Math.abs(pts[0].x + 6) > 0.3 || Math.abs(pts.at(-1).x - 6) > 0.3 || p.recipe.travelLock?.lock !== "kick") fail("drawing the path on the map did not set the walk path");
@@ -299,6 +303,7 @@ export async function smokeBeatPath(browser, base, { fail, OUT, SHOTS }) {
   await smokeBeatPathRefs(browser, base, { fail, SHOTS });
   await smokeBeatPathImages(browser, base, { fail, SHOTS });
   await smokeBeatPathSetup(browser, base, { fail, OUT });
+  await smokeBeatPathFallback(browser, base, { fail });
 }
 
 /** Export (a WAV of the window, within a frame), Slice (the track becomes the window), and the WAV loaded back with Your track. */
@@ -332,11 +337,12 @@ async function smokeTrackActions(page, fail, SHOTS) {
 }
 
 /** Example 1's frame 0 camera in the CLI render (out/ex5/final/camera.json, track[0].position). */
-const EX1_CLI_FRAME0 = [-21.484, 8, -4.015];
+const EX1_CLI_FRAME0 = [-21.234, 8, -4.015];
 
 /**
  * Example 1: the ship on the owner's loop, a 13.488 s file under a 14 s clip. The recipe builds on the file's given
- * grid (107.5 BPM, beat 0 at 0 s), the camera ranges are isometric, right behind and top, the lane edges stay where
+ * grid (107.5 BPM, beat 0 at 0 s), the camera ranges are isometric, right behind, top and top pushing in, with no lock
+ * (no hold on each hit), the lane edges stay where
  * the script put them, frame 0 is the CLI render's, and playback runs to the clip's end (the last half second of the
  * 14 s window is silent, as in the guide) and wraps to its start.
  */
@@ -345,8 +351,9 @@ async function smokeExample1(page, fail, SHOTS) {
   const ranges = ex1.r.camera.segments.map(s => s.modes.join("+")).join(" "), edges = ex1.s.cameraLane.map(b => b.from).concat(ex1.s.cameraLane.at(-1).to);
   const off = Math.max(...ex1.cam0.position.map((v, i) => Math.abs(v - EX1_CLI_FRAME0[i])));
   console.log(`draw control: Example 1 builds: ranges ${ranges}; edges ${edges.join(" ")}; ${ex1.r.beatGrid.bpm} BPM, beat 0 at ${ex1.r.beatGrid.offsetSeconds} s; frame 0 camera at ${ex1.cam0.position.map(v => v.toFixed(2)).join(", ")} (CLI ${EX1_CLI_FRAME0.map(v => v.toFixed(3)).join(", ")}, off ${off.toFixed(3)} m); track ${ex1.track} ${ex1.length?.toFixed(3)} s, clip ${ex1.s.clip} s`);
-  if (ranges !== "threeQuarter chase top") fail(`Example 1's camera ranges are ${ranges}, not threeQuarter chase top`);
-  if (edges.join(" ") !== "0 8 16 26") fail(`Example 1's camera edges moved when its music loaded: ${edges.join(" ")}`);
+  if (ranges !== "threeQuarter chase top top+pushIn") fail(`Example 1's camera ranges are ${ranges}, not threeQuarter chase top top+pushIn`);
+  if (ex1.r.travelLock || ex1.r.camera.segments.some(s => s.lock)) fail("Example 1 holds on the hits (a travel or camera lock is set)");
+  if (edges.join(" ") !== "0 8 16 18 26") fail(`Example 1's camera edges moved when its music loaded: ${edges.join(" ")}`);
   if (ex1.r.beatGrid.bpm !== 107.5 || ex1.r.beatGrid.offsetSeconds !== 0) fail(`Example 1 is not on its given grid (${ex1.r.beatGrid.bpm} BPM, ${ex1.r.beatGrid.offsetSeconds} s)`);
   if (off > 0.05) fail(`Example 1's frame 0 camera is ${off.toFixed(3)} m from the CLI render's`);
   if (!(Math.abs(ex1.length - 13.488) < 0.01)) fail(`Example 1's track is ${ex1.length} s, not the 13.488 s loop`);
@@ -368,7 +375,7 @@ async function smokeExample1(page, fail, SHOTS) {
   await page.screenshot({ path: `${SHOTS}beat-path-example-1.png` });
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) {
   const { createServer } = await import("vite");
   const { chromium } = await import("playwright-core");
   const OUT = new URL("../out/smoke/", import.meta.url).pathname, SHOTS = new URL("../out/", import.meta.url).pathname;

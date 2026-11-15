@@ -1,8 +1,9 @@
 /**
  * Example 1 (examples/scripts/beat-path-ex1-flyer.txt): the ship down the avenue on the owner's loop,
  * a 13.488 s music file under a 14 s clip, in three moves (isometric, right behind as it turns left
- * into a gap, the top as it lands). Its lanes end where the page fits them (clipBeats), so loading
- * the music moves no edge off its hit, and frame 0 is the CLI render's.
+ * into a gap, the top pushing in as it lands), with no hold on each hit (no camera or travel lock).
+ * Its lanes end where the page fits them (clipBeats), so loading the music moves no edge off its
+ * hit, and frame 0 is the CLI render's.
  */
 import { existsSync, statSync } from "node:fs";
 import { describe, expect, it } from "vitest";
@@ -41,18 +42,27 @@ describe("Example 1: the ship on the owner's loop", () => {
     expect(beats).toBe(26);
     expect(s.cameraLane.at(-1)!.to).toBe(beats);
     expect(fitLanes(s, beats)).toEqual(s);
-    expect(s.cameraLane.map(b => b.from)).toEqual([0, 8, 16]);
-    expect(s.character.map(b => [b.from, b.to, b.word])).toEqual([[0, 23, "glide"], [23, 26, "hover"]]);
+    expect(s.cameraLane.map(b => b.from)).toEqual([0, 8, 16, 18]);
+    expect(s.character.map(b => [b.from, b.to, b.word])).toEqual([[0, 26, "glide"]]);
     expect(s.cameraLane.every(b => b.shot === "-")).toBe(true);
+  });
+  it("no hold on each hit: the page carries no camera or travel lock, and prints none back", () => {
+    const s = exampleState(i);
+    expect(s.camLock.lock).toBe("off");
+    expect(s.charLock.lock).toBe("off");
+    expect(toScript(s)).not.toMatch(/\block (kick|snare|hat|beat)\b/);
+    const r = beatPathRecipe(s, info);
+    expect(r.travelLock).toBeUndefined();
+    expect(r.camera!.segments.every(g => !g.lock)).toBe(true);
   });
   it("three moves: isometric, right behind, the top; frame 0 as the CLI render has it", () => {
     const s = exampleState(i);
     expect(s.rig).toEqual({ distance: 7, height: 5, fov: 50, yaw: 145 });
     const r = beatPathRecipe(s, info);
-    expect(r.camera!.segments.map(g => g.modes.join("+"))).toEqual(["threeQuarter", "chase", "top"]);
+    expect(r.camera!.segments.map(g => g.modes.join("+"))).toEqual(["threeQuarter", "chase", "top", "top+pushIn"]);
     // out/ex5/final/camera.json track[0].position: behind the ship's left, at the 8 m ceiling.
     const c = cameraAtFrame(planCamera(r), 0);
-    expect(c.position[0]).toBeCloseTo(-21.484, 1);
+    expect(c.position[0]).toBeCloseTo(-21.234, 1);
     expect(c.position[1]).toBeCloseTo(8, 1);
     expect(c.position[2]).toBeCloseTo(-4.015, 1);
   });

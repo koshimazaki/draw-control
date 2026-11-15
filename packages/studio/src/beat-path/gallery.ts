@@ -14,7 +14,7 @@ import { exportBundle } from "../export/bundle";
 import { GRID_LOOKS } from "../ground-grid";
 import { Viewport } from "../viewport";
 import { EXAMPLES, exampleState } from "./examples";
-import { exampleMusic } from "./example-music";
+import { exampleMusic, musicIdentity } from "./example-music";
 import { composePrompt, MODELS } from "./generate";
 import { beatPathRecipe, exportRange, type TrackInfo } from "./recipe-map";
 import { legendFor } from "./script";
@@ -37,8 +37,9 @@ async function exampleRecipe(i: number) {
   const s = exampleState(i), id = EXAMPLES[i].id, t = EXAMPLE_TRACKS[id], music = await exampleMusic(id);
   const f = analyseSamples(music.channels, music.sampleRate);
   const drive = buildDrive(f, 24, Math.ceil(f.lengthSeconds * 24) + 1);
-  const grid = music.fromFile ? t.grid : undefined;
-  const info: TrackInfo = { name: t.name, licence: t.licence, bpm: grid?.bpm ?? f.estimatedBpm ?? GROOVES[t.groove].bpm, offsetSeconds: grid?.offsetSeconds ?? f.estimatedOffsetSeconds, lengthSeconds: f.lengthSeconds };
+  // The example's grid even on the fallback groove, as the editor does, so the moves stay put; the fallback goes out under its own name.
+  const grid = t.grid, named = musicIdentity(id, music.fromFile);
+  const info: TrackInfo = { name: named.name, licence: named.licence, bpm: grid?.bpm ?? f.estimatedBpm ?? GROOVES[t.groove].bpm, offsetSeconds: grid?.offsetSeconds ?? f.estimatedOffsetSeconds, lengthSeconds: f.lengthSeconds };
   return { s, recipe: beatPathRecipe(s, info, { drive, bands: drive.bands }), drive, music };
 }
 

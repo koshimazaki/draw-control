@@ -11,8 +11,9 @@
  * files (no URLs or ffmpeg protocols). Prints the input and output durations. Needs ffmpeg and ffprobe.
  */
 import { execFileSync } from "node:child_process";
-import { existsSync, statSync } from "node:fs";
+import { existsSync, realpathSync, statSync } from "node:fs";
 import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 
 const usage = "usage: npm run finish -- <video.mp4> <audio> --out <file.mp4> [--crf 16]";
 function fail(msg) { console.error(`finish: ${msg}`); process.exit(1); }
@@ -37,7 +38,8 @@ export function parseFinishArgs(argv) {
 
 /** The ffmpeg arguments: the video's first stream and the audio's, cut to `seconds`, re-encoded. */
 export function finishCommand({ video, audio, out, crf }, seconds) {
-  return ["-v", "error", "-y", "-protocol_whitelist", "file", "-i", `file:${resolve(video)}`, "-i", `file:${resolve(audio)}`,
+  // -protocol_whitelist is an input option: it applies to the next -i only, so each input gets its own.
+  return ["-v", "error", "-y", "-protocol_whitelist", "file", "-i", `file:${resolve(video)}`, "-protocol_whitelist", "file", "-i", `file:${resolve(audio)}`,
     "-map", "0:v:0", "-map", "1:a:0", "-t", seconds.toFixed(6),
     "-c:v", "libx264", "-preset", "medium", "-crf", String(crf), "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "256k", "-movflags", "+faststart", resolve(out)];
 }
@@ -64,4 +66,4 @@ function main() {
   } catch (e) { fail(e.message.split("\n")[0]); }
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) main();
+if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) main();

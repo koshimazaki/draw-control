@@ -55,7 +55,9 @@ export async function smokeBeatPathSetup(browser, base, { fail, OUT }) {
   /** Settings open (a click elsewhere may have closed it). */
   const settings = async () => { if (!(await page.isVisible("#saveSetup"))) await page.click("#settings summary"); };
   await settings();
-  // 0. Example 1 with "Next move on each hit" on (its camera anchors on hits): saved, it loads back as it was.
+  // 0. Example 1 with its camera locked to the kicks (it has no lock of its own) and "Next move on each hit" on
+  //    (its camera anchors on hits): saved, it loads back as it was.
+  await page.click("#chipCamera"); await page.click('#menu button:has-text("Lock to kick")');
   const advance = async () => { await settings(); await page.click("#setCamLock"); await page.click('#menu button:has-text("Next move on each hit")'); };
   await advance();
   if (!(await state()).camLock.advance) fail("Next move on each hit did not turn on");

@@ -12,7 +12,7 @@ import {
 import { sensitiveBands } from "@motion-studio/core/internal";
 import { Player, loadTrack, trackFromSamples, type Track } from "../audio";
 import { createGlider } from "../characters/glider";
-import { GROOVES, grooveTimes, synthDrums } from "@motion-studio/core";
+import { musicIdentity, synthMusic } from "./example-music";
 import { EXAMPLE_TRACKS } from "./tracks";
 import { Viewport } from "../viewport";
 import { GRID_LOOKS } from "../ground-grid";
@@ -376,10 +376,17 @@ export function startBeatPath(root: HTMLElement) {
     if (t.file) {
       // A fetched track lands only if its example is still the one showing (rapid switching).
       try { const res = await fetch(t.file); const loaded = await loadTrack(new File([await res.blob()], t.name)); if (!current()) return; return useTrack(loaded, t.licence, t.grid); }
-      catch (e) { say(`Could not load ${t.file}: ${(e as Error).message}`); }
+      catch (e) {
+        // The generated groove instead, under its own name and licence, on the example's grid so the moves stay put.
+        if (!current()) return;
+        const music = synthMusic(id), named = musicIdentity(id, false);
+        await useTrack(trackFromSamples(named.name, music.channels, music.sampleRate), named.licence, t.grid);
+        say(`Couldn't load the example's music (${t.file}: ${(e as Error).message}); playing a generated groove`);
+        return;
+      }
     }
-    const bpm = GROOVES[t.groove].bpm, seconds = 0.1 + t.bars * 4 * 60 / bpm + 0.5;
-    return useTrack(trackFromSamples(t.name, [synthDrums(grooveTimes(t.groove, t.bars, 0.1), seconds)], 44100), t.licence);
+    const music = synthMusic(id);
+    return useTrack(trackFromSamples(t.name, music.channels, music.sampleRate), t.licence);
   }
   /** The example switcher: each slot keeps its own edits; an example brings its own music, or the cut a Slice made of it. */
   const slots = new Map<string, BeatPathState>();

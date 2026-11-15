@@ -215,15 +215,20 @@ The camera lanes (`camera.lanes`) use the same shape and the same commands (`pai
 
 A camera `path` block no longer runs on its own clock: the camera is as far along its drawn path as the subject is along its own over the clip (the same fraction of distance travelled), so a camera path drawn along a parallel street stays abreast of the subject without hand timing. A path block that starts mid-clip joins its path at the subject's fraction. When the subject does not travel (under 0.5 m in the clip), the old pacing applies (energy-driven, covered by the end of the last path block). The camera aims at the subject for the whole block, as before.
 
-## Authoring a shot from the CLI (round 8, Examples 1 and 2)
+## Authoring a shot from the CLI (round 8; Example 1 since 15 Nov 2026)
+
+Example 1 on its music file, a 14 s clip with beat 0 at the file's start (its `grid` in `tracks.ts`):
 
 ```
-motion-studio groove straight --bars 9 --out straight.wav        # the example's music (the page's own synth)
-motion-studio analyse straight.wav --out straight.json
-motion-studio new --character glider --clip 8 --analysis straight.json --out base.json
-motion-studio script base.json examples/scripts/beat-path-ex1-flyer.txt --analysis straight.json --out ex1.json
-motion-studio describe ex1.json --analysis straight.json --script   # prints the script back
-motion-studio render ex1.json --audio straight.wav --out ex1-bundle --grid --start 0 --length 8 --unit seconds
+M=packages/studio/public/tracks/neon-rain-loop.mp3
+motion-studio analyse $M --out loop.json
+motion-studio new --character glider --clip 14 --analysis loop.json --out base.json
+motion-studio set base.json beatGrid.offsetSeconds 0 --out base.json   # beat 0 at the file's start, as the page has it
+motion-studio script base.json examples/scripts/beat-path-ex1-flyer.txt --analysis loop.json --out ex1.json
+motion-studio describe ex1.json --analysis loop.json --script   # prints the script back
+motion-studio render ex1.json --audio $M --out ex1-bundle --grid --start 0 --length 14 --unit seconds
 ```
+
+The avenue shot that was Example 1 before (`examples/scripts/beat-path-avenue-cross.txt`) runs on the straight groove: `groove straight --bars 9`, `--clip 8`, `--length 8`.
 
 The MCP server takes the same steps as tool calls: `analyse_audio`, `new_recipe`, `apply_script`, `get_script`, `render`.
