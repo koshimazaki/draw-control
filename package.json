@@ -29,7 +29,8 @@
     "mixamo-check": "node scripts/mixamo-check.mjs",
     "cli": "node cli/bin/motion-studio.mjs",
     "mcp": "node mcp/bin/motion-studio-mcp.mjs",
-    "drums": "node scripts/drum-fixture.mjs out/drums-120.wav 120 8"
+    "drums": "node scripts/drum-fixture.mjs out/drums-120.wav 120 8",
+    "publish:clip": "node scripts/publish-clip.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

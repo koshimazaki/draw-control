@@ -23,6 +23,7 @@ import { icon } from "./ui/icons";
 import type { Ref } from "./ref-store";
 import { readableVideo, videoFrame, type RefGetter } from "./page-refs";
 import { applyStep, followStep, playLocal } from "./result-sync";
+import { loadPublished, tileClip, type PublishedRun } from "./published";
 
 /** A run added to the gallery: a clip (video), or a still made for a reference (image, with its cost and the drop it was for). */
 export type Run = { slot: string; model: string; modelName: string; url: string; prompt: string; kind?: "video" | "image"; costUsd?: number | null; for?: "character" | "environment"; blob?: Blob | null };
@@ -119,6 +120,18 @@ export function bindGallery(opts: {
   const box = (media: HTMLElement, get: RefGetter, what: string) => { const b = el("div", "row-media"); b.append(media); opts.attach?.(b, get, what); return b; };
   const guideBox = (src: string) => { const v = video(src); return box(v, frameOf(v, "guide"), "this frame of the guide"); };
   const runBox = (src: string) => { const v = video(src); return box(v, frameOf(v, "result"), "this frame of the clip"); };
+  /** Clips published with the build (published.ts), shown until the visitor makes their own; filled in once the list loads. */
+  let published: PublishedRun[] = [];
+  /** A model's tile: the visitor's run, else the published clip (back to "No clip yet" if it fails to load), else "No clip yet". */
+  const modelTile = (label: string, pick: ReturnType<typeof tileClip<Run>>) => {
+    if (!pick) return tile(label, "No clip yet");
+    if (pick.kind === "own") return tile(label, runBox(pick.run.url));
+    const b = runBox(pick.run.url), p = pick.run;
+    b.querySelector("video")?.addEventListener("error", () => t.replaceWith(tile(label, "No clip yet")), { once: true });
+    const t: HTMLElement = tile(`${label} · published${p.costUsd != null ? ` · ${p.costUsd.toFixed(2)} USD` : ""}${p.seconds != null ? ` · ${p.seconds} s` : ""}`, b);
+    if (p.prompt) t.title = p.prompt;
+    return t;
+  };
   const media = new Map<number, Media>();
   const jobs = new Map<number, Promise<Media>>();
   let queue: Promise<unknown> = Promise.resolve();
@@ -150,7 +163,7 @@ export function bindGallery(opts: {
     text.title = "Click to expand"; text.onclick = () => text.classList.toggle("clamp");
     strip.append(tile("Shot", text));
     const runs = opts.runs().filter(x => x.slot === String(i));
-    for (const m of MODELS) { const run = runs.find(x => x.model === m.id); strip.append(tile(m.label, run ? runBox(run.url) : "No clip yet")); }
+    for (const m of MODELS) strip.append(modelTile(m.label, tileClip(runs.find(x => x.model === m.id), published.find(p => p.example === ex.id && p.model === m.id))));
     row.append(head, strip, player.scrub);
     if (!media.has(i)) {
       // Render the guide when the row first comes into view, one row at a time.
@@ -192,5 +205,6 @@ export function bindGallery(opts: {
     opts.root.replaceChildren(...rows, ...(own ? [own] : []));
   }
   render();
+  void loadPublished({ examples: EXAMPLES.map(e => e.id), models: MODELS.map(m => m.id) }, document.baseURI).then(list => { if (list.length) { published = list; render(); } });
   return { render };
 }

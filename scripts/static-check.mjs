@@ -15,7 +15,7 @@ import { chromium } from "playwright-core";
 
 const root = new URL("../packages/studio/dist-beat-path/", import.meta.url).pathname, SUB = "/some/sub/path/";
 execFileSync("npm", ["run", "build:beat-path"], { cwd: new URL("..", import.meta.url).pathname, stdio: "inherit" });
-const types = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".json": "application/json", ".svg": "image/svg+xml", ".png": "image/png", ".md": "text/markdown", ".wav": "audio/wav" };
+const types = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".json": "application/json", ".svg": "image/svg+xml", ".png": "image/png", ".md": "text/markdown", ".wav": "audio/wav", ".mp4": "video/mp4", ".webm": "video/webm" };
 const missing = [];
 const server = createServer(async (req, res) => {
   const url = decodeURIComponent((req.url ?? "/").split("?")[0]);
