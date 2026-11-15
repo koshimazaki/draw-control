@@ -37,7 +37,8 @@ describe("motion-studio CLI", () => {
     expect((await run("script", base, script, "--out", out)).code).toBe(0);
     expect((await run("describe", out, "--timed")).out).toBe("0.0–2.5 s: wide shot; the camera follows from behind as it glides along its path\n2.5–8.0 s, on the beat: top view, looking straight down on it");
     expect((await run("describe", out, "--timed", "--style", "brackets", "--seconds", "4")).out.split("\n")[1]).toBe("[2.5-4s] on the beat: top view, looking straight down on it");
-    expect((await run("describe", out, "--timed", "--style", "json")).code).not.toBe(0);
+    for (const bad of [["--timed", "--style", "json"], ["--timed", "--script"], ["--style", "brackets"], ["--seconds", "4"], ["--timed", "--seconds", "x"], ["--timed", "--seconds"], ["--timed", "--style"]])
+      expect((await run("describe", out, ...bad)).code, bad.join(" ")).not.toBe(0);
   });
   it("parses flags and values", () => {
     expect(parseArgs(["apply", "r.json", "--out", "x.json", "--grid"])).toEqual({ pos: ["apply", "r.json"], flags: { out: "x.json", grid: true } });

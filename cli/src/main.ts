@@ -145,6 +145,14 @@ export async function main(argv: string[], out: (s: string) => void = s => conso
       case "describe": {
         if (!rest[0]) throw new Error("describe <recipe.json> [--analysis a.json] [--script | --timed [--style plain|brackets] [--seconds 8]]");
         const r = validateRecipe(readJson(rest[0])), bands = contextFrom(flags).analysis?.bands;
+        // A flag that would be ignored, or one missing its value, is an error, never silently dropped.
+        if (flags.timed !== undefined && flags.timed !== true) throw new Error("--timed takes no value (put it after the recipe)");
+        if (flags.timed && flags.script) throw new Error("describe takes --script or --timed, not both");
+        for (const k of ["style", "seconds"]) {
+          if (flags[k] === undefined) continue;
+          if (!flags.timed) throw new Error(`--${k} goes with --timed`);
+          if (flags[k] === true) throw new Error(`--${k} needs a value`);
+        }
         if (flags.timed) {
           const style = (flagStr(flags, "style") ?? "plain") as TimedStyle, sec = flagStr(flags, "seconds");
           if (!TIMED_STYLES.includes(style)) throw new Error(`--style takes ${TIMED_STYLES.join(" or ")}`);

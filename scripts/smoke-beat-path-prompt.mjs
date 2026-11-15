@@ -34,6 +34,13 @@ export async function smokeBeatPathPrompt(browser, base, { fail }) {
   });
   if (!over) fail("the prompt editor does not cover the screens above the shot fields");
 
+  // The covered controls are out of the tab order: Tab from the editor never lands in the screens.
+  if (!(await page.evaluate(() => document.getElementById("screens").inert))) fail("the screens under the prompt editor are not inert");
+  for (let i = 0; i < 12; i++) {
+    await page.keyboard.press("Tab");
+    if (await page.evaluate(() => document.getElementById("screens").contains(document.activeElement))) { fail("Tab reached a control under the prompt editor"); break; }
+  }
+  await page.focus("#edAction");
   // Timed over the example's own text asks first; Cancel keeps it, Replace writes the timeline.
   await page.click("#shotTimed");
   await page.waitForSelector("#costDialog:not([hidden])");
@@ -67,6 +74,7 @@ export async function smokeBeatPathPrompt(browser, base, { fail }) {
 
   await page.keyboard.press("Escape");
   const closed = await page.evaluate(() => ({ hidden: document.getElementById("shotEditor").hidden, expanded: document.getElementById("shotExpand").getAttribute("aria-expanded"), focus: document.activeElement?.id }));
+  if (await page.evaluate(() => document.getElementById("screens").inert)) fail("the screens stay inert after the editor closed");
   if (!closed.hidden || closed.expanded !== "false" || closed.focus !== "shotExpand") fail(`Escape did not close the prompt editor and return focus (${JSON.stringify(closed)})`);
   // A click on the read-only action field opens the editor again; a click outside closes it.
   await page.click("#shotAction");

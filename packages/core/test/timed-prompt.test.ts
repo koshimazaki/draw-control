@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { applyScript, beatPathBase, timedLines, timedPrompt, formatLine, hitAt, isTimedLine, validateRecipe, SHOT_LIMITS, type BandAnalysis } from "../src/index";
-import { clipSeconds } from "../src/timed-prompt";
+import { clipSeconds, MAX_TIMED_LINES } from "../src/timed-prompt";
 
 /** An 8 s Draw Control clip at 120 BPM (first beat at 0.25 s) with the given shot script rows. */
 const shot = (rows: string) => applyScript(beatPathBase({ seconds: 8, bpm: 120, offsetSeconds: 0.25 }), { script: rows });
@@ -21,6 +21,22 @@ describe("the timed prompt (timed-prompt.ts)", () => {
     const r = shot(TWO);
     expect(clipSeconds(r)).toBe(8);
     expect(timedLines(r, { seconds: 4 }).map(l => [l.from, l.to])).toEqual([[0, 2.5], [2.5, 4]]);
+  });
+  it("the clip estimate inverts clipBeats for a glider recipe, and is a plain recipe's own length", () => {
+    for (const [s, bpm] of [[8, 97], [8, 120], [9, 120], [5, 140], [30, 100], [3, 61]]) expect(clipSeconds(beatPathBase({ seconds: s, bpm }))).toBe(s);
+    const plain = validateRecipe({ ...beatPathBase({ seconds: 8, bpm: 120 }), durationBeats: 17, character: { kind: "mannequin", name: "m", licence: "MIT" } });
+    expect(clipSeconds(plain)).toBe(8.5);
+  });
+  it("past the cap, the last line carries every block left, each with its start", () => {
+    const rows = Array.from({ length: 16 }, (_, i) => `beats ${i}-${i + 1} | action: ${i ? "continue" : "glide on path (-10,0) (10,0)"} | camera: ${i % 2 ? "top" : "orbit 20"} | shot: -`).join("\n") + "\nbeats 16-17 | action: continue | camera: top | shot: -\n";
+    const lines = timedLines(shot(rows));
+    expect(lines).toHaveLength(MAX_TIMED_LINES);
+    expect(lines.at(-1)!.to).toBe(8);
+    expect(lines.at(-1)!.text).toMatch(/; then from 6\.0 s, on the downbeat, /);
+    expect(lines.at(-1)!.text.match(/; then from/g)).toHaveLength(16 - MAX_TIMED_LINES);   // 16 blocks in the 8 s clip (beat 16 is its end)
+  });
+  it("after a slice the bar phase is unknown: an edge on a bar says on the beat", () => {
+    expect(hitAt(validateRecipe({ ...shot(TWO), slice: 3.25 }), 4)).toBe("beat");
   });
   it("a block's start names the hit on its edge (analysed, tolerance 60 ms), else the downbeat or the beat", () => {
     const r = shot(TWO);

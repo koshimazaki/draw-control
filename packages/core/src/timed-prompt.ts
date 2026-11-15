@@ -15,6 +15,7 @@ import { hitBands } from "./lock";
 import { beatAtSeconds } from "./beats";
 import { rootAt, travelRange } from "./root-travel";
 import type { Recipe } from "./recipe";
+import { clipBeats } from "./beat-path";
 import type { BandAnalysis } from "./audio-bands";
 import type { CameraSegment } from "./camera";
 
@@ -33,7 +34,7 @@ export type TimedOptions = {
 
 /** A hit within this many seconds of a block edge starts it. */
 export const HIT_TOLERANCE = 0.06;
-/** At most this many lines: a model loses a long list (Seedance's guide warns against micro-control). */
+/** At most this many lines: a model loses a long list (Seedance's guide warns against micro-control). Blocks past it go on the last line, each with its start. */
 export const MAX_TIMED_LINES = 12;
 const BAND_WORD = { low: "kick", mid: "snare", high: "hat" } as const;
 
@@ -52,7 +53,8 @@ export function hitAt(r: Recipe, beat: number, bands?: BandAnalysis): HitLabel |
   if (best) return best.label;
   const whole = Math.abs(beat - Math.round(beat)) < 1e-3;
   if (!whole) return undefined;
-  return Math.round(beat) % r.beatGrid.beatsPerBar === 0 ? "downbeat" : "beat";
+  // After a slice, beat 0 is the beat nearest the cut, not a bar line: the bar phase is unknown.
+  return r.slice === undefined && Math.round(beat) % r.beatGrid.beatsPerBar === 0 ? "downbeat" : "beat";
 }
 
 const MOVES: Record<string, string> = {
@@ -140,13 +142,16 @@ export function subjectEvents(r: Recipe, endBeat: number): Event[] {
 }
 
 /**
- * The clip a recipe was made for: a Draw Control recipe runs to the beat after its whole-second clip
- * (beat-path.ts `clipBeats`), so its clip is the whole second within a beat under its end; any other
- * recipe is its own length.
+ * An estimate of the clip a recipe was made for (the recipe does not record it; the page passes its
+ * own clip, and `seconds` overrides this everywhere). A Draw Control recipe (the glider) runs to the
+ * beat after its whole-second clip, `clipBeats(seconds, bpm)`: the clip is the longest whole second,
+ * 3 to 30, that gives exactly its length in beats. Any other recipe is its own length.
  */
 export function clipSeconds(r: Recipe): number {
-  const all = r.durationBeats * 60 / r.beatGrid.bpm, whole = Math.floor(all - 1 / 24 + 1e-6);
-  return whole >= 1 && all - whole < 60 / r.beatGrid.bpm + 1e-6 ? whole : all;
+  const all = r.durationBeats * 60 / r.beatGrid.bpm;
+  if (r.character.kind !== "glider") return all;
+  for (let w = Math.min(30, Math.ceil(all)); w >= 3; w--) if (clipBeats(w, r.beatGrid.bpm) === r.durationBeats) return w;
+  return all;
 }
 
 /** The shot as timed lines: one per camera block (gaps hold still), the subject's events folded into the block they fall in. */
@@ -173,7 +178,11 @@ export function timedLines(r: Recipe, opts: TimedOptions = {}): TimedLine[] {
     const on = hitAt(r, b.from, opts.bands);
     return { from: r1(spanSeconds(r, b.from)), to: r1(spanSeconds(r, b.to)), ...(on ? { on } : {}), text };
   }).filter(l => l.to > l.from);
-  return lines.length > MAX_TIMED_LINES ? [...lines.slice(0, MAX_TIMED_LINES - 1), { ...lines[MAX_TIMED_LINES - 1], to: lines[lines.length - 1].to }] : lines;
+  if (lines.length <= MAX_TIMED_LINES) return lines;
+  // Past the cap, the last line carries every block left, each with its own start: nothing is dropped.
+  const last = lines.slice(MAX_TIMED_LINES - 1);
+  return [...lines.slice(0, MAX_TIMED_LINES - 1), { ...last[0], to: last[last.length - 1].to,
+    text: [last[0].text, ...last.slice(1).map(l => `from ${l.from.toFixed(1)} s${l.on ? `, ${HIT_WORDS[l.on]},` : ""} ${l.text}`)].join("; then ") }];
 }
 
 const trim = (x: number) => String(r1(x));

@@ -7,7 +7,7 @@
  * person's to edit: pressing Timed again over edited text asks first. It closes on the chevron,
  * the close button, Escape or a click outside, and gives focus back to the chevron.
  */
-import { timedPrompt } from "@motion-studio/core";
+import { SHOT_LIMITS, isTimedLine, timedPrompt } from "@motion-studio/core";
 import type { Page } from "./page";
 import { shotRefusal } from "./page-setup";
 import { MODELS, type ModelId } from "./generate";
@@ -18,8 +18,15 @@ type Ask = (title: string, text: string, ok?: string) => Promise<boolean>;
 /** The time syntax a model's guide documents (docs/models.md): Seedance's "[0-3s]" windows, else "0.0–3.0 s:" lines. */
 export const timedStyleFor = (model: ModelId) => MODELS.find(m => m.id === model)!.timed;
 
-/** Whether pressing Timed over `action` would lose text the person wrote: it is not empty and not what Timed last wrote. */
-export const replacesEdited = (action: string, lastTimed: string | null) => action.trim() !== "" && action.trim() !== (lastTimed ?? "").trim();
+/**
+ * Whether pressing Timed over `action` would lose text the person wrote: it is not empty, not what Timed last wrote,
+ * and (when this page has not written one yet, e.g. after a reload) not made only of timed lines.
+ */
+export function replacesEdited(action: string, lastTimed: string | null): boolean {
+  const a = action.trim();
+  if (!a || a === (lastTimed ?? "").trim()) return false;
+  return lastTimed !== null || !a.split("\n").filter(l => l.trim()).every(isTimedLine);
+}
 
 export function bindShotEditor(p: Page, o: { ask: Ask; model: () => ModelId; changed: () => void }) {
   const { $ } = p;
@@ -42,6 +49,7 @@ export function bindShotEditor(p: Page, o: { ask: Ask; model: () => ModelId; cha
     refresh();
     editor.hidden = false;
     expand.setAttribute("aria-expanded", "true");
+    $("screens").inert = true;   // the controls the editor covers leave the tab order
     expand.setAttribute("aria-label", "Close the prompt editor");
     area(FIELDS.find(f => f[0] === focus)![1]).focus();
   }
@@ -49,6 +57,7 @@ export function bindShotEditor(p: Page, o: { ask: Ask; model: () => ModelId; cha
     if (!isOpen()) return;
     editor.hidden = true;
     expand.setAttribute("aria-expanded", "false");
+    $("screens").inert = false;
     expand.setAttribute("aria-label", "Open the prompt editor");
     (opener.isConnected ? opener : expand).focus();
   }
@@ -80,12 +89,14 @@ export function bindShotEditor(p: Page, o: { ask: Ask; model: () => ModelId; cha
     if (unbuilt) { p.say(unbuilt); return; }
     const timed = timedPrompt(p.recipe, { bands: p.drive?.bands, seconds: p.state.clip, style: timedStyleFor(o.model()) });
     if (!timed) { p.say("Nothing to time: the shot has no camera blocks yet."); return; }
+    if (timed.length > SHOT_LIMITS.action) { p.say(`The timed action would be ${timed.length} characters; the action takes ${SHOT_LIMITS.action}. Merge some camera blocks and press Timed again.`); return; }
     if (replacesEdited(p.state.shot.action, lastTimed)
       && !await o.ask("Replace the action?", "Timed writes the action again from the camera blocks and the hits; the text in the action field now is replaced (undo puts it back).", "Replace")) return;
-    lastTimed = timed;
-    p.update({ ...p.state, shot: { ...p.state.shot, action: timed } }, true);
-    area("edAction").value = timed;
+    const built = p.update({ ...p.state, shot: { ...p.state.shot, action: timed } }, true);
+    area("edAction").value = p.state.shot.action;
     count(); o.changed();
+    if (!built || p.unbuilt) return;   // the page already said why the shot did not build
+    lastTimed = timed;
     p.say(`Timed: ${timed.split("\n").length} lines from the camera blocks. Edit them freely.`);
     if (isOpen()) area("edAction").focus();
   };

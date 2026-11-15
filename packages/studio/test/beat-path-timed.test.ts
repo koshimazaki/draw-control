@@ -27,6 +27,9 @@ describe("the timed prompt on the page (shot-editor.ts)", () => {
     expect(replacesEdited("it flies down the avenue", null)).toBe(true);
     expect(replacesEdited("0.0–2.5 s: x", "0.0–2.5 s: x")).toBe(false);
     expect(replacesEdited("0.0–2.5 s: x, faster", "0.0–2.5 s: x")).toBe(true);
+    // After a reload (nothing written yet on this page), a text of only timed lines is its own.
+    expect(replacesEdited("0.0–2.5 s: x\n[2.5-8s] on the kick: y", null)).toBe(false);
+    expect(replacesEdited("0.0–2.5 s: x\nand then it lands", null)).toBe(true);
   });
   it("the cost dialog warns past a model's prompt limit", () => {
     expect(promptWarning("h3", "a".repeat(7000))).toBeNull();
