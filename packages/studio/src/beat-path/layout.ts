@@ -108,6 +108,9 @@ export const LAYOUT = `
             <div class="opt-row"><span class="lab">Figure</span><select id="figureShape" aria-label="Figure shape"><option value="glider">Pyramid</option><option value="car">Car</option><option value="flyer">Flyer</option><option value="runner">Runner</option></select>
               <span class="swatches" data-tip="Body and head colours (a prompt can name them)"><input id="figureBody" type="color" aria-label="Figure body colour" /><input id="figureHead" type="color" aria-label="Figure head colour" /></span></div>
             <div class="opt-row"><span class="lab">Guide file</span><button type="button" id="exportGuide" class="btn outline">${icon("download")}<span class="btn-label">Download guide (.zip)</span></button></div>
+            <div class="opt-row"><span class="lab">Setup</span><button type="button" id="saveSetup" class="btn outline" data-tip="The whole page (paths, lanes, locks, scenery, shot) as one file to load back later">${icon("download")}Save (.json)</button>
+              <label class="btn outline file" data-tip="Load a setup .json, or a downloaded guide .zip">Load file…<input id="setupFile" type="file" accept=".json,.zip,application/json,application/zip" /></label>
+              <label class="btn outline file" data-tip="Load a setup from an unzipped guide's folder">Folder…<input id="setupFolder" type="file" webkitdirectory /></label></div>
           </div>
         </details>
       </div>

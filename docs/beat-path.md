@@ -52,6 +52,7 @@ All paths below are in `packages/studio/src/beat-path/` unless they say otherwis
 | Example music | `tracks.ts`, `examples.ts` | Which generated groove each example plays; the three examples, read from `examples/scripts/beat-path-ex*.txt` |
 | The preview | `../viewport.ts`, `../characters/glider.ts` | The shared Three.js viewport and the figure shapes |
 | Download guide (.zip) and the in-memory guide | `page-actions.ts`, `page-generate.ts`, `recipe-map.ts`, `../export/bundle.ts` | The zip export button; `exportGuideInMemory()` for Generate; `exportRange`; the bundle builder |
+| Settings › Setup: Save (.json), Load file…, Folder… | `page-setup.ts`, `setup-file.ts`, `setup-source.ts`, `page.ts` (`loadSetup`) | The buttons (`page-setup.ts`); the file format and its reader (`setup-file.ts`); finding setup.json in a zip or folder, and the music a setup brings (`setup-source.ts`) |
 | Shot fields, model, Generate | `page-generate.ts`, `generate.ts` | The run: guide render, cost question, progress, result (`page-generate.ts`); the models, the 3 USD limit, clip limits per model and error wording (`generate.ts`) |
 | The cost question | `cost-dialog.ts` | One question at a time; Stop answers it; a held key or a click in the first 300 ms never confirms |
 | The key panel and the embed | `arena.ts` | Loads the vendored embed; the fake provider |
@@ -70,6 +71,24 @@ The engine is `packages/core` (the recipe, the shot script grammar in `shot-scri
 - **An edit becomes a recipe** in one way: `update(next, final)` stores the new state and schedules `rebuild()`, which calls `beatPathRecipe` (`recipe-map.ts`): `toScript(state)` applied with the core's `applyScript` command on top of `beatPathBase`. The CLI (`new --character glider`, then `script`) and the MCP server (`new_recipe`, then `apply_script`) run the same two steps, so an agent that writes the script gets the page's recipe without the page (tested in `mcp/test/beat-path-parity.test.ts`). The script is never shown on the page; in development `window.__beatPath.script()` prints it.
 - **Undo lives in `page.ts`**: `past` and `future` lists of whole states, 200 steps. A drag calls `update(next, false)` while it moves and `update(next, true)` once at the end, so a whole drag is one step. Switching examples clears the history (each example keeps its own state). Slice and loading a track are not undo steps; Slice moves every state in the history onto the cut.
 - **`busy` is true while a guide renders** into the shared viewport, for Generate or for Download guide. While it is set, `update`, `undo`, `setSelection`, `switchSlot`, `useFile`, `removeTrack` and `useCut` are refused with "The guide is rendering…", a rebuild waits until the render ends, playback will not start, and the three shot fields are disabled. After the render, during the upload and the wait, editing is allowed again: the run already holds its guide, model and shot.
+
+## The setup file
+
+The whole page (paths, lanes, locks, markers, slice, figure, scenery, boxes, shot description) as one JSON file, so a rough draft can be saved and loaded back. **Settings › Setup** has three controls: **Save (.json)** downloads `draw-control-setup.json` at once (no render); **Load file…** takes a setup `.json` or a downloaded guide `.zip`; **Folder…** takes an unzipped guide's folder. Every guide zip from **Download guide** carries the same file as `setup.json`, beside the guide's files. It is not listed in `bundle.json`: that manifest follows the pinned guide schema (`schema/guide-bundle.schema.json`, `additionalProperties: false`), which model-arena owns.
+
+```json
+{
+  "kind": "beat-path-setup", "version": 1, "saved": "2026-11-15T10:00:00.000Z",
+  "music": { "name": "song.mp3", "licence": "unspecified", "bpm": 128, "offsetSeconds": 0.32, "lengthSeconds": 201.4 },
+  "state": { "clip": 8, "subject": [{ "x": -6, "z": 3 }], "character": [{ "from": 0, "to": 17, "word": "glide" }], "…": "the whole BeatPathState" },
+  "script": "# clip: 8 s · …\nbeats 0-17 | action: walk on path … | camera: follow behind\n"
+}
+```
+
+- **`state` is what loads**; `script` (`toScript(state)`) is for people and agents, and the CLI's `script` command takes the setup file in place of a script. `music` says what the lanes were timed to (`null`: no track).
+- **The reader never throws** (`readSetup` in `setup-file.ts`). Not JSON, another `kind`, a newer `version` or no `state` is refused with a sentence. Anything else is read field by field: a field it cannot use keeps the blank page's value (`BLANK_STATE`), values are clamped as the page clamps them (clip 3 to 30 s, points within ±60 m and 16 to a path, boxes as the recipe takes them, follow offsets to `FOLLOW_LIMITS`), lists are capped, and the status line says what was dropped. Last, the state must build a recipe; a typed camera direction the engine refuses is dropped with a note.
+- **Loading is one undo step** (`loadSetup` in `page.ts`, through `update`), into the example slot showing, framed on the map, refused while a guide renders. The music it brings (`planMusic` in `setup-source.ts`): an example's own music comes back with the example; from a guide zip or folder, its `audio.wav` (the music in the clip window) becomes the track as a cut, as Slice makes one, with the markers moved onto it; the user's own file is kept if it is the one loaded (same name, tempo and length), otherwise the page has no track and says "load it again". Loading that file again (Your track, or a drop) brings back the setup's slice and markers, and its lanes if they were not edited meanwhile. Loading the music is not part of the undo step, as with any track.
+- The smoke step is `scripts/smoke-beat-path-setup.mjs`; the unit tests are `packages/studio/test/beat-path-setup.test.ts`.
 
 ## Rules a change must keep
 

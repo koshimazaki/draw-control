@@ -7,7 +7,8 @@
  * 3. the example switcher (shapes, music, kept edits), scenery, Generate (faked in dev) with the output beside the preview;
  * 4. the guide is exported at 1280×720 (193 frames) and the bundle checked against the pinned schema;
  * 5. Export saves the music in the clip window as a WAV, Slice makes it the track, the WAV loads back alike;
- * 6. screenshots of both themes at 1280×720 and 1440×900 in out/.
+ * 6. screenshots of both themes at 1280×720 and 1440×900 in out/;
+ * 7. Settings › Setup: save, load back, the guide zip and folder, the user's own track (smoke-beat-path-setup.mjs).
  */
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { unzipSync, strFromU8 } from "fflate";
@@ -18,6 +19,7 @@ import { smokeBeatPathParallel } from "./smoke-beat-path-parallel.mjs";
 import { smokeBeatPathSlice } from "./smoke-beat-path-slice.mjs";
 import { smokeBeatPathRefs } from "./smoke-beat-path-refs.mjs";
 import { smokeBeatPathImages } from "./smoke-beat-path-images.mjs";
+import { smokeBeatPathSetup } from "./smoke-beat-path-setup.mjs";
 
 
 export async function smokeBeatPath(browser, base, { fail, OUT, SHOTS }) {
@@ -275,6 +277,7 @@ export async function smokeBeatPath(browser, base, { fail, OUT, SHOTS }) {
   await smokeBeatPathSlice(browser, base, { fail, OUT, SHOTS });
   await smokeBeatPathRefs(browser, base, { fail, SHOTS });
   await smokeBeatPathImages(browser, base, { fail, SHOTS });
+  await smokeBeatPathSetup(browser, base, { fail, OUT });
 }
 
 /** Export (a WAV of the window, within a frame), Slice (the track becomes the window), and the WAV loaded back with Your track. */

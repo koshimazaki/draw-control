@@ -8,6 +8,7 @@
  *   set <recipe.json> <path> <value> [--out next.json]
  *   describe <recipe.json> [--analysis a.json] [--script]
  *   script <recipe.json> <script.txt> [--analysis a.json] [--out next.json]
+ *       (a page setup file, setup.json, works in place of the script: its script is applied)
  *   commands
  *   render <recipe.json> [--audio track.wav] --out bundle/ [--view rig|front|side|top|orbit|iso] [--size 1280x720]
  *          [--start 8 --length 8 --unit beats|seconds] [--grid]
@@ -24,6 +25,19 @@ import { decodeAudioFile } from "./audio-file.ts";
 import { analyse, driveFrom, parseAnalysis, type AnalysisJson } from "./analysis.ts";
 
 type Flags = Record<string, string | true>;
+
+/** A shot script, or the page's setup file (`{ "kind": "beat-path-setup", "script": "…" }`, docs/beat-path.md): its script. */
+export function scriptText(text: string): string {
+  if (!/^\s*\{/.test(text)) return text;
+  let file: unknown;
+  try { file = JSON.parse(text); } catch { return text; }
+  const f = file as { kind?: unknown; script?: unknown };
+  if (f && f.kind === "beat-path-setup") {
+    if (typeof f.script !== "string") throw new Error("the setup file has no script");
+    return f.script;
+  }
+  return text;
+}
 const USAGE = readFileSync(new URL(import.meta.url)).toString().split("*/")[0].replace(/^\/\*\*\n?/, "").replace(/^ \* ?/gm, "");
 
 export function parseArgs(argv: string[]): { pos: string[]; flags: Flags } {
@@ -136,7 +150,7 @@ export async function main(argv: string[], out: (s: string) => void = s => conso
       case "script": {
         if (!rest[0] || !rest[1]) throw new Error("script <recipe.json> <script.txt> [--analysis a.json] [--out next.json]");
         const recipe = validateRecipe(readJson(rest[0]));
-        output(applyCommands(recipe, [{ type: "applyScript", script: readFileSync(rest[1], "utf8") }], contextFrom(flags).ctx), flags, out);
+        output(applyCommands(recipe, [{ type: "applyScript", script: scriptText(readFileSync(rest[1], "utf8")) }], contextFrom(flags).ctx), flags, out);
         return 0;
       }
       case "commands": {

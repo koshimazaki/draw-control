@@ -17,6 +17,7 @@ import { beatPathRecipe, exportRange } from "./recipe-map";
 import { HIT_CHOICES, LABELS, LOCK_CHOICES, clampClip, clipLabel, fitLanes, setWord, toScript, type BeatPathState, type Block, type CameraWord } from "./script";
 import { bindFader, setFader } from "./ui/fader";
 import { dragHasImage } from "./page-refs";
+import { bindSetup, setupFiles } from "./page-setup";
 import { isTyping } from "./drag";
 import { bindFollowFields, followProbe, parallelStreet } from "./page-follow";
 import { canSmooth, smoothPoints, SMOOTH_STEP } from "./map-select";
@@ -332,13 +333,14 @@ export function bindActions(p: Page) {
     button.disabled = true;
     try {
       const recipe = p.recipe, range = exportRange(recipe, p.state.clip);
-      const result = await exportBundle({ recipe, range, viewport: p.viewport, ...EXPORT, audio: p.track?.buffer ?? null, drive: p.drive,
+      const result = await exportBundle({ recipe, range, viewport: p.viewport, ...EXPORT, audio: p.track?.buffer ?? null, drive: p.drive, extra: setupFiles(p),
         onProgress: (d, t) => { button.querySelector(".btn-label")!.textContent = `Rendering ${Math.round(d / t * 100)}%`; } });
       download(result.zip, "beat-path-guide.zip", "application/zip");
       p.say(`Exported ${result.frames} frames, ${EXPORT.width}×${EXPORT.height}, ${(result.zip.length / 1e6).toFixed(1)} MB`);
     } catch (e) { p.say(`Export failed: ${(e as Error).message}`); }
     finally { p.busy = false; button.disabled = false; button.querySelector(".btn-label")!.textContent = "Download guide (.zip)"; }
   };
+  bindSetup(p);
   // Transport and files
   $("play").onclick = () => p.setPlaying(!p.player.playing);
   $("barPlay").onclick = () => p.setPlaying(!p.player.playing);
@@ -354,7 +356,8 @@ export function bindActions(p: Page) {
     $("sound").setAttribute("aria-pressed", String(!on));
     $("sound").textContent = on ? "Sound off" : "Sound on";
   };
-  input("trackFile").onchange = () => { const f = input("trackFile").files?.[0]; if (f) void p.useFile(f); };
+  // Cleared after each pick, so picking the same file again (after a setup asked for it) still loads it.
+  input("trackFile").onchange = () => { const f = input("trackFile").files?.[0]; input("trackFile").value = ""; if (f) void p.useFile(f); };
   const wrap = $("waveWrap");
   // A file from the desktop lights the music strip; an image lights the reference drops instead (page-refs.ts).
   window.addEventListener("dragover", e => { e.preventDefault(); if ([...(e.dataTransfer?.types ?? [])].includes("Files") && !dragHasImage(e.dataTransfer)) wrap.classList.add("drop"); });
