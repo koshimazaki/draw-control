@@ -231,6 +231,8 @@ async function smokeLaneInterrupted(page, { fail }) {
 
 /**
  * Paid-run safety, with the fake provider:
+ * - Stop while the guide renders: Generate again within about a second, "nothing was submitted", no
+ *   inference task sent, the page free (not busy, the shot fields on); a second run then goes to the end;
  * - a switch during "Rendering the guide…" is refused, and the run completes on the example it started on;
  * - the image panel's question while the video guide renders waits its turn: OK answers the question on screen;
  * - switching away from the running job and back shows its progress again; Stop ends a question still waiting.
@@ -252,6 +254,26 @@ async function smokePaidRuns(browser, base, { fail }) {
   const press = sel => page.evaluate(s => document.querySelector(s).click(), sel);
   await ex("0");
   await page.waitForFunction(() => window.__beatPath.slot() === "0", null, { timeout: 30_000 });
+
+  // 0. Stop while the guide renders.
+  const videoTasks = () => page.evaluate(() => (globalThis.__fakeTasks ?? []).filter(t => t.taskType === "videoInference").length);
+  const tasks0 = await videoTasks();
+  await page.click("#runGenerate");
+  await page.waitForFunction(() => document.getElementById("outputNote").textContent === "Rendering the guide…" && window.__beatPath.busy(), null, { timeout: 30_000 });
+  const t0 = Date.now();
+  await page.click("#runGenerate");
+  const gaveBack = await page.waitForFunction(() => document.getElementById("runGenerate").textContent === "Generate", null, { timeout: 5_000 }).then(() => true, () => false);
+  const stopMs = Date.now() - t0;
+  await page.waitForTimeout(500);   // a render that kept going would reach its task by now
+  const stopped = await page.evaluate(() => ({ status: document.getElementById("status").textContent, busy: window.__beatPath.busy(), shotOn: !document.getElementById("shotSubject").disabled, dialog: !document.getElementById("costDialog").hidden }));
+  const sentAfterStop = await videoTasks() - tasks0;
+  console.log(`beat path paid runs: Stop during the render: Generate again after ${stopMs} ms, ${JSON.stringify(stopped)}, ${sentAfterStop} tasks sent`);
+  if (!gaveBack || stopMs > 1500) fail(`Stop during the guide render took ${stopMs} ms to give Generate back`);
+  if (!/stopped/i.test(stopped.status ?? "") || !/nothing was submitted/i.test(stopped.status ?? "")) fail(`Stop during the render did not say it stopped with nothing submitted: ${stopped.status}`);
+  if (stopped.busy || !stopped.shotOn || stopped.dialog) fail(`Stop during the render left the page busy, the shot locked or a question open (${JSON.stringify(stopped)})`);
+  if (sentAfterStop) fail(`Stop during the render still sent ${sentAfterStop} inference task(s)`);
+  await page.click("#runGenerate"); await dialogOpen(); await page.click("#costOk"); await idle();
+  if (!(await page.evaluate(() => !!document.querySelector("#generateSlot arena-player"))) || await videoTasks() - tasks0 !== 1) fail("the run after a Stop during the render did not go to the end");
 
   // 1. A switch during the render is refused; the run goes out with Example 1's shot.
   const subject = (await bp(() => window.__beatPath.state())).shot.subject;
