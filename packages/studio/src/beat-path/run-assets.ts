@@ -95,7 +95,7 @@ export function fileName(e: RunEntry, type: string) {
   const d = new Date(e.at), two = (n: number) => String(n).padStart(2, "0");
   const when = `${d.getFullYear()}${two(d.getMonth() + 1)}${two(d.getDate())}-${two(d.getHours())}${two(d.getMinutes())}`;   // local time, as the list shows
   const where = e.slot === "own" ? "own" : `ex${Number(e.slot) + 1}`;
-  return `beat-path-${where}-${e.model.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}-${when}.${ext}`;
+  return `draw-control-${where}-${e.model.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}-${when}.${ext}`;
 }
 
 /** Save the run's file to the computer: the browser's copy, else the link if it may be read, else open the link. */
