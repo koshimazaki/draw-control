@@ -147,7 +147,8 @@ export type StationSpacing = "even" | "time";
  * and both edges keep their beat, so the block keeps its length.
  */
 export function pulseBeat(beat: number, from: number, to: number, hits: readonly number[], strength: number): number {
-  if (strength <= 0 || beat <= from || beat >= to) return beat;
+  // No hits: nothing to pulse into, so the block plays at its steady rate (as stationProgress does).
+  if (strength <= 0 || !hits.length || beat <= from || beat >= to) return beat;
   const keys = keysOf(from, to, hits);
   let k = 0;
   while (k < keys.length - 2 && beat >= keys[k + 1]) k++;

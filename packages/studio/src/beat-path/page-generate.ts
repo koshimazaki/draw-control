@@ -10,7 +10,7 @@
  */
 import { exportBundle } from "../export/bundle";
 import { ARENA_THEME, fakeFetch, loadArena, type ArenaKeyElement, type ArenaModule } from "./arena";
-import { clipRefusal, composePrompt, ERROR_MESSAGES, MAX_PRICE, MODELS, type ModelId, type References } from "./generate";
+import { clipRefusal, composePrompt, runErrorText, MAX_PRICE, MODELS, type ModelId, type References, type RunError } from "./generate";
 import type { Page } from "./page";
 import { exportRange } from "./recipe-map";
 import { clipLabel, legendFor } from "./script";
@@ -24,6 +24,7 @@ import { RefStore } from "./ref-store";
 import { bindRefs, readableVideo, videoFrame } from "./page-refs";
 import { bindImages } from "./page-image";
 import { applyStep, followStep, playLocal } from "./result-sync";
+import { bindCostDialog } from "./cost-dialog";
 
 const EXPORT = { width: 1280, height: 720 } as const;
 const store = (() => { try { return window.sessionStorage; } catch { return null; } })();
@@ -52,12 +53,14 @@ export function bindGenerate(p: Page) {
     : composePrompt(p.state.shot, legendFor(p.state.figure));
 
   /** The guide bundle in memory: every file as a Blob (the same content as the zip), the references, the shot and the prompt. */
-  async function exportGuideInMemory(onProgress?: (done: number, total: number) => void) {
-    const recipe = p.recipe, range = exportRange(recipe, p.state.clip);
-    const result = await exportBundle({ recipe, range, viewport: p.viewport, ...EXPORT, audio: p.track?.buffer ?? null, drive: p.drive, onProgress });
+  // Everything the bundle carries is read before the first await: the render awaits between frames.
+  // A signal stops the render between frames (Stop while the guide renders): it throws an error with code "aborted".
+  async function exportGuideInMemory(onProgress?: (done: number, total: number) => void, signal?: AbortSignal) {
+    const recipe = p.recipe, range = exportRange(recipe, p.state.clip), references = refStore.blobs(p.slot) as References, prompt = currentPrompt();
+    const result = await exportBundle({ recipe, range, viewport: p.viewport, ...EXPORT, audio: p.track?.buffer ?? null, drive: p.drive, onProgress, signal });
     const type = (name: string) => (name.endsWith(".mp4") ? "video/mp4" : name.endsWith(".png") ? "image/png" : name.endsWith(".wav") ? "audio/wav" : "application/json");
     const files = Object.fromEntries(Object.entries(result.contents).map(([name, bytes]) => [name, new Blob([bytes as BlobPart], { type: type(name) })]));
-    return { files, references: refStore.blobs(p.slot) as References, shot: recipe.shot ?? null, prompt: currentPrompt() };
+    return { files, references, shot: recipe.shot ?? null, prompt };
   }
   (window as unknown as { beatPath: unknown }).beatPath = { exportGuideInMemory, prompt: currentPrompt };
 
@@ -74,13 +77,18 @@ export function bindGenerate(p: Page) {
     if (arena) { player.setAttribute("controls", "none"); player.setAttribute("label", "Output"); }
     else Object.assign(player, { muted: true, playsInline: true });
     player.className = "output-video";
-    player.setAttribute("src", url);
+    // No src on the player itself: it would stream the provider's link beside the copy (a second download).
     $("generateSlot").replaceChildren(player);
     // Played from a copy in this tab, not streamed from the provider's link (result-sync.ts).
+    // A remote result (another origin, served without CORS) would taint a canvas, so its frames cannot be taken:
+    // the control shows once the local copy is in, and stays hidden when the page may only play the link.
     const v = resultVideo();
-    if (v) playLocal(v, url);
-    // A remote result (another origin, served without CORS) would taint a canvas, so its frames cannot be taken: no control for it.
     refUi.showControl($("screenOutput"), readableVideo(url));
+    if (!v) return;
+    // While the copy downloads the video has no source (a black box): a short note says so until it does.
+    const wait = /^https?:/i.test(url) ? Object.assign(document.createElement("p"), { className: "output-loading muted", textContent: "Loading the clip…" }) : null;
+    if (wait) $("generateSlot").append(wait);
+    void playLocal(v, url).then(src => { if (resultVideo() === v) refUi.showControl($("screenOutput"), readableVideo(src)); }).finally(() => wait?.remove());
   }
   const divider = $("divider");
   divider.addEventListener("pointerdown", e => {
@@ -132,30 +140,23 @@ export function bindGenerate(p: Page) {
     if (v) { model = v; sync(); }
   });
 
-  /** The page's own cost dialog (video, images, the no-bound notice): resolves true only on its OK button. */
-  const ask = (title: string, text: string, ok = "Generate") => new Promise<boolean>(resolve => {
-    $("costTitle").textContent = title; $("costText").textContent = text; $("costOk").lastChild!.textContent = ok;
-    $("costDialog").hidden = false;
-    $("costOk").focus();
-    const esc = (e: KeyboardEvent) => { if (e.key === "Escape") { e.preventDefault(); done(false); } };
-    const done = (v: boolean) => { $("costDialog").hidden = true; window.removeEventListener("keydown", esc, true); resolve(v); };
-    window.addEventListener("keydown", esc, true);
-    $("costOk").onclick = () => done(true);
-    $("costCancel").onclick = () => done(false);
-  });
+  /** The page's own cost dialog (video, images, the no-bound notice): one question at a time, true only on OK (cost-dialog.ts). */
+  const ask = bindCostDialog($);
   const localNote = () => (fake && !key?.connected ? " Local preview: nothing is sent and nothing is charged." : "");
-  const confirmCost = (q: { usd: number; modelName: string; inputs: unknown[] }) => ask("Generate with this model?",
-    `Up to ${q.usd.toFixed(2)} USD on ${q.modelName} (limit ${MAX_PRICE} USD). It sends the guide video${(q.inputs?.length ?? 0) > 1 ? ", the reference images" : ""} and the prompt from your shot description.${localNote()}`);
+  const confirmCost = (q: { usd: number; modelName: string; inputs: unknown[] }, signal: AbortSignal) => ask("Generate with this model?",
+    `Up to ${q.usd.toFixed(2)} USD on ${q.modelName} (limit ${MAX_PRICE} USD). It sends the guide video${(q.inputs?.length ?? 0) > 1 ? ", the reference images" : ""} and the prompt from your shot description.${localNote()}`, "Generate", signal);
 
   // One run at a time; while it runs the Generate button stops it. The run belongs to the example it
   // started on: switching examples mid-run files the result there and never shows it on another.
-  let running: AbortController | null = null, runStarted = 0;
+  let running: AbortController | null = null, runStarted = 0, runSlot: string | null = null;
   // The note and the progress bar are held here: a shown result replaces them in the output frame,
   // and a second run looked them up by id and found nothing (it threw and left the button on Stop).
   const bar = $("genProgress"), note = $("outputNote"), spin = textSpinner(), noteRow = document.createElement("div");
   noteRow.className = "note-row"; noteRow.append(spin.el, note);
   const runButton = $<HTMLButtonElement>("runGenerate");
-  const setRunning = (c: AbortController | null) => { running = c; runButton.querySelector(".btn-label")!.textContent = c ? "Stop" : "Generate"; runButton.classList.toggle("running", !!c); };
+  /** The running job's note and progress bar in the output pane (its example showing again after a switch puts them back). */
+  const showProgress = () => { setOutputPane(true); $("addToGallery").hidden = true; bar.hidden = false; $("generateSlot").replaceChildren(noteRow, bar); };
+  const setRunning = (c: AbortController | null, slot: string | null = null) => { running = c; runSlot = c ? slot : null; runButton.querySelector(".btn-label")!.textContent = c ? "Stop" : "Generate"; runButton.classList.toggle("running", !!c); };
   runButton.onclick = async () => {
     if (running) { running.abort(); p.say("Stopping…"); return; }
     if (p.busy) return;
@@ -166,26 +167,35 @@ export function bindGenerate(p: Page) {
     // A clip longer (or shorter) than the model takes is refused before the guide renders or anything is sent.
     const refusal = clipRefusal(model, p.state.clip);
     if (refusal) { p.say(refusal); return; }
-    const slot = p.slot, runModel = model, abort = new AbortController();
+    // The run's shot is taken now: the slot, the model, the shot and (in the bundle) the prompt and references.
+    // While the guide renders, page.ts refuses example switches and edits, so the guide matches them.
+    const slot = p.slot, runModel = model, runShot = shot(), abort = new AbortController();
     runStarted = Date.now();
-    setRunning(abort);
+    setRunning(abort, slot);
     const here = () => p.slot === slot;
     const fill = bar.firstElementChild as HTMLElement;
-    setOutputPane(true); $("addToGallery").hidden = true;
-    bar.hidden = false; note.textContent = "Rendering the guide…"; fill.style.width = "0%";
-    $("generateSlot").replaceChildren(noteRow, bar);
+    note.textContent = "Rendering the guide…"; fill.style.width = "0%";
+    showProgress();
     spin.start();
     try {
-      // The page is busy (playback paused) only while the guide renders in the shared viewport.
+      // The page is busy only while the guide renders in the shared viewport: playback stops first, as for the zip export.
+      p.setPlaying(false);
       p.busy = true;
-      const bundle = await exportGuideInMemory((d, t) => { fill.style.width = `${Math.round(d / t * 40)}%`; }).finally(() => { p.busy = false; });
+      // Stop ends the render within a frame (the export's own error carries code "aborted": "Stopped. Nothing was submitted.").
+      const bundle = await exportGuideInMemory((d, t) => { fill.style.width = `${Math.round(d / t * 40)}%`; }, abort.signal).finally(() => { p.busy = false; });
       if (abort.signal.aborted) throw Object.assign(new Error("Stopped. Nothing was submitted."), { code: "aborted" });
-      fakeResult = URL.createObjectURL(bundle.files["guide.mp4"]);
-      const r = refStore.blobs(slot);
+      // The local preview's "result" is the guide itself: one link per run, and the last one released
+      // unless an output pane or the gallery still shows it.
+      if (fake && !key?.connected) {
+        const before = fakeResult;
+        fakeResult = URL.createObjectURL(bundle.files["guide.mp4"]);
+        if (before && !inUse(before)) URL.revokeObjectURL(before);
+      }
+      const r = bundle.references;
       const result = await arena.generateFromGuide({
-        guide: bundle.files, model: runModel, shot: shot(), signal: abort.signal, references: { character: r.character, environment: r.environment }, maxPrice: MAX_PRICE,
-        key: key?.connected ? key : "local-preview-key-0000000000000000", confirm: confirmCost,
-        onProgress: (g: { stage: string; message: string; progress?: number }) => { if (!here()) return; note.textContent = g.message; fill.style.width = `${40 + Math.round((g.progress ?? ({ plan: 5, confirm: 10, upload: 30, submit: 40, poll: 60, done: 100 } as Record<string, number>)[g.stage] ?? 50) * 0.6)}%`; },
+        guide: bundle.files, model: runModel, shot: runShot, signal: abort.signal, references: { character: r.character, environment: r.environment }, maxPrice: MAX_PRICE,
+        key: key?.connected ? key : "local-preview-key-0000000000000000", confirm: (q: Parameters<typeof confirmCost>[0]) => confirmCost(q, abort.signal),
+        onProgress: (g: { stage: string; message: string; progress?: number }) => { note.textContent = g.message; fill.style.width = `${40 + Math.round((g.progress ?? ({ plan: 5, confirm: 10, upload: 30, submit: 40, poll: 60, done: 100 } as Record<string, number>)[g.stage] ?? 50) * 0.6)}%`; },
         fetch: logged(fake && !key?.connected ? fakeFetch(() => fakeResult) : null, labelOf(runModel), fake && !key?.connected, slot),
         ...(fake && !key?.connected ? { poll: { initialDelayMs: 100, intervalMs: 100, maxIntervalMs: 200 } } : {}),
       });
@@ -195,9 +205,8 @@ export function bindGenerate(p: Page) {
       renderGallery();
       if (key?.connected) void key.refreshBalance?.();
     } catch (e) {
-      const err = e as { code?: string; message: string };
-      const plain = err.code ? ERROR_MESSAGES[err.code] ?? err.message : err.message;
-      note.textContent = err.code === "refused" || err.code === "provider" ? `${plain}: ${err.message}` : plain;
+      // Stopped or timed out after the task was submitted: it may still be billed and lands in Runs (generate.ts).
+      note.textContent = runErrorText(e as RunError);
       p.say(note.textContent);
       if (here()) { if (!outputs.get(slot)) { bar.hidden = true; } else showResult(outputs.get(slot)!.url); }
     } finally { setRunning(null); bar.hidden = true; spin.stop(); }
@@ -213,6 +222,8 @@ export function bindGenerate(p: Page) {
 
   // The Gallery: one row per example (path, guide, references, shot, outputs per model), then the visitor's runs.
   const runs: Run[] = [];
+  /** A link the page still shows: an example's output pane, or the gallery. */
+  const inUse = (url: string) => [...outputs.values()].some(o => o.url === url) || runs.some(r => r.url === url);
   const gallery = bindGallery({ root: $("gallerySlot"), load: slot => void p.switchSlot(slot), refs: slot => ({ character: refStore.get(slot, "character"), environment: refStore.get(slot, "environment") }), runs: () => runs,
     attach: (host, get, what) => refUi.attach(host, get, what) });
   // Reference images made with an image model, from the Generate buttons beside the drops (page-image.ts).
@@ -224,7 +235,7 @@ export function bindGenerate(p: Page) {
   // Runs: every generation's task id and result, kept in this browser so a reload never loses one (run-log.ts, page-history.ts).
   bindHistory({
     $, log: runLog, key: () => (key?.connected ? key.getKey() ?? null : null), say: t => p.say(t),
-    live: e => !!running && e.kind === "video" && e.at >= runStarted,
+    live: e => !!running && e.kind === "video" && e.at >= runStarted, inUse,
     show: (e, url) => {
       outputs.set(e.slot, { url, record: null, model: e.model, prompt: "" });
       if (p.slot === e.slot) showResult(url); else void p.switchSlot(e.slot);
@@ -260,8 +271,9 @@ export function bindGenerate(p: Page) {
     /** A new slot: its references, its output (if any). */
     onSlot(slot: string) {
       refUi.sync();
-      // A run in progress on another example keeps going; this example shows its own output (or none).
-      showResult(outputs.get(slot)?.url ?? null);
+      // A run in progress on another example keeps going; this example shows its own output (or none),
+      // or, when the running job is this example's, its note and progress bar again.
+      if (running && runSlot === slot) showProgress(); else showResult(outputs.get(slot)?.url ?? null);
       sync();
     },
   };

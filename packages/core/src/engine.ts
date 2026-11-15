@@ -148,8 +148,10 @@ export function poseAtBeat(recipe: Recipe, beat: number, rate = 1, bands?: BandA
   if (weight < 1) {
     const pm = recipe.moves[k - 1];
     const prev = evaluateMove(recipe, k - 1, local(pm), bands);
-    pose = mixPoses(prev.pose, cur.pose, weight);
-    if (pm.clip) layers.push({ moveId: pm.id, clip: pm.clip, cyclePhase: prev.cyclePhase, weight: 1 - weight });
+    // The previous move blends out from where it is: at rest, if its block already ended (as loopLayersAt does).
+    const prevRest = restWeight(recipe, k - 1, beat);
+    pose = mixPoses(prevRest > 0 ? mixPoses(prev.pose, neutralPose(), prevRest) : prev.pose, cur.pose, weight);
+    if (pm.clip) layers.push({ moveId: pm.id, clip: pm.clip, cyclePhase: prev.cyclePhase, weight: (1 - weight) * (1 - prevRest) });
   }
   if (rest > 0) pose = mixPoses(pose, neutralPose(), rest);
   if (move.clip) layers.push({ moveId: move.id, clip: move.clip, cyclePhase: cur.cyclePhase, weight: weight * (1 - rest) });

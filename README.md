@@ -4,11 +4,12 @@ A browser studio where a neutral figure moves to your music, beat by beat, under
 You (or an agent, by command or by a plain-text shot script) edit the moves and the camera on a timeline.
 The result exports as a guide clip, with its beats and camera path, for video models to follow.
 
-Status: working studio, CLI and MCP server, 11 November 2026. What is not done is [at the end](#not-done). Detail: [PRD](docs/PRD.md) · [plan and current state](docs/plan.md) · [agents: CLI and MCP](docs/agents.md) · [recipe and shot script format](docs/recipe.md) · [video models: length and frame rate](docs/models.md).
+Status: working studio, CLI and MCP server, 11 November 2026. What is not done is [at the end](#not-done). Detail: [PRD](docs/PRD.md) · [plan and current state](docs/plan.md) · [agents: CLI and MCP](docs/agents.md) · [Hermes on Runware](docs/hermes.md) · [recipe and shot script format](docs/recipe.md) · [video models: length and frame rate](docs/models.md).
 
 ## Beat Path (start here)
 
 The lean demo: **draw a path on a map, add music, and the movement and the camera lock to the beat; export a guide clip for video models.** One screen, an abstract figure, a handful of controls.
+Changing the page (developers and agents): [docs/beat-path.md](docs/beat-path.md) says how to run and check it and which file owns each control.
 
 ```bash
 nvm use && npm install && npm run dev   # open http://127.0.0.1:5180/path.html  (Runware look: /path.html?theme=runware)
@@ -20,7 +21,7 @@ It opens on **Example 1** (a flying car among city towers) with its own music: p
 - **Preview** (right), and once something is generated, the **output** beside it on the same playhead and music: drag the divider (double-click resets), swap the sides.
 - **Shot**: subject, environment, action; optional *Character* and *Environment* images; the prompt the chosen model will get is shown beneath. **Model** (Kling 4.0, Seedance 2.5, MiniMax H3) and **Generate**: with your Runware key (*Add your Runware API key*, top right) it renders the guide in memory, asks you to confirm the estimated cost, and shows progress and the result beside the preview; *Add to gallery* keeps it. Swapping the asset and generating your own is two clicks from any example.
 - **Music strip and lanes** (bottom): click a kick or snare marker to switch it off for every lock; *Sound on/off*, *Your track*, *No music*. *Character* lane (glide, hover, spin, jump, freeze) and *Camera* lane (follow behind, follow side, orbit, top, my path, push in, or a typed direction such as `over shoulder then go above`); their lock chips set what each lands on.
-- **Settings** (closed): clip 5 or 8 s, locks, snap, ground grid, scenery (none, scatter, street, city), figure shape and colours, *Download guide (.zip)*.
+- **Settings** (closed): clip length (whole seconds, 3 to 30), locks, snap, ground grid, scenery (none, scatter, street, city), figure shape and colours, *Download guide (.zip)*.
 - **The camera never loses the subject**: a framing guard turns the aim towards the figure only when it nears the frame's edge (tested on every frame).
 - **Gallery** (scroll down): one row per example: its path, its guide (rendered in the browser when the row comes into view), the reference images, the shot description and prompt, and a clip per model, on one playhead with the example's music; your added runs form a last row. **Open source**: the footer links the code (MIT); it runs in your browser with your own Runware key.
 
@@ -35,7 +36,7 @@ You need Node 24 (`.nvmrc`) and Google Chrome or Edge (the export uses WebCodecs
 ```bash
 git clone <this repo> motion-studio && cd motion-studio
 nvm use && npm install
-npm run check          # typecheck, lint, unit tests (about 10 s)
+npm run check          # typecheck, lint, unit tests (about 30 s)
 npm run dev            # open http://127.0.0.1:5180
 ```
 

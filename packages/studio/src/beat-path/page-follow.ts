@@ -16,7 +16,8 @@ type Page = {
   $: <T extends HTMLElement = HTMLElement>(id: string) => T;
   state: BeatPathState; recipe: Recipe; tool: string; head: number;
   selection: { kind: "point" } | { kind: "block"; lane: "character" | "cameraLane"; index: number } | null;
-  update(next: BeatPathState, final?: boolean): void;
+  /** False when the page refused the edit (a guide is rendering). */
+  update(next: BeatPathState, final?: boolean): boolean;
   say(text: string): void;
 };
 
@@ -42,8 +43,7 @@ export function bindFollowFields(p: Page) {
       const { follow: _drop, ...rest } = b; void _drop;
       return Object.keys(f).length ? { ...rest, follow: f } : rest;
     });
-    p.update({ ...p.state, cameraLane: lane });
-    if (note) p.say(note);
+    if (p.update({ ...p.state, cameraLane: lane }) && note) p.say(note);
   };
   const read = (id: string, lo: number, hi: number) => { const v = field(id).value.trim(); return v === "" ? undefined : Math.max(lo, Math.min(hi, Number(v))); };
   field("followDistance").onchange = () => set(f => ({ ...f, distance: read("followDistance", ...FOLLOW_LIMITS.distance) }));

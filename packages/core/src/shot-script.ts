@@ -24,6 +24,7 @@ import { MOVE_KEYS } from "./moves";
 import { onsetBeats } from "./move-edits";
 import type { Recipe } from "./recipe";
 import { travelRange } from "./root-travel";
+import { oneLine } from "./validate";
 
 /** Spoken words for moves: [rigged clip, procedural library move]; exact clip and move names work too. */
 export const ACTION_WORDS: Record<string, [rigged: string | null, procedural: string | null]> = {
@@ -216,7 +217,7 @@ export function printScript(r: Recipe, bands?: BandAnalysis): string {
   const added = (["low", "mid", "high"] as const).map(b => (r.addedHits ?? []).filter(h => h.band === b)).filter(l => l.length).map(l => `${word[l[0].band]} ${l.map(h => fmt(h.seconds)).join(" ")}`).join(" ");
   const settings = (r.slice !== undefined ? `slice: ${fmt(r.slice)}s\n` : "") + (added ? `markers: ${added}\n` : "") + (r.scenery ? `scenery: ${r.scenery}${r.scenerySight === "passes" ? " sight passes" : ""}\n` : "")
     + (r.sceneryBoxes ?? []).map(b => `box: ${[b.x, b.z, b.w, b.d, b.h, ...(b.yaw ? [b.yaw] : [])].map(fmt).join(" ")}\n`).join("") + (r.landmarks ? `landmarks: ${r.landmarks.on ? `on seed ${r.landmarks.seed}` : "off"}\n` : "") + (r.hitSensitivity !== undefined ? `sensitivity: ${fmt(r.hitSensitivity)}\n` : "") + (r.mutedHits?.length ? `muted: ${r.mutedHits.map(fmt).join(" ")}\n` : "") + (r.figure ? `figure: ${r.figure.shape ? `shape ${r.figure.shape} ` : ""}body ${r.figure.body} head ${r.figure.head}\n` : "")
-    + (r.shot ? (["subject", "environment", "action", "legend"] as const).filter(k => r.shot![k]).map(k => `shot ${k}: ${r.shot![k]}\n`).join("") : "");
+    + (r.shot ? (["subject", "environment", "action", "legend"] as const).map(k => [k, oneLine(r.shot![k] ?? "")] as const).filter(([, v]) => v).map(([k, v]) => `shot ${k}: ${v}\n`).join("") : "");   // never a raw line break: it would end the line, or start a row
   return settings + rows.map(cells => cells.map((c, k) => (k < cells.length - 1 ? c.padEnd(widths[k]) : c)).join(" | ")).join("\n") + "\n";
 }
 

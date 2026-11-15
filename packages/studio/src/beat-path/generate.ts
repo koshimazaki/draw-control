@@ -36,9 +36,27 @@ export const ERROR_MESSAGES: Record<string, string> = {
   "not-confirmed": "Cancelled: nothing was sent.",
   "invalid-key": "The Runware key was refused. Check it in the key panel.",
   timeout: "The model is taking long: the task is still running and may still finish (it was not sent twice).",
-  aborted: "Stopped.",
+  aborted: "Stopped. Nothing was submitted.",
   provider: "Runware reported a problem with this request",
 };
+
+/** What the embed throws (its GenerateError): a code, its own message, and the task id once the task was submitted. */
+export type RunError = { code?: string; message: string; taskUUID?: string };
+
+/**
+ * The words for a failed or stopped run. Once a task was submitted (the error carries its id) a
+ * Stop or a timeout does not end it on Runware's side: it may still finish and be billed, and it
+ * shows up in Runs when it does, so the reader is told so and not to send it again.
+ * `plain` overrides the message for a code (the image panel's own price-limit wording).
+ */
+export function runErrorText(err: RunError, plain: Partial<Record<string, string>> = {}): string {
+  const id = err.taskUUID ? String(err.taskUUID) : "";
+  const submitted = id ? ` It was already submitted (task ${id.slice(0, 8)}), so it may still finish and be billed; it will appear in Runs. Do not generate again unless you want a second run.` : "";
+  if (err.code === "aborted") return id ? `Stopped watching.${submitted}` : "Stopped. Nothing was submitted.";
+  if (err.code === "timeout") return id ? `The model is taking long.${submitted}` : ERROR_MESSAGES.timeout;
+  const text = err.code ? plain[err.code] ?? ERROR_MESSAGES[err.code] ?? err.message : err.message;
+  return err.code === "refused" || err.code === "provider" ? `${text}: ${err.message}` : text;
+}
 
 export type References = { character?: Blob; environment?: Blob };
 

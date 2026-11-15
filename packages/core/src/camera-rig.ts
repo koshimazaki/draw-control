@@ -14,6 +14,7 @@
  * There are no cuts and no noise.
  */
 import { energyAtFrame, type AudioDrive } from "./audio-drive";
+import { effectiveDrive } from "./energy-curve";
 import { beatAtSeconds, secondsAtBeat } from "./beats";
 import { CAMERA_MAX_HEIGHT, FOLLOW_ANGLES, modesAt, type CameraConfig, type CameraMode } from "./camera";
 import type { Recipe } from "./recipe";
@@ -86,6 +87,8 @@ function followStep(x: number, v: number, target: number, targetV: number, omega
 export function planCamera(recipe: Recipe, drive?: AudioDrive, frames = 0): CameraPlan {
   const config = recipe.camera;
   if (!config) throw new Error("planCamera: the recipe has no camera rig");
+  // The loudness the rig reads: the recipe's hand-drawn energy curve when it has one (its hits stay the track's).
+  const energyDrive = effectiveDrive(recipe, drive);
   const fps = recipe.fps, dt = 1 / fps, g = recipe.beatGrid;
   const beatSeconds = 60 / g.bpm;
   const total = Math.max(frames, Math.ceil((g.offsetSeconds + recipe.durationBeats * beatSeconds) * fps) + 64);
@@ -125,7 +128,7 @@ export function planCamera(recipe: Recipe, drive?: AudioDrive, frames = 0): Came
   for (let n = 0; n < total; n++) {
     const beat = beatAtSeconds(g, n * dt);
     const modes = modesAt(config, beat);
-    const e = energyAtFrame(drive, n);
+    const e = energyAtFrame(energyDrive, n);
     const segNow = segAt(beat), pace = segNow?.pace === "fast" ? 1.8 : segNow?.pace === "slow" ? 0.55 : 1;
     const k = speedFactor(config.intensity, e) * pace;
     shoulderW = slew(shoulderW, segNow?.shoulder ? 1 : 0, 1.5 * dt * pace);
@@ -188,7 +191,7 @@ export function planCamera(recipe: Recipe, drive?: AudioDrive, frames = 0): Came
     for (let b = 0; b <= recipe.durationBeats; b++) {
       const seconds = secondsAtBeat(g, b);
       const downbeat = b % g.beatsPerBar === 0;
-      const amount = config.intensity * (downbeat ? 1 : BEAT_PUSH_SHARE) * (0.5 + 0.5 * energyAtFrame(drive, seconds * fps));
+      const amount = config.intensity * (downbeat ? 1 : BEAT_PUSH_SHARE) * (0.5 + 0.5 * energyAtFrame(energyDrive, seconds * fps));
       accents.push({ beat: b, seconds, downbeat, amount });
       const bar = Math.floor(b / g.beatsPerBar);
       const nudgeSign = (Math.sign(config.orbitDegreesPerBeat) || 1) * (bar % 2 === 0 ? 1 : -1);
@@ -219,7 +222,7 @@ export function planCamera(recipe: Recipe, drive?: AudioDrive, frames = 0): Came
     const cums = new Float64Array(total);
     for (let n = 0; n < total; n++) {
       const on = modesAt(config, Math.max(0, beatAtSeconds(g, n * dt))).includes("path");
-      rate = slew(rate, on ? speedFactor(config.intensity, energyAtFrame(drive, n)) : 0, 2 * dt);
+      rate = slew(rate, on ? speedFactor(config.intensity, energyAtFrame(energyDrive, n)) : 0, 2 * dt);
       cum += rate * (1 - prog.gate[n]) * dt;   // a locked hold on a path block stops it on each hit
       cums[n] = cum;
       w = slew(w, on ? 1 : 0, 1.2 * dt);
@@ -284,7 +287,7 @@ export function planCamera(recipe: Recipe, drive?: AudioDrive, frames = 0): Came
       ch.height[n] = position[1];
     }
     if (position[1] > CAMERA_MAX_HEIGHT + 1e-9) { heightClamped++; position = [position[0], CAMERA_MAX_HEIGHT, position[2]]; ch.height[n] = CAMERA_MAX_HEIGHT; }
-    samples[n] = { position, target, fov: fovAt(n), energy: energyAtFrame(drive, n) };
+    samples[n] = { position, target, fov: fovAt(n), energy: energyAtFrame(energyDrive, n) };
   }
   // Beat Path: the camera never loses the subject (camera-guard.ts).
   if (config.keepInFrame) {

@@ -4,7 +4,7 @@
  * with getResponse and the same id (never resubmitted). Only ids, links, costs and times are kept.
  */
 import { describe, expect, it } from "vitest";
-import { RunLog, checkRun, loggingFetch, readResponse } from "../src/beat-path/run-log";
+import { RunLog, checkRun, loggingFetch, readResponse, trimRuns, type RunEntry } from "../src/beat-path/run-log";
 
 const memory = () => { const m = new Map<string, string>(); return { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => void m.set(k, v), raw: m }; };
 const reply = (body: unknown) => ({ ok: true, status: 200, json: async () => body, clone: () => ({ json: async () => body }) });
@@ -47,5 +47,29 @@ describe("Runs: every generation's task id survives a reload", () => {
     expect(sent).toEqual([{ body: [{ taskType: "getResponse", taskUUID: "v9" }], auth: "Bearer rw-key-123456" }]);
     expect(now).toMatchObject({ status: "done", url: "https://cdn.example/v9.mp4" });
     expect(log.pending()).toEqual([]);
+  });
+});
+
+describe("the log's size cap never drops a paid run still processing", () => {
+  const e = (id: string, patch: Partial<RunEntry> = {}): RunEntry => ({ taskUUID: id, kind: "video", model: "Kling 4.0", slot: "0", at: 0, status: "done", ...patch });
+  it("drops local previews first, then the oldest finished runs, and keeps the order", () => {
+    // Newest first: n0 is the newest.
+    const list = [e("n0"), e("local1", { local: true }), e("p2", { status: "processing" }), e("n3"), e("local4", { local: true, status: "processing" }), e("n5", { status: "failed" })];
+    expect(trimRuns(list, 4).map(x => x.taskUUID)).toEqual(["n0", "p2", "n3", "n5"]);
+    expect(trimRuns(list, 2).map(x => x.taskUUID)).toEqual(["n0", "p2"]);
+  });
+  it("keeps every processing paid run even past the cap", () => {
+    const list = [e("n0"), e("p1", { status: "processing" }), e("p2", { status: "processing" }), e("p3", { status: "processing" })];
+    expect(trimRuns(list, 2).map(x => x.taskUUID)).toEqual(["p1", "p2", "p3"]);
+  });
+  it("a full log of images and previews never pushes out a processing video", () => {
+    const log = new RunLog(memory(), 3);
+    log.add(e("video", { status: "processing" }));
+    for (let i = 0; i < 6; i++) log.add(e(`img${i}`, { kind: "image" }));
+    for (let i = 0; i < 4; i++) log.add(e(`local${i}`, { local: true }));
+    const ids = log.list().map(x => x.taskUUID);
+    expect(ids).toContain("video");
+    expect(ids.length).toBe(3);
+    expect(ids.filter(x => x.startsWith("local")).length).toBeLessThanOrEqual(1);
   });
 });

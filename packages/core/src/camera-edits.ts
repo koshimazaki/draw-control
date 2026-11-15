@@ -8,7 +8,8 @@
  *   facing turned along the path (or held, for a glide), and its travel lock.
  * Every edit is pure and returns a fresh validated recipe.
  */
-import { CAMERA_MODES, DEFAULT_CAMERA, type CameraConfig, type CameraMode, type CameraSegment } from "./camera";
+import { CAMERA_MODES, CAMERA_SEGMENTS_MAX, DEFAULT_CAMERA, type CameraConfig, type CameraMode, type CameraSegment } from "./camera";
+import { rangeStarts } from "./camera-shots";
 import type { BandAnalysis } from "./audio-bands";
 import { onsetBeats, makeMoveFor } from "./move-edits";
 import { RecipeError, SPEED_RANGE, validateRecipe, type Recipe, type RootPoint } from "./recipe";
@@ -44,16 +45,44 @@ export function setCameraModes(recipe: Recipe, args: { modes: CameraMode[] | Cam
   const modes = checkModes(args.modes);
   const from = r3(Math.max(0, args.fromBeat ?? 0)), to = r3(Math.min(recipe.durationBeats, args.toBeat ?? recipe.durationBeats));
   if (!(to > from)) throw new RecipeError("setCameraModes: toBeat must be after fromBeat");
-  const cam = cameraOf(recipe);
+  const cam = cameraOf(recipe), starts = rangeStarts(cam);
   const kept: CameraSegment[] = [];
-  for (const s of cam.segments) {
-    if (s.toBeat <= from || s.fromBeat >= to) { kept.push(s); continue; }
-    if (s.fromBeat < from) kept.push({ ...s, toBeat: from });
-    if (s.toBeat > to) kept.push({ ...s, fromBeat: to });
-  }
+  cam.segments.forEach((s, i) => {
+    if (s.toBeat <= from || s.fromBeat >= to) { kept.push(s); return; }
+    if (s.fromBeat < from) kept.push(pieceOf(s, starts[i], s.fromBeat, from));
+    if (s.toBeat > to) kept.push(pieceOf(s, starts[i], to, s.toBeat));
+  });
   kept.push({ ...(args.fields ?? {}), fromBeat: from, toBeat: to, modes });
-  cam.segments = kept.sort((a, b) => a.fromBeat - b.fromBeat).slice(0, 32);
+  if (kept.length > CAMERA_SEGMENTS_MAX) throw new RecipeError(`setCameraModes: the camera holds up to ${CAMERA_SEGMENTS_MAX} ranges, and this edit would make ${kept.length} (use fewer, longer ranges)`);
+  cam.segments = kept.sort((a, b) => a.fromBeat - b.fromBeat);
   return validateRecipe({ ...clone(recipe), camera: cam });
+}
+
+/**
+ * The part of range `s` over beats a–b, when an edit cuts into it, performing the share of
+ * the range's programmed move that falls in those beats (camera-shots.ts reads the fields):
+ * - `amount` (orbit degrees, pushIn/pullOut/rise/truck metres) is relative, so each part gets
+ *   the amount times its share of the range's beats: the parts add up to what is kept;
+ * - `to` (pushIn/pullOut end distance, rise end height) is absolute: the part that ends where
+ *   the range ended keeps it; a part ending earlier gets the value the range passed through
+ *   there, on a straight line from the value it started at (`start`) to `to`;
+ * - `from` (rise start height) is absolute too: a rise with from and to is the height path
+ *   from → to, so each part runs from and to the heights at its own edges (from alone holds
+ *   that height, and stays as it is).
+ * Each part eases over its own beats, so the motion pauses at a cut; the totals are exact.
+ */
+function pieceOf(s: CameraSegment, start: { distance: number; height: number }, a: number, b: number): CameraSegment {
+  const len = s.toBeat - s.fromBeat, u = (x: number) => (x - s.fromBeat) / len;
+  const out: CameraSegment = { ...s, fromBeat: a, toBeat: b };
+  if (s.amount !== undefined) out.amount = r3(s.amount * (b - a) / len);
+  const clampTo = (x: number) => r3(Math.max(s.modes.includes("rise") ? 0.05 : 0.5, Math.min(30, x)));
+  if (s.modes.includes("rise") && s.from !== undefined) {
+    if (s.to !== undefined) { out.from = clampTo(s.from + (s.to - s.from) * u(a)); out.to = clampTo(s.from + (s.to - s.from) * u(b)); }
+  } else if (s.to !== undefined && b < s.toBeat) {
+    const v0 = s.modes.includes("rise") ? start.height : start.distance;
+    out.to = clampTo(v0 + (s.to - v0) * u(b));
+  }
+  return out;
 }
 
 /** Start camera move X on the Nth kick or snare (0-based; or a beat), for `lengthBeats` (default: until the next range or 8 beats). */

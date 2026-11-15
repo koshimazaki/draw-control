@@ -9,6 +9,8 @@ Everything a person does in the studio is a command in `packages/core/src/comman
 
 Both tools run the TypeScript sources directly on Node 24 (no build step). Everything stays on this machine; the only network use is `npm install`.
 
+Working on the Beat Path page itself (its files, its state, the rules a change must keep): start at [beat-path.md](beat-path.md).
+
 ## CLI
 
 ```bash
@@ -20,7 +22,8 @@ npm run cli -- commands                   # or: node cli/bin/motion-studio.mjs c
 | Command | What it does |
 | --- | --- |
 | `analyse <audio> --out analysis.json` | Tempo, first beat, kick, snare and hat onsets with strengths, amplitude peaks, and the loudness envelopes. WAV is read directly; MP3, M4A, FLAC and OGG need ffmpeg. |
-| `new [--character rigged\|mannequin\|block\|stick\|blob\|glider] [--clip 5\|8] [--analysis a.json] --out recipe.json` | A starting recipe (the rigged mannequin dancing), fitted to the track's tempo and length. `glider` starts the Beat Path base instead: a clip of `--clip` seconds from beat 0 with the page's camera rig, ready for a Beat Path script (`examples/scripts/beat-path-*.txt`). |
+| `groove <straight\|drive\|laidback> [--bars 9] --out track.wav` | The drum music of the Beat Path examples (the page's own synth), so `analyse` has a file. |
+| `new [--character rigged\|mannequin\|block\|stick\|blob\|glider] [--clip 8] [--slice 42.5] [--analysis a.json] --out recipe.json` | A starting recipe (the rigged mannequin dancing), fitted to the track's tempo and length. `glider` starts the Beat Path base instead: a clip of `--clip` seconds from beat 0 with the page's camera rig, ready for a Beat Path script (`examples/scripts/beat-path-*.txt`). The page offers whole seconds 3 to 30; the CLI takes up to 60 (default 8). `--slice` starts the clip that many seconds into a longer track, snapped to its nearest beat ([below](#slicing-a-clip-out-of-a-longer-track-round-9)). |
 | `apply <recipe.json> <commands.json> [--analysis a.json] [--out next.json]` | Apply a list of commands in order. All or nothing: a refused command names its index and the reason. |
 | `set <recipe.json> <path> <value> [--out next.json]` | Set any recipe field by path: `beatGrid.bpm 98`, `moves#Dance_Loop-4.speed 2`, `moves[0].phases[0].amplitude 2.5`, `camera.distance 5`, `reactive.amplitude 1`. The value is JSON when it parses, text otherwise; `null` deletes the field. |
 | `describe <recipe.json> [--analysis a.json] [--script]` | The timeline as text: move blocks with start, end, speed, amplitude and lock, rests, hit markers, the camera ranges (with shots, amounts and locks), the camera lanes and paths, the walk path and its lock, the envelope, and the kicks, snares and hats in beats. With `--script` (put it last): the shot script instead. |
@@ -37,7 +40,7 @@ Run `npm run cli -- commands` for the full list with arguments. In short:
 - **Shot script:** `applyScript` (`{ script }`, the same as `motion-studio script`).
 - **Blocks on the move track:** `moveMoveTo`, `resizeMove` (an edge; a longer block plays slower), `setMoveFields` (start, length, speed, amplitude, `lock` off/beat/kick/snare/hat, `strength`), `snapMoveTo` (nearest or Nth kick, snare or hat), `placeOnEvery` (a move or an accent on every Nth kick or snare), `insertMove`, `swapMove`, `removeMove`, `deleteMove`, `setMoveAtBeat`, `setMoveBlend`, `setAmplitude`, `extendPhase`.
 - **Automation lanes** (the amplitude envelope, 0–3 per frame scaling every move, and the camera lanes `distance`, `height`, `yaw`, `fov`): `paintEnvelope`, `drawEnvelope` (one value per frame), `setEnvelopePoints`, `setEnvelopePoint`, `removeEnvelopePoint`, `clearEnvelope`, each with `lane` (default `amplitude`); `envelopeFromAudio` (loudness, kick, snare, hat or peaks) for the amplitude envelope. A camera lane overrides its parameter where it has points (yaw adds an offset); see [recipe.md](recipe.md#camerasegments-shot-amount-lock) for which wins.
-- **Camera:** `setCamera` (distance, height, fov, intensity, orbit speed), `setCameraModes` (static, orbit, pushIn, pullOut, rise, truck, lead, threeQuarter, side, chase, top, fixed, path, on a beat range), `startCameraMove` (on the Nth kick or snare), `setCameraSegment` (a block's modes, `shot`, `cut`, `amount`, `from`, `to`, `lock`, `strength`, `onHit`, `punch`; `null` clears), `moveCameraSegment`, `resizeCameraSegment` (the timeline's drags), `setCameraPath`, `clearCameraPath`.
+- **Camera:** `setCamera` (distance, height, fov, intensity, orbit speed), `setCameraModes` (static, orbit, pushIn, pullOut, rise, truck, lead, threeQuarter, side, chase, top, fixed, path, on a beat range), `startCameraMove` (on the Nth kick or snare), `setCameraSegment` (a block's modes, `shot`, `cut`, `amount`, `from`, `to`, `lock`, `strength`, `onHit`, `punch`; `null` clears), `moveCameraSegment`, `resizeCameraSegment` (the timeline's drags), `setCameraPath`, `clearCameraPath`. The camera holds at most 32 ranges: an edit or a script that would make more is refused with `setCameraModes: the camera holds up to 32 ranges, and this edit would make 33 (use fewer, longer ranges)`, and the recipe is left as it was. Cutting into a programmed range keeps each part's share of the move: `orbit 360` over beats 0–8 with `chase` put on 6–8 leaves `orbit 270` on 0–6.
 - **Walk path:** `setRootPath` (a drawn floor path over a beat range, smoothed, steady speed; `gait` adds a walk or run block at the path's speed, `gait: "glide"` slides with no gait; points may carry a height `y`; `lock`, `strength`), `setTravelLock` (stations on each locked hit), `clearRootPath`.
 - **Music-driven layer:** `addMarker`, `removeMarker`, `moveMarker`, `setMarkerAccent`, `retimePhase`, `setImpact`, `setAnticipation`, `deletePhase`, `restorePhase`, `setStepAmplitude`, `clearSteps`, `deleteStep`, `paintEnergy`, `clearEnergyCurve`.
 - **Anything else:** `set` by path.
@@ -56,7 +59,7 @@ Register it with any MCP client as a stdio server with that command (absolute pa
 | --- | --- |
 | `analyse_audio` | `path`, `out?` (also writes analysis.json) |
 | `load_analysis` | `path` |
-| `new_recipe` | `character?` (`glider`: the Beat Path base), `clip?` (seconds, with `glider`) |
+| `new_recipe` | `character?` (`glider`: the Beat Path base), `clip?` (seconds, with `glider`), `slice?` (seconds into a longer track) |
 | `load_recipe`, `save_recipe` | `path` |
 | `get_recipe`, `describe`, `get_script`, `list_commands`, `undo` | none |
 | `apply_script` | `script` (returns the script as it now reads) |
@@ -64,7 +67,9 @@ Register it with any MCP client as a stdio server with that command (absolute pa
 | `set` | `path`, `value` |
 | `render` | `out`, `audio?`, `view?`, `size?`, `start?`, `length?`, `unit?`, `grid?` |
 
-A refused command comes back as a tool error and leaves the recipe as it was.
+A refused command comes back as a tool error and leaves the recipe as it was (and adds no undo step; undo keeps the last 100 changes).
+
+**Which files the server touches.** `save_recipe`, `analyse_audio`'s `out` and `render`'s `out` write, and `load_recipe` and `load_analysis` read, only under the server's working directory, the motion-studio repo, the OS temp directory, or a folder listed in `MOTION_STUDIO_ROOTS` (separated like `PATH`: `:` on macOS and Linux, `;` on Windows) in the server's environment. Each path is resolved through its real path when the tool is called, so `..` and symlinks cannot leave those folders. The working directory is whatever folder the MCP client starts the server in: start it in the repo, or in a folder whose JSON files you are happy for the agent to read, never in your home folder. Anything else is a tool error naming the path and the folders allowed; a file that is not valid JSON is reported without quoting it. Audio (`analyse_audio`'s `path`, `render`'s `audio`) may be any existing file on the machine, never a URL or an ffmpeg protocol string (`https://…`, `concat:…`), and ffmpeg runs with `-protocol_whitelist file`. The CLI run by a person is not confined. `render` also checks `start`, `length`, `size` and `view` before it starts a browser, and fails at once with the page's message if the export is refused.
 
 ## Worked example
 
@@ -173,7 +178,7 @@ beats 10.5-13  | action: continue           | camera: rise 6m to 1m  | shot: wid
 beats 13-17    | action: continue           | camera: dolly in 2m    | shot: wide
 ```
 
-Then, with the CLI: `motion-studio analyse track.wav --out a.json`, `motion-studio new --character glider --clip 8 --analysis a.json --out base.json`, `motion-studio script base.json examples/scripts/voice-freeze-orbit.txt --analysis a.json --out shot.json`, `motion-studio render shot.json --audio track.wav --out bundle`. Over MCP: `analyse_audio` (or `load_analysis`), `new_recipe { character: "glider", clip: 8 }`, `apply_script`, `render`. Both give the same recipe (`mcp/test/voice-freeze.test.ts`, which also checks the figure hangs in the air through the freeze, lands after it, and the camera circles meanwhile). `rise 6m to 1m` cranes down: rise takes descending heights. Commands for agents added with Beat Path: `setSceneryBoxes`, `addSceneryBox`, `removeSceneryBox` and `setScenerySight` (build a street box by box: `box: 6 4 5 8 12` lines, or `scenery: street sight passes` for columns between camera and subject), `setLandmarks`, `setScenery` ("put it in a big city": `{ "type": "setScenery", "preset": "city" }` or the script line `scenery: city`), `muteHit`, `resetMutedHits`, `setFigure` (`shape`: glider, car, flyer, runner), `setShot`; the camera grammar (`over shoulder`, `above`, `slow|even|fast`, `then`, `at 2s`) and the settings lines are in [recipe.md](recipe.md#shot-script).
+Then, with the CLI: `motion-studio analyse track.wav --out a.json`, `motion-studio new --character glider --clip 8 --analysis a.json --out base.json`, `motion-studio script base.json examples/scripts/voice-freeze-orbit.txt --analysis a.json --out shot.json`, `motion-studio render shot.json --audio track.wav --out bundle`. Over MCP: `analyse_audio` (or `load_analysis`), `new_recipe { character: "glider", clip: 8 }`, `apply_script`, `render`. Both give the same recipe (`mcp/test/voice-freeze.test.ts`, which also checks the figure hangs in the air through the freeze, lands after it, and the camera circles meanwhile). `rise 6m to 1m` cranes down: rise takes descending heights. Commands for agents added with Beat Path: `setSceneryBoxes`, `addSceneryBox`, `removeSceneryBox` and `setScenerySight` (build a street box by box: `box: 6 4 5 8 12` lines, or `scenery: street sight passes` for columns between camera and subject), `setLandmarks`, `setScenery` ("put it in a big city": `{ "type": "setScenery", "preset": "city" }` or the script line `scenery: city`), `muteHit`, `resetMutedHits`, `setFigure` (`shape`: glider, car, flyer, runner), `setShot` (each field is one line: a line break becomes a space, so a field cannot add a script row); the camera grammar (`over shoulder`, `above`, `slow|even|fast`, `then`, `at 2s`) and the settings lines are in [recipe.md](recipe.md#shot-script).
 
 
 ## Worked example: a parallel-street shot (Beat Path Examples 1 and 2, round 8)

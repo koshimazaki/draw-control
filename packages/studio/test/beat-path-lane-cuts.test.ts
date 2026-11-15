@@ -2,6 +2,8 @@
 import { describe, expect, it } from "vitest";
 import { blockAt, everyBeats, movesOnHits, parseMoves, splitBlockAt } from "../src/beat-path/lane-cuts";
 import type { Block, CameraWord } from "../src/beat-path/script";
+import { beatPathRecipe } from "../src/beat-path/recipe-map";
+import { exampleState } from "../src/beat-path/examples";
 
 const lane: Block<CameraWord>[] = [{ from: 0, to: 8, word: "orbit" }, { from: 8, to: 17, word: "path" }];
 describe("Lane cuts", () => {
@@ -17,6 +19,13 @@ describe("Lane cuts", () => {
   it("Moves on hits cuts the whole lane at each hit and cycles the moves", () => {
     const out = movesOnHits(16, [2, 2.5, 4, 6, 8, 10.25, 12, 14], ["orbit", "top", "push"]);
     expect(out.map(b => [b.from, b.to, b.word])).toEqual([[0, 2, "orbit"], [2, 4, "top"], [4, 6, "push"], [6, 8, "orbit"], [8, 10.25, "top"], [10.25, 12, "push"], [12, 14, "orbit"], [14, 16, "top"]]);
+  });
+  it("more camera blocks than the rig holds is refused with the limit, not cut short (the page says it)", () => {
+    const base = exampleState(0), total = 60;
+    const hits = Array.from({ length: 39 }, (_, k) => 1.5 * (k + 1));
+    const state = { ...base, clip: 30, cameraLane: movesOnHits(total, hits, ["orbit", "top"]), camLock: { ...base.camLock, advance: false } };
+    expect(state.cameraLane.length).toBeGreaterThan(32);
+    expect(() => beatPathRecipe(state, null)).toThrow(/up to 32 ranges/);
   });
   it("reads plain move names, and says which word is not one", () => {
     expect(parseMoves("Orbit, top → push in then my path")).toEqual({ words: ["orbit", "top", "push", "path"] });

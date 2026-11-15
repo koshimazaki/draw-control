@@ -80,3 +80,29 @@ export function simplifyPen(points: PathPt[], max = 8): PathPt[] {
     if (out.length <= max) return out;
   }
 }
+
+/** How far one Smooth press moves a point towards the midpoint of its two neighbours. */
+export const SMOOTH_STEP = 0.5;
+const r3 = (x: number) => Math.round(x * 1000) / 1000;
+/**
+ * One Smooth press: each interior point in `group` (every interior point when the group is empty)
+ * moves part of the way towards the midpoint of its two neighbours on the path, read before the
+ * press. The first and last points never move; a picked point at the edge of a selection uses its
+ * real neighbours. Heights smooth the same way where the points have them (a neighbour without one
+ * counts as `baseY`; a result at or below 0 drops the height, as a drag does). Same point count.
+ */
+export function smoothPoints(pts: readonly PathPt[], group: readonly number[] = [], step = SMOOTH_STEP, baseY = 0): PathPt[] {
+  const on = group.length ? new Set(group) : null, y = (p: PathPt) => p.y ?? baseY;
+  return pts.map((p, i) => {
+    if (i === 0 || i === pts.length - 1 || (on && !on.has(i))) return { ...p };
+    const a = pts[i - 1], b = pts[i + 1], q: PathPt = { x: r3(p.x + step * ((a.x + b.x) / 2 - p.x)), z: r3(p.z + step * ((a.z + b.z) / 2 - p.z)) };
+    if (p.y !== undefined || a.y !== undefined || b.y !== undefined) {
+      const h = r3(y(p) + step * ((y(a) + y(b)) / 2 - y(p)));
+      if (h > 0 && (p.y !== undefined || Math.abs(h - baseY) > 1e-9)) q.y = h;
+    }
+    return q;
+  });
+}
+/** Would Smooth move anything (a path of three points or more, with an interior point to move)? */
+export const canSmooth = (pts: readonly PathPt[], group: readonly number[] = []) =>
+  pts.length >= 3 && (!group.length || group.some(i => i > 0 && i < pts.length - 1));

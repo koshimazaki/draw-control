@@ -43,7 +43,8 @@ export function startApp(root: HTMLElement) {
   let rigged: RiggedCharacter | null = null;
   let bonesFor: Character | undefined;
   let riggedLoading: Promise<RiggedCharacter> | null = null;
-  const ensureRigged = () => (riggedLoading ??= loadRiggedCharacter().then(c => { rigged = c; return c; }));
+  // A failed load is forgotten, so picking the rigged mannequin again retries it.
+  const ensureRigged = () => (riggedLoading ??= loadRiggedCharacter().then(c => { rigged = c; return c; }, e => { riggedLoading = null; throw e; }));
   const keep = (c: Character | undefined) => c === fileCharacter || c === rigged;
   let frame = 0;
   let selectedId: string | null = null;
@@ -183,8 +184,17 @@ export function startApp(root: HTMLElement) {
   function setCharacter(kind: Recipe["character"]["kind"]) {
     let c: Character | null;
     if (kind === "rigged" && !rigged) {
-      say("characterStatus", "Loading the rigged mannequin…");
-      void ensureRigged().then(() => { say("characterStatus", ""); setCharacter("rigged"); });
+      const loading = "Loading the rigged mannequin…", select = $<HTMLSelectElement>("character");
+      say("characterStatus", loading);
+      const settle = (text: string) => { if ($("characterStatus").textContent === loading) say("characterStatus", text); };
+      void ensureRigged().then(() => {
+        settle("");
+        // Another figure picked while it loaded wins: the mannequin stays loaded for later.
+        if (select.value === "rigged") setCharacter("rigged");
+      }, e => {
+        if (select.value === "rigged") select.value = recipe.character.kind;
+        settle(`Could not load the rigged mannequin: ${(e as Error).message}`);
+      });
       return;
     }
     if (kind === "rigged") c = rigged;

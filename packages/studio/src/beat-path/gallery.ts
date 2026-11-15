@@ -69,8 +69,10 @@ async function renderGuide(i: number): Promise<Media> {
   const { s, recipe, drive, samples } = exampleRecipe(i);
   const host = el("div"); host.style.cssText = "position:fixed;left:-10000px;top:0;width:320px;height:180px";
   document.body.appendChild(host);
+  let v: Viewport | null = null;
   try {
-    const v = new Viewport(host), glider = createGlider();
+    v = new Viewport(host);
+    const glider = createGlider();
     glider.setShape(s.figure.shape); glider.setColours(parseInt(s.figure.body.slice(1), 16), parseInt(s.figure.head.slice(1), 16));
     v.setCharacter(glider); v.setShowPaths(false); v.setGrid(true); v.setGridLook(GRID_LOOKS.dark); v.setBackgroundColour(GRID_LOOKS.dark.horizon); v.setExportGrid(true);
     const frames = Math.ceil((secondsAtBeat(recipe.beatGrid, recipe.durationBeats) + 0.3) * 24), plan = planCamera(recipe, drive, frames);
@@ -78,9 +80,8 @@ async function renderGuide(i: number): Promise<Media> {
     const audio = new AudioBuffer({ length: samples.length, numberOfChannels: 1, sampleRate: 44100 });
     audio.copyToChannel(samples as Float32Array<ArrayBuffer>, 0);
     const result = await exportBundle({ recipe, range: exportRange(recipe, s.clip), viewport: v, width: 640, height: 360, audio, drive });
-    v.dispose();
     return { guide: URL.createObjectURL(new Blob([result.contents["guide.mp4"] as BlobPart], { type: "video/mp4" })), audio: URL.createObjectURL(new Blob([result.contents["audio.wav"] as BlobPart], { type: "audio/wav" })) };
-  } catch { return null; } finally { host.remove(); }
+  } catch { return null; } finally { v?.dispose(); host.remove(); }
 }
 
 /** One row's player: the music is the clock, every video in the row follows it. */
@@ -104,7 +105,7 @@ function rowPlayer(row: HTMLElement, audioUrl: string | null) {
 }
 
 const tile = (label: string, content: HTMLElement | string) => { const t = el("figure", "row-tile"); const cap = el("figcaption", "", label); const body = typeof content === "string" ? el("div", "row-empty muted", content) : content; t.append(body, cap); return t; };
-const video = (src: string) => { const v = el("video"); v.muted = true; v.playsInline = true; v.loop = true; playLocal(v, src); return v; };
+const video = (src: string) => { const v = el("video"); v.muted = true; v.playsInline = true; v.loop = true; void playLocal(v, src); return v; };
 
 export function bindGallery(opts: {
   root: HTMLElement; load(slot: string): void; refs(slot: string): { character?: Ref; environment?: Ref } | undefined; runs(): Run[];
@@ -135,6 +136,8 @@ export function bindGallery(opts: {
   const media = new Map<number, Media>();
   const jobs = new Map<number, Promise<Media>>();
   let queue: Promise<unknown> = Promise.resolve();
+  /** The rows waiting to come into view: a render replaces them, and their observers go with them. */
+  const watching = new Set<IntersectionObserver>();
   /** One render per example, ever: a row drawn again while its guide renders waits for the same job. */
   const job = (i: number) => {
     let j = jobs.get(i);
@@ -169,13 +172,13 @@ export function bindGallery(opts: {
       // Render the guide when the row first comes into view, one row at a time.
       const io = new IntersectionObserver(entries => {
         if (!entries.some(e => e.isIntersecting)) return;
-        io.disconnect();
+        io.disconnect(); watching.delete(io);
         void job(i).then(m => {
           guide.firstElementChild!.replaceWith(m ? guideBox(m.guide) : el("div", "row-empty muted", "The guide renders in Chrome or Edge (WebCodecs)."));
           if (m) player.setAudio(m.audio);
         });
       });
-      io.observe(row);
+      io.observe(row); watching.add(io);
     }
     return row;
   }
@@ -201,6 +204,8 @@ export function bindGallery(opts: {
   }
 
   function render() {
+    for (const io of watching) io.disconnect();
+    watching.clear();
     const rows = EXAMPLES.map((_, i) => exampleRow(i)), own = runsRow();
     opts.root.replaceChildren(...rows, ...(own ? [own] : []));
   }

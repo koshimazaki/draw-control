@@ -19,6 +19,7 @@ import { bindFader, setFader } from "./ui/fader";
 import { dragHasImage } from "./page-refs";
 import { isTyping } from "./drag";
 import { bindFollowFields, followProbe, parallelStreet } from "./page-follow";
+import { canSmooth, smoothPoints, SMOOTH_STEP } from "./map-select";
 
 /** What each block's shape on the map is, said in its popover. */
 const CAMERA_NOTES: Record<CameraWord, string> = {
@@ -55,6 +56,17 @@ export function bindActions(p: Page) {
   const input = (id: string) => $<HTMLInputElement>(id);
 
   const followFields = bindFollowFields(p);
+  /** The map's own hints (map.ts `hint`) on the line under the map, not the page's status line. */
+  let note: { text: string; key: string } | null = null, noteTimer = 0;
+  const noteKey = () => `${p.tool}|${p.view}|${p.pen}`;
+  function mapNote(text: string) {
+    note = text ? { text, key: noteKey() } : null;
+    clearTimeout(noteTimer);
+    if (note) noteTimer = window.setTimeout(() => { note = null; sync(); }, 8000);
+    sync();
+    // Where the map's footer hides its hint line (a narrow map, the follow fields), the status line says it.
+    if (text && !$("mapHint").offsetWidth) p.say(text);
+  }
   function sync() {
     const s = p.state;
     const pick = (name: string, value: string | number) => document.querySelectorAll<HTMLButtonElement>(`[data-control="${name}"] button`).forEach(b => {
@@ -92,12 +104,18 @@ export function bindActions(p: Page) {
     const rigs = p.tool === "camera" && pts.length < 2 && !s.cameraLane.some(b => b.word === "path");
     empty.hidden = pts.length >= 2 || p.tool === "blocks" || rigs;
     empty.textContent = p.view === "side" ? `Draw the ${p.tool} path in the top view first.` : `No ${p.tool} path yet: press Draw new, then drag on the map or click to place points.`;
-    $("mapHint").textContent = rigs ? "The camera follows the Camera lane · drag a follow line to adjust it · Draw new replaces it with your path"
+    const hint = rigs ? "The camera follows the Camera lane · drag a follow line to adjust it · Draw new replaces it with your path"
       : p.tool === "blocks" ? (p.pen === "draw" ? "Drag a rectangle to add a block · Esc stops" : "Click to select · drag to move · corners resize · ⌘D duplicates · Delete removes")
       : p.view !== "top" ? `Drag a point up or down to set the ${p.tool}’s height`
       : p.pen === "draw" ? (p.tool === "camera" ? "Drawing replaces the block's camera with your path · Esc stops" : "Drag a stroke or click points · Esc stops")
       : "Drag points to move · Delete removes · Draw new starts a path";
+    // A hint from the map (what a click did) stays until the tool, view or pen changes, or it times out.
+    if (note && note.key !== noteKey()) note = null;
+    $("mapHint").textContent = note?.text ?? hint;
     $("mapHint").title = $("mapHint").textContent ?? "";   // the full hint when two lines cut it
+    // Smooth: on a path tool, once the path has three points.
+    $("smoothPath").hidden = p.tool === "blocks";
+    $<HTMLButtonElement>("smoothPath").disabled = pts.length < 3;
     $("map").classList.toggle("pen", p.pen === "draw");
   }
 
@@ -149,8 +167,7 @@ export function bindActions(p: Page) {
   const greyish = (hex: string) => { const v = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16)); return Math.max(...v) - Math.min(...v) < 48 && Math.max(...v) > 90 && Math.max(...v) < 230; };
   const figure = (final: boolean) => {
     const body = input("figureBody").value, head = input("figureHead").value;
-    p.update({ ...p.state, figure: { ...p.state.figure, body, head } }, final);
-    if (final) p.say(greyish(body) || greyish(head) ? "That colour is close to the grey landmarks: the figure may not stand out" : `Figure: body ${body}, head ${head}`);
+    if (p.update({ ...p.state, figure: { ...p.state.figure, body, head } }, final) && final) p.say(greyish(body) || greyish(head) ? "That colour is close to the grey landmarks: the figure may not stand out" : `Figure: body ${body}, head ${head}`);
   };
   for (const id of ["figureBody", "figureHead"]) { input(id).oninput = () => figure(false); input(id).onchange = () => figure(true); }
   // A preset fills the scene again with its own (editable) boxes.
@@ -159,8 +176,15 @@ export function bindActions(p: Page) {
   input("sightPasses").onchange = () => p.update({ ...p.state, sight: input("sightPasses").checked ? "passes" : "clear" });
   input("gridExport").onchange = () => { p.viewport.setExportGrid(input("gridExport").checked); p.viewport.setGrid(input("gridExport").checked); p.rebuild(); };
   $("wholeClip").onclick = () => {
-    p.update({ ...p.state, cameraLane: [{ from: 0, to: p.totalBeats(), word: "path" }] });
-    p.say("Your camera path flies the whole clip (one Camera block)");
+    if (p.update({ ...p.state, cameraLane: [{ from: 0, to: p.totalBeats(), word: "path" }] })) p.say("Your camera path flies the whole clip (one Camera block)");
+  };
+  // Smooth: each press moves the picked points (two or more), else every point, part of the way towards
+  // the midpoint of their neighbours; the ends stay. One undo step per press.
+  $("smoothPath").onclick = () => {
+    if (p.tool === "blocks") return;
+    const key = p.tool, pts = p.state[key], group = p.map.picked().length > 1 ? p.map.picked() : [];
+    if (!canSmooth(pts, group)) { p.say(pts.length < 3 ? "Smooth needs a path of three points or more" : "Pick points between the ends to smooth them"); return; }
+    if (p.update({ ...p.state, [key]: smoothPoints(pts, group, SMOOTH_STEP, key === "camera" ? 2 : 0) })) p.say(`Smoothed ${group.length ? `the ${group.length} picked points` : `the ${key} path`} · press again for more · Cmd/Ctrl-Z undoes`);
   };
   $("clearPath").onclick = () => {
     const s = p.state;
@@ -169,11 +193,31 @@ export function bindActions(p: Page) {
     else p.update({ ...s, camera: [], cameraLane: s.cameraLane.map(b => (b.word === "path" ? { ...b, word: "behind" as const } : b)) });
   };
 
+  /**
+   * Why a state would not build a recipe (null when it does), so a lane edit the engine refuses
+   * (more camera blocks than the rig holds, after cutting on every hit) is said, not stored half-applied.
+   */
+  function refusal(state: BeatPathState): string | null {
+    try { beatPathRecipe(state, p.info, p.track && p.drive ? { drive: p.drive, bands: p.drive.bands } : {}); return null; }
+    catch (e) {
+      return (e as Error).message.replace(/^Recipe: /, "").replace(/^script line \d+: /, "")
+        .replace(/^setCameraModes: the camera holds up to (\d+) ranges, and this edit would make (\d+).*$/, "the Camera lane takes up to $1 blocks and this would make $2: cut on fewer hits (lower Sensitivity) or longer blocks");
+    }
+  }
+  /** Apply a lane edit, or say why it cannot be. */
+  function updateOrSay(state: BeatPathState): boolean {
+    const why = refusal(state);
+    if (why) { p.say(`Not applied: ${why}`); return false; }
+    return p.update(state);
+  }
+  /** What a menu's field shows when the page refused its edit (the status line says why too). */
+  const BUSY = "Not applied: the guide is rendering";
+
   // Lane block menus: the lane's words, then split and remove.
   function openBlock<W extends string>(key: "character" | "cameraLane", view: LaneView<W>, anchor: HTMLElement, i: number, beat: number,
     labels: Record<W, string>, words: readonly W[], single?: W) {
     const blocks = p.state[key] as unknown as Block<W>[], b = blocks[i];
-    const set = (next: Block<W>[] | null, extra: Partial<BeatPathState> = {}) => { if (next) p.update({ ...p.state, [key]: next, ...extra }); };
+    const set = (next: Block<W>[] | null, extra: Partial<BeatPathState> = {}) => !!next && updateOrSay({ ...p.state, [key]: next, ...extra });
     const items: MenuItem[] = words.map(w => ({
       label: labels[w], on: w === b.word,
       run: () => {
@@ -186,8 +230,8 @@ export function bindActions(p: Page) {
       label: "Parallel street (Follow side beyond the blocks, Pass in front on)",
       run: () => {
         const ps = parallelStreet(p.state.subject, p.blocks.host.boxes()), { side, ...follow } = ps;
-        set((blocks as unknown as Block<CameraWord>[]).map((x, k) => (k === i ? { from: x.from, to: x.to, word: "side" as const, follow } : x)) as unknown as Block<W>[], { sight: "passes" });
-        p.say(`Parallel street: Follow side, ${side}, ${follow.distance} m out, Pass in front on · drag the line or type the numbers to adjust`);
+        if (set((blocks as unknown as Block<CameraWord>[]).map((x, k) => (k === i ? { from: x.from, to: x.to, word: "side" as const, follow } : x)) as unknown as Block<W>[], { sight: "passes" }))
+          p.say(`Parallel street: Follow side, ${side}, ${follow.distance} m out, Pass in front on · drag the line or type the numbers to adjust`);
       },
     });
     // Cuts on the beat: at the playhead (snapped like an edge), at every hit of the lane's lock (after Sensitivity), every 1, 2 or 4 beats.
@@ -210,10 +254,9 @@ export function bindActions(p: Page) {
         const next = (blocks as unknown as Block<CameraWord>[]).map((x, k) => (k !== i ? x : phrase ? { ...x, word: wordOf(phrase, x.word), phrase } : { from: x.from, to: x.to, word: x.word }));
         const state = { ...p.state, cameraLane: next };
         if (/\bpath\b/.test(phrase) && state.camera.length < 2) state.camera = DEFAULT_CAMERA_PATH.map(q => ({ ...q }));
-        try { beatPathRecipe(state, p.info, p.track && p.drive ? { drive: p.drive, bands: p.drive.bands } : {}); }
-        catch (e) { return (e as Error).message.replace(/^script line \d+: /, ""); }
-        p.update(state);
-        return null;
+        const why = refusal(state);
+        if (why) return why;
+        return p.update(state) ? null : BUSY;
       },
     };
     p.menu.show((view.root.children[i] as HTMLElement) ?? anchor, `${key === "character" ? "Character" : "Camera"} · beats ${b.from}–${b.to}`, items, () => view.render(), field,
@@ -235,10 +278,13 @@ export function bindActions(p: Page) {
         if ("error" in parsed) return parsed.error;
         const hits = laneHits(lock, 0, total);
         if (!hits.length) return `No ${lock} hits in the clip: add a track, or raise Sensitivity`;
-        lastMoves = text;
         const lane = movesOnHits(total, hits, parsed.words), extra: Partial<BeatPathState> = {};
         if (parsed.words.includes("path") && p.state.camera.length < 2) extra.camera = DEFAULT_CAMERA_PATH.map(q => ({ ...q }));
-        p.update({ ...p.state, ...extra, cameraLane: lane, camLock: { ...cl, lock, advance: false } });
+        const state: BeatPathState = { ...p.state, ...extra, cameraLane: lane, camLock: { ...cl, lock, advance: false } };
+        const why = refusal(state);
+        if (why) return why;
+        if (!p.update(state)) return BUSY;
+        lastMoves = text;
         p.say(`Camera lane cut on every ${lock}: ${lane.length} blocks, ${parsed.words.length} moves cycling · each block's menu still edits it`);
         return null;
       },
@@ -252,14 +298,14 @@ export function bindActions(p: Page) {
   function setZoom(z: number) {
     zoom = Math.max(ZOOMS[0], Math.min(ZOOMS[ZOOMS.length - 1], z));
     timeline.style.setProperty("--zoom", String(zoom));
-    $<HTMLButtonElement>("zoomOut").disabled = zoom === ZOOMS[0]; $<HTMLButtonElement>("zoomIn").disabled = zoom === ZOOMS[ZOOMS.length - 1];
+    $<HTMLButtonElement>("tlZoomOut").disabled = zoom === ZOOMS[0]; $<HTMLButtonElement>("tlZoomIn").disabled = zoom === ZOOMS[ZOOMS.length - 1];
     requestAnimationFrame(() => { scroller.scrollLeft = headFraction() * scroller.scrollWidth - scroller.clientWidth / 2; });
     p.say(zoom === 1 ? "Timeline: the whole clip" : `Timeline ${zoom}× · scroll sideways to move along it`);
   }
   const step = (dir: 1 | -1) => setZoom(ZOOMS[Math.max(0, Math.min(ZOOMS.length - 1, ZOOMS.indexOf(zoom) + dir))]);
-  $("zoomIn").onclick = () => step(1); $("zoomOut").onclick = () => step(-1);
+  $("tlZoomIn").onclick = () => step(1); $("tlZoomOut").onclick = () => step(-1);
   scroller.addEventListener("wheel", e => { if (e.ctrlKey || e.metaKey) { e.preventDefault(); step(e.deltaY < 0 ? 1 : -1); } }, { passive: false });
-  $<HTMLButtonElement>("zoomOut").disabled = true;
+  $<HTMLButtonElement>("tlZoomOut").disabled = true;
   const followHead = () => {
     if (zoom > 1 && p.player.playing) {
       const x = headFraction() * scroller.scrollWidth, v0 = scroller.scrollLeft, v1 = v0 + scroller.clientWidth;
@@ -353,7 +399,7 @@ export function bindActions(p: Page) {
     if (picked.length > 1 && !inField && (e.key === "Delete" || e.key === "Backspace")) {
       e.preventDefault();
       const key = p.tool === "subject" ? "subject" : "camera", gone = new Set(picked);
-      p.update({ ...p.state, [key]: p.state[key].filter((_, k) => !gone.has(k)) });
+      if (!p.update({ ...p.state, [key]: p.state[key].filter((_, k) => !gone.has(k)) })) return;
       p.map.clearGroup(); p.setSelection(null);
       p.say(`${picked.length} points removed`);
       return;
@@ -362,13 +408,15 @@ export function bindActions(p: Page) {
     if ((e.key === "Delete" || e.key === "Backspace") && p.selection && !target.closest("input")) {
       e.preventDefault();
       const sel = p.selection, s = p.state;
+      let applied = true;
       if (sel.kind === "point") {
         const key = sel.tool === "subject" ? "subject" : "camera";
-        p.update({ ...s, [key]: s[key].filter((_, k) => k !== sel.index) });
+        applied = p.update({ ...s, [key]: s[key].filter((_, k) => k !== sel.index) });
       } else {
         const next = removeAt(s[sel.lane] as Block<string>[], sel.index);
-        if (next) p.update({ ...s, [sel.lane]: next });
+        if (next) applied = p.update({ ...s, [sel.lane]: next });
       }
+      if (!applied) return;   // refused (a guide is rendering): the selection stays on what is still there
       p.menu.hide();
       p.setSelection(null);
       return;
@@ -379,7 +427,7 @@ export function bindActions(p: Page) {
       const cut = p.snapLane(beat), next = i >= 0 ? splitBlockAt(blocks, i, [cut]) : null;
       e.preventDefault();
       if (!next) { p.say("No split here: each part needs at least a beat (zoom in and move the playhead)"); return; }
-      p.update({ ...p.state, [key]: next });
+      if (!updateOrSay({ ...p.state, [key]: next })) return;
       p.say(`${key === "cameraLane" ? "Camera" : "Character"} lane split at beat ${+cut.toFixed(2)} · click the new block to pick its move`);
       return;
     }
@@ -403,7 +451,9 @@ export function bindActions(p: Page) {
       boxes: () => p.blocks.host.boxes(), boxSelected: () => p.blocks.selected, slot: () => p.slot, trackName: () => p.info?.name ?? null, trackLength: () => p.info?.lengthSeconds ?? null,
       followSegs: () => p.followSegs.map(s => ({ block: s.block, word: s.word, points: s.points, anchors: s.anchors })),
       followProbe: (k: number) => followProbe(p.recipe, p.drive, p.state.cameraLane[k]),
+      timelineZoom: () => zoom, busy: () => p.busy,
+      kicks: () => (p.drive?.bands?.low ?? []).map(o => o.seconds),
     };
   }
-  return { sync, openBlock };
+  return { sync, openBlock, mapNote };
 }

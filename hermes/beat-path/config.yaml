@@ -1,0 +1,100 @@
+# Beat Path on Runware. `npm run hermes:setup` installs this profile and fills in the quoted
+# Node and checkout placeholders below with this machine's paths.
+# The key is read from RUNWARE_API_KEY in the environment, never stored here. `npm run hermes`
+# fills that variable from the macOS Keychain item runware-api-key when it is unset. Hermes, both
+# MCP servers and every terminal command the agent runs inherit it.
+# No spend limit covers the chat model itself (providers.runware below): its tokens are billed by
+# Runware with no cap in this file. The only spend guard is on the runware MCP server, further down.
+model:
+  default: openai:gpt@6.1-sol
+  provider: custom:runware
+providers:
+  runware:
+    name: Runware
+    api: https://api.runware.ai/v1
+    key_env: RUNWARE_API_KEY
+    transport: chat_completions
+    default_model: openai:gpt@6.1-sol
+    # Every live Runware text model with tool calling (catalog index, 14 Nov 2026), then the newer
+    # "compatible-only" ones documented on their model pages (GPT-6 Sol/Astra/Terra/Luna, GLM-5.2/5.3,
+    # Kimi, DeepSeek V4); every ID checked against its public page on 15 Nov 2026.
+    # Switch with /model custom:runware:<AIR>; prices are in skills/runware-hermes.
+    models:
+      openai:gpt@6.1-sol: {}
+      openai:gpt@6-astra: {}
+      openai:gpt@6-sol: {}
+      openai:gpt@6.1-terra: {}
+      openai:gpt@6-luna: {}
+      zai:glm@5.3: {}
+      zai:glm@5.3-flash: {}
+      zai:glm@5.2: {}
+      moonshotai:kimi@k3.1-pro: {}
+      moonshotai:kimi@k3: {}
+      deepseek:v4@pro: {}
+      deepseek:v4.1@flash: {}
+      openai:gpt@5.4-mini: {}
+      openai:gpt@5.4: {}
+      openai:gpt@5.5: {}
+      openai:gpt@5.4-pro: {}
+      anthropic:claude@haiku-4.5: {}
+      anthropic:claude@sonnet-4.6: {}
+      anthropic:claude@opus-4.7: {}
+      anthropic:claude@opus-4.8: {}
+      anthropic:claude@fable-5: {}
+      google:gemini@3.1-flash-lite: {}
+      google:gemini@3-flash: {}
+      google:gemini@3.5-flash: {}
+      google:gemini@3.1-pro: {}
+      zai:glm@5.1: {}
+      xai:grok@4.3: {}
+      minimax:m3@0: {}
+# Short names: `/model astra` in a chat, `/model astra --once` for one turn,
+# `hermes -p beat-path -m astra` at launch. `npm run review -- --model astra` takes the same names.
+model_aliases:
+  sol: { model: "openai:gpt@6.1-sol", provider: custom, base_url: "https://api.runware.ai/v1", key_env: RUNWARE_API_KEY }
+  astra: { model: "openai:gpt@6-astra", provider: custom, base_url: "https://api.runware.ai/v1", key_env: RUNWARE_API_KEY }
+  terra: { model: "openai:gpt@6.1-terra", provider: custom, base_url: "https://api.runware.ai/v1", key_env: RUNWARE_API_KEY }
+  luna: { model: "openai:gpt@6-luna", provider: custom, base_url: "https://api.runware.ai/v1", key_env: RUNWARE_API_KEY }
+  glm: { model: "zai:glm@5.3", provider: custom, base_url: "https://api.runware.ai/v1", key_env: RUNWARE_API_KEY }
+  kimi: { model: "moonshotai:kimi@k3.1-pro", provider: custom, base_url: "https://api.runware.ai/v1", key_env: RUNWARE_API_KEY }
+  deepseek: { model: "deepseek:v4@pro", provider: custom, base_url: "https://api.runware.ai/v1", key_env: RUNWARE_API_KEY }
+  opus: { model: "anthropic:claude@opus-4.8", provider: custom, base_url: "https://api.runware.ai/v1", key_env: RUNWARE_API_KEY }
+  gemini: { model: "google:gemini@3.1-pro", provider: custom, base_url: "https://api.runware.ai/v1", key_env: RUNWARE_API_KEY }
+  grok: { model: "xai:grok@4.3", provider: custom, base_url: "https://api.runware.ai/v1", key_env: RUNWARE_API_KEY }
+  mini: { model: "openai:gpt@5.4-mini", provider: custom, base_url: "https://api.runware.ai/v1", key_env: RUNWARE_API_KEY }
+mcp_servers:
+  # Beat Path itself: shot scripts, describe, render (all local and free).
+  motion-studio:
+    command: "__NODE__"
+    args:
+      - "__REPO__/mcp/bin/motion-studio-mcp.mjs"
+  # Runware's own MCP server: images, video, audio.
+  runware:
+    command: npx
+    args: ["-y", "@runware/mcp@1.3.7"]
+    env:
+      RUNWARE_API_KEY: ${RUNWARE_API_KEY}
+    # trust: untrusted makes every call to a tool not annotated read-only ask for approval, until
+    # the owner answers "for this session" or "always" for that tool; from then on it runs unasked.
+    trust: untrusted
+    cost_unit: USD
+    # What Hermes does with these (tools/mcp_tool_costs.py): it books the top of the declared range,
+    # 5 USD, for every `run` it dispatches, in memory for this chat only, and never sees Runware's
+    # real bill. A call that would take the chat's booked total past spend_limit asks for an explicit
+    # yes for that one call, even after an "always" grant; it does not block. Here that is the third
+    # `run` of a chat (5 + 5 = 10 is still within the limit). The tally starts again at 0 in a new
+    # chat or a restarted Hermes. It covers this server only, never the chat model's own tokens.
+    tool_costs:
+      run: { credits: [0.005, 5], note: "per task, see model_pricing" }
+    spend_limit: 10
+platform_toolsets:
+  cli:
+    - file
+    - terminal
+    - skills
+    - memory
+    - todo
+    - motion-studio
+    - runware
+terminal:
+  cwd: "__REPO__"

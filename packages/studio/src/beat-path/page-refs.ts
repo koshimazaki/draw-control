@@ -48,8 +48,20 @@ export const readableVideo = (src: string) => src.startsWith("blob:") || new URL
 export function bindRefs(p: Page, store: RefStore, changed: () => void) {
   const { $ } = p;
   let extra: () => { label: string; take(got: { blob: Blob | string; source: RefSource }): void } | null = () => null;
-  const getters = new Map<string, RefGetter>(), controls = new Map<HTMLElement, HTMLButtonElement>();
-  let nextId = 0;
+  const getters = new Map<string, RefGetter>(), controls = new Map<HTMLElement, HTMLButtonElement>(), hosts = new Map<string, HTMLElement>();
+  let nextId = 0, sweeping = false;
+  /**
+   * A gallery render replaces its rows (and their boxes) in one go: once it is done, the boxes no
+   * longer in the page are forgotten, so their getters do not keep the old rows and videos alive.
+   */
+  const forgetGone = () => {
+    if (sweeping) return;
+    sweeping = true;
+    setTimeout(() => {
+      sweeping = false;
+      for (const [id, h] of hosts) if (!h.isConnected) { hosts.delete(id); getters.delete(id); controls.delete(h); }
+    }, 0);
+  };
 
   async function use(kind: RefKind, get: RefGetter) {
     const got = await get();
@@ -61,7 +73,8 @@ export function bindRefs(p: Page, store: RefStore, changed: () => void) {
   /** Give an element (an image's box) the "Use as reference" control and make it draggable onto a drop. */
   function attach(host: HTMLElement, get: RefGetter, what = "this image") {
     const id = `r${nextId++}`;
-    getters.set(id, get);
+    getters.set(id, get); hosts.set(id, host);
+    forgetGone();
     host.classList.add("ref-host");
     const b = document.createElement("button");
     b.type = "button"; b.className = "ref-use tip-end";

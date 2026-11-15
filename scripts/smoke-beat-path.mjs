@@ -6,7 +6,8 @@
  * 2. a subject path is drawn with the mouse on the map, lock set to kick, a lane block swapped by its menu;
  * 3. the example switcher (shapes, music, kept edits), scenery, Generate (faked in dev) with the output beside the preview;
  * 4. the guide is exported at 1280×720 (193 frames) and the bundle checked against the pinned schema;
- * 5. screenshots of both themes at 1280×720 and 1440×900 in out/.
+ * 5. Export saves the music in the clip window as a WAV, Slice makes it the track, the WAV loads back alike;
+ * 6. screenshots of both themes at 1280×720 and 1440×900 in out/.
  */
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { unzipSync, strFromU8 } from "fflate";
@@ -241,6 +242,8 @@ export async function smokeBeatPath(browser, base, { fail, OUT, SHOTS }) {
   if (!playingAfterOne || (await probe()).playing) fail("clicking the video did not toggle play twice");
   await page.screenshot({ path: `${SHOTS}beat-path-generated.png` });
   if (!(await page.isVisible("#gallery h2"))) fail("no gallery section");
+  // Export and Slice in the track panel: the music inside the clip window as a WAV, then as the track itself.
+  await smokeTrackActions(page, fail, SHOTS);
   // No track: a plain timed clip that still plays and exports.
   await page.click("#removeTrack");
   if ((await probe()).recipe.audio) fail("Remove did not take the track off");
@@ -272,6 +275,36 @@ export async function smokeBeatPath(browser, base, { fail, OUT, SHOTS }) {
   await smokeBeatPathSlice(browser, base, { fail, OUT, SHOTS });
   await smokeBeatPathRefs(browser, base, { fail, SHOTS });
   await smokeBeatPathImages(browser, base, { fail, SHOTS });
+}
+
+/** Export (a WAV of the window, within a frame), Slice (the track becomes the window), and the WAV loaded back with Your track. */
+async function smokeTrackActions(page, fail, SHOTS) {
+  const look = () => page.evaluate(() => ({ name: window.__beatPath.trackName(), length: window.__beatPath.trackLength(), bpm: window.__beatPath.recipe().beatGrid.bpm,
+    offset: window.__beatPath.recipe().beatGrid.offsetSeconds, clip: window.__beatPath.state().clip, lanes: JSON.stringify([window.__beatPath.state().character, window.__beatPath.state().cameraLane]),
+    slice: !document.getElementById("sliceTrack").disabled, export: !document.getElementById("exportTrack").disabled, status: document.getElementById("status").textContent }));
+  const before = await look();
+  if (!before.slice || !before.export) fail(`with ${before.length.toFixed(1)} s of music and an ${before.clip} s clip, Slice (${before.slice}) and Export (${before.export}) should both be enabled`);
+  await page.locator(".audio-info").screenshot({ path: `${SHOTS}beat-path-track-panel.png` });
+  // Export: a download, a 16-bit WAV of the window's length within a frame.
+  const dl = page.waitForEvent("download", { timeout: 30_000 });
+  await page.click("#exportTrack");
+  const file = await dl, path = await file.path(), bytes = readFileSync(path), v = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const rate = v.getUint32(24, true), ch = v.getUint16(22, true), seconds = v.getUint32(40, true) / 2 / ch / rate;
+  console.log(`beat path track: Export saved ${file.suggestedFilename()}: ${seconds.toFixed(3)} s, ${ch} channel(s), ${rate} Hz (window ${before.clip} s)`);
+  if (String.fromCharCode(...bytes.subarray(0, 4)) !== "RIFF" || !/\.wav$/.test(file.suggestedFilename()) || Math.abs(seconds - before.clip) > 1 / 24) fail(`Export did not save the window as a WAV (${file.suggestedFilename()}, ${seconds} s)`);
+  // Slice: the track becomes the window, on the same beat grid; the lanes stay; Slice is then disabled.
+  await page.click("#sliceTrack");
+  await page.waitForFunction(n => window.__beatPath.trackName() !== n, before.name, { timeout: 30_000 });
+  const sliced = await look();
+  console.log(`beat path track: Slice → "${sliced.name}", ${sliced.length.toFixed(3)} s, ${sliced.bpm} BPM, beat 0 at ${sliced.offset} s; Slice ${sliced.slice ? "enabled" : "disabled"}, Export ${sliced.export ? "enabled" : "disabled"}; status "${sliced.status}"`);
+  if (Math.abs(sliced.length - before.clip) > 1 / 24 || sliced.bpm !== before.bpm || sliced.offset !== 0 || sliced.lanes !== before.lanes) fail(`Slice did not make the window the track on the same grid (${JSON.stringify({ ...sliced, lanes: undefined })})`);
+  if (sliced.slice || !sliced.export || !/Sliced to/.test(sliced.status)) fail(`after Slice: Slice should be disabled and Export enabled, and the status say so (${sliced.slice}, ${sliced.export}, "${sliced.status}")`);
+  // The exported file loads back through Your track with the same length and tempo.
+  await page.setInputFiles("#trackFile", { name: file.suggestedFilename(), mimeType: "audio/wav", buffer: bytes });
+  await page.waitForFunction(n => window.__beatPath.trackName() === n, file.suggestedFilename(), { timeout: 30_000 });
+  const back = await look();
+  console.log(`beat path track: loaded back ${back.length.toFixed(3)} s at ${back.bpm} BPM`);
+  if (Math.abs(back.length - before.clip) > 1 / 24 || Math.abs(back.bpm - before.bpm) > 0.5) fail(`the exported WAV did not load back alike (${back.length} s, ${back.bpm} BPM vs ${before.clip} s, ${before.bpm} BPM)`);
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

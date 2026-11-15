@@ -25,17 +25,28 @@ export function cornerPath<T extends P>(points: readonly T[], corners: number): 
   const hasY = points.some(p => p.y !== undefined);
   const copy = (p: P): P => (hasY ? { x: p.x, z: p.z, y: p.y ?? 0 } : { x: p.x, z: p.z });
   if (n < 3 || c <= 0) return points.map(copy);
-  // Samples per corner, so the whole path fits.
-  const per = Math.max(2, Math.min(8, Math.floor((CORNER_PATH_MAX - 2) / (n - 2))));
+  // Samples per corner, so the whole path fits. Past 32 points two per corner no longer fit:
+  // the sharpest corners are rounded (two points each) and the rest stay hard (the point itself).
+  const per = Math.min(8, Math.floor((CORNER_PATH_MAX - 2) / (n - 2)));
+  const rounded = new Set<number>();
+  if (per < 2) {
+    const turn = (i: number) => {
+      const a = points[i - 1], b = points[i], d = points[i + 1];
+      return Math.abs(Math.atan2((b.x - a.x) * (d.z - b.z) - (b.z - a.z) * (d.x - b.x), (b.x - a.x) * (d.x - b.x) + (b.z - a.z) * (d.z - b.z)));
+    };
+    const order = Array.from({ length: n - 2 }, (_, k) => k + 1).sort((p, q) => turn(q) - turn(p) || p - q);
+    for (const i of order.slice(0, Math.max(0, CORNER_PATH_MAX - n))) rounded.add(i);
+  }
   const out: P[] = [copy(points[0])];
   for (let i = 1; i < n - 1; i++) {
     const a = points[i - 1], b = points[i], d = points[i + 1];
     const inLen = Math.hypot(b.x - a.x, b.z - a.z), outLen = Math.hypot(d.x - b.x, d.z - b.z);
     const cut = c * 0.5 * Math.min(inLen, outLen);
-    if (cut < 1e-6) { out.push(copy(b)); continue; }
+    if (cut < 1e-6 || (per < 2 && !rounded.has(i))) { out.push(copy(b)); continue; }
+    const samples = Math.max(2, per);
     const p0 = mix(b, a, cut / inLen, hasY), p2 = mix(b, d, cut / outLen, hasY);
-    for (let k = 0; k < per; k++) {
-      const t = k / (per - 1);
+    for (let k = 0; k < samples; k++) {
+      const t = k / (samples - 1);
       out.push(mix(mix(p0, b, t, hasY), mix(b, p2, t, hasY), t, hasY));
     }
   }

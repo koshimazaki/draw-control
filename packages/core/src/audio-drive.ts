@@ -63,7 +63,6 @@ export function detectOnsets(rms: Float32Array, hopSeconds: number, opts: { k?: 
   const k = opts.k ?? 1.5, minGap = opts.minGapSeconds ?? 0.12;
   const novelty = onsetNovelty(rms);
   const win = Math.max(8, Math.round(1 / hopSeconds));
-  let peak = 0;
   const found: { i: number; v: number }[] = [];
   for (let i = 1; i < novelty.length - 1; i++) {
     const v = novelty[i];
@@ -75,8 +74,9 @@ export function detectOnsets(rms: Float32Array, hopSeconds: number, opts: { k?: 
     const last = found[found.length - 1];
     if (last && (i - last.i) * hopSeconds < minGap) { if (v > last.v) found[found.length - 1] = { i, v }; continue; }
     found.push({ i, v });
-    peak = Math.max(peak, v);
   }
+  // The peak of the final list: a stronger onset within minGap may have replaced the last one.
+  const peak = found.reduce((p, f) => Math.max(p, f.v), 0);
   return found.map(f => ({ seconds: Math.round(f.i * hopSeconds * 10000) / 10000, strength: peak ? f.v / peak : 0 }));
 }
 

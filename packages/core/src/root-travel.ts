@@ -44,12 +44,22 @@ export function travelStations(recipe: Recipe, drive?: AudioDrive): number[] {
   return lockHits(recipe.beatGrid, hitBands(drive?.bands, recipe), lock.lock, range.from, range.to);
 }
 
-/** The root at a beat, after the travel lock. */
-export function rootAt(recipe: Recipe, beat: number, drive?: AudioDrive) {
+/**
+ * Where along its path the root is at a beat, as the beat `sampleRootPath` is read at: the
+ * beat itself without a travel lock, re-timed by the lock with one. It stands still while
+ * the figure holds at a station, so whatever is read off the path at this beat (the glider's
+ * smoothed heading, glide-heading.ts) holds with it.
+ */
+export function pathBeatAt(recipe: Recipe, beat: number, drive?: AudioDrive): number {
   const lock = recipe.travelLock, range = lock?.lock ? travelRange(recipe.rootPath) : null;
-  if (!lock || !range || !(lock.strength ?? DEFAULT_LOCK_STRENGTH) || beat <= range.from || beat >= range.to) return sampleRootPath(recipe.rootPath, beat);
+  if (!lock || !range || !(lock.strength ?? DEFAULT_LOCK_STRENGTH) || beat <= range.from || beat >= range.to) return beat;
   const hits = travelStations(recipe, drive);
   // Stations where steady travel is on each hit: every leg at the same average speed (no dash in a short leg).
   const p = stationProgress(beat, range.from, range.to, hits, lock.strength ?? DEFAULT_LOCK_STRENGTH, "time");
-  return sampleRootPath(recipe.rootPath, range.from + (range.to - range.from) * p);
+  return range.from + (range.to - range.from) * p;
+}
+
+/** The root at a beat, after the travel lock. */
+export function rootAt(recipe: Recipe, beat: number, drive?: AudioDrive) {
+  return sampleRootPath(recipe.rootPath, pathBeatAt(recipe, beat, drive));
 }
