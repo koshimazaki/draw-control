@@ -70,7 +70,7 @@ ms describe out/x/base.json --analysis out/x/m.json  # "Onsets in beats": kicks,
   `ceil((seconds + 1/24) × BPM / 60)` (`clipBeats`: 8 s at 120 → 17, 14 s at 107.5 → 26): on
   loading the music the page rescales every lane so its last edge lands there, which moves every
   edge (and re-times the path) when the script ends anywhere else.
-- **A paid model may refuse the length**: the page refuses any estimate over its 3 USD limit before
+- **A paid model may refuse the length**: the page refuses any estimate over its 10 USD limit before
   the cost dialog (Seedance 2.5 at 14 s). Check each model's estimate for the clip in the page
   (Generate shows it; nothing is sent in dev) before you settle the length, and say which refuse.
 - **Three sync points, not a station on every hit.** The owner's rule (15 Nov 2026): the motion starts
