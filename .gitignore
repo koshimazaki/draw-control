@@ -30,3 +30,4 @@ assets-local/
 
 # Example 1's music ships (the owner's track, glitchcandies, made with Suno, used with permission)
 !packages/studio/public/tracks/neon-rain-loop.mp3
+!packages/studio/public/tracks/drum-n-bass.mp3

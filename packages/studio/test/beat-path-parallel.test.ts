@@ -1,5 +1,5 @@
 /**
- * The avenue shot (Example 1 until 15 Nov 2026, now beat-path-avenue-cross.txt) and Example 2 (round 8): parallel-street shots authored as shot scripts. The subject is
+ * The avenue shot (Example 1 until 15 Nov 2026, now beat-path-avenue-cross.txt) and the skate-rail shot (Example 2 until 15 Nov 2026, now beat-path-skate-rail.txt): parallel-street shots authored as shot scripts. The subject is
  * visible for well over half the clip through the placed blocks, a drawn camera path is paced
  * to the subject (abreast on the parallel street), and the new script words round-trip.
  */
@@ -27,7 +27,7 @@ function hiddenShare(r: Recipe, drive: ReturnType<typeof buildDrive>) {
 }
 
 describe("parallel-street examples", () => {
-  for (const [file, style, bars] of [["beat-path-avenue-cross.txt", "straight", 9], ["beat-path-ex2-runner.txt", "drive", 10]] as const) it(`${file}: the subject is visible for well over half the clip`, () => {
+  for (const [file, style, bars] of [["beat-path-avenue-cross.txt", "straight", 9], ["beat-path-skate-rail.txt", "drive", 10]] as const) it(`${file}: the subject is visible for well over half the clip`, () => {
     const { r, drive, state } = load(file, style, bars);
     expect(r.sceneryBoxes?.length).toBeGreaterThan(5);
     expect(state.sight).toBe("passes");
@@ -45,13 +45,13 @@ describe("parallel-street examples", () => {
     }
   });
   it("follow front, fov and offsets round-trip through printScript and applyScript", () => {
-    const { r, drive } = load("beat-path-ex2-runner.txt", "drive", 10);
+    const { r, drive } = load("beat-path-skate-rail.txt", "drive", 10);
     const last = r.camera!.segments.at(-1)!;
     expect(last).toMatchObject({ modes: ["lead"], fov: 100, follow: { distance: 2.5, height: 0.4 } });
     expect(applyScript(beatPathBase({ seconds: 8, bpm: r.beatGrid.bpm, offsetSeconds: r.beatGrid.offsetSeconds }), { script: printScript(r) }, { drive, bands: drive.bands }).camera).toEqual(r.camera);
   });
   it("the page reads both examples back unchanged", () => {
-    for (const [file, style, bars] of [["beat-path-avenue-cross.txt", "straight", 9], ["beat-path-ex2-runner.txt", "drive", 10]] as const) {
+    for (const [file, style, bars] of [["beat-path-avenue-cross.txt", "straight", 9], ["beat-path-skate-rail.txt", "drive", 10]] as const) {
       const { state } = load(file, style, bars);
       expect(fromScript(toScript(state), BLANK_STATE).state.cameraLane).toEqual(state.cameraLane);
     }

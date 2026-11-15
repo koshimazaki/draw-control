@@ -73,13 +73,14 @@ function valuesIn(s: CameraSegment, v: Values, hits: number[], beat: number): Va
   const w = s.cut ? 1 : ease((beat - s.fromBeat) / t);
   const preset = s.shot ? SHOT_PRESETS[s.shot] : null;
   const p = progressOf(s, hits, beat);
-  // A follow offset sets the distance and height the way a shot does (and wins over the shot's).
+  // A follow offset sets the distance, height and aim the way a shot does (and wins over the shot's).
   const td = s.follow?.distance ?? preset?.distance, th = s.follow?.height ?? preset?.height;
   let d = td !== undefined ? v.d + (td - v.d) * w : v.d;
   let h = th !== undefined ? v.h + (th - v.h) * w : v.h;
   const tf = s.fov ?? preset?.fov;
   const f = tf !== undefined ? v.f + (tf - v.f) * w : v.f;
-  const a = preset ? v.a + (preset.aim - v.a) * w : v.a;
+  const ta = s.follow?.aim ?? preset?.aim;
+  const a = ta !== undefined ? v.a + (ta - v.a) * w : v.a;
   if (isDolly(s)) {
     if (s.to !== undefined) d = v.d + (s.to - v.d) * p;
     else d += (s.modes.includes("pushIn") ? -1 : 1) * s.amount! * p;
@@ -99,12 +100,18 @@ function valuesIn(s: CameraSegment, v: Values, hits: number[], beat: number): Va
 }
 
 /**
+ * The aim height at frame 0: 1 m, or the first block's follow `aim` when that block starts on beat 0 (the rig has no
+ * aim of its own, so a clip that opens on a detail starts on it instead of tilting down from 1 m).
+ */
+const startAim = (config: CameraConfig) => { const s = config.segments[0]; return s && s.fromBeat <= 0 && s.follow?.aim !== undefined ? s.follow.aim : 1; };
+
+/**
  * The programmed distance and height each range starts from (carried from the end of the
  * range before; the first starts from the rig numbers). A range ends on its full move
  * whatever its lock, so this needs no hits.
  */
 export function rangeStarts(config: CameraConfig): { distance: number; height: number }[] {
-  let v: Values = { d: config.distance, h: config.height, f: config.fov, a: 1, orbit: 0, truck: 0 };
+  let v: Values = { d: config.distance, h: config.height, f: config.fov, a: startAim(config), orbit: 0, truck: 0 };
   return config.segments.map(s => { const start = { distance: v.d, height: v.h }; v = valuesIn(s, v, [], s.toBeat); return start; });
 }
 
@@ -118,7 +125,7 @@ export function programCamera(config: CameraConfig, grid: BeatGrid, bands: BandA
   out.hits = segs.map(s => (s.lock ? lockHits(grid, bands, s.lock, s.fromBeat, s.toBeat) : []));
   // Values at the start of each range, carried from the end of the one before.
   const starts: Values[] = [];
-  let v: Values = { d: config.distance, h: config.height, f: config.fov, a: 1, orbit: 0, truck: 0 };
+  let v: Values = { d: config.distance, h: config.height, f: config.fov, a: startAim(config), orbit: 0, truck: 0 };
   segs.forEach((s, i) => { starts.push(v); v = valuesIn(s, v, out.hits[i], s.toBeat); });
   for (let n = 0; n < total; n++) {
     const beat = beatAtSeconds(grid, n / fps);

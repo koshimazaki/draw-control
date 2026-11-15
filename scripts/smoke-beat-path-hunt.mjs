@@ -27,9 +27,9 @@ export async function smokeBeatPathHunt(browser, base, { fail }) {
   // 1. Rapid switching while playing.
   await page.click("#barPlay");
   for (const s of ["1", "2", "0", "2", "1"]) await ex(s);
-  await page.waitForTimeout(400);
+  await page.waitForFunction(() => window.__beatPath.trackName() === "drum-n-bass.mp3", null, { timeout: 30_000 }).catch(() => {});
   const landed = await bp(() => ({ slot: window.__beatPath.slot(), track: window.__beatPath.trackName(), kind: window.__beatPath.recipe().character.kind, playing: window.__beatPath.playing() }));
-  if (landed.slot !== "1" || landed.track !== "generated-drive-140.wav" || landed.playing) fail(`rapid switching did not land on Example 2 with its music, paused: ${JSON.stringify(landed)}`);
+  if (landed.slot !== "1" || landed.track !== "drum-n-bass.mp3" || landed.playing) fail(`rapid switching did not land on Example 2 with its music, paused: ${JSON.stringify(landed)}`);
 
   // 2. A selected scenery box does not carry over to another example.
   await page.click('[data-control="tool"] [data-value="blocks"]');
@@ -363,7 +363,9 @@ async function smokePaidRuns(browser, base, { fail }) {
   await page.click("#runGenerate");
   await dialogOpen();
   await press('[data-control="example"] [data-value="1"]');
-  await page.waitForFunction(() => window.__beatPath.slot() === "1", null, { timeout: 30_000 });
+  // Example 2 loads its music file before the output pane follows the switch (switchSlot awaits it).
+  await page.waitForFunction(() => window.__beatPath.slot() === "1" && window.__beatPath.trackName() === "drum-n-bass.mp3", null, { timeout: 30_000 });
+  await page.waitForTimeout(100);
   const away = await page.evaluate(() => !document.getElementById("screenOutput").hidden && !!document.querySelector("#generateSlot #genProgress"));
   await press('[data-control="example"] [data-value="0"]');
   await page.waitForFunction(() => window.__beatPath.slot() === "0", null, { timeout: 30_000 });

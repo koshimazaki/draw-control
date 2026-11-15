@@ -4,9 +4,9 @@
  * clip's window; the window is dragged (it lands on a beat), nudged with an arrow key, a kick
  * marker is added with Alt-click on the strip; the guide is exported in memory and its
  * audio.wav is the clip's length and its beats.json starts on a beat. 10 s clips export 241
- * frames. Then Example 2 is sliced with a hit switched off and a marker on a kick, Example 3 shown
- * and Example 2 again: it comes back with its cut, and both still sit on kicks of the music loaded
- * (Example 2's groove is longer than its clip; Example 1's loop is shorter than its clip).
+ * frames. Then Example 3 is sliced with a hit switched off and a marker on a kick, Example 4 shown
+ * and Example 3 again: it comes back with its cut, and both still sit on kicks of the music loaded
+ * (Example 3's groove is longer than its clip; Examples 1 and 2 play files shorter than their clips).
  * Then slicing again for a loop, zoom and the playhead (smoke-beat-path-reslice.mjs).
  * Any console error or warning fails the run.
  */
@@ -88,7 +88,7 @@ export async function smokeBeatPathSlice(browser, base, { fail, OUT, SHOTS }) {
   await smokeBeatPathReslice(browser, base, { fail, OUT });
 }
 
-/** Example 2 sliced, Example 3 shown, Example 2 again: its cut comes back (slot-music.ts), and the switched-off hit and the marker sit on kicks of the music loaded. */
+/** Example 3 sliced, Example 4 shown, Example 3 again: its cut comes back (slot-music.ts), and the switched-off hit and the marker sit on kicks of the music loaded. */
 async function smokeSliceReturn(browser, base, { fail }) {
   const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
   const errors = [];
@@ -97,8 +97,8 @@ async function smokeSliceReturn(browser, base, { fail }) {
   await page.goto(`${base}/path.html`);
   await page.waitForFunction(() => window.__beatPath?.recipe().audio && window.__beatPath.trackName() === "neon-rain-loop.mp3", null, { timeout: 30_000 });
   const ex = slot => page.click(`[data-control="example"] [data-value="${slot}"]`);
-  await ex("1");
-  await page.waitForFunction(() => window.__beatPath.slot() === "1" && window.__beatPath.trackName() === "generated-drive-140.wav", null, { timeout: 30_000 });
+  await ex("2");
+  await page.waitForFunction(() => window.__beatPath.slot() === "2" && window.__beatPath.trackName() === "generated-laidback-100.wav", null, { timeout: 30_000 });
   await page.$eval("#sliceStart", el => { el.value = "4"; el.dispatchEvent(new window.Event("change")); });
   const s0 = await page.evaluate(() => window.__beatPath.state());
   // A kick a second into the clip switched off (a click on it), and a marker added on a later kick (Alt-click on it).
@@ -116,15 +116,15 @@ async function smokeSliceReturn(browser, base, { fail }) {
   await page.click("#sliceTrack");
   await page.waitForFunction(() => /\(/.test(window.__beatPath.trackName() ?? ""), null, { timeout: 30_000 });
   const sliced = await onKicks();
+  await ex("3");
+  await page.waitForFunction(() => window.__beatPath.slot() === "3" && window.__beatPath.trackName() === "generated-laidback-100-6bars.wav", null, { timeout: 30_000 });
   await ex("2");
-  await page.waitForFunction(() => window.__beatPath.slot() === "2" && window.__beatPath.trackName() === "generated-laidback-100.wav", null, { timeout: 30_000 });
-  await ex("1");
-  await page.waitForFunction(() => window.__beatPath.slot() === "1", null, { timeout: 30_000 });
+  await page.waitForFunction(() => window.__beatPath.slot() === "2", null, { timeout: 30_000 });
   await page.waitForTimeout(300);
   const back = await onKicks();
-  console.log(`draw control slice: Example 2 sliced (${sliced.name}), away and back: ${back.name}, muted ${back.muted} markers ${back.markers}, worst ${(back.worst * 1000).toFixed(1)} ms off a kick`);
+  console.log(`draw control slice: Example 3 sliced (${sliced.name}), away and back: ${back.name}, muted ${back.muted} markers ${back.markers}, worst ${(back.worst * 1000).toFixed(1)} ms off a kick`);
   if (sliced.worst > 0.02) fail(`after Slice the switched-off hit or the marker is off the kicks (${JSON.stringify(sliced)})`);
-  if (back.name !== sliced.name || back.worst > 0.02 || back.muted.length !== 1 || back.markers.length !== 1) fail(`Example 2 came back with its markers off the music loaded (${JSON.stringify(back)}, sliced ${JSON.stringify(sliced)})`);
+  if (back.name !== sliced.name || back.worst > 0.02 || back.muted.length !== 1 || back.markers.length !== 1) fail(`Example 3 came back with its markers off the music loaded (${JSON.stringify(back)}, sliced ${JSON.stringify(sliced)})`);
   if (errors.length) fail(`slice return logged: ${errors.join(" | ")}`);
   await page.close();
 }
