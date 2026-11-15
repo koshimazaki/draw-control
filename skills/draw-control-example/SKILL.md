@@ -63,6 +63,15 @@ box: -10 2.5 2 2 3.2                               # x z width depth height (met
 
 ## 3. Camera: views
 
+**Left and right** are the subject's own, and the map, the script and the video agree (checked
+15 Nov 2026, map screenshot against a top render). World: x right, z towards the front camera,
+y up. The page's map is a true top view: x to the right, **z downwards**. So for a subject
+moving right on the map (+x), its **right is the bottom of the map (+z)** and its left is the
+top (−z). `follow side` (left) puts the camera on −z, `follow side right` on +z; a `box:` with
+z > 0 sits on the subject's right while it travels +x. Turn the rule round when the path runs
+the other way. Check it on the map (the camera blocks are labelled there) or in `camera.json`.
+
+
 Frame 0 is the **rig start**, not the first block, and a block without its own distance/height
 falls back to the rig. So set the rig to the opening view:
 
