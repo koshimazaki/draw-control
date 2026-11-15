@@ -14,7 +14,8 @@ export type Box = { x: number; z: number; w: number; d: number; h: number; yaw?:
 export type BlockHost = {
   /** The boxes as they stand (explicit, or the preset's placement). */
   boxes(): Box[];
-  setBoxes(boxes: Box[], final: boolean): void;
+  /** False when the page refused the edit (a guide is rendering). */
+  setBoxes(boxes: Box[], final: boolean): boolean;
   pen(): "edit" | "draw";
   /** The subject's floor positions (the path a box may not swallow). */
   subject(): PathPt[];
@@ -91,11 +92,13 @@ export class BlockTool {
     const i = this.selected;
     if (boxes[i]) {
       const n = nudge(boxes[i], this.host.subject());
-      if (n.moved) { boxes = boxes.map((b, k) => (k === i ? n.box : b)); this.host.say("That block covered the subject's path: moved off it"); }
+      if (n.moved) boxes = boxes.map((b, k) => (k === i ? n.box : b));
+      if (this.host.setBoxes(boxes, true) && n.moved) this.host.say("That block covered the subject's path: moved off it");
+      return;
     }
     this.host.setBoxes(boxes, true);
   }
-  remove() { if (this.selected < 0) return false; this.host.setBoxes(this.host.boxes().filter((_, i) => i !== this.selected), true); this.selected = -1; return true; }
+  remove() { if (this.selected < 0) return false; if (this.host.setBoxes(this.host.boxes().filter((_, i) => i !== this.selected), true)) this.selected = -1; return true; }
   duplicate() {
     const b = this.host.boxes()[this.selected];
     if (!b) return false;

@@ -79,6 +79,7 @@ export async function smokeBeatPathHunt(browser, base, { fail }) {
   await ex("0");
   await smokeLaneEdge(page, { fail });
   await smokeLaneInterrupted(page, { fail });
+  await smokeLaneUndoHeld(page, { fail });
   for (const model of await page.$$eval('[data-control="model"] button', bs => bs.map(b => b.dataset.value))) {
     await page.click(`[data-control="model"] [data-value="${model}"]`);
     await page.click("#runGenerate"); await page.waitForSelector("#costDialog:not([hidden])");
@@ -209,6 +210,25 @@ async function smokeLaneEdge(page, { fail }) {
   if (await cameraLane(page) !== before) fail(`one undo after an edge drag did not restore the lane: ${await cameraLane(page)} vs ${before}`);
 }
 
+/** Cmd/Ctrl-Z while a block drag is held: the drag ends (the lane put back) and that is all; the edit before it stays. */
+async function smokeLaneUndoHeld(page, { fail }) {
+  const sight = () => page.evaluate(() => window.__beatPath.state().sight);
+  await page.evaluate(() => document.getElementById("sightPasses").click());
+  const sight1 = await sight(), before = await cameraLane(page);
+  const [a, b] = await laneBoxes(page), y = a.y + a.height / 2;
+  await page.mouse.move(a.x + a.width / 2, y); await page.mouse.down();
+  const dx = b.x + b.width / 2 - (a.x + a.width) + 12;
+  for (let k = 1; k <= 8; k++) await page.mouse.move(a.x + a.width / 2 + dx * k / 8, y);
+  const moved = await cameraLane(page);
+  await page.keyboard.press("ControlOrMeta+z");
+  const after = { lane: await cameraLane(page), sight: await sight() };
+  await page.mouse.up();
+  console.log(`beat path lanes: undo during a held block drag: ${moved} → ${after.lane}, sight ${sight1} → ${after.sight}`);
+  if (moved === before) fail("the held block drag did not rearrange the lane (the undo step proves nothing)");
+  if (after.lane !== before || after.sight !== sight1) fail(`one undo during a held drag did more than end the drag: ${JSON.stringify(after)} (lane ${before}, sight ${sight1})`);
+  await page.keyboard.press("ControlOrMeta+z");   // the sight toggle, taken back for the steps after
+}
+
 /**
  * A block drag still held when Generate (pressed with the keyboard) starts the guide render: the lane goes
  * back to its order before the drag, the release changes nothing, and the drag leaves no undo step (one
@@ -294,6 +314,14 @@ async function smokePaidRuns(browser, base, { fail }) {
   const during = await bp(() => ({ slot: window.__beatPath.slot(), status: document.getElementById("status").textContent, on: document.querySelector('[data-control="example"] button.on')?.dataset.value }));
   console.log(`beat path paid runs: switch during the render: ${JSON.stringify(during)}`);
   if (during.slot !== "0" || during.on !== "0" || !/guide is rendering/.test(during.status ?? "")) fail(`a switch during the guide render was not refused: ${JSON.stringify(during)}`);
+  // An edit refused during the render says so, not that it landed (Whole clip once reported success over the refusal).
+  const laneNow = () => bp(() => JSON.stringify(window.__beatPath.state().cameraLane));
+  const lane0 = await laneNow();
+  const whole = await bp(() => { document.getElementById("status").textContent = ""; document.getElementById("wholeClip").click(); return { status: document.getElementById("status").textContent, busy: window.__beatPath.busy() }; });
+  whole.same = (await laneNow()) === lane0;
+  console.log(`beat path paid runs: Whole clip during the render: ${JSON.stringify(whole)}`);
+  if (!whole.busy) fail("the render ended before Whole clip was pressed (the step proves nothing)");
+  else if (!/guide is rendering/.test(whole.status ?? "") || !whole.same) fail(`Whole clip during the guide render did not say it was refused: ${JSON.stringify(whole)}`);
   await dialogOpen(); await page.click("#costOk"); await idle();
   const sent = await page.evaluate(() => (globalThis.__fakeTasks ?? []).filter(t => t.taskType === "videoInference").at(-1)?.positivePrompt ?? "");
   const shown = await bp(() => ({ slot: window.__beatPath.slot(), player: !!document.querySelector("#generateSlot arena-player") }));

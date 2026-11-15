@@ -80,13 +80,17 @@ export function startBeatPath(root: HTMLElement) {
     actions.sync();
     return true;
   }
-  /** Every edit: the new state; history on a final edit (a drag records where it began). */
-  function update(next: BeatPathState, final = true) {
-    if (refused()) return;
+  /**
+   * Every edit: the new state; history on a final edit (a drag records where it began). False when it
+   * was refused (a guide is rendering): nothing changed, so a caller says or does nothing more.
+   */
+  function update(next: BeatPathState, final = true): boolean {
+    if (refused()) return false;
     const r = editStep({ state, base: dragBase }, next, final);
     state = r.state; dragBase = r.base;
     if (r.step) { past.push(r.step); if (past.length > 200) past.shift(); future.length = 0; }
     schedule(final);
+    return true;
   }
   /** A drag that ended without a change: the state goes back to where it began, no undo step (drag-edit.ts). */
   function restoreDrag() {
@@ -98,10 +102,11 @@ export function startBeatPath(root: HTMLElement) {
    * A lane drag still held when something else takes over (a guide render starting, undo, an example
    * switch) is put back first: never left half done with no undo step, or with its base kept.
    */
-  function endLaneDrags() { characterLane.abort(); cameraLane.abort(); }
+  function endLaneDrags(): boolean { const a = characterLane.abort(), b = cameraLane.abort(); return a || b; }
   function undo(redo = false) {
     if (refused()) return;
-    endLaneDrags();
+    // Undo during a held lane drag ends the drag (the lane put back) and stops there: one key, one change.
+    if (endLaneDrags()) return;
     const from = redo ? future : past, to = redo ? past : future;
     const s = from.pop();
     if (!s) return;
@@ -119,6 +124,7 @@ export function startBeatPath(root: HTMLElement) {
     corners: t => (t === "camera" ? state.cameraCorners : state.subjectCorners),
     change: (t, points, final) => {
       const next = { ...state, ...(t === "subject" ? { subject: points } : { camera: points }) };
+      let note = "";
       // A drawn camera path flies a block: the selected camera block, else the block under the playhead
       // (a new "path" block when the lane is empty). It is never silently stored with nothing using it.
       if (t === "camera" && final && points.length >= 2) {
@@ -129,10 +135,10 @@ export function startBeatPath(root: HTMLElement) {
           const k = sel >= 0 ? sel : next.cameraLane.findIndex(b => beat >= b.from && beat < b.to);
           if (k < 0) next.cameraLane = [...next.cameraLane, { from: 0, to: totalBeats(), word: "path" as const }];
           else next.cameraLane = next.cameraLane.map((b, i) => (i === k ? { from: b.from, to: b.to, word: "path" as const } : b));
-          say(k < 0 ? "A new path block on the Camera lane flies your path" : next.cameraLane.length > 1 ? `Block ${k + 1} of the Camera lane now flies your path · Whole clip (map footer) makes it fly all of it` : "Your path flies the whole clip");
-        } else say(`Block ${used + 1} of the Camera lane flies your path`);
+          note = (k < 0 ? "A new path block on the Camera lane flies your path" : next.cameraLane.length > 1 ? `Block ${k + 1} of the Camera lane now flies your path · Whole clip (map footer) makes it fly all of it` : "Your path flies the whole clip");
+        } else note = `Block ${used + 1} of the Camera lane flies your path`;
       }
-      update(next, final);
+      if (update(next, final) && note) say(note);
     },
     blocksDown: (e, w, toScreen, fromScreen) => blocks.down(e, w, toScreen, fromScreen),
     followDown: (e, toScreen, fromScreen) => follow.down(e, toScreen, fromScreen),
