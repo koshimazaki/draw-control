@@ -9,7 +9,7 @@
  * page-generate.ts.
  */
 import { checkRun, type RunEntry, type RunLog } from "./run-log";
-import { download, pruneAssets, saveAsset, savedBlob } from "./run-assets";
+import { download, pruneAssets, saveAsset, savedBlob, shouldCopy } from "./run-assets";
 
 type Deps = {
   $: <T extends HTMLElement = HTMLElement>(id: string) => T;
@@ -82,12 +82,13 @@ export function bindHistory(d: Deps) {
   button.onclick = () => { pop.hidden = !pop.hidden; render(); };
   window.addEventListener("pointerdown", e => { if (!pop.hidden && !pop.contains(e.target as Node) && !button.contains(e.target as Node)) pop.hidden = true; });
   window.addEventListener("keydown", e => { if (e.key === "Escape") pop.hidden = true; });
-  // A run that has just finished: its file is copied into the browser once (older copies are dropped).
-  const copying = new Set<string>();
+  // A run that has just finished: its file is copied into the browser (tried a few times, run-assets.ts).
+  // A copy that failed is tried again once per page load while the provider's link may still work.
+  const tried = new Set<string>();
   const keep = () => {
-    for (const r of d.log.list()) if (r.status === "done" && r.url && r.saved === undefined && !copying.has(r.taskUUID)) {
-      copying.add(r.taskUUID);
-      void saveAsset(d.log, r).finally(() => copying.delete(r.taskUUID));
+    for (const r of d.log.list()) if (shouldCopy(r, Date.now(), performance.timeOrigin, tried.has(r.taskUUID))) {
+      tried.add(r.taskUUID);
+      void saveAsset(d.log, r);
     }
   };
   d.log.onChange(() => { render(); keep(); });
