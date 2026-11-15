@@ -438,7 +438,10 @@ export function applyScript(recipe: Recipe, args: { script: string }, ctx: { ban
       r = setCameraModes(r, { modes, fromBeat: start, toBeat: b.to, fields: { ...fields, ...b.shot } });
       continue;
     }
-    if (at) {
+    // "@kick 1" on a block that holds no kick (a one-beat accent between two hits): the block starts on its row, as
+    // without an anchor, rather than failing the whole shot. With no track analysed it still refuses (nothing to anchor on).
+    const empty = at && at.band !== "beat" && bands && !onsetBeats(r, bands, at.band).some(x => x >= b.row.from - 1e-6 && x < b.row.to - 1e-6);
+    if (at && !empty) {
       start = resolveAnchor(r, bands, b.row, at.band, at.index);
       const nth = onsetBeats(r, bands, at.band).findIndex(x => Math.abs(x - start) < 1e-6);
       r = startCameraMove(r, { modes, target: at.band, index: nth, lengthBeats: b.to - start, fields: { ...fields, ...b.shot } }, bands);
