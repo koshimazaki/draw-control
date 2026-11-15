@@ -3,7 +3,8 @@
  * polyline whose points each carry a yaw (the direction of travel there, or the held facing
  * of a glide that does not turn), so the raw yaw steps at every point and its turning rate
  * jumps. Here:
- * - the heading is the path's yaw averaged over a short window of the path's own time
+ * - the heading is the path's yaw (taken the short way round between points, so a stored
+ *   yaw that wraps at ±180° does not swing it through 0°) averaged over a short window of the path's own time
  *   (HEADING_SECONDS wide: the exact mean of the straight-line yaw, one pass over the
  *   points). It is read at the path beat (root-travel.ts `pathBeatAt`), so it holds wherever
  *   the figure holds (a station of the travel lock, a freeze, standing still), and a held
@@ -37,6 +38,22 @@ export const LEAN_SECONDS = 1.2;
 /** Heading samples each side of the frame for the lean. */
 const LEAN_TAPS = 4;
 
+/**
+ * The points with each yaw moved by whole turns so no step between neighbours is more than
+ * half a turn: the yaw changes the short way round, whatever the stored numbers (a path
+ * facing ±180° may store -179.8 then 179.9). The same array when nothing needs moving.
+ */
+function unwrapYaw(points: readonly RootPoint[]): readonly RootPoint[] {
+  let out: RootPoint[] | null = null, prev = points[0].yaw;
+  for (let i = 1; i < points.length; i++) {
+    let yaw = points[i].yaw;
+    if (Math.abs(yaw - prev) > 180) yaw += 360 * Math.round((prev - yaw) / 360);
+    if (yaw !== points[i].yaw) { out ??= points.slice(); out[i] = { ...points[i], yaw }; }
+    prev = yaw;
+  }
+  return out ?? points;
+}
+
 /** ∫ yaw over [lo, hi] of the path's beats, degree-beats: straight between points, held before the first and after the last. */
 function yawIntegral(points: readonly RootPoint[], lo: number, hi: number): number {
   const first = points[0], last = points[points.length - 1];
@@ -55,9 +72,8 @@ function yawIntegral(points: readonly RootPoint[], lo: number, hi: number): numb
 
 /** The smoothed yaw, degrees, at a beat of the path's own time. */
 export function smoothPathYaw(recipe: Recipe, pathBeat: number): number {
-  const points = recipe.rootPath;
-  if (points.length < 2) return sampleRootPath(points, pathBeat).yaw;
-  const range = travelRange(points);
+  if (recipe.rootPath.length < 2) return sampleRootPath(recipe.rootPath, pathBeat).yaw;
+  const points = unwrapYaw(recipe.rootPath), range = travelRange(points);
   if (!range) return sampleRootPath(points, pathBeat).yaw;
   const h = Math.min(HEADING_SECONDS / 2 * recipe.beatGrid.bpm / 60, pathBeat - range.from, range.to - pathBeat);
   if (!(h > 1e-6)) return sampleRootPath(points, pathBeat).yaw;

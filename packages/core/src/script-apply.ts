@@ -314,9 +314,15 @@ function retimePath(r: Recipe, from: number, to: number, glide: boolean): RootPo
   const moving = r.rootPath.filter(p => p.beat >= travel.from - 1e-6);
   const k = (to - from) / (travel.to - travel.from), r3 = (x: number) => Math.round(x * 1000) / 1000;
   const pts = moving.map(p => ({ ...p, beat: r3(from + (p.beat - travel.from) * k) }));
+  let lastYaw: number | null = null;
   if (!glide) pts.forEach((p, i) => {
     const a = pts[Math.max(0, i - 1)], b = pts[Math.min(pts.length - 1, i + 1)];
-    if (a.x !== b.x || a.z !== b.z) p.yaw = r3(Math.atan2(b.x - a.x, b.z - a.z) * 180 / Math.PI);
+    if (a.x !== b.x || a.z !== b.z) {
+      let yaw = Math.atan2(b.x - a.x, b.z - a.z) * 180 / Math.PI;
+      if (lastYaw !== null) yaw += 360 * Math.round((lastYaw - yaw) / 360);   // unwrap, as setRootPath does: no spin on a ±180° crossing
+      p.yaw = r3(Math.max(-720, Math.min(720, yaw)));
+    }
+    lastYaw = p.yaw;
   });
   return from > 0 ? [{ ...pts[0], beat: 0 }, ...pts] : pts;
 }
