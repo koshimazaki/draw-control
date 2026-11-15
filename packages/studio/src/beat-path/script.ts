@@ -280,7 +280,10 @@ export function fromScript(text: string, base: BeatPathState, grid: { bpm: numbe
         const m = /\b(?:jump|kick)\s*@(kick|snare|hat|beat)\s+([\d.]+)/.exec(a);
         if (m && !(m[1] === "kick" && m[2] === "1")) {
           // A beat is kept as an offset from the block's start; it is held inside the block once the block's end is known (below).
-          at = { band: m[1] as HopAnchor["band"], n: m[1] === "beat" ? Math.round((Number(m[2]) - row.from) * 1000) / 1000 : Number(m[2]) };
+          const n = Number(m[2]);
+          if (m[1] === "beat") at = { band: "beat", n: Math.round((n - row.from) * 1000) / 1000 };
+          else if (Number.isInteger(n) && n >= 1 && n <= 64) at = { band: m[1] as HopAnchor["band"], n };
+          else notes.push(`line ${row.line}: @${m[1]} ${m[2]}: count from 1 to 64, so the hop lands on the first kick`);
         }
       }
       else if (/^freeze\b/.test(a)) word = "freeze";
@@ -361,7 +364,9 @@ export function fitLanes(state: BeatPathState, beats: number): BeatPathState {
     for (const b of lane) {
       const from = out.length ? out.at(-1)!.to : 0;
       const to = Math.min(beats, Math.max(from + 1, Math.round(b.to * k * 2) / 2));
-      if (to > from) out.push({ ...b, from, to });
+      // A hop on a beat keeps its place in the block, scaled with it.
+      const at = b.at?.band === "beat" ? { band: "beat" as const, n: hopOffset(Math.round(b.at.n * (to - from) / (b.to - b.from) * 1000) / 1000, to - from) } : b.at;
+      if (to > from) out.push({ ...b, from, to, ...(at ? { at } : {}) });
     }
     out[out.length - 1].to = beats;
     return out;

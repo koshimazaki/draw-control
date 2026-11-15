@@ -4,7 +4,7 @@
  * ranges are replaced by its rows (beats past the last row rest and hold the camera); the
  * beat grid, the character, the rig numbers, the envelope and the rest stay. Everything goes
  * through the edit functions the studio and the commands use (insertMove, setMoveFields,
- * addMarker, setRootPath's re-timing, setCameraModes, startCameraMove, setCameraSegment), so
+ * the marker edits, setRootPath's re-timing, setCameraModes, startCameraMove, setCameraSegment), so
  * the result is a validated recipe. Unknown words fail with the list of valid ones.
  */
 import { isAccentKey, type AccentKey } from "./accents";
@@ -17,7 +17,7 @@ import { gaitSpeedFor, setCameraModes, setCameraPath, setRootPath, startCameraMo
 import { insertMove } from "./commands";
 import { LOCK_TARGETS, lockHits, hitBands, type LockTarget } from "./lock";
 import { makeMoveFor, onsetBeats, setMoveFields } from "./move-edits";
-import { addMarker } from "./performance-edits";
+import { currentMarkers, withMarkers } from "./performance-edits";
 import { DEFAULT_REACTIVE } from "./reactive-config";
 import { RecipeError, validateRecipe, type Recipe, type RootPoint } from "./recipe";
 import { travelRange } from "./root-travel";
@@ -175,11 +175,15 @@ function takeLock(row: Row, words: string[]): { words: string[]; lock?: Lock; re
   return { words: words.slice(0, k), lock, rest: words.slice(j) };
 }
 
+/** The highest hit an anchor counts to ("@kick 64"): a setup file's Hop takes the same. */
+const MAX_ANCHOR = 64;
 function parseHit(row: Row, item: string): Hit {
   const m = /^([a-z]+)\s*@\s*(kick|snare|hat|beat)\s+(\d+(?:\.\d+)?)$/.exec(item.trim());
   if (!m) bad(row, `an accent reads "jump @kick 2" (got ${JSON.stringify(item)})`);
   if (!isAccentKey(m![1])) bad(row, `unknown accent ${JSON.stringify(m![1])}: use one of ${accentVocabulary().join(", ")}`);
-  return { accent: m![1] as AccentKey, band: m![2], index: Number(m![3]) };
+  const index = Number(m![3]);
+  if (m![2] !== "beat" && !(Number.isInteger(index) && index >= 1 && index <= MAX_ANCHOR)) bad(row, `@${m![2]} ${m![3]}: count from 1 to ${MAX_ANCHOR}`);
+  return { accent: m![1] as AccentKey, band: m![2], index };
 }
 
 type Action = { kind: "continue" | "rest" | "move" | "glide" | "freeze"; move?: string; onPath?: boolean; points?: Point[]; corners?: number; lock?: Lock; hits: Hit[] };
@@ -258,7 +262,7 @@ function parseCameraWords(row: Row, text: string, points: Point[] | undefined, c
   const at = words.findIndex(w => w.startsWith("@"));
   if (at >= 0) {
     const band = words[at].slice(1), index = Number(words[at + 1]);
-    if (!["kick", "snare", "hat"].includes(band) || !Number.isInteger(index) || index < 1) bad(row, "a camera start reads \"@snare 1\"");
+    if (!["kick", "snare", "hat"].includes(band) || !Number.isInteger(index) || index < 1 || index > MAX_ANCHOR) bad(row, `a camera start reads "@snare 1" (count from 1 to ${MAX_ANCHOR})`);
     cam.at = { band, index };
     words = [...words.slice(0, at), ...words.slice(at + 2)];
   }
@@ -397,8 +401,7 @@ export function applyScript(recipe: Recipe, args: { script: string }, ctx: { ban
       // An accent with no hit of its band in the row lands on the row's start, so the shot still builds; the marker
       // keeps the anchor it asked for (fellBack), so describe shows it (a mistyped "@kick 5" stays visible).
       const found = resolveAnchor(r, bands, row, hit.band, hit.index), seconds = secondsAtBeat(r.beatGrid, found ?? row.from);
-      r = addMarker(r, ctx.drive, seconds, hit.accent);
-      if (found === undefined) r = validateRecipe({ ...r, reactive: { ...r.reactive!, markers: r.reactive!.markers!.map(m => Math.abs(m.seconds - seconds) < 1e-3 && m.accent === hit.accent ? { ...m, fellBack: `@${hit.band} ${hit.index}` } : m) } });
+      r = withMarkers(r, [...currentMarkers(r, ctx.drive), { seconds: Math.round(Math.max(0, seconds) * 1e4) / 1e4, accent: hit.accent, source: "manual", ...(found === undefined ? { fellBack: `@${hit.band} ${hit.index}` } : {}) }]);
     }
   }
   // Camera track.

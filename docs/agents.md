@@ -31,7 +31,7 @@ npm run cli -- commands                   # or: node cli/bin/motion-studio.mjs c
 | `render <recipe.json> [--audio track.wav] --out bundle/` | The guide bundle, rendered in headless Chrome through the studio (as `npm run smoke` does). Options: `--view rig\|front\|side\|top\|orbit\|iso` (default: `rig` when the recipe has a camera rig), `--size 1280x720`, `--start 8 --length 8 --unit beats\|seconds`, `--grid` (render the ground grid). Needs Google Chrome (or `CHROME_PATH`). |
 | `commands` | Every command type with its arguments. |
 
-Without `--analysis`, the commands that need the music's hits fail with a clear message: a camera start on a hit (a script's camera `@kick N`, `startCameraMove`), `snapMoveTo` and `placeOnEvery`. A lock has no hits to land on, so it does nothing. An action accent in a script lands on its row's start.
+Without `--analysis`, the commands that need the music's hits fail with a clear message: a camera start on a hit (a script's camera `@kick N`, `startCameraMove`), `snapMoveTo` and `placeOnEvery`. A lock on the beat still lands on every beat; a lock on kicks, snares or hats finds none of them, so it holds nothing (only hits added by hand with `markers:` give it some). An action accent in a script lands on its row's start.
 
 ### Commands, by area
 

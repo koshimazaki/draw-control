@@ -107,6 +107,19 @@ describe("Example 2: one street guide for any subject", () => {
     const bad = hop({ band: "kick", n: 0 });
     expect(bad.ok && bad.state.character.find(b => b.word === "hop")!.at).toBeUndefined();
     expect(bad.ok && bad.notes.join(" ")).toMatch(/1 unreadable hop anchor dropped/);
+    // A hop index past 64 (or not whole) is dropped with a note, as a setup file drops it; the hop lands on the first kick.
+    const far = fromScript(text.replace("@beat 40", "@kick 1000"), BLANK_STATE, { bpm: 174, offsetSeconds: 0 });
+    expect(far.state.character.find(b => b.word === "hop")!.at).toBeUndefined();
+    expect(far.notes.join(" ")).toMatch(/@kick 1000: count from 1 to 64/);
+    // A setup block whose edges are joined shorter: its @beat is held inside the joined block.
+    const st = structuredClone(exampleState(i)) as unknown as { character: { from: number; to: number; word: string; at?: unknown }[] };
+    st.character = [{ from: 0, to: 22, word: "glide" }, { from: 19, to: 23, word: "hop", at: { band: "beat", n: 1.8 } }, { from: 23, to: 35, word: "hover" }];
+    const joined = readSetup(JSON.stringify(buildSetup(st as never, info)));
+    expect(joined.ok && joined.state.character.find(b => b.word === "hop")).toMatchObject({ from: 22, to: 23, at: { band: "beat", n: 0.5 } });
+    expect(joined.ok && joined.notes.join(" ")).toMatch(/1 hop on a beat outside the block moved inside it/);
+    // Refitting the lanes scales the hop's beat with its block, so it stays where it was in it.
+    const fitted = fitLanes(read.state, 70).character.find(b => b.word === "hop")!;
+    expect(fitted.at).toEqual({ band: "beat", n: 31 });
     // A block that shrinks under its @beat prints the hop inside it.
     const shrunk = structuredClone(read.state), h = shrunk.character.find(b => b.word === "hop")!;
     h.to = 21; shrunk.character.push({ from: 21, to: 35, word: "hover" });

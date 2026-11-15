@@ -253,7 +253,7 @@ function blocks(v: unknown, words: readonly string[], camera: boolean): { list: 
     if (!camera && word === "hop" && b.at !== undefined) {
       // As fromScript reads it: a beat offset is kept inside the block (hopOffset), a hit index is 1–64; anything else is dropped.
       const n = isRec(b.at) ? num(b.at.n) : undefined, band = isRec(b.at) ? b.at.band : undefined;
-      if (n !== undefined && band === "beat") { block.at = { band, n: hopOffset(n, to - from) }; if (block.at.n !== n) hopNotes.clamped++; }
+      if (n !== undefined && band === "beat") block.at = { band, n };   // held inside the block once the edges are joined (below)
       else if (n !== undefined && (band === "kick" || band === "snare" || band === "hat") && Number.isInteger(n) && n >= 1 && n <= 64) block.at = { band, n };
       else hopNotes.dropped++;
     }
@@ -262,6 +262,7 @@ function blocks(v: unknown, words: readonly string[], camera: boolean): { list: 
   if (!list.length) return null;
   list[0].from = 0;
   for (let i = 1; i < list.length; i++) { list[i].from = list[i - 1].to; if (list[i].to <= list[i].from) list[i].to = list[i].from + 1; }
+  for (const b of list) if (b.at?.band === "beat") { const n = hopOffset(b.at.n, b.to - b.from); if (n !== b.at.n) { hopNotes.clamped++; b.at = { band: "beat", n }; } }
   const read = list.length;
   // The camera rig holds at most 32 ranges (camera.ts): the 32nd block runs on to the lane's end.
   let phrases = 0;
