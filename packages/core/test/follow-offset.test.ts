@@ -83,3 +83,21 @@ describe("the rig follows the offset", () => {
     expect(offsetAt(r, 120).right).toBeGreaterThan(15);
   });
 });
+
+describe("a follow block after a programmed orbit", () => {
+  // Example 4 (15 Nov 2026): an `orbit 70` block turned every later follow block by 70°, so
+  // `follow side right` ended in front of the subject and `follow side` behind it.
+  const after = (follow: string) => applyScript(base(), { script: `beats 0-6 | action: ${STRAIGHT} lock kick 1 | camera: orbit 70\nbeats 6-17 | action: continue | camera: ${follow}` }, ctx);
+  it("sits at its own side, not turned by the orbit before it", () => {
+    const left = offsetAt(after("follow side distance 6m"), 190), right = offsetAt(after("follow side right distance 6m"), 190);
+    expect(Math.abs(left.ahead)).toBeLessThan(1.5);
+    expect(Math.abs(right.ahead)).toBeLessThan(1.5);
+    expect(left.right).toBeLessThan(-4);
+    expect(right.right).toBeGreaterThan(4);
+  });
+  it("an orbit inside the follow block itself still turns it", () => {
+    const plain = offsetAt(applyScript(base(), { script: `beats 0-17 | action: ${STRAIGHT} lock kick 1 | camera: chase` }, ctx), 150);
+    const turning = offsetAt(applyScript(base(), { script: `beats 0-17 | action: ${STRAIGHT} lock kick 1 | camera: chase + orbit 90` }, ctx), 150);
+    expect(Math.abs(Math.atan2(turning.right, turning.ahead) - Math.atan2(plain.right, plain.ahead))).toBeGreaterThan(0.5);
+  });
+});
