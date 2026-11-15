@@ -377,11 +377,11 @@ export function startBeatPath(root: HTMLElement) {
       // A fetched track lands only if its example is still the one showing (rapid switching).
       try { const res = await fetch(t.file); const loaded = await loadTrack(new File([await res.blob()], t.name)); if (!current()) return; return useTrack(loaded, t.licence, t.grid); }
       catch (e) {
-        // The generated groove instead, under its own name and licence, on the example's grid so the moves stay put.
+        // The generated groove instead, under its own name, licence and tempo (the example's grid is the file's, not this groove's: the lanes refit).
         if (!current()) return;
         const music = synthMusic(id), named = musicIdentity(id, false);
-        await useTrack(trackFromSamples(named.name, music.channels, music.sampleRate), named.licence, t.grid);
-        say(`Couldn't load the example's music (${t.file}: ${(e as Error).message}); playing a generated groove`);
+        await useTrack(trackFromSamples(named.name, music.channels, music.sampleRate), named.licence);
+        say(`Couldn't load the example's music (${t.file}: ${(e as Error).message}); playing a generated groove at its own tempo, the lanes refitted`);
         return;
       }
     }

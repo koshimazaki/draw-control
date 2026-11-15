@@ -13,7 +13,8 @@ const mp3 = fileURLToPath(new URL("../../packages/studio/public/tracks/neon-rain
 const hasFfmpeg = (() => { try { execFileSync("ffmpeg", ["-version"], { stdio: "ignore" }); return true; } catch { return false; } })();
 const decode = (rate: number) => {
   const raw = execFileSync("ffmpeg", ["-v", "error", "-i", mp3, "-f", "f32le", "-ac", "1", "-ar", String(rate), "-"], { maxBuffer: 1 << 28 });
-  return new Float32Array(raw.buffer, raw.byteOffset, raw.byteLength / 4).slice();
+  // A copy of the bytes: the Buffer may sit at an offset that is not a multiple of 4 (as cli/src/audio-file.ts does).
+  return new Float32Array(raw.buffer.slice(raw.byteOffset, raw.byteOffset + Math.floor(raw.byteLength / 4) * 4));
 };
 const near = (list: number[], t: number) => list.some(x => Math.abs(x - t) < 0.03);
 

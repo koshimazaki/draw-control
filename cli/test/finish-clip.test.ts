@@ -1,12 +1,15 @@
 /** scripts/finish-clip.mjs (`npm run finish`): its command line and the ffmpeg arguments it builds. ffmpeg itself is not run here. */
 import { spawnSync } from "node:child_process";
-import { copyFileSync, mkdtempSync } from "node:fs";
+import { copyFileSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it } from "vitest";
 // @ts-expect-error: a plain .mjs script, no type declarations
 import { finishCommand, parseFinishArgs } from "../../scripts/finish-clip.mjs";
+
+const dirs: string[] = [];
+afterAll(() => { for (const d of dirs) rmSync(d, { recursive: true, force: true }); });
 
 describe("npm run finish", () => {
   it("reads two inputs, --out and an optional --crf", () => {
@@ -33,6 +36,7 @@ describe("npm run finish", () => {
   });
   it("runs from a path with a space in it (the main guard compares file URLs, not raw paths)", () => {
     const dir = mkdtempSync(join(tmpdir(), "finish clip ")), copy = join(dir, "finish clip.mjs");
+    dirs.push(dir);
     copyFileSync(fileURLToPath(new URL("../../scripts/finish-clip.mjs", import.meta.url)), copy);
     const r = spawnSync(process.execPath, [copy, "only-one-arg"], { encoding: "utf8" });
     expect(r.status).toBe(1);

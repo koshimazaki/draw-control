@@ -42,7 +42,7 @@ describe("Example 1: the ship on the owner's loop", () => {
     expect(beats).toBe(26);
     expect(s.cameraLane.at(-1)!.to).toBe(beats);
     expect(fitLanes(s, beats)).toEqual(s);
-    expect(s.cameraLane.map(b => b.from)).toEqual([0, 8, 16, 18]);
+    expect(s.cameraLane.map(b => b.from)).toEqual([0, 6, 7, 8, 16, 18]);   // 6–7: one zoom in on the kick at beat 6.15
     expect(s.character.map(b => [b.from, b.to, b.word])).toEqual([[0, 26, "glide"]]);
     expect(s.cameraLane.every(b => b.shot === "-")).toBe(true);
   });
@@ -59,7 +59,7 @@ describe("Example 1: the ship on the owner's loop", () => {
     const s = exampleState(i);
     expect(s.rig).toEqual({ distance: 7, height: 5, fov: 50, yaw: 145 });
     const r = beatPathRecipe(s, info);
-    expect(r.camera!.segments.map(g => g.modes.join("+"))).toEqual(["threeQuarter", "chase", "top", "top+pushIn"]);
+    expect(r.camera!.segments.map(g => g.modes.join("+"))).toEqual(["threeQuarter", "threeQuarter", "threeQuarter", "chase", "top", "top+pushIn"]);
     // out/ex5/final/camera.json track[0].position: behind the ship's left, at the 8 m ceiling.
     const c = cameraAtFrame(planCamera(r), 0);
     expect(c.position[0]).toBeCloseTo(-21.234, 1);

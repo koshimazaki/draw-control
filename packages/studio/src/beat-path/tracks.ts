@@ -11,8 +11,8 @@ import type { GrooveStyle } from "@motion-studio/core";
 /**
  * `grid`: the music's beat grid, given instead of estimated. Example 1's guide starts at the file's
  * own start (beat 0 at 0 s, where the analysis puts it at 0.081 s), so the finish step
- * (scripts/finish-clip.mjs) lays the original audio on a generated clip with no offset. It holds on
- * the fallback groove too, so the moves stay put when the file cannot load.
+ * (scripts/finish-clip.mjs) lays the original audio on a generated clip with no offset. It belongs to
+ * the file: the fallback groove plays at its own tempo, and the lanes refit to it.
  */
 export type ExampleTrack = { name: string; groove: GrooveStyle; bars: number; file?: string; grid?: { bpm: number; offsetSeconds: number }; licence: string };
 
