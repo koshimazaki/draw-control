@@ -52,8 +52,20 @@ export async function smokeBeatPathSetup(browser, base, { fail, OUT }) {
   };
   const undo = async redo => { await page.evaluate(() => document.activeElement?.blur()); await page.keyboard.press(redo ? "Control+Shift+z" : "Control+z"); };
 
-  // 1. Save, change, load back; one undo step.
   await page.click("#settings summary");
+  // 0. Example 1 with "Next move on each hit" on (its camera anchors on snares): saved, it loads back as it was.
+  const advance = async () => { await page.click("#setCamLock"); await page.click('#menu button:has-text("Next move on each hit")'); };
+  await advance();
+  if (!(await state()).camLock.advance) fail("Next move on each hit did not turn on");
+  const withAdvance = await state();
+  await save("advance-setup.json");
+  await page.selectOption("#scenery", "none");
+  const la = await loaded("a setup with next move on each hit", "#setupFile", `${dir}advance-setup.json`);
+  if (canon(await state()) !== canon(withAdvance) || /lands once/.test(la.status)) fail(`a setup with next move on each hit did not load as saved ("${la.status}")`);
+  await advance();
+  if ((await state()).camLock.advance) fail("Next move on each hit did not turn off");
+
+  // 1. Save, change, load back; one undo step.
   await page.selectOption("#scenery", "street");
   await page.selectOption("#figureShape", "car");
   const before = await state(), file = await save("setup.json");
@@ -119,6 +131,10 @@ export async function smokeBeatPathSetup(browser, base, { fail, OUT }) {
   l = await loaded("bad-audio.zip", "#setupFile", `${dir}bad-audio.zip`);
   const fit = await page.evaluate(() => ({ end: window.__beatPath.state().character.at(-1).to, beats: window.__beatPath.recipe().durationBeats }));
   if (!/Could not read the guide's audio/.test(l.status) || fit.end !== fit.beats) fail(`a bad guide audio left the page half loaded (${l.status}; lanes end ${fit.end}, clip ${fit.beats} beats)`);
+  // The music that stays is the 8 s cut: the setup's slice (12.3 s) is past its end, so it goes.
+  const kept = await page.evaluate(() => ({ slice: window.__beatPath.state().slice, clip: window.__beatPath.state().clip, length: window.__beatPath.trackLength() }));
+  if (kept.slice !== undefined && kept.slice + kept.clip > (kept.length ?? 0) + 0.05) fail(`a bad guide audio left a slice past the music's end (slice ${kept.slice}, ${kept.length} s of music)`);
+  if (!/slice cleared/.test(l.status)) fail("a bad guide audio cleared the slice without saying so");
 
   if (errors.length) fail(`setup page errors: ${errors.join(" | ")}`);
   await page.close();

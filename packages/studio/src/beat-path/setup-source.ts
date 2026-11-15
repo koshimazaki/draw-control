@@ -18,6 +18,18 @@ const depth = (path: string) => path.split("/").length;
 
 export type SetupSource = { text: string; audio?: Uint8Array } | { error: string };
 
+/**
+ * The most a picked file may be, checked on its size before a byte is read (a stored zip entry is
+ * never inflated, so only this bounds it): a setup .json its own cap; a guide zip the setup's and
+ * the audio's caps together, which also holds a 30 s guide video (6 Mbit/s, about 23 MB).
+ */
+export const ZIP_MAX_BYTES = SETUP_MAX_BYTES + AUDIO_MAX_BYTES;
+const mb = (n: number) => `${(n / 1e6).toFixed(1)} MB`;
+export function tooBig(size: number, zip: boolean): string | null {
+  const cap = zip ? ZIP_MAX_BYTES : SETUP_MAX_BYTES;
+  return size > cap ? `the file is too big (${mb(size)}; a ${zip ? "guide zip" : "setup file"} is at most ${mb(cap)})` : null;
+}
+
 /** A guide has nine files; this leaves room for a zipped folder with more beside it. */
 export const ZIP_MAX_ENTRIES = 1000;
 class TooMany extends Error {}
@@ -30,8 +42,9 @@ class TooMany extends Error {}
  */
 export function fromZip(bytes: Uint8Array): SetupSource {
   const sizes = new Map<string, number>();
+  let entries = 0;   // every entry, a repeated name too
   try {
-    unzipSync(bytes, { filter: f => { if (sizes.size >= ZIP_MAX_ENTRIES) throw new TooMany(); sizes.set(f.name, f.originalSize); return false; } });
+    unzipSync(bytes, { filter: f => { if (++entries > ZIP_MAX_ENTRIES) throw new TooMany(); sizes.set(f.name, f.originalSize); return false; } });
   } catch (e) { return { error: e instanceof TooMany ? `The zip has more than ${ZIP_MAX_ENTRIES} files: not a guide` : "Could not open the zip" }; }
   const setup = shallowest([...sizes.keys()].filter(n => base(n) === SETUP_FILE));
   if (!setup) return { error: `No ${SETUP_FILE} in the zip: a guide downloaded before setups were saved in it has none` };
@@ -59,7 +72,8 @@ export function pickFromFolder<F extends { path: string; size: number }>(files: 
   const path = shallowest(setups.map(f => f.path));
   if (!path) return { error: `No ${SETUP_FILE} in that folder: pick an unzipped guide's folder` };
   const setup = setups.find(f => f.path === path)!;
-  if (setup.size > SETUP_MAX_BYTES) return { error: "The setup file is too big" };
+  const big = tooBig(setup.size, false);
+  if (big) return { error: big };
   const dir = path.slice(0, path.length - SETUP_FILE.length), audio = files.find(f => f.path === dir + BUNDLE_FILES.audio && f.size <= AUDIO_MAX_BYTES);
   return { setup, ...(audio ? { audio } : {}) };
 }
@@ -100,6 +114,11 @@ export const matchAwaited = (a: Awaited | null, name: string, length: number) =>
 export function restoreAwaited(a: Awaited, s: BeatPathState): BeatPathState {
   const lanes = lanesOf(s) === a.lanes ? { character: a.state.character, cameraLane: a.state.cameraLane } : {};
   return { ...s, slice: a.state.slice, markers: a.state.markers, muted: a.state.muted, ...lanes };
+}
+/** The setup's slice only if the clip fits in the music that stays (`length` seconds; null: no track), else cleared. */
+export function keepSliceIn(s: BeatPathState, length: number | null): { state: BeatPathState; cleared: boolean } {
+  if (s.slice === undefined || (length !== null && s.slice + s.clip <= length + 0.05)) return { state: s, cleared: false };
+  return { state: { ...s, slice: undefined }, cleared: true };
 }
 /** Same file, as far as the page can tell: name, tempo and length. */
 const sameMusic = (a: SetupMusic, b: SetupMusic) => a.name === b.name && Math.abs(a.bpm - b.bpm) < 1e-6 && Math.abs(a.lengthSeconds - b.lengthSeconds) < 0.05;

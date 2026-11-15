@@ -14,7 +14,7 @@
  * `readSetup` never throws: a field it cannot use falls back to the blank page's value (BLANK_STATE)
  * on its own, with a note, rather than refusing the whole file; values are clamped as the page clamps them.
  */
-import { CAMERA_MAX_HEIGHT, FOLLOW_LIMITS, clipBeats, type FollowOffset } from "@motion-studio/core";
+import { CAMERA_MAX_HEIGHT, FOLLOW_LIMITS, clipBeats, type CommandContext, type FollowOffset } from "@motion-studio/core";
 import { beatPathRecipe, type TrackInfo } from "./recipe-map";
 import {
   BLANK_STATE, CAMERA_WORDS, CHARACTER_WORDS, HIT_CHOICES, LOCK_CHOICES, clampClip, fitLanes, toScript,
@@ -32,7 +32,7 @@ export const SETUP_MAX_BYTES = 2_000_000;
 
 export type SetupMusic = TrackInfo;
 export type SetupFile = { kind: typeof SETUP_KIND; version: typeof SETUP_VERSION; saved: string; music: SetupMusic | null; state: BeatPathState; script: string };
-export type SetupRead = { ok: true; state: BeatPathState; music: SetupMusic | null; notes: string[] } | { ok: false; error: string };
+export type SetupRead = { ok: true; state: BeatPathState; music: SetupMusic | null; notes: string[]; /** "Next move on each hit" waits for the hits of a track not given in `ctx`. */ waitsForHits?: boolean } | { ok: false; error: string };
 
 /** The file for the page's state and the music it is timed to. */
 export function buildSetup(state: BeatPathState, music: TrackInfo | null, now = new Date()): SetupFile {
@@ -43,7 +43,7 @@ export const setupJson = (state: BeatPathState, music: TrackInfo | null, now?: D
 // Limits: the map's own (map.ts: points within ±60 m, 16 points a path), the recipe's for scenery
 // boxes (recipe.ts: up to 200, ±200 m, sides 0.2–80 m, height 0.2–60 m, yaw ±7 rad), generous caps elsewhere.
 const LIMIT = {
-  coord: 60, points: 16, blocks: 64, boxes: 200, box: { coord: 200, side: [0.2, 80], height: [0.2, 60], yaw: 7 },
+  coord: 60, points: 16, blocks: 64, cameraBlocks: 32, boxes: 200, box: { coord: 200, side: [0.2, 80], height: [0.2, 60], yaw: 7 },
   // The recipe's own: 512 switched-off hits and markers (recipe.ts), shot text 300 characters; `scan` bounds the work on a hostile list.
   hits: 512, scan: 10_000, shot: 300, text: 2000, phrase: 300, seconds: 3600, subjectY: 30,
 } as const;
@@ -67,7 +67,7 @@ const ms = (t: number) => Math.round(t * 1000) / 1000;
 const shotText = (v: string) => v.replace(/[<>{}\\]/g, " ").replace(/(https?|data|javascript):\S*/gi, " ").replace(/\s*[\r\n]+\s*/g, " ").replace(/ {2,}/g, " ").trim().slice(0, LIMIT.shot).trim();
 
 /** Read a setup file's text. Never throws: a state with notes, or a plain error. */
-export function readSetup(text: string): SetupRead {
+export function readSetup(text: string, ctx: CommandContext = {}): SetupRead {
   if (typeof text !== "string") return { ok: false, error: "Not a setup file" };
   if (text.length > SETUP_MAX_BYTES) return { ok: false, error: `The setup file is too big (${(text.length / 1e6).toFixed(1)} MB; a setup is a few kB)` };
   let raw: unknown;
@@ -82,15 +82,22 @@ export function readSetup(text: string): SetupRead {
   let state = readState(raw.state, notes);
   // The lanes fill the clip at the music's tempo, as the page keeps them.
   state = fitLanes(state, clipBeats(state.clip, music?.bpm ?? 120));
-  // Last: the state must build a recipe. Typed camera phrases are the one part the core can still refuse.
-  const builds = (s: BeatPathState) => { try { beatPathRecipe(s, music); return null; } catch (e) { return (e as Error).message; } };
-  let why = builds(state);
-  if (why && state.cameraLane.some(b => b.phrase)) {
-    state = { ...state, cameraLane: state.cameraLane.map(({ phrase: _, ...b }) => b) };
-    if (!builds(state)) { notes.push(`camera directions dropped (${why.replace(/^Recipe: /, "")})`); why = null; }
+  // Last: the state must build a recipe, as the page builds it (`ctx`: the hits of the track loaded).
+  // "Next move on each hit" anchors camera blocks on hits, so without the setup's own track it cannot
+  // resolve yet: that never refuses the file; the state keeps it and it lands once the track is loaded.
+  // Typed camera phrases are the other part the core can refuse: those are dropped, with a note.
+  const builds = (s: BeatPathState) => { try { beatPathRecipe(s, music, ctx); return null; } catch (e) { return (e as Error).message; } };
+  const off = (s: BeatPathState): BeatPathState => ({ ...s, camLock: { ...s.camLock, advance: false } });
+  const ok = (s: BeatPathState) => (!builds(s) ? "now" : s.camLock.advance && !builds(off(s)) ? "hits" : null);
+  const why = builds(state);
+  let result = why ? ok(state) : "now";
+  if (!result && state.cameraLane.some(b => b.phrase)) {
+    const bare = { ...state, cameraLane: state.cameraLane.map(({ phrase: _, ...b }) => b) };
+    result = ok(bare);
+    if (result) { state = bare; notes.push(`camera directions dropped (${why!.replace(/^Recipe: /, "")})`); }
   }
-  if (why) return { ok: false, error: `The setup does not make a shot: ${why.replace(/^Recipe: /, "")}` };
-  return { ok: true, state, music, notes };
+  if (!result) return { ok: false, error: `The setup does not make a shot: ${why!.replace(/^Recipe: /, "")}` };
+  return { ok: true, state, music, notes, ...(result === "hits" ? { waitsForHits: true } : {}) };
 }
 
 function readMusic(v: unknown, notes: string[]): SetupMusic | null {
@@ -125,7 +132,11 @@ export function readState(s: Rec, notes: string[]): BeatPathState {
   for (const [key, words] of [["character", CHARACTER_WORDS], ["cameraLane", CAMERA_WORDS]] as const) {
     if (!has(key)) continue;
     const lane = blocks(s[key], words as readonly string[], key === "cameraLane");
-    if (lane) { (out as Rec)[key] = lane.list; if (lane.dropped) notes.push(`${key === "character" ? "character" : "camera"} lane: ${lane.dropped} unreadable blocks dropped`); }
+    if (lane) {
+      (out as Rec)[key] = lane.list;
+      if (lane.dropped) notes.push(`${key === "character" ? "character" : "camera"} lane: ${lane.dropped} unreadable blocks dropped`);
+      if (lane.capped) notes.push(`camera lane: kept ${LIMIT.cameraBlocks} blocks (the rig's most), the last one runs to the end`);
+    }
     else drop(`${key === "character" ? "character" : "camera"} lane`);
   }
 
@@ -223,7 +234,7 @@ function points(v: unknown, camera: boolean): { list: PathPt[]; cut?: string } |
 }
 
 /** A lane: readable blocks in order, edges joined (each block starts where the last ends, the first at 0). */
-function blocks(v: unknown, words: readonly string[], camera: boolean): { list: Block<string>[]; dropped: number } | null {
+function blocks(v: unknown, words: readonly string[], camera: boolean): { list: Block<string>[]; dropped: number; capped?: number } | null {
   if (!Array.isArray(v)) return null;
   const list = v.slice(0, LIMIT.blocks).flatMap(b => {
     if (!isRec(b)) return [];
@@ -237,7 +248,10 @@ function blocks(v: unknown, words: readonly string[], camera: boolean): { list: 
   if (!list.length) return null;
   list[0].from = 0;
   for (let i = 1; i < list.length; i++) { list[i].from = list[i - 1].to; if (list[i].to <= list[i].from) list[i].to = list[i].from + 1; }
-  return { list, dropped: v.length - list.length };
+  const read = list.length;
+  // The camera rig holds at most 32 ranges (camera.ts): the 32nd block runs on to the lane's end.
+  if (camera && list.length > LIMIT.cameraBlocks) { const end = list.at(-1)!.to; list.length = LIMIT.cameraBlocks; list[list.length - 1].to = end; }
+  return { list, dropped: v.length - read, ...(read > list.length ? { capped: read - list.length } : {}) };
 }
 
 function follow(f: Rec): FollowOffset | undefined {

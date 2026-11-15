@@ -20,7 +20,7 @@ import { exampleState, ownState } from "./examples";
 import { bindGenerate } from "./page-generate";
 import { editStep, endDrag } from "./drag-edit";
 import { musicFor, type Cut } from "./slot-music";
-import { awaitFor, matchAwaited, planMusic, restoreAwaited, type Awaited } from "./setup-source";
+import { awaitFor, keepSliceIn, matchAwaited, planMusic, restoreAwaited, type Awaited } from "./setup-source";
 import { moveOntoCut, slicedName } from "./track-cut";
 import { movedIndex } from "./lane-cuts";
 import { LaneView, Menu } from "./lanes";
@@ -445,7 +445,11 @@ export function startBeatPath(root: HTMLElement) {
         if (state.track) cuts.set(slot, { track: cut, licence: music.licence, grid, from: state.track });
         await useTrack(cut, music.licence, grid);
         // A guide audio that cannot be read: the setup stays, on the music that is loaded, its lanes fitted to it.
-      } catch (e) { state = fitLanes(state, totalBeats()); rebuild(); said = `Could not read the guide's audio (${(e as Error).message}): the music loaded stays`; }
+      } catch (e) {
+        const kept = keepSliceIn(state, info?.lengthSeconds ?? null);
+        state = fitLanes(kept.state, totalBeats()); rebuild();
+        said = `Could not read the guide's audio (${(e as Error).message}): the music loaded stays${kept.cleared ? ", the slice cleared (it is past that music's end)" : ""}`;
+      }
     } else if (plan.kind === "keep") { state = fitLanes(state, totalBeats()); rebuild(); }
     else {
       if (track) removeTrack(); else { state = fitLanes(state, totalBeats()); rebuild(); }
