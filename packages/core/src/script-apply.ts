@@ -300,11 +300,14 @@ function parseShot(row: Row): { shot?: Shot; cut?: boolean } {
   return { shot: name as Shot, ...(flag ? { cut: true } : {}) };
 }
 
-/** The beat of the Nth (1-based) onset of a band inside a row, or a beat. */
-function resolveAnchor(r: Recipe, bands: BandAnalysis | undefined, row: Row, band: string, index: number): number {
+/**
+ * The beat of the Nth (1-based) onset of a band inside a row, or a beat. A row that holds none of that band
+ * (a one-beat block between two kicks, or no track analysed yet) gives undefined: the caller starts on the row.
+ */
+function resolveAnchor(r: Recipe, bands: BandAnalysis | undefined, row: Row, band: string, index: number): number | undefined {
   if (band === "beat") return index;
   const list = onsetBeats(r, bands, band).filter(b => b >= row.from - 1e-6 && b < row.to - 1e-6);
-  if (!list.length) return bad(row, `no ${band}s in beats ${row.from}-${row.to}${bands ? "" : " (analyse a track first: --analysis)"}`);
+  if (!list.length) return undefined;
   if (!Number.isInteger(index) || index < 1 || index > list.length) return bad(row, `@${band} ${index}: beats ${row.from}-${row.to} have ${list.length} ${band}s (count from 1)`);
   return list[index - 1];
 }
@@ -391,7 +394,8 @@ export function applyScript(recipe: Recipe, args: { script: string }, ctx: { ban
   if (hits.length || recipe.reactive?.markers) {
     r = validateRecipe({ ...r, reactive: { ...(r.reactive ?? { ...DEFAULT_REACTIVE, accents: [] }), markers: [] } });
     for (const { row, hit } of hits) {
-      const beat = hit.band === "beat" ? hit.index : resolveAnchor(r, bands, row, hit.band, hit.index);
+      // An accent with no hit of its band in the row lands on the row's start, so the shot still builds.
+      const beat = resolveAnchor(r, bands, row, hit.band, hit.index) ?? row.from;
       r = addMarker(r, ctx.drive, secondsAtBeat(r.beatGrid, beat), hit.accent);
     }
   }
@@ -438,11 +442,12 @@ export function applyScript(recipe: Recipe, args: { script: string }, ctx: { ban
       r = setCameraModes(r, { modes, fromBeat: start, toBeat: b.to, fields: { ...fields, ...b.shot } });
       continue;
     }
-    // "@kick 1" on a block that holds no kick (a one-beat accent between two hits): the block starts on its row, as
-    // without an anchor, rather than failing the whole shot. With no track analysed it still refuses (nothing to anchor on).
-    const empty = at && at.band !== "beat" && bands && !onsetBeats(r, bands, at.band).some(x => x >= b.row.from - 1e-6 && x < b.row.to - 1e-6);
-    if (at && !empty) {
-      start = resolveAnchor(r, bands, b.row, at.band, at.index);
+    // "@kick 1" on a block that holds no kick (a one-beat accent between two hits) starts on its row, as an accent does.
+    // With no track analysed a camera start still refuses: the page says to load the track (Next move on each hit).
+    const anchored = at ? resolveAnchor(r, bands, b.row, at.band, at.index) : undefined;
+    if (at && anchored === undefined && !bands) bad(b.row, `no ${at.band}s in beats ${b.row.from}-${b.row.to} (analyse a track first: --analysis)`);
+    if (at && anchored !== undefined) {
+      start = anchored;
       const nth = onsetBeats(r, bands, at.band).findIndex(x => Math.abs(x - start) < 1e-6);
       r = startCameraMove(r, { modes, target: at.band, index: nth, lengthBeats: b.to - start, fields: { ...fields, ...b.shot } }, bands);
     } else r = setCameraModes(r, { modes, fromBeat: b.from, toBeat: b.to, fields: { ...fields, ...b.shot } });

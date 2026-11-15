@@ -16,15 +16,8 @@ export const baseFor = (clip: number, track: TrackInfo | null) =>
 
 /** The page's recipe: its shot script applied to the base. `ctx` carries the analysed onsets. */
 export function beatPathRecipe(state: BeatPathState, track: TrackInfo | null, ctx: CommandContext = {}): Recipe {
-  const script = toScript(state), apply = (text: string) => applyMotionCommand(baseFor(state.clip, track), { type: "applyScript", script: text }, ctx);
-  let r: Recipe;
-  try { r = apply(script); } catch (e) {
-    // A hop lands on the first kick of its row; with no kick there (no track analysed yet, or none in the row) it lands
-    // on the row's start instead, so the shot still builds. The CLI, given the same script and hits, lands it alike.
-    const fallback = hopOnBeat(script);
-    if (fallback === script || !/no kicks in beats|analyse a track first/.test(String((e as Error).message))) throw e;
-    r = apply(fallback);
-  }
+  // A hop or camera start with no hit of its band in its row starts on the row (applyScript), as in the CLI and MCP.
+  let r = applyMotionCommand(baseFor(state.clip, track), { type: "applyScript", script: toScript(state) }, ctx);
   // Without a glide block the figure stands at the start of its path.
   if (!state.character.some(b => b.word === "glide") && state.subject.length) {
     const p = state.subject[0];
@@ -32,9 +25,6 @@ export function beatPathRecipe(state: BeatPathState, track: TrackInfo | null, ct
   }
   return r;
 }
-
-/** The script with every hop ("continue, jump @kick 1") anchored on its row's first beat instead of a kick. */
-export const hopOnBeat = (script: string) => script.replace(/^beats ([\d.]+)-([\d.]+) \| action: continue, jump @kick 1\b/gm, (_, from: string, to: string) => `beats ${from}-${to} | action: continue, jump @beat ${from}`);
 
 /** The exported range: the clip from beat 0, 121 frames for 5 s, 193 for 8 s, 721 for 30 s. */
 export const exportRange = (recipe: Recipe, clip: number) => resolveExportRange(recipe, { unit: "beats", start: 0, length: clip * recipe.beatGrid.bpm / 60 });

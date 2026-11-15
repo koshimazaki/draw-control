@@ -247,6 +247,10 @@ function blocks(v: unknown, words: readonly string[], camera: boolean): { list: 
     const fov = num(b.fov);
     if (camera && (word === "behind" || word === "side") && fov !== undefined) block.fov = clamp(fov, FOV_RANGE[0], FOV_RANGE[1]);
     if (camera && b.shot === "-") block.shot = "-";
+    if (!camera && word === "hop" && isRec(b.at) && ["kick", "snare", "hat", "beat"].includes(b.at.band as string)) {
+      const n = num(b.at.n), beat = b.at.band === "beat";
+      if (n !== undefined && (beat ? n >= 0 && n < to - from : Number.isInteger(n) && n >= 1 && n <= 64)) block.at = { band: b.at.band as "kick", n };
+    }
     return [block];
   }).sort((a, b) => a.from - b.from);
   if (!list.length) return null;

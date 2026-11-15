@@ -68,7 +68,9 @@ describe("shot script", () => {
     expect(() => applyScript(base(), { script: "beats 0-4 | action: run | camera: swoop" })).toThrow(/unknown camera move "swoop".*orbit/);
     expect(() => applyScript(base(), { script: "beats 0-4 | action: run | camera: orbit | shot: extreme" })).toThrow(/wide, medium, close, low, top/);
     expect(() => applyScript(base(), { script: "beats 0-2 | action: jump @kick 5" }, { bands })).toThrow(/have 2 kicks/);
-    expect(() => applyScript(base(), { script: "beats 0-2 | action: jump @kick 1" })).toThrow(/analyse a track first/);
+    // No kick to land on (no track analysed): the accent lands on its row's start, as a camera start with hits does.
+    expect(applyScript(base(), { script: "beats 2-4 | action: jump @kick 1" }).reactive!.markers!.map(m => m.accent)).toEqual(["jump"]);
+    expect(() => applyScript(base(), { script: "beats 0-2 | camera: top\nbeats 2-4 | camera: orbit @kick 1" })).toThrow(/analyse a track first/);
   });
 });
 

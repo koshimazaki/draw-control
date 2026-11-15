@@ -20,7 +20,9 @@ export type CameraWord = (typeof CAMERA_WORDS)[number];
  * A camera block read with `shot: -` where the page would print a framing preset keeps `shot: "-"`: no preset, its own
  * distance, height and fov frame it (a preset would pull the camera to the preset's framing).
  */
-export type Block<W extends string> = { from: number; to: number; word: W; phrase?: string; follow?: FollowOffset; fov?: number; shot?: "-" };
+export type Block<W extends string> = { from: number; to: number; word: W; phrase?: string; follow?: FollowOffset; fov?: number; shot?: "-"; at?: HopAnchor };
+/** Where a hop lands when not on its row's first kick: the Nth hit of a band, or (beat) N beats after the block's start. */
+export type HopAnchor = { band: "kick" | "snare" | "hat" | "beat"; n: number };
 /** The page's follow words and the rig mode each prints as. */
 export const FOLLOW_WORDS = { behind: "chase", side: "side" } as const;
 export const isFollowWord = (w: string): w is keyof typeof FOLLOW_WORDS => w in FOLLOW_WORDS;
@@ -189,7 +191,7 @@ export function toScript(state: BeatPathState): string {
       if (c === glide && state.subject.length >= 2) action = `walk on path ${pts(state.subject)} corners ${f(state.subjectCorners)}${lock}`;
       else if (c.word === "spin" || c.word === "jump") action = `rest, ${c.word} @beat ${f(mid)}`;
       // A hop jumps on the first kick of its row while the travel carries on through it (the walk block runs on).
-      else if (c.word === "hop") action = "continue, jump @kick 1";
+      else if (c.word === "hop") action = `continue, jump ${!c.at ? "@kick 1" : c.at.band === "beat" ? `@beat ${f(c.from + c.at.n)}` : `@${c.at.band} ${c.at.n}`}`;
       else if (c.word === "freeze") action = "freeze";
       else action = "rest";
     }
@@ -262,7 +264,7 @@ export function fromScript(text: string, base: BeatPathState, grid: { bpm: numbe
     const a = row.action ?? "continue";
     if (a === "continue") { const last = state.character.at(-1); if (last) last.to = row.to; }
     else {
-      let word: CharacterWord = "hover";
+      let word: CharacterWord = "hover", at: HopAnchor | undefined;
       if (/\bon path\b/.test(a)) {
         word = "glide";
         const p = pointsIn(a);
@@ -270,12 +272,17 @@ export function fromScript(text: string, base: BeatPathState, grid: { bpm: numbe
         const c = cornersIn(a);
         state.subjectCorners = c ?? 0;
         if (readLock(a, state.charLock)) charSeen = true;
-      } else if (/^continue\b/.test(a) && /\b(jump|kick)\s*@/.test(a)) word = "hop";
+      } else if (/^continue\b/.test(a) && /\b(jump|kick)\s*@/.test(a)) {
+        // The anchor the row was written with is kept, so it prints back where it was ("@kick 1", the default, is not stored).
+        word = "hop";
+        const m = /\b(?:jump|kick)\s*@(kick|snare|hat|beat)\s+([\d.]+)/.exec(a);
+        if (m && !(m[1] === "kick" && m[2] === "1")) at = { band: m[1] as HopAnchor["band"], n: m[1] === "beat" ? Math.round((Number(m[2]) - row.from) * 1000) / 1000 : Number(m[2]) };
+      }
       else if (/^freeze\b/.test(a)) word = "freeze";
       else if (/\bspin\s*@/.test(a)) word = "spin";
       else if (/\b(jump|kick)\s*@/.test(a)) word = "jump";
       else if (!/^(rest|idle)\b/.test(a)) notes.push(`line ${row.line}: "${a}" reads as hover`);
-      state.character.push({ from: row.from, to: row.to, word });
+      state.character.push({ from: row.from, to: row.to, word, ...(at ? { at } : {}) });
     }
     const c = row.camera ?? "continue";
     if (c === "continue") { const last = state.cameraLane.at(-1); if (last) last.to = row.to; continue; }

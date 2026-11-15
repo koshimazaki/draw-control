@@ -7,10 +7,11 @@
  */
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { cameraAtFrame, clipBeats, planCamera } from "@motion-studio/core";
+import { applyScript, cameraAtFrame, clipBeats, describeRecipe, planCamera } from "@motion-studio/core";
 import { EXAMPLES, exampleState } from "../src/beat-path/examples";
-import { beatPathRecipe, hopOnBeat } from "../src/beat-path/recipe-map";
+import { baseFor, beatPathRecipe } from "../src/beat-path/recipe-map";
 import { BLANK_STATE, fitLanes, fromScript, toScript } from "../src/beat-path/script";
+import { buildSetup, readSetup } from "../src/beat-path/setup-file";
 import { EXAMPLE_TRACKS } from "../src/beat-path/tracks";
 
 const i = EXAMPLES.findIndex(e => e.id === "runner");
@@ -64,7 +65,26 @@ describe("Example 2: one street guide for any subject", () => {
   it("with no kick to land on (no track analysed yet), the hop lands on its row's start and the shot still builds", () => {
     const r = beatPathRecipe(exampleState(i), info);
     expect(r.reactive?.markers?.map(m => [Math.round(m.seconds * 1000) / 1000, m.accent])).toEqual([[Math.round(19 * 60 / 174 * 1000) / 1000, "jump"]]);
-    expect(hopOnBeat("beats 19-21 | action: continue, jump @kick 1 | camera: continue")).toBe("beats 19-21 | action: continue, jump @beat 19 | camera: continue");
+    // The core lands it there, so the CLI and MCP (applyScript on the same script) build the same recipe.
+    expect(applyScript(baseFor(12, info), { script: toScript(exampleState(i)) })).toEqual(r);
+    // With hits but none in its row: the same, and describe says the marker sits on no hit.
+    const bands = { hopSeconds: 0.01, low: [{ seconds: 1, strength: 0.4 }], mid: [], high: [], peaks: [] } as never;
+    const withHits = beatPathRecipe(exampleState(i), info, { bands });
+    expect(withHits.reactive?.markers).toEqual(r.reactive?.markers);
+    expect(applyScript(baseFor(12, info), { script: toScript(exampleState(i)) }, { bands })).toEqual(withHits);
+    expect(describeRecipe(withHits, bands)).toMatch(/jump@19 \(on no hit\)/);
+  });
+  it("a hop keeps the anchor it was written with: @beat, @snare N print back as read", () => {
+    for (const a of ["@beat 19.5", "@snare 2"]) {
+      const text = toScript(exampleState(i)).replace("continue, jump @kick 1", `continue, jump ${a}`);
+      const s = fromScript(text, BLANK_STATE, { bpm: 174, offsetSeconds: 0 }).state;
+      expect(s.character.find(b => b.word === "hop")).toBeDefined();
+      expect(toScript(s)).toMatch(new RegExp(`^beats 19-21 \\| action: continue, jump ${a} \\|`, "m"));
+    }
+    expect(fromScript(toScript(exampleState(i)), BLANK_STATE, { bpm: 174, offsetSeconds: 0 }).state.character.find(b => b.word === "hop")!.at).toBeUndefined();
+    const s = fromScript(toScript(exampleState(i)).replace("jump @kick 1", "jump @snare 2"), BLANK_STATE, { bpm: 174, offsetSeconds: 0 }).state;
+    const read = readSetup(JSON.stringify(buildSetup(s, info)));
+    expect(read.ok && read.state.character.find(b => b.word === "hop")!.at).toEqual({ band: "snare", n: 2 });
   });
   it("the page prints the script back to the same shot", () => {
     const s = exampleState(i);
