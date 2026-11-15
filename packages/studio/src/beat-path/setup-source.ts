@@ -18,15 +18,38 @@ const depth = (path: string) => path.split("/").length;
 
 export type SetupSource = { text: string; audio?: Uint8Array } | { error: string };
 
-/** A guide zip's setup and audio (decompressing only those two, each within its size). */
+/** A guide has nine files; this leaves room for a zipped folder with more beside it. */
+export const ZIP_MAX_ENTRIES = 1000;
+class TooMany extends Error {}
+
+/**
+ * A guide zip's setup and audio. The unzipper allocates each accepted entry at its declared size,
+ * so nothing is accepted blind: a first pass only lists the entries (accepting none, at most
+ * ZIP_MAX_ENTRIES), then the second decompresses just the shallowest setup.json and the audio.wav
+ * beside it, by exact name, each within its cap (so at most SETUP_MAX_BYTES + AUDIO_MAX_BYTES in all).
+ */
 export function fromZip(bytes: Uint8Array): SetupSource {
-  let files: Record<string, Uint8Array>;
+  const sizes = new Map<string, number>();
   try {
-    files = unzipSync(bytes, { filter: f => (base(f.name) === SETUP_FILE && f.originalSize <= SETUP_MAX_BYTES) || (base(f.name) === BUNDLE_FILES.audio && f.originalSize <= AUDIO_MAX_BYTES) });
-  } catch { return { error: "Could not open the zip" }; }
-  const setup = shallowest(Object.keys(files).filter(n => base(n) === SETUP_FILE));
+    unzipSync(bytes, { filter: f => { if (sizes.size >= ZIP_MAX_ENTRIES) throw new TooMany(); sizes.set(f.name, f.originalSize); return false; } });
+  } catch (e) { return { error: e instanceof TooMany ? `The zip has more than ${ZIP_MAX_ENTRIES} files: not a guide` : "Could not open the zip" }; }
+  const setup = shallowest([...sizes.keys()].filter(n => base(n) === SETUP_FILE));
   if (!setup) return { error: `No ${SETUP_FILE} in the zip: a guide downloaded before setups were saved in it has none` };
-  const dir = setup.slice(0, setup.length - SETUP_FILE.length), audio = files[dir + BUNDLE_FILES.audio];
+  if (sizes.get(setup)! > SETUP_MAX_BYTES) return { error: "The setup file is too big" };
+  const audioName = setup.slice(0, setup.length - SETUP_FILE.length) + BUNDLE_FILES.audio, audioSize = sizes.get(audioName);
+  const wanted = new Set([setup, ...(audioSize !== undefined && audioSize <= AUDIO_MAX_BYTES ? [audioName] : [])]);
+  let files: Record<string, Uint8Array>;
+  // Checked again per entry, with a running total: a name repeated in the zip must not get a second, bigger allocation.
+  let left = SETUP_MAX_BYTES + AUDIO_MAX_BYTES;
+  const take = (f: { name: string; originalSize: number }) => {
+    const cap = f.name === setup ? SETUP_MAX_BYTES : AUDIO_MAX_BYTES;
+    if (!wanted.has(f.name) || f.originalSize > cap || f.originalSize > left) return false;
+    left -= f.originalSize;
+    return true;
+  };
+  try { files = unzipSync(bytes, { filter: take }); } catch { return { error: "Could not open the zip" }; }
+  if (!files[setup]) return { error: "Could not open the zip" };
+  const audio = files[audioName];
   return { text: new TextDecoder().decode(files[setup]), ...(audio ? { audio } : {}) };
 }
 
@@ -62,6 +85,21 @@ export function musicKind(state: Pick<BeatPathState, "track">, music: Pick<Setup
   if (example && (!music || music.name === example)) return "example";
   if (!music) return "none";
   return example && music.name.startsWith(`${example} (`) ? "example-cut" : "own";
+}
+/**
+ * A loaded setup whose own track is not here (page.ts holds one, and forgets it on undo, a switch
+ * or another load): the file to wait for, the setup's state, and its lanes as fitted while it waits.
+ */
+export type Awaited = { name: string; length: number; licence: string; state: BeatPathState; lanes: string };
+const lanesOf = (s: BeatPathState) => JSON.stringify([s.character, s.cameraLane]);
+export const awaitFor = (music: SetupMusic, saved: BeatPathState, now: BeatPathState): Awaited =>
+  ({ name: music.name, length: music.lengthSeconds, licence: music.licence, state: structuredClone(saved), lanes: lanesOf(now) });
+/** The awaited setup, when the track just loaded is its file (name, and length within 50 ms). */
+export const matchAwaited = (a: Awaited | null, name: string, length: number) => (a && a.name === name && Math.abs(a.length - length) < 0.05 ? a : null);
+/** The setup's slice, markers and switched-off hits back on the state, and its lanes if they were not edited while it waited. */
+export function restoreAwaited(a: Awaited, s: BeatPathState): BeatPathState {
+  const lanes = lanesOf(s) === a.lanes ? { character: a.state.character, cameraLane: a.state.cameraLane } : {};
+  return { ...s, slice: a.state.slice, markers: a.state.markers, muted: a.state.muted, ...lanes };
 }
 /** Same file, as far as the page can tell: name, tempo and length. */
 const sameMusic = (a: SetupMusic, b: SetupMusic) => a.name === b.name && Math.abs(a.bpm - b.bpm) < 1e-6 && Math.abs(a.lengthSeconds - b.lengthSeconds) < 0.05;

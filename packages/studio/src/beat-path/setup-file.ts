@@ -44,7 +44,8 @@ export const setupJson = (state: BeatPathState, music: TrackInfo | null, now?: D
 // boxes (recipe.ts: up to 200, ±200 m, sides 0.2–80 m, height 0.2–60 m, yaw ±7 rad), generous caps elsewhere.
 const LIMIT = {
   coord: 60, points: 16, blocks: 64, boxes: 200, box: { coord: 200, side: [0.2, 80], height: [0.2, 60], yaw: 7 },
-  hits: 2000, text: 2000, phrase: 300, seconds: 3600,
+  // The recipe's own: 512 switched-off hits and markers (recipe.ts), shot text 300 characters; `scan` bounds the work on a hostile list.
+  hits: 512, scan: 10_000, shot: 300, text: 2000, phrase: 300, seconds: 3600, subjectY: 30,
 } as const;
 const BANDS = ["low", "mid", "high"] as const;
 const SHAPES = ["glider", "car", "flyer", "runner"] as const;
@@ -61,6 +62,9 @@ const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v
 const pick = <T extends string>(v: unknown, list: readonly T[]): T | undefined => (typeof v === "string" && (list as readonly string[]).includes(v) ? (v as T) : undefined);
 /** One line of text: no line breaks, no script separators (`|`, `#`), trimmed and capped. */
 const line = (v: string, max: number) => v.replace(/[\r\n|#]+/g, " ").replace(/\s+/g, " ").trim().slice(0, max);
+const ms = (t: number) => Math.round(t * 1000) / 1000;
+/** Shot text as the recipe takes it (validate.ts `text`): one line, no `<>{}\`, no URL schemes, at most 300 characters. */
+const shotText = (v: string) => v.replace(/[<>{}\\]/g, " ").replace(/(https?|data|javascript):\S*/gi, " ").replace(/\s*[\r\n]+\s*/g, " ").replace(/ {2,}/g, " ").trim().slice(0, LIMIT.shot).trim();
 
 /** Read a setup file's text. Never throws: a state with notes, or a plain error. */
 export function readSetup(text: string): SetupRead {
@@ -146,12 +150,13 @@ export function readState(s: Rec, notes: string[]): BeatPathState {
     const raw = Array.isArray(s.markers) ? s.markers : null;
     if (!raw) drop("markers");
     else {
-      const list = raw.slice(0, LIMIT.hits).flatMap(m => {
+      const read = raw.slice(0, LIMIT.scan).flatMap(m => {
         const band = isRec(m) ? pick(m.band, BANDS) : undefined, seconds = isRec(m) ? num(m.seconds) : undefined;
-        return band && seconds !== undefined && seconds >= 0 && seconds <= LIMIT.seconds ? [{ band, seconds }] : [];
-      });
-      if (list.length < raw.length) notes.push(`markers: ${raw.length - list.length} unreadable dropped`);
-      if (list.length) out.markers = list.sort((a, b) => a.seconds - b.seconds);
+        return band && seconds !== undefined && seconds >= 0 && seconds <= LIMIT.seconds ? [{ band, seconds: ms(seconds) }] : [];
+      }).sort((a, b) => a.seconds - b.seconds);
+      if (read.length < raw.length) notes.push(`markers: ${raw.length - read.length} unreadable dropped`);
+      if (read.length > LIMIT.hits) notes.push(`markers: kept the first ${LIMIT.hits} (the recipe's most)`);
+      if (read.length) out.markers = read.slice(0, LIMIT.hits);
     }
   }
   const slice = num(s.slice);
@@ -185,9 +190,17 @@ export function readState(s: Rec, notes: string[]): BeatPathState {
   const track = pick(s.track, TRACKS);
   if (track) out.track = track; else if (has("track")) drop("example music");
   if (has("shot")) {
-    const sh = isRec(s.shot) ? s.shot : {}, text = (v: unknown) => (typeof v === "string" ? v.slice(0, LIMIT.text) : "");
-    out.shot = { subject: text(sh.subject), environment: text(sh.environment), action: text(sh.action) };
+    const sh = isRec(s.shot) ? s.shot : {}, changed: string[] = [];
+    const text = (k: "subject" | "environment" | "action") => {
+      const v = sh[k];
+      if (typeof v !== "string") return "";
+      const t = shotText(v);
+      if (t !== v) changed.push(k);
+      return t;
+    };
+    out.shot = { subject: text("subject"), environment: text("environment"), action: text("action") };
     if (!isRec(s.shot)) drop("shot description");
+    if (changed.length) notes.push(`shot ${changed.join(", ")}: shortened to one line of ${LIMIT.shot} characters, without links or <>{}\\`);
   }
   if (typeof s.prompt === "string" && line(s.prompt, LIMIT.text)) out.prompt = line(s.prompt, LIMIT.text); else if (has("prompt") && typeof s.prompt !== "string") drop("prompt");
   return out;
@@ -200,8 +213,9 @@ function points(v: unknown, camera: boolean): { list: PathPt[]; cut?: string } |
     const x = isRec(p) ? num(p.x) : undefined, z = isRec(p) ? num(p.z) : undefined, y = isRec(p) ? num(p.y) : undefined;
     if (x === undefined || z === undefined) return [];
     const q: PathPt = { x: clamp(x, -LIMIT.coord, LIMIT.coord), z: clamp(z, -LIMIT.coord, LIMIT.coord) };
-    const top = camera ? CAMERA_MAX_HEIGHT : LIMIT.coord;
-    if (y) q.y = clamp(y, camera ? 0 : -top, top);
+    // Heights as the engine takes them: the camera up to CAMERA_MAX_HEIGHT, the subject 0–30 m (setRootPath); 0 means on the ground (no y).
+    const top = camera ? CAMERA_MAX_HEIGHT : LIMIT.subjectY, h = y === undefined ? 0 : clamp(y, 0, top);
+    if (h) q.y = h;
     return [q];
   });
   const cut = v.length > LIMIT.points ? `kept the first ${LIMIT.points} points` : list.length < v.length ? `${v.length - list.length} unreadable points dropped` : undefined;
@@ -234,9 +248,12 @@ function follow(f: Rec): FollowOffset | undefined {
   return Object.keys(out).length ? out : undefined;
 }
 
-/** Hit times (switched-off hits): finite, 0 to an hour, sorted, capped. */
+/** Hit times (switched-off hits) as the recipe keeps them: finite, 0 to an hour, to the millisecond, once each, sorted, at most 512. */
 function times(v: unknown): { list: number[]; cut?: string } | null {
   if (!Array.isArray(v)) return null;
-  const list = v.slice(0, LIMIT.hits).flatMap(t => { const n = num(t); return n !== undefined && n >= 0 && n <= LIMIT.seconds ? [n] : []; }).sort((a, b) => a - b);
-  return { list, ...(list.length < v.length ? { cut: `${v.length - list.length} unreadable dropped` } : {}) };
+  const read = v.slice(0, LIMIT.scan).flatMap(t => { const n = num(t); return n !== undefined && n >= 0 && n <= LIMIT.seconds ? [ms(n)] : []; });
+  const list = [...new Set(read)].sort((a, b) => a - b), cuts: string[] = [];
+  if (read.length < v.length) cuts.push(`${v.length - read.length} unreadable dropped`);
+  if (list.length > LIMIT.hits) cuts.push(`kept the first ${LIMIT.hits} (the recipe's most)`);
+  return { list: list.slice(0, LIMIT.hits), ...(cuts.length ? { cut: cuts.join(", ") } : {}) };
 }

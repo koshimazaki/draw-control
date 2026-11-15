@@ -20,7 +20,7 @@ import { exampleState, ownState } from "./examples";
 import { bindGenerate } from "./page-generate";
 import { editStep, endDrag } from "./drag-edit";
 import { musicFor, type Cut } from "./slot-music";
-import { planMusic } from "./setup-source";
+import { awaitFor, matchAwaited, planMusic, restoreAwaited, type Awaited } from "./setup-source";
 import { moveOntoCut, slicedName } from "./track-cut";
 import { movedIndex } from "./lane-cuts";
 import { LaneView, Menu } from "./lanes";
@@ -51,6 +51,8 @@ export function startBeatPath(root: HTMLElement) {
   let busy = false, head = 0, dirty = true;
   const past: BeatPathState[] = [], future: BeatPathState[] = [];
   let dragBase: BeatPathState | null = null;
+  /** A setup whose own track is not loaded: loading that file again brings back its slice and markers. Undo, a switch or another load forgets it. */
+  let awaiting: Awaited | null = null;
   const player = new Player();
   const live = () => (track ? drive : undefined);
   const bpm = () => info?.bpm ?? 120;
@@ -112,6 +114,7 @@ export function startBeatPath(root: HTMLElement) {
     const from = redo ? future : past, to = redo ? past : future;
     const s = from.pop();
     if (!s) return;
+    awaiting = null;   // a loaded setup's "load your track again" holds only while its state does (setup-source.ts)
     to.push(structuredClone(state));
     state = s;
     // A selection may point past what the restored state holds: drop it rather than act on the wrong item.
@@ -411,10 +414,9 @@ export function startBeatPath(root: HTMLElement) {
     try {
       const loaded = await loadTrack(file, stage => { strip.message = stage; strip.setScene({ track, start: window0(), end: window1(), beats: [], kicks: [], snares: [], hats: [], added: [], selected: -1, locked: [], muted: [] }); });
       // A new track starts at its first beat, with no markers of its own (the old ones belong to the old track),
-      // unless it is the track a loaded setup asked for: then the setup's slice and markers come back (and its lanes, if untouched).
-      const back = awaiting && awaiting.name === file.name && Math.abs(awaiting.length - loaded.features.lengthSeconds) < 0.05 ? awaiting : null;
-      const lanes = back && JSON.stringify([state.character, state.cameraLane]) === back.lanes ? { character: back.state.character, cameraLane: back.state.cameraLane } : {};
-      state = back ? { ...state, slice: back.state.slice, markers: back.state.markers, muted: back.state.muted, ...lanes } : { ...state, slice: undefined, markers: undefined, muted: [] };
+      // unless it is the track a loaded setup asked for (setup-source.ts): then the setup's slice and markers come back.
+      const back = matchAwaited(awaiting, file.name, loaded.features.lengthSeconds);
+      state = back ? restoreAwaited(back, state) : { ...state, slice: undefined, markers: undefined, muted: [] };
       awaiting = null;
       cuts.delete(slot);
       await useTrack(loaded, back?.licence ?? "unspecified");
@@ -422,19 +424,12 @@ export function startBeatPath(root: HTMLElement) {
     }
     catch (e) { strip.message = ""; rebuild(); say(`Could not read the track: ${(e as Error).message}`); }
   }
-  /** A setup whose own track is not loaded (page-setup.ts): loading that file again brings back its slice, markers and lanes. */
-  let awaiting: { name: string; length: number; licence: string; state: BeatPathState; lanes: string } | null = null;
-  /**
-   * A setup file (page-setup.ts): its state in the slot showing, one undo step, framed on the map, with
-   * its music as planned (setup-source.ts). Resolves to the note to show (null when refused or superseded).
-   */
-  async function loadSetup(next: BeatPathState, music: TrackInfo | null, guideAudio?: Uint8Array): Promise<{ note?: string } | null> {
+  /** A setup file (page-setup.ts) in the slot showing: the page one undo step (not the music, planned in setup-source.ts); null when refused. */
+  async function loadSetup(next: BeatPathState, music: TrackInfo | null, guideAudio?: Uint8Array): Promise<{ note?: string; music: boolean } | null> {
     if (refused()) return null;
     if (map.busy) map.cancelStroke();
-    endLaneDrags();
-    setPlaying(false);
-    const ticket = ++switching;
-    const { plan, note } = planMusic(next, music, info, !!guideAudio);
+    endLaneDrags(); setPlaying(false);
+    const ticket = ++switching, { plan, note } = planMusic(next, music, info, !!guideAudio), had = info?.name;
     if (!update(next)) return null;
     selection = null; blocks.selected = -1; menu.hide();
     awaiting = null; cuts.delete(slot);
@@ -449,15 +444,17 @@ export function startBeatPath(root: HTMLElement) {
         state = moveOntoCut(state, plan.start, state.clip);
         if (state.track) cuts.set(slot, { track: cut, licence: music.licence, grid, from: state.track });
         await useTrack(cut, music.licence, grid);
-      } catch (e) { said = `Could not read the guide's audio: ${(e as Error).message}`; }
+        // A guide audio that cannot be read: the setup stays, on the music that is loaded, its lanes fitted to it.
+      } catch (e) { state = fitLanes(state, totalBeats()); rebuild(); said = `Could not read the guide's audio (${(e as Error).message}): the music loaded stays`; }
     } else if (plan.kind === "keep") { state = fitLanes(state, totalBeats()); rebuild(); }
     else {
       if (track) removeTrack(); else { state = fitLanes(state, totalBeats()); rebuild(); }
-      if (plan.kind === "none" && plan.awaiting) awaiting = { name: plan.awaiting, length: music?.lengthSeconds ?? 0, licence: music?.licence ?? "unspecified", state: structuredClone(next), lanes: JSON.stringify([state.character, state.cameraLane]) };
+      if (plan.kind === "none" && plan.awaiting && music) awaiting = awaitFor(music, next, state);
     }
     map.fit();
     actions.sync();
-    return said ? { note: said } : {};
+    // Did the music change (so undo, which puts back only the page, leaves the new music)?
+    return { ...(said ? { note: said } : {}), music: info?.name !== had };
   }
 
   /** Bound after the page object exists (it needs the page); the rebuild reaches it through here. */

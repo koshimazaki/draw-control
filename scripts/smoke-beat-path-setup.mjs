@@ -4,10 +4,11 @@
  * carries the same setup.json (not in bundle.json) and loads back, so does its unzipped folder.
  * With the user's own track: the setup loads over the same track keeping it; with no track it asks
  * for the file, and loading that file again brings the slice back; the guide zip brings the clip's
- * audio as the track. Any console error or warning fails the run.
+ * audio as the track; undo after loading forgets the wait for the track; a guide audio that cannot
+ * be read leaves the setup on the music loaded. Any console error or warning fails the run.
  */
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { strFromU8, unzipSync } from "fflate";
+import { strFromU8, strToU8, unzipSync, zipSync } from "fflate";
 import { drumWav } from "./smoke-features.mjs";
 
 /** Keys sorted all the way down: two states compare by content, not by key order. */
@@ -92,6 +93,13 @@ export async function smokeBeatPathSetup(browser, base, { fail, OUT }) {
   if (own.music?.name !== "own.wav") fail("the own-track setup does not name own.wav");
   let l = await loaded("own-setup.json over its own track", "#setupFile", `${dir}own-setup.json`);
   if (l.track !== "own.wav" || (await state()).slice !== sliced.slice) fail(`loading over the same track did not keep it (${l.track}, slice ${(await state()).slice})`);
+  // Undo after loading forgets the "load your track again": the file then loads as any new track (no slice).
+  await page.click("#removeTrack");
+  await loaded("own-setup.json, then undo", "#setupFile", `${dir}own-setup.json`);
+  await undo(false);
+  await page.setInputFiles("#trackFile", `${dir}own.wav`);
+  await page.waitForFunction(() => window.__beatPath.trackName() === "own.wav", null, { timeout: 120_000 });
+  if ((await state()).slice !== undefined) fail(`after undo, loading own.wav still restored the setup's slice (${(await state()).slice})`);
   await page.click("#removeTrack");
   l = await loaded("own-setup.json with no track", "#setupFile", `${dir}own-setup.json`);
   if (l.track !== null || !/load it again/.test(l.status)) fail("a setup on the user's own track did not ask for the file again");
@@ -104,6 +112,13 @@ export async function smokeBeatPathSetup(browser, base, { fail, OUT }) {
   s = await state();
   console.log(`beat path setup: the guide's audio as the track: ${l.track}, ${l.length?.toFixed(2)} s, slice ${s.slice}`);
   if (!/^own\.wav \(/.test(l.track ?? "") || Math.abs(l.length - sliced.clip) > 0.05 || s.slice !== undefined) fail("the guide zip did not bring the clip's audio as the track");
+  if (!/not the music/.test(l.status)) fail("a load that changed the music did not say undo leaves the music");
+
+  // A guide whose audio cannot be read: the setup loads on the music already there, lanes fitted to it.
+  writeFileSync(`${dir}bad-audio.zip`, zipSync({ "setup.json": ownGuide.zip["setup.json"], "audio.wav": strToU8("not a wav") }));
+  l = await loaded("bad-audio.zip", "#setupFile", `${dir}bad-audio.zip`);
+  const fit = await page.evaluate(() => ({ end: window.__beatPath.state().character.at(-1).to, beats: window.__beatPath.recipe().durationBeats }));
+  if (!/Could not read the guide's audio/.test(l.status) || fit.end !== fit.beats) fail(`a bad guide audio left the page half loaded (${l.status}; lanes end ${fit.end}, clip ${fit.beats} beats)`);
 
   if (errors.length) fail(`setup page errors: ${errors.join(" | ")}`);
   await page.close();

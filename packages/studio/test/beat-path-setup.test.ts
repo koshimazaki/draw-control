@@ -7,7 +7,7 @@ import { strToU8, zipSync } from "fflate";
 import { EXAMPLES, exampleState, ownState } from "../src/beat-path/examples";
 import { BLANK_STATE, toScript, type BeatPathState } from "../src/beat-path/script";
 import { SETUP_KIND, SETUP_VERSION, buildSetup, readSetup, setupJson } from "../src/beat-path/setup-file";
-import { fromZip, musicKind, pickFromFolder, planMusic } from "../src/beat-path/setup-source";
+import { awaitFor, fromZip, matchAwaited, musicKind, pickFromFolder, planMusic, restoreAwaited } from "../src/beat-path/setup-source";
 import { EXAMPLE_TRACKS } from "../src/beat-path/tracks";
 
 const flyerMusic = { name: EXAMPLE_TRACKS.flyer.name, licence: EXAMPLE_TRACKS.flyer.licence, bpm: 120, offsetSeconds: 0.1, lengthSeconds: 18.6 };
@@ -101,6 +101,30 @@ describe("bad files never throw", () => {
     expect(toScript(s).split("\n").filter(l => l.startsWith("beats ")).length).toBeGreaterThan(0);
     expect(r.notes.join(" ")).toMatch(/ignored: extra/);
   });
+  it("values past the recipe's limits load with a note, never refusing the whole file", () => {
+    const long = "a fox ".repeat(100) + "<b>{x}\\ see https://example.com/x and javascript:alert(1)\nnext line";
+    const r = readSetup(file({
+      ...exampleState(0),
+      muted: Array.from({ length: 900 }, (_, i) => i * 0.01 + 0.0001), markers: Array.from({ length: 900 }, (_, i) => ({ band: "low", seconds: i * 0.01 })),
+      subject: [{ x: 0, z: 0, y: -5 }, { x: 5, z: 0, y: 55 }], shot: { subject: long, environment: "a street", action: "data:text/html,hi" },
+    }));
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.state.muted).toHaveLength(512);
+    expect(new Set(r.state.muted).size).toBe(512);
+    expect(r.state.markers).toHaveLength(512);
+    expect(r.state.subject).toEqual([{ x: 0, z: 0 }, { x: 5, z: 0, y: 30 }]);
+    const s = r.state.shot.subject;
+    expect(s.length).toBeLessThanOrEqual(300);
+    expect(s).not.toMatch(/[<>{}\\\n]|https?:|javascript:/i);
+    expect(r.state.shot.action).not.toMatch(/data:/i);
+    expect(r.notes.join(" ")).toMatch(/512/);
+    expect(r.notes.join(" ")).toMatch(/shot/);
+  });
+  it("switched-off hits that round to the same millisecond count once", () => {
+    const r = ok(file({ ...exampleState(0), muted: [1.0001, 1.0002, 2] }));
+    expect(r.state.muted).toEqual([1, 2]);
+  });
   it("a __proto__ key sets nothing", () => {
     const r = ok(`{"kind":"${SETUP_KIND}","version":1,"state":{"__proto__":{"clip":30},"figure":{"__proto__":{"shape":"car"}}}}`);
     expect(r.state.clip).toBe(BLANK_STATE.clip);
@@ -138,6 +162,33 @@ describe("sources", () => {
     expect(fromZip(zipSync({ "guide.mp4": new Uint8Array(1) }))).toEqual({ error: expect.stringMatching(/No setup.json/) });
     expect(fromZip(strToU8("hello"))).toEqual({ error: "Could not open the zip" });
   });
+  /** Rewrite every central-directory entry's declared (uncompressed) size: a zip bomb's lie. */
+  const declare = (zip: Uint8Array, size: number, which: (i: number) => boolean = () => true) => {
+    const out = zip.slice(), view = new DataView(out.buffer);
+    for (let o = 0, i = 0; o < out.length - 46; o++) if (view.getUint32(o, true) === 0x02014b50) { if (which(i++)) view.setUint32(o + 24, size, true); o += 45; }
+    return out;
+  };
+  it("a zip bomb: many entries declaring huge sizes allocate nothing past the two files it reads", () => {
+    const entries: Record<string, Uint8Array> = { "setup.json": strToU8(setup) };
+    for (let i = 0; i < 40; i++) entries[`d${i}/audio.wav`] = wav;
+    const bomb = declare(zipSync(entries), 59_000_000, i => i > 0);
+    const before = process.memoryUsage().arrayBuffers;
+    const s = fromZip(bomb);
+    expect(process.memoryUsage().arrayBuffers - before).toBeLessThan(50_000_000);
+    expect(!("error" in s) && s.text).toBe(setup);
+    expect(!("error" in s) && s.audio).toBeFalsy();
+  });
+  it("a setup or audio declaring more than its cap is not decompressed", () => {
+    expect(fromZip(declare(zipSync({ "setup.json": strToU8(setup) }), 59_000_000))).toEqual({ error: "The setup file is too big" });
+    const s = fromZip(declare(zipSync({ "setup.json": strToU8(setup), "audio.wav": wav }), 900_000_000, i => i === 1));
+    expect(!("error" in s) && s.text).toBe(setup);
+    expect(!("error" in s) && s.audio).toBeFalsy();
+  });
+  it("a zip with too many entries is refused before anything is read", () => {
+    const entries: Record<string, Uint8Array> = { "setup.json": strToU8(setup) };
+    for (let i = 0; i < 1001; i++) entries[`f${i}.txt`] = new Uint8Array(1);
+    expect(fromZip(zipSync(entries))).toEqual({ error: expect.stringMatching(/more than 1000 files/) });
+  });
   it("a folder: the shallowest setup.json and the audio beside it", () => {
     const files = [
       { path: "g/sub/setup.json", size: 10 }, { path: "g/setup.json", size: 10 }, { path: "g/audio.wav", size: 3 }, { path: "g/sub/audio.wav", size: 3 },
@@ -170,6 +221,19 @@ describe("the music a setup brings", () => {
     expect(planMusic(ex, { ...flyerMusic, name: `${flyerMusic.name} (2.0–10.0 s)` }, null, false)).toEqual({ plan: { kind: "example", id: "flyer" }, note: expect.stringMatching(/cut/) });
     expect(planMusic(ex, own, null, false).plan).toEqual({ kind: "none", awaiting: "song.mp3" });
     expect(planMusic(ex, own, null, true).plan).toEqual({ kind: "guide", start: own.offsetSeconds });
+  });
+  it("waiting for the user's track: only that file brings the slice and markers back, lanes only if untouched", () => {
+    const saved: BeatPathState = { ...ownState(), slice: 12, markers: [{ band: "low", seconds: 13 }], muted: [12.5] };
+    const now = { ...saved, slice: 12, character: [{ from: 0, to: 17, word: "hover" as const }] };
+    const a = awaitFor(own, saved, now);
+    expect(matchAwaited(a, "other.mp3", own.lengthSeconds)).toBeNull();
+    expect(matchAwaited(a, "song.mp3", own.lengthSeconds + 1)).toBeNull();
+    expect(matchAwaited(null, "song.mp3", own.lengthSeconds)).toBeNull();
+    expect(matchAwaited(a, "song.mp3", own.lengthSeconds + 0.01)).toBe(a);
+    const reset = { ...now, slice: undefined, markers: undefined, muted: [] };
+    expect(restoreAwaited(a, reset)).toMatchObject({ slice: 12, markers: saved.markers, muted: [12.5], character: saved.character });
+    const edited = { ...reset, character: [{ from: 0, to: 17, word: "spin" as const }] };
+    expect(restoreAwaited(a, edited).character).toEqual(edited.character);
   });
   it("no music in the setup: none", () => expect(planMusic(ownState(), null, flyerMusic, false).plan).toEqual({ kind: "none" }));
 });

@@ -29,7 +29,7 @@ export function bindSetup(p: Page) {
     if (p.busy) { p.say(BUSY); return; }
     const done = await p.loadSetup(read.state, read.music, source.audio);
     if (!done) return;
-    const notes = [...(done.note ? [done.note] : []), ...read.notes];
+    const notes = [...(done.note ? [done.note] : []), ...read.notes, ...(done.music ? ["Undo puts back the page, not the music"] : [])];
     p.say(`Loaded the setup from ${from}${notes.length ? ` · ${notes.join(" · ")}` : ""}`);
   }
   const fail = (e: unknown) => p.say(`Not loaded: ${(e as Error).message}`);
