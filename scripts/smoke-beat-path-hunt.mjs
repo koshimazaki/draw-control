@@ -5,6 +5,7 @@
  * - a selected scenery box or lane block never carries over to another example (Delete there did nothing wrong);
  * - typing in the API key's password field or the box height keeps Backspace and Cmd/Ctrl-Z for the field;
  * - undo after deleting points never leaves a selection pointing past the path;
+ * - a Camera block dragged by its body changes places with its neighbour (Escape cancels, a click stays a click, one undo);
  * - Generate: Escape cancels the cost dialog, Stop ends a run, a run started on one example files
  *   its result there (never on the example switched to), a second run works, Add to gallery once per clip;
  * - the gallery re-rendered keeps one playing row at most; no-track mode plays;
@@ -68,6 +69,9 @@ export async function smokeBeatPathHunt(browser, base, { fail }) {
   if (sel.n !== points0) fail(`undo after Delete did not restore the path (${sel.n} of ${points0})`);
   if (sel.sel && sel.sel.index >= sel.n) fail("a selection points past the path after undo");
 
+  // 4b. Move a Camera block by dragging its body past its neighbour; a plain click still opens the menu; undo puts it back.
+  await smokeLaneMove(page, { fail });
+
   // 5. Generate on every model: Escape at the cost dialog, Stop mid-run, switch example mid-run, run twice.
   await page.waitForFunction(() => document.querySelector("#keySlot arena-key"), null, { timeout: 30_000 });
   await ex("0");
@@ -124,6 +128,51 @@ export async function smokeBeatPathHunt(browser, base, { fail }) {
   console.log("beat path hunt: switching, selections, field keys, undo, generate (cancel, stop, twice, mid-switch), gallery, no track, paid-run safety checked");
   await page.close();
   await smokePaidRuns(browser, base, { fail });
+}
+
+/** The Camera lane's body drag (lanes.ts): order changes, lengths and tiling kept, Escape cancels, a click is still a click, one undo step. */
+async function smokeLaneMove(page, { fail }) {
+  const lane = () => page.evaluate(() => window.__beatPath.state().cameraLane.map(b => ({ from: b.from, to: b.to, word: b.word })));
+  const tiles = l => l[0].from === 0 && l.every((b, k) => k === 0 || b.from === l[k - 1].to) && l.every(b => b.to > b.from);
+  const shape = l => JSON.stringify(l.map(b => [b.word, +(b.to - b.from).toFixed(3)]));
+  if ((await lane()).length < 2) {
+    await page.click("#laneCamera .block >> nth=0"); await page.click('#menu button:has-text("Split every 4 beats")');
+  }
+  // Give the first two blocks different words, so a swap shows in the order.
+  const first = await lane();
+  if (first[0].word === first[1].word) { await page.click("#laneCamera .block >> nth=1"); await page.click(`#menu button:has-text("${first[1].word === "top" ? "Orbit" : "Top"}")`); }
+  const before = await lane();
+  const box = async k => page.locator("#laneCamera .block").nth(k).boundingBox();
+  const drag = async (end, escape = false) => {
+    const a = await box(0), b = await box(1), y = a.y + a.height / 2;
+    await page.mouse.move(a.x + a.width / 2, y); await page.mouse.down();
+    // Far enough that block 1's middle is passed: the right edge of block 0 goes past it.
+    const dx = b.x + b.width / 2 - (a.x + a.width) + 12;
+    for (let k = 1; k <= 8; k++) await page.mouse.move(a.x + a.width / 2 + dx * k / 8, y);
+    const during = await page.evaluate(() => ({ moving: !!document.querySelector("#laneCamera .block.moving"), slot: !!document.querySelector("#laneCamera .lane-slot") }));
+    if (!during.moving || !during.slot) fail(`a block drag shows no moving block or landing slot (${JSON.stringify(during)})`);
+    if (escape) await page.keyboard.press("Escape");
+    await page.mouse.up();
+    if (end) await end();
+  };
+  // Escape during the drag: everything goes back, and the release opens no menu.
+  await drag(null, true);
+  if (shape(await lane()) !== shape(before)) fail(`Escape during a block drag did not put the lane back: ${shape(await lane())} vs ${shape(before)}`);
+  if (!(await page.evaluate(() => document.getElementById("menu").hidden))) fail("releasing a cancelled block drag opened the menu");
+  // A real move: block 0 lands after block 1, both keep their lengths, the lane tiles to the same end.
+  await drag();
+  const after = await lane();
+  const swapped = shape([before[1], before[0], ...before.slice(2)]);
+  if (shape(after) !== swapped || !tiles(after) || after.at(-1).to !== before.at(-1).to) fail(`dragging Camera block 1 past block 2 did not swap them: ${shape(after)} (wanted ${swapped})`);
+  if (!(await page.evaluate(() => document.getElementById("menu").hidden))) fail("releasing a block drag opened the menu");
+  // A plain click still opens the block's menu.
+  await page.click("#laneCamera .block >> nth=0");
+  if (await page.evaluate(() => document.getElementById("menu").hidden)) fail("a plain click on a Camera block no longer opens its menu");
+  await page.keyboard.press("Escape"); await page.keyboard.press("Escape");
+  // One undo step takes the move back.
+  await page.keyboard.press("ControlOrMeta+z");
+  if (shape(await lane()) !== shape(before)) fail(`undo after a block move did not restore the order: ${shape(await lane())}`);
+  console.log(`beat path lanes: block drag ${shape(before)} → ${shape(after)}, Escape, click, undo checked`);
 }
 
 /**
