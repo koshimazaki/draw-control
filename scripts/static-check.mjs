@@ -37,7 +37,7 @@ try {
   page.on("pageerror", e => errors.push(e.message));
   page.on("response", r => { if (r.status() >= 400) missing.push(`${r.status()} ${r.url()}`); });
   await page.goto(`${base}?theme=neutral`);
-  await page.waitForFunction(() => /generated-straight-120/.test(document.getElementById("trackName")?.textContent ?? ""), null, { timeout: 30_000 });
+  await page.waitForFunction(() => /neon-rain-loop/.test(document.getElementById("trackName")?.textContent ?? ""), null, { timeout: 30_000 });
   const title = await page.title();
   console.log(`static: ${base} → "${title}", track ${await page.textContent("#trackName")}`);
   if (missing.length) { ok = false; console.error(`STATIC FAIL: not found: ${missing.join(", ")}`); }

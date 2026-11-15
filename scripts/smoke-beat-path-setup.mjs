@@ -22,7 +22,7 @@ export async function smokeBeatPathSetup(browser, base, { fail, OUT }) {
   page.on("pageerror", e => errors.push(e.message));
   page.on("console", m => { if (m.type() === "error" || m.type() === "warning") errors.push(`${m.type()}: ${m.text()}`); });
   await page.goto(`${base}/path.html`);
-  await page.waitForFunction(() => window.__beatPath?.recipe().audio?.name === "generated-straight-120.wav", null, { timeout: 30_000 });
+  await page.waitForFunction(() => window.__beatPath?.recipe().audio?.name === "neon-rain-loop.mp3", null, { timeout: 30_000 });
   const state = () => page.evaluate(() => window.__beatPath.state());
   const look = () => page.evaluate(() => ({ track: window.__beatPath.trackName(), length: window.__beatPath.trackLength(), status: document.getElementById("status").textContent }));
   const loaded = async (what, input, path) => {
@@ -55,7 +55,9 @@ export async function smokeBeatPathSetup(browser, base, { fail, OUT }) {
   /** Settings open (a click elsewhere may have closed it). */
   const settings = async () => { if (!(await page.isVisible("#saveSetup"))) await page.click("#settings summary"); };
   await settings();
-  // 0. Example 1 with "Next move on each hit" on (its camera anchors on snares): saved, it loads back as it was.
+  // 0. Example 1 with its camera locked to the snares (it has no lock of its own; its one-beat accent block at 7–8 holds no
+  //    kick but a snare) and "Next move on each hit" on (its camera anchors on hits): saved, it loads back as it was.
+  await page.click("#chipCamera"); await page.click('#menu button:has-text("Lock to snare")');
   const advance = async () => { await settings(); await page.click("#setCamLock"); await page.click('#menu button:has-text("Next move on each hit")'); };
   await advance();
   if (!(await state()).camLock.advance) fail("Next move on each hit did not turn on");
@@ -71,7 +73,7 @@ export async function smokeBeatPathSetup(browser, base, { fail, OUT }) {
   await page.selectOption("#scenery", "street");
   await page.selectOption("#figureShape", "car");
   const before = await state(), file = await save("setup.json");
-  if (file.kind !== "beat-path-setup" || file.version !== 1 || canon(file.state) !== canon(before) || !/^beats /m.test(file.script) || file.music?.name !== "generated-straight-120.wav")
+  if (file.kind !== "beat-path-setup" || file.version !== 1 || canon(file.state) !== canon(before) || !/^beats /m.test(file.script) || file.music?.name !== "neon-rain-loop.mp3")
     fail(`the saved setup is not the page: ${JSON.stringify({ kind: file.kind, version: file.version, music: file.music })}`);
   await page.selectOption("#scenery", "none");
   await page.selectOption("#figureShape", "runner");
@@ -142,6 +144,10 @@ export async function smokeBeatPathSetup(browser, base, { fail, OUT }) {
   //    refuse up front, with nothing sent; once its track is loaded the shot builds and Generate asks again.
   await page.setInputFiles("#trackFile", `${dir}own.wav`);
   await page.waitForFunction(() => window.__beatPath.trackName() === "own.wav", null, { timeout: 120_000 });
+  // Next move on each hit needs a hit in every camera block: Example 1's one-beat zoom accent (beats 6–7, 7–8), refitted to
+  // own.wav, holds none, so its two short blocks go first ("Remove": the block before takes its beats), then on kicks.
+  for (let k = 0; k < 2; k++) { await page.click("#laneCamera .block >> nth=1"); await page.click('#menu button:has-text("Remove")'); }
+  await page.click("#chipCamera"); await page.click('#menu button:has-text("Lock to kick")');
   await advance();
   if (!(await state()).camLock.advance) fail("Next move on each hit did not turn on over own.wav");
   await settings();
@@ -176,7 +182,7 @@ export async function smokeBeatPathSetup(browser, base, { fail, OUT }) {
   await page.waitForFunction(() => window.__beatPath.trackName() === "own.wav", null, { timeout: 120_000 });
   if ((await say()).startsWith("The shot is not built")) fail("loading its track did not build the shot");
   await page.click("#runGenerate");
-  await page.waitForSelector("#costDialog:not([hidden])", { timeout: 120_000 }).catch(() => fail("Generate did not ask once the shot built"));
+  await page.waitForSelector("#costDialog:not([hidden])", { timeout: 120_000 }).catch(async () => fail(`Generate did not ask once the shot built ("${await say()}"; clip ${(await state()).clip} s, model ${await page.evaluate(() => document.querySelector('[data-control="model"] [aria-checked="true"]')?.getAttribute("data-value") ?? "?")})`));
   await page.click("#costCancel");
   await page.waitForFunction(() => document.querySelector("#runGenerate .btn-label")?.textContent === "Generate", null, { timeout: 30_000 });
   if ((await videoTasks()) !== tasks0) fail("a cancelled Generate sent a video task");

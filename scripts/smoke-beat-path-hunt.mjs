@@ -27,9 +27,9 @@ export async function smokeBeatPathHunt(browser, base, { fail }) {
   // 1. Rapid switching while playing.
   await page.click("#barPlay");
   for (const s of ["1", "2", "0", "2", "1"]) await ex(s);
-  await page.waitForTimeout(400);
+  await page.waitForFunction(() => window.__beatPath.trackName() === "drum-n-bass.mp3", null, { timeout: 30_000 }).catch(() => {});
   const landed = await bp(() => ({ slot: window.__beatPath.slot(), track: window.__beatPath.trackName(), kind: window.__beatPath.recipe().character.kind, playing: window.__beatPath.playing() }));
-  if (landed.slot !== "1" || landed.track !== "generated-drive-140.wav" || landed.playing) fail(`rapid switching did not land on Example 2 with its music, paused: ${JSON.stringify(landed)}`);
+  if (landed.slot !== "1" || landed.track !== "drum-n-bass.mp3" || landed.playing) fail(`rapid switching did not land on Example 2 with its music, paused: ${JSON.stringify(landed)}`);
 
   // 2. A selected scenery box does not carry over to another example.
   await page.click('[data-control="tool"] [data-value="blocks"]');
@@ -80,9 +80,14 @@ export async function smokeBeatPathHunt(browser, base, { fail }) {
   await smokeLaneEdge(page, { fail });
   await smokeLaneInterrupted(page, { fail });
   await smokeLaneUndoHeld(page, { fail });
+  // Example 1 runs 14 s: a model whose estimate for that is over the page's price limit is refused before the cost dialog.
+  const overPrice = [];
   for (const model of await page.$$eval('[data-control="model"] button', bs => bs.map(b => b.dataset.value))) {
     await page.click(`[data-control="model"] [data-value="${model}"]`);
-    await page.click("#runGenerate"); await page.waitForSelector("#costDialog:not([hidden])");
+    await page.evaluate(() => { document.getElementById("status").textContent = ""; });   // a refusal from the model before is not this one's
+    await page.click("#runGenerate");
+    const opened = await (await page.waitForFunction(() => !document.getElementById("costDialog").hidden ? "dialog" : /above the \d+ USD limit/.test(document.getElementById("status").textContent ?? "") ? "over" : null, null, { timeout: 60_000 })).jsonValue();
+    if (opened === "over") { overPrice.push(model); continue; }
     await page.keyboard.press("Escape");
     await page.waitForFunction(() => document.getElementById("costDialog").hidden && document.getElementById("runGenerate").textContent === "Generate", null, { timeout: 15_000 })
       .catch(() => fail(`${model}: Escape did not cancel the cost dialog`));
@@ -92,7 +97,10 @@ export async function smokeBeatPathHunt(browser, base, { fail }) {
         .catch(() => fail(`${model}: run ${k + 1} did not finish`));
     }
   }
-  // Stop during the run.
+  if (overPrice.length) console.log(`draw control hunt: refused over the price limit at Example 1's 14 s, nothing sent: ${overPrice.join(", ")}`);
+  if (overPrice.length === (await page.$$eval('[data-control="model"] button', bs => bs.length))) fail("every model was refused over the price limit");
+  // Stop during the run (on the last model, which took the clip).
+  await page.click(`[data-control="model"] [data-value="h3"]`);
   await page.click("#runGenerate"); await page.waitForSelector("#costDialog:not([hidden])"); await page.click("#costOk");
   await page.click("#runGenerate");
   await page.waitForFunction(() => document.getElementById("runGenerate").textContent === "Generate", null, { timeout: 30_000 }).catch(() => fail("Stop did not end the run"));
@@ -151,7 +159,7 @@ async function smokeLaneMove(page, { fail }) {
     const [a, b] = await laneBoxes(page), y = a.y + a.height / 2;
     await page.mouse.move(a.x + a.width / 2, y); await page.mouse.down();
     // Far enough that block 1's middle is passed: the right edge of block 0 goes past it.
-    const dx = b.x + b.width / 2 - (a.x + a.width) + 12;
+    const dx = b.x + b.width / 2 - (a.x + a.width / 2) + 12;   // the dragged block's middle past the next one's, whatever their widths
     for (let k = 1; k <= 8; k++) await page.mouse.move(a.x + a.width / 2 + dx * k / 8, y);
     const during = await page.evaluate(() => ({ moving: !!document.querySelector("#laneCamera .block.moving"), slot: !!document.querySelector("#laneCamera .lane-slot") }));
     if (!during.moving || !during.slot) fail(`a block drag shows no moving block or landing slot (${JSON.stringify(during)})`);
@@ -191,19 +199,23 @@ const laneBoxes = (page, what = ".block") => page.waitForFunction(sel => {
   return r.every(b => b.width > 0 && b.height > 0) ? r.map(b => ({ x: b.x, y: b.y, width: b.width, height: b.height })) : null;
 }, what, { timeout: 10_000 }).then(h => h.jsonValue());
 
-const cameraLane = page => page.evaluate(() => JSON.stringify(window.__beatPath.state().cameraLane.map(b => [b.word, b.from, b.to])));
+const cameraLane = page => page.evaluate(() => JSON.stringify(window.__beatPath.state().cameraLane.map(b => [b.phrase ?? b.word, b.from, b.to])));   // a typed phrase tells two blocks of one word apart
 
 /** The edge between two Camera blocks dragged in small steps over four beats: the cut follows to the end (the lane re-renders each step), one undo. */
 async function smokeLaneEdge(page, { fail }) {
   const before = await cameraLane(page), total = await page.evaluate(() => window.__beatPath.state().cameraLane.at(-1).to);
-  const lane = await page.locator("#laneCamera").boundingBox(), [edge] = await laneBoxes(page, ".edge");
-  const x0 = edge.x + 2, y = edge.y + edge.height / 2, cut0 = JSON.parse(before)[0][2];
+  // The first edge with room after it (at least five beats: a one-beat block, as Example 1's zoom accent, cannot shrink).
+  const blocks = JSON.parse(before), k = Math.max(0, blocks.findIndex((b, i) => i > 0 && b[2] - b[1] >= 5) - 1);
+  await page.waitForFunction(n => document.querySelectorAll("#laneCamera .edge").length === n, blocks.length - 1, { timeout: 10_000 });
+  const lane = await page.locator("#laneCamera").boundingBox(), edges = await laneBoxes(page, ".edge"), edge = edges[k];
+  if (!edge) { fail(`no edge ${k} to drag (${edges.length} edges for ${blocks.length} blocks: ${before})`); return; }
+  const x0 = edge.x + 2, y = edge.y + edge.height / 2, cut0 = blocks[k][2];
   await page.mouse.move(x0, y); await page.mouse.down();
   const cuts = [];
-  for (let k = 1; k <= 40; k++) { await page.mouse.move(x0 + k / 40 * 4 * lane.width / total, y); cuts.push(JSON.parse(await cameraLane(page))[0][2]); }
+  for (let k = 1; k <= 40; k++) { await page.mouse.move(x0 + k / 40 * 4 * lane.width / total, y); cuts.push(JSON.parse(await cameraLane(page))[k]?.[2]); }
   await page.mouse.up();
-  const after = JSON.parse(await cameraLane(page))[0][2], steps = new Set(cuts).size;
-  console.log(`draw control lanes: edge drag in 40 small steps, cut ${cut0} → ${after} through ${steps} positions`);
+  const after = JSON.parse(await cameraLane(page))[k]?.[2], steps = new Set(cuts).size;
+  console.log(`draw control lanes: edge drag (edge ${k}) in 40 small steps, cut ${cut0} → ${after} through ${steps} positions; lane before ${before}, after ${await cameraLane(page)}`);
   if (!(after >= cut0 + 3) || steps < 3) fail(`an edge drag lost the pointer after the first step (cut ${cut0} → ${after}, ${steps} positions: ${cuts.join(",")})`);
   if (!(await page.evaluate(() => document.getElementById("menu").hidden))) fail("releasing an edge drag opened the menu");
   await page.keyboard.press("ControlOrMeta+z");
@@ -217,7 +229,7 @@ async function smokeLaneUndoHeld(page, { fail }) {
   const sight1 = await sight(), before = await cameraLane(page);
   const [a, b] = await laneBoxes(page), y = a.y + a.height / 2;
   await page.mouse.move(a.x + a.width / 2, y); await page.mouse.down();
-  const dx = b.x + b.width / 2 - (a.x + a.width) + 12;
+  const dx = b.x + b.width / 2 - (a.x + a.width / 2) + 12;   // the dragged block's middle past the next one's, whatever their widths
   for (let k = 1; k <= 8; k++) await page.mouse.move(a.x + a.width / 2 + dx * k / 8, y);
   const moved = await cameraLane(page);
   await page.keyboard.press("ControlOrMeta+z");
@@ -241,7 +253,7 @@ async function smokeLaneInterrupted(page, { fail }) {
   const before = await cameraLane(page);
   const [a, b] = await laneBoxes(page), y = a.y + a.height / 2;
   await page.mouse.move(a.x + a.width / 2, y); await page.mouse.down();
-  const dx = b.x + b.width / 2 - (a.x + a.width) + 12;
+  const dx = b.x + b.width / 2 - (a.x + a.width / 2) + 12;   // the dragged block's middle past the next one's, whatever their widths
   for (let k = 1; k <= 8; k++) await page.mouse.move(a.x + a.width / 2 + dx * k / 8, y);
   const moved = await cameraLane(page);
   await page.focus("#runGenerate"); await page.keyboard.press("Enter");
@@ -355,7 +367,9 @@ async function smokePaidRuns(browser, base, { fail }) {
   await page.click("#runGenerate");
   await dialogOpen();
   await press('[data-control="example"] [data-value="1"]');
-  await page.waitForFunction(() => window.__beatPath.slot() === "1", null, { timeout: 30_000 });
+  // Example 2 loads its music file before the output pane follows the switch (switchSlot awaits it).
+  await page.waitForFunction(() => window.__beatPath.slot() === "1" && window.__beatPath.trackName() === "drum-n-bass.mp3", null, { timeout: 30_000 });
+  await page.waitForTimeout(100);
   const away = await page.evaluate(() => !document.getElementById("screenOutput").hidden && !!document.querySelector("#generateSlot #genProgress"));
   await press('[data-control="example"] [data-value="0"]');
   await page.waitForFunction(() => window.__beatPath.slot() === "0", null, { timeout: 30_000 });

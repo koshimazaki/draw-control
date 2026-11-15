@@ -24,6 +24,8 @@ export async function smokeBeatPathFollow(browser, base, { fail, SHOTS }) {
   const k = Math.floor(seg.points.length / 2), p0 = seg.points[k], a = seg.anchors[k];
   const out = { x: a.x + (p0.x - a.x) * 1.6, z: a.z + (p0.z - a.z) * 1.6 };
   const before = (await lane())[seg.block];
+  // The playhead into the block (Example 1 opens on its isometric block, a typed phrase without follow fields); the fields follow on the next edit.
+  await page.evaluate(b => { const bpm = window.__beatPath.recipe().beatGrid.bpm, el = document.getElementById("scrub"); el.value = String((b.from + b.to) / 2 * 60 / bpm / window.__beatPath.state().clip); el.dispatchEvent(new window.Event("input")); }, before);
   const s0 = await page.evaluate(q => window.__beatPath.mapPoint(q), p0), s1 = await page.evaluate(q => window.__beatPath.mapPoint(q), out);
   await page.mouse.move(s0.x, s0.y); await page.mouse.down(); await page.mouse.move(s1.x, s1.y, { steps: 8 }); await page.mouse.up();
   const after = (await lane())[seg.block];

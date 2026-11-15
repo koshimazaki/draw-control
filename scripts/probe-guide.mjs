@@ -4,8 +4,9 @@
  * an ffmpeg that fails on the clip are failures, so a corrupt guide.mp4 never ends in OK.
  *   node scripts/probe-guide.mjs <guide.mp4> [frames]   (checks one file, and its frame count when given; exit 1 on failure)
  */
-import { existsSync, statSync } from "node:fs";
+import { existsSync, realpathSync, statSync } from "node:fs";
 import { execFileSync } from "node:child_process";
+import { pathToFileURL } from "node:url";
 
 const firstLine = e => String(e.stderr?.length ? e.stderr : e.message).trim().split("\n")[0];
 
@@ -31,7 +32,7 @@ export function runFfmpeg(args, label, fail) {
   }
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) {
   const path = process.argv[2];
   let failed = false;
   const streams = probeStreams(path, "guide", msg => { console.error(`PROBE FAIL: ${msg}`); failed = true; });

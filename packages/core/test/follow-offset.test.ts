@@ -44,6 +44,28 @@ describe("follow offset words", () => {
   });
 });
 
+describe("a follow block's aim", () => {
+  it("reads, prints back, is checked, and sets the height the camera looks at", () => {
+    expect(parseFollowArgs("side", ["distance", "2.5m", "height", "0.3m", "aim", "0.3m"], no)).toEqual({ distance: 2.5, height: 0.3, aim: 0.3 });
+    expect(followWords("side", { distance: 2.5, aim: 0.3 })).toBe("distance 2.5m aim 0.3m");
+    expect(() => parseFollowArgs("side", ["aim", "5m"], no)).toThrow(/0–3/);
+    const r = run("follow side distance 2.5m height 0.3m aim 0.3m");
+    expect(printScript(r)).toMatch(/camera: side distance 2\.5m height 0\.3m aim 0\.3m/);
+    expect(applyScript(base(), { script: printScript(r) }, ctx)).toEqual(r);
+    expect(() => validateRecipe({ ...r, camera: { ...r.camera!, segments: [{ ...r.camera!.segments[0], follow: { aim: 4 } }] } })).toThrow(/aim/);
+    const plan = planCamera(r, drive, 200), plain = planCamera(run("follow side distance 2.5m height 0.3m"), drive, 200);
+    expect(plan.samples[100].target[1]).toBeLessThan(0.45);
+    expect(plain.samples[100].target[1]).toBeGreaterThan(0.9);
+  });
+  it("a block at beat 0 starts on its aim (the rig has none), later blocks ease to theirs and keep it", () => {
+    const r = applyScript(base(), { script: `beats 0-8 | action: ${STRAIGHT} | camera: follow side distance 4m height 0.3m aim 0.2m\nbeats 8-17 | action: continue | camera: follow side height 1.6m` }, ctx);
+    const plan = planCamera(r, drive, 200);
+    expect(plan.samples[0].target[1]).toBeLessThan(0.45);
+    // The second block sets no aim: it keeps 0.2 m (an aim carries on like a distance or height).
+    expect(plan.samples[180].target[1]).toBeLessThan(0.45);
+  });
+});
+
 describe("a block's lens (fov)", () => {
   it("reads, prints back and reaches the camera", () => {
     const r = run("follow front distance 3m fov 100 lock kick 1 hold");

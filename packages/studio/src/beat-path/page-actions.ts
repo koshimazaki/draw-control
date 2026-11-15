@@ -37,6 +37,7 @@ const CHARACTER_NOTES = {
   hover: "Hover: stands still at the start or the end of its path.",
   spin: "Spin: turns on the spot half way through the block.",
   jump: "Jump: a hop that lands half way through the block.",
+  hop: "Hop: a small jump on the first kick of the block while the subject keeps travelling (it needs a kick there).",
   freeze: "Freeze: holds still, mid-air too, while the camera keeps moving; then carries on.",
 };
 

@@ -10,7 +10,7 @@ import { escapeLines, followWords, multiLine, parseFollowArgs } from "@motion-st
 import { EXAMPLE_TRACKS, type ExampleId } from "./tracks";
 
 export type PathPt = { x: number; z: number; y?: number };
-export const CHARACTER_WORDS = ["glide", "hover", "spin", "jump", "freeze"] as const;
+export const CHARACTER_WORDS = ["glide", "hover", "spin", "jump", "hop", "freeze"] as const;
 export type CharacterWord = (typeof CHARACTER_WORDS)[number];
 export const CAMERA_WORDS = ["behind", "side", "orbit", "top", "path", "push"] as const;
 export type CameraWord = (typeof CAMERA_WORDS)[number];
@@ -91,7 +91,7 @@ export type BeatPathState = {
 };
 
 export const LABELS = {
-  character: { glide: "Glide", hover: "Hover", spin: "Spin", jump: "Jump", freeze: "Freeze" },
+  character: { glide: "Glide", hover: "Hover", spin: "Spin", jump: "Jump", hop: "Hop", freeze: "Freeze" },
   camera: { behind: "Follow behind", side: "Follow side", orbit: "Orbit", top: "Top", path: "My path", push: "Push in" },
   lock: { off: "Off", beat: "Beat", kick: "Kick", snare: "Snare", hat: "Hat" },
   hit: { move: "Keeps moving", hold: "Holds", punch: "Punches in" },
@@ -123,16 +123,21 @@ const rigWords = (rig?: BeatPathState["rig"]) => !rig ? "" : [
   rig.distance !== undefined ? `distance ${f(rig.distance)}m` : "", rig.height !== undefined ? `height ${f(rig.height)}m` : "",
   rig.fov !== undefined ? `fov ${f(rig.fov)}` : "", rig.yaw !== undefined ? `yaw ${f(rig.yaw)}` : "",
 ].filter(Boolean).join(" ");
-/** An example's "# track:" words: its groove, and its bars when an earlier example has the same groove ("laidback 6 bars"). */
+/** An example's "# track:" words: its file ("file neon-rain-loop.mp3"), else its groove, and its bars when an earlier example has the same groove ("laidback 6 bars"). */
 const trackWords = (id: ExampleId) => {
-  const t = EXAMPLE_TRACKS[id], first = Object.values(EXAMPLE_TRACKS).find(o => o.groove === t.groove)!;
+  const t = EXAMPLE_TRACKS[id];
+  if (t.file) return `file ${t.name}`;
+  const first = Object.values(EXAMPLE_TRACKS).find(o => !o.file && o.groove === t.groove)!;
   return first === t ? t.groove : `${t.groove} ${t.bars} bars`;
 };
-/** The example a "# track:" comment names: the groove, the bars picking between examples that share it. */
+/** The example a "# track:" comment names: the file, or the groove with the bars picking between examples that share it. */
 const trackFrom = (text: string): ExampleId | undefined => {
+  const ids = Object.keys(EXAMPLE_TRACKS) as ExampleId[];
+  const file = /^#\s*track:\s*file\s+(\S+)/im.exec(text);
+  if (file) return ids.find(id => EXAMPLE_TRACKS[id].file && EXAMPLE_TRACKS[id].name === file[1]);
   const m = /^#\s*track:\s*(straight|drive|laidback)(?:\s+(\d+)\s*bars?)?/im.exec(text);
   if (!m) return undefined;
-  const list = (Object.keys(EXAMPLE_TRACKS) as ExampleId[]).filter(id => EXAMPLE_TRACKS[id].groove === m[1]);
+  const list = ids.filter(id => !EXAMPLE_TRACKS[id].file && EXAMPLE_TRACKS[id].groove === m[1]);
   return (m[2] ? list.find(id => EXAMPLE_TRACKS[id].bars === Number(m[2])) : undefined) ?? list[0];
 };
 const pts = (list: PathPt[]) => list.map(p => `(${f(p.x)},${f(p.z)}${p.y ? `,${f(p.y)}` : ""})`).join(" ");
@@ -183,6 +188,8 @@ export function toScript(state: BeatPathState): string {
       const mid = Math.round((c.from + c.to)) / 2;
       if (c === glide && state.subject.length >= 2) action = `walk on path ${pts(state.subject)} corners ${f(state.subjectCorners)}${lock}`;
       else if (c.word === "spin" || c.word === "jump") action = `rest, ${c.word} @beat ${f(mid)}`;
+      // A hop jumps on the first kick of its row while the travel carries on through it (the walk block runs on).
+      else if (c.word === "hop") action = "continue, jump @kick 1";
       else if (c.word === "freeze") action = "freeze";
       else action = "rest";
     }
@@ -263,7 +270,8 @@ export function fromScript(text: string, base: BeatPathState, grid: { bpm: numbe
         const c = cornersIn(a);
         state.subjectCorners = c ?? 0;
         if (readLock(a, state.charLock)) charSeen = true;
-      } else if (/^freeze\b/.test(a)) word = "freeze";
+      } else if (/^continue\b/.test(a) && /\b(jump|kick)\s*@/.test(a)) word = "hop";
+      else if (/^freeze\b/.test(a)) word = "freeze";
       else if (/\bspin\s*@/.test(a)) word = "spin";
       else if (/\b(jump|kick)\s*@/.test(a)) word = "jump";
       else if (!/^(rest|idle)\b/.test(a)) notes.push(`line ${row.line}: "${a}" reads as hover`);

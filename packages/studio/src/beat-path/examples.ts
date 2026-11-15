@@ -14,12 +14,12 @@ export { BLANK_STATE, DEFAULT_CAMERA_PATH } from "./script";
 
 export const EXAMPLES = [
   { id: "flyer", label: "Flying car", script: flyer },
-  { id: "runner", label: "Runner", script: runner },
+  { id: "runner", label: "Street, any subject", script: runner },
   { id: "car", label: "Car on a bend", script: car },
   { id: "drone", label: "Drone between pillars", script: drone },
 ] as const;
 
-const TEMPO = { flyer: 120, runner: 140, car: 100, drone: 100 } as const;
+const TEMPO = { flyer: 107.5, runner: 174, car: 100, drone: 100 } as const;
 export const exampleState = (i: number): BeatPathState => fromScript(EXAMPLES[i].script, BLANK_STATE, { bpm: TEMPO[EXAMPLES[i].id], offsetSeconds: 0.09 }).state;
 
 /** "Your own": a plain path and camera to start from, no music of its own. */

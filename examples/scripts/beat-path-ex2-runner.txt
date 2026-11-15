@@ -1,22 +1,32 @@
-# Draw Control example 2: a skateboarder along one street, seen from the parallel street through the gaps between the blocks; the camera comes over, goes round to the front, and the clip ends on a very wide lens as the rail trick lands. The figure is a runner shape.
-# track: drive
-# clip: 8 s · figure: runner · Draw Control
+# Draw Control example 2: one street guide for any travelling subject, a person or a vehicle. It opens low and close on the subject's feet (a shoe, a skateboard, a forklift's wheel) on the first kick, pulls back alongside it as it passes behind the row of blocks and shows through the gaps (on the snare at beat 9), with one small hop on the kick at 6.64 s (beat 19.24) in the gap between the first two blocks, and rises to a high three-quarter view of the whole street (on the snare at beat 21). The subject keeps one steady speed. The figure is a runner shape.
+# track: file drum-n-bass.mp3
+# clip: 12 s · figure: runner · Draw Control
+# The same guide serves three subjects: swap only the three shot lines below (and the references); the legend line stays (the page builds it from the figure's colours). This file carries the New York runner.
+# Anime skater:
+#   shot subject: an anime-style skateboarder in a loose hoodie and sneakers, drawn with clean outlines and flat colours (the orange figure; white marks the chest)
+#   shot environment: an anime city street in the afternoon, shops and cafés along the pavement, cel-shaded, soft sky
+#   shot action: close on the skateboard's wheels and deck as they push along, then alongside them as they pass behind the shopfronts and show through the gaps, an ollie in a gap, then a high view of the whole street
+# Factory forklift:
+#   shot subject: an industrial forklift carrying a pallet, yellow and black (the orange figure; white marks its front)
+#   shot environment: a car factory floor, the grey blocks are its steel pillars and machines, car bodies on the line, robot arms, overhead lights
+#   shot action: close on its front wheel as it drives along, then alongside it as it passes behind the factory pillars and between the stations, a bump over a floor plate in a gap, then a high view of the whole factory floor
+rig: distance 2.5m height 0.3m fov 32 yaw 90
 landmarks: on seed 7
 figure: shape runner body #ff6a13 head #f2a35e
 scenery: street sight passes
-box: -18 -7 3.5 4 9
-box: -10 -7 3.5 4 12
-box: -2 -7 3.5 4 8
-box: 16 0 7 0.25 0.7
-box: -16 8 7 6 14
-box: -4 8 7 6 10
-box: 8 8 7 6 13
-shot subject: an anime-style skateboarder in a loose hoodie, drawn with clean outlines and flat colours (the orange figure; white marks the chest)
-shot environment: a city street in the afternoon, people passing by on the pavement, shopfronts, a metal rail at the end of the street
-shot action: skateboarding along the street, seen between the buildings from the next street; they ollie onto the rail and land a trick, very wide lens at the end
+box: -1.5 -4 3 2 3.6
+box: 5 -4 3 2 4.2
+box: 11.5 -4 3 2 3.4
+box: -20 8 8 6 12
+box: -10 8 8 6 15
+box: 0 8 8 6 11
+box: 10 8 8 6 14
+box: 20 8 8 6 12
+shot subject: a young woman running, athletic, in black running kit and white trainers, shot like a running-shoe advert (the orange figure; white marks her chest)
+shot environment: a New York street in the morning, shops and cafés along the pavement, yellow cabs, shot on film with visible grain
+shot action: close on her trainers as she runs, then alongside her as she passes behind the shopfronts and shows through the gaps, a quick hop over a puddle in a gap, then a high view of the whole street
 shot legend: the orange figure is the character; grey blocks are placeholders for the environment
-beats 0-10  | action: walk on path (-22,0) (10,0) (13,0,0.7) (19.5,0,0.7) corners 0.3 lock kick 0.6 | camera: path (-22,-14,1.6) (19.5,-14,1.6) corners 0.5 lock snare 1 hold | shot: -
-beats 10-13 | action: continue | camera: follow side distance 3m lock snare 1 hold | shot: wide
-beats 13-14 | action: continue | camera: follow front distance 4m height 0.6m lock snare 1 hold | shot: wide
-beats 14-16 | action: rest, jump @beat 15 | camera: continue
-beats 16-19 | action: rest, spin @beat 17.5 | camera: follow front distance 2.5m height 0.4m fov 100 lock snare 1 hold | shot: wide
+beats 0-9   | action: walk on path (-24,0) (24,0) corners 0 | camera: follow side distance 2.5m height 0.3m aim 0.3m fov 32 | shot: -
+beats 9-19  | action: continue | camera: follow side height 1.6m aim 1m fov 36 + pull out to 13m | shot: -
+beats 19-21 | action: continue, jump @kick 1 | camera: continue
+beats 21-35 | action: continue | camera: three-quarter distance 13m aim 1m fov 42 + rise to 8m | shot: -
