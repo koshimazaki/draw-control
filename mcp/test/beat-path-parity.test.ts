@@ -30,7 +30,7 @@ const examples = readdirSync(scriptsDir).filter(f => f.startsWith("beat-path-"))
 const cli = async (...argv: string[]) => { const err: string[] = []; const code = await main(argv, () => {}, s => err.push(s)); if (code) throw new Error(err.join("\n")); };
 
 describe("Draw Control scripts: page, CLI and MCP agree", () => {
-  it("has the examples", () => expect(examples.length).toBe(11));
+  it("has the examples", () => expect(examples.length).toBe(12));   // with beat-path-avenue-cross.txt (Example 1 until 15 Nov); a file track ("# track: file …", Example 1) runs on the straight groove here: the parity is of the script, not the music
   for (const file of examples) it(file, async () => {
     const text = readFileSync(new URL(file, scriptsDir), "utf8");
     const style = (/^#\s*track:\s*(straight|drive|laidback)/m.exec(text)?.[1] ?? "straight") as GrooveStyle;

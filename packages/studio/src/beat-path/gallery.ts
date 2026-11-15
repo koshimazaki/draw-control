@@ -8,12 +8,13 @@
  * loads it. Runs added by the visitor form an extra row, "Your runs". Never empty: paths and
  * guides show before any model clip exists.
  */
-import { analyseSamples, buildDrive, frameAt, placeLandmarks, planCamera, secondsAtBeat, synthDrums, grooveTimes, GROOVES } from "@motion-studio/core";
+import { analyseSamples, buildDrive, frameAt, placeLandmarks, planCamera, secondsAtBeat, GROOVES } from "@motion-studio/core";
 import { createGlider } from "../characters/glider";
 import { exportBundle } from "../export/bundle";
 import { GRID_LOOKS } from "../ground-grid";
 import { Viewport } from "../viewport";
 import { EXAMPLES, exampleState } from "./examples";
+import { exampleMusic, musicIdentity } from "./example-music";
 import { composePrompt, MODELS } from "./generate";
 import { beatPathRecipe, exportRange, type TrackInfo } from "./recipe-map";
 import { legendFor } from "./script";
@@ -31,19 +32,26 @@ type Media = { guide: string; audio: string } | null;
 
 const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls = "", text = "") => { const e = document.createElement(tag); if (cls) e.className = cls; if (text) e.textContent = text; return e; };
 
-/** An example's recipe on its own music (analysed here, as the page does). */
-function exampleRecipe(i: number) {
-  const s = exampleState(i), t = EXAMPLE_TRACKS[EXAMPLES[i].id], bpm = GROOVES[t.groove].bpm, seconds = 0.1 + t.bars * 4 * 60 / bpm + 0.5;
-  const samples = synthDrums(grooveTimes(t.groove, t.bars, 0.1), seconds), f = analyseSamples([samples], 44100);
+/** An example's recipe on its own music (its file or the synth groove, analysed here, as the page does). */
+async function exampleRecipe(i: number) {
+  const s = exampleState(i), id = EXAMPLES[i].id, t = EXAMPLE_TRACKS[id], music = await exampleMusic(id);
+  const f = analyseSamples(music.channels, music.sampleRate);
   const drive = buildDrive(f, 24, Math.ceil(f.lengthSeconds * 24) + 1);
-  const info: TrackInfo = { name: t.name, licence: t.licence, bpm: f.estimatedBpm ?? bpm, offsetSeconds: f.estimatedOffsetSeconds, lengthSeconds: f.lengthSeconds };
-  return { s, recipe: beatPathRecipe(s, info, { drive, bands: drive.bands }), drive, samples };
+  // The file's grid only with the file: the fallback groove goes out under its own name and its own tempo, as in the editor.
+  const grid = music.fromFile ? t.grid : undefined, named = musicIdentity(id, music.fromFile);
+  const info: TrackInfo = { name: named.name, licence: named.licence, bpm: grid?.bpm ?? f.estimatedBpm ?? GROOVES[t.groove].bpm, offsetSeconds: grid?.offsetSeconds ?? f.estimatedOffsetSeconds, lengthSeconds: f.lengthSeconds };
+  return { s, recipe: beatPathRecipe(s, info, { drive, bands: drive.bands }), drive, music };
 }
 
-/** A static map of both paths and the blocks, fitted to them. */
+/** A static map of both paths and the blocks, fitted to them; drawn once the example's music is analysed. */
 function thumbnail(i: number): HTMLCanvasElement {
-  const { recipe, drive } = exampleRecipe(i), c = el("canvas", "row-map");
+  const c = el("canvas", "row-map");
   c.width = 320; c.height = 200;
+  void exampleRecipe(i).then(({ recipe, drive }) => drawThumbnail(c, recipe, drive)).catch(() => {});
+  return c;
+}
+
+function drawThumbnail(c: HTMLCanvasElement, recipe: Awaited<ReturnType<typeof exampleRecipe>>["recipe"], drive: Awaited<ReturnType<typeof exampleRecipe>>["drive"]) {
   const g = c.getContext("2d")!, frames = Math.ceil((secondsAtBeat(recipe.beatGrid, recipe.durationBeats)) * 24), plan = planCamera(recipe, drive, frames + 2);
   const floor: [number, number][] = [], cam: [number, number][] = [];
   for (let n = 0; n < frames; n += 2) { const r = frameAt(recipe, n, drive).root, p = plan.samples[n].position; floor.push([r.x, r.z]); cam.push([p[0], p[2]]); }
@@ -60,13 +68,12 @@ function thumbnail(i: number): HTMLCanvasElement {
   const line = (pts: [number, number][], colour: string, w: number) => { g.strokeStyle = colour; g.lineWidth = w; g.beginPath(); pts.forEach(([x, z], j) => { const [px, py] = at(x, z); if (j) g.lineTo(px, py); else g.moveTo(px, py); }); g.stroke(); };
   line(cam, tok("--map-camera", "#6cc4ff"), 1.5);
   line(floor, tok("--map-subject", "#ff8a3d"), 2.5);
-  return c;
 }
 
 /** Render an example's guide in a hidden viewport of its own (the editor's preview is untouched). */
 async function renderGuide(i: number): Promise<Media> {
   if (typeof VideoEncoder === "undefined") return null;
-  const { s, recipe, drive, samples } = exampleRecipe(i);
+  const { s, recipe, drive, music } = await exampleRecipe(i);
   const host = el("div"); host.style.cssText = "position:fixed;left:-10000px;top:0;width:320px;height:180px";
   document.body.appendChild(host);
   let v: Viewport | null = null;
@@ -77,8 +84,8 @@ async function renderGuide(i: number): Promise<Media> {
     v.setCharacter(glider); v.setShowPaths(false); v.setGrid(true); v.setGridLook(GRID_LOOKS.dark); v.setBackgroundColour(GRID_LOOKS.dark.horizon); v.setExportGrid(true);
     const frames = Math.ceil((secondsAtBeat(recipe.beatGrid, recipe.durationBeats) + 0.3) * 24), plan = planCamera(recipe, drive, frames);
     v.setRig(plan, recipe, drive, frames); v.setView("rig"); v.setLandmarks(placeLandmarks(recipe, plan, drive));
-    const audio = new AudioBuffer({ length: samples.length, numberOfChannels: 1, sampleRate: 44100 });
-    audio.copyToChannel(samples as Float32Array<ArrayBuffer>, 0);
+    const audio = new AudioBuffer({ length: music.channels[0].length, numberOfChannels: music.channels.length, sampleRate: music.sampleRate });
+    music.channels.forEach((ch, k) => audio.copyToChannel(ch as Float32Array<ArrayBuffer>, k));
     const result = await exportBundle({ recipe, range: exportRange(recipe, s.clip), viewport: v, width: 640, height: 360, audio, drive });
     return { guide: URL.createObjectURL(new Blob([result.contents["guide.mp4"] as BlobPart], { type: "video/mp4" })), audio: URL.createObjectURL(new Blob([result.contents["audio.wav"] as BlobPart], { type: "audio/wav" })) };
   } catch { return null; } finally { v?.dispose(); host.remove(); }

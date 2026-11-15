@@ -3,15 +3,19 @@ import { analyseSamples, waveformMinMax, type AudioFeatures } from "@motion-stud
 
 export type Track = { name: string; buffer: AudioBuffer; features: AudioFeatures; wave: ReturnType<typeof waveformMinMax> };
 
+/**
+ * Every track is decoded at this rate, whatever the output device runs at, so the page, the Gallery
+ * and the CLI (which decodes at 44.1 kHz too, cli/src/audio-file.ts) find the same hits and tempo:
+ * the analysis is not rate-independent (Example 1's loop reads 107.5 BPM at 44.1 kHz and 122.9 BPM
+ * at 48 kHz, and loses five kicks). A 44.1 kHz buffer plays in any audio context.
+ */
+export const DECODE_RATE = 44100;
+
 /** Decode and analyse a track; `stage` hears what it is doing. Long tracks analyse in a worker, so the page never freezes. */
 export async function loadTrack(file: File, stage: (text: string) => void = () => {}): Promise<Track> {
   if (file.size > 150 * 1024 * 1024) throw new Error("Keep the track below 150 MB.");
-  const ctx = new AudioContext();
-  let buffer: AudioBuffer;
-  try {
-    stage(`Decoding ${file.name}…`);
-    buffer = await ctx.decodeAudioData(await file.arrayBuffer());
-  } finally { await ctx.close().catch(() => {}); }
+  stage(`Decoding ${file.name}…`);
+  const buffer = await new OfflineAudioContext(1, 1, DECODE_RATE).decodeAudioData(await file.arrayBuffer());
   const m = Math.floor(buffer.duration / 60), sec = Math.round(buffer.duration % 60);
   stage(`Analysing ${file.name} (${m}:${String(sec).padStart(2, "0")}): kicks, snares, hats…`);
   if (buffer.duration < 30 || typeof Worker === "undefined") return trackFromBuffer(file.name, buffer);

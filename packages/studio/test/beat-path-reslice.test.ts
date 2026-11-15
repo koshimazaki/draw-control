@@ -51,6 +51,12 @@ describe("resizing the window by a bracket", () => {
     expect(resizeWindow("end", 200, { start: 10, clip: 8 }, long, true)).toEqual({ start: 10, clip: 30 });
     expect(resizeWindow("end", 10, { start: 0, clip: 3 }, { ...cut8, lengthSeconds: 2.5 }, true)).toBeNull();
   });
+  it("a track a little short of whole seconds keeps the next second (Example 1: 13.488 s of music, a 14 s clip)", () => {
+    const loop = { ...cut8, name: "neon-rain-loop.mp3", lengthSeconds: 13.488 };
+    expect(resizeWindow("end", 13.2, { start: 0, clip: 14 }, loop, true)).toEqual({ start: 0, clip: 13 });
+    expect(resizeWindow("end", 20, { start: 0, clip: 13 }, loop, true)).toEqual({ start: 0, clip: 14 });
+    expect(resizeWindow("end", 20, { start: 0, clip: 4 }, { ...cut8, lengthSeconds: 8.1 }, true)).toEqual({ start: 0, clip: 8 });
+  });
   it("drags the left bracket with the end held (snapped to the beat with Snap on)", () => {
     expect(resizeWindow("start", 3.9, { start: 0, clip: 8 }, cut8, false)).toEqual({ start: 4, clip: 4 });
     expect(resizeWindow("start", 3.9, { start: 0, clip: 8 }, cut8, true)).toEqual({ start: 4, clip: 4 });

@@ -181,12 +181,13 @@ beats 13-17    | action: continue           | camera: dolly in 2m    | shot: wid
 Then, with the CLI: `motion-studio analyse track.wav --out a.json`, `motion-studio new --character glider --clip 8 --analysis a.json --out base.json`, `motion-studio script base.json examples/scripts/voice-freeze-orbit.txt --analysis a.json --out shot.json`, `motion-studio render shot.json --audio track.wav --out bundle`. Over MCP: `analyse_audio` (or `load_analysis`), `new_recipe { character: "glider", clip: 8 }`, `apply_script`, `render`. Both give the same recipe (`mcp/test/voice-freeze.test.ts`, which also checks the figure hangs in the air through the freeze, lands after it, and the camera circles meanwhile). `rise 6m to 1m` cranes down: rise takes descending heights. Commands for agents added with Draw Control: `setSceneryBoxes`, `addSceneryBox`, `removeSceneryBox` and `setScenerySight` (build a street box by box: `box: 6 4 5 8 12` lines, or `scenery: street sight passes` for columns between camera and subject), `setLandmarks`, `setScenery` ("put it in a big city": `{ "type": "setScenery", "preset": "city" }` or the script line `scenery: city`), `muteHit`, `resetMutedHits`, `setFigure` (`shape`: glider, car, flyer, runner), `setShot` (each field is one line: a line break becomes a space, so a field cannot add a script row), and the `rig: distance 8m height 5m fov 30 yaw 45` line for the camera's start framing (open isometric, top or side with it, not with `set`; Frame 0 is the rig start. Each block starts where the block before it ended: a follow offset (distance, height; it wins over a shot preset), a shot preset, a fov and the end of a programmed dolly, push, pull or rise carry on into every later block until another block changes them; a block that sets none of them keeps what it started with. The camera word top (or above) with `shot: -` is the exception: it lifts the camera overhead from those values without changing them, so the block after it comes back to the distance and height from before it (a fov set on it carries on). With the `top` shot preset (`top | shot: top`, what the page prints for a top block) it sets 1.4 m, 6.5 m and fov 45 like any preset, and those carry on.); the camera grammar (`over shoulder`, `above`, `slow|even|fast`, `then`, `at 2s`) and the settings lines are in [recipe.md](recipe.md#shot-script).
 
 
-## Worked example: a parallel-street shot (Draw Control Examples 1 and 2, round 8)
+## Worked example: a parallel-street shot (the avenue shot and Example 2, round 8)
 
 The owner's shot: the subject travels along one street, the camera along the parallel street,
 blocks in between, so the subject is seen through the gaps; camera and subject start apart.
-Both examples were written as shot scripts and applied with the CLI (Example 2 also over MCP);
-the page loads the same files (`examples/scripts/beat-path-ex1-flyer.txt`, `-ex2-runner.txt`).
+Both were written as shot scripts and applied with the CLI (Example 2 also over MCP). The avenue
+shot was Example 1 until 15 Nov 2026 and is kept as `examples/scripts/beat-path-avenue-cross.txt`
+(Example 1 is now the ship on the owner's loop); the page loads Example 2 from `-ex2-runner.txt`.
 
 ```
 motion-studio groove drive --bars 10 --out drive.wav               # the example's own music

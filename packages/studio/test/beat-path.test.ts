@@ -4,13 +4,14 @@ import { patternTimes, synthDrums } from "@motion-studio/core/internal";
 import { beatPathRecipe, exportRange, type TrackInfo } from "../src/beat-path/recipe-map";
 import { fitLanes, fromScript, setWord, toScript, type BeatPathState } from "../src/beat-path/script";
 import { BLANK_STATE, EXAMPLES, exampleState } from "../src/beat-path/examples";
+import { avenueState } from "./avenue";
 
 const samples = synthDrums(patternTimes(120, 8, 0.1), 16.6);
 const features = analyseSamples([samples], 44100);
 const drive = buildDrive(features, 24, Math.ceil(features.lengthSeconds * 24) + 1);
 const info: TrackInfo = { name: "demo-drums-120.wav", licence: "generated", bpm: features.estimatedBpm!, offsetSeconds: features.estimatedOffsetSeconds, lengthSeconds: features.lengthSeconds };
 const ctx = { drive, bands: drive.bands };
-const S = (over: Partial<BeatPathState> = {}): BeatPathState => ({ ...exampleState(0), ...over });
+const S = (over: Partial<BeatPathState> = {}): BeatPathState => ({ ...avenueState(), ...over });
 const build = (s: BeatPathState) => beatPathRecipe(s, info, ctx);
 const seg = (r: Recipe, i = 0) => r.camera!.segments[i];
 const frames = (r: Recipe) => Array.from({ length: 193 }, (_, n) => frameAt(r, n, drive).root);
