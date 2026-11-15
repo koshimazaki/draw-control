@@ -41,9 +41,9 @@ ms describe out/x/base.json --analysis out/x/m.json  # "Onsets in beats": kicks,
 
 - **Your own music file** instead of a groove: `ms analyse <file.mp3> --out out/x/m.json` (the CLI
   decodes at 44.1 kHz). **Check the tempo against what the owner says**: the estimate can depend on
-  the sample rate (one loop read 107.5 BPM at 44.1 kHz and 122.9 BPM from a 48 kHz WAV), and the
-  page decodes at the browser's rate. For a page example give the file its beat grid in
-  `tracks.ts` (`grid: { bpm, offsetSeconds }`) so the page cannot drift from the CLI.
+  the sample rate (one loop read 107.5 BPM at 44.1 kHz and 122.9 BPM from a 48 kHz WAV, and lost
+  five kicks). The CLI, the editor and the Gallery all decode at 44.1 kHz for that reason
+  (`DECODE_RATE` in `packages/studio/src/audio.ts`); never analyse a WAV you resampled to 48 kHz.
 - **Where beat 0 sits.** The page's clip window starts at beat 0. A loop that starts on its
   downbeat wants beat 0 at the file's start, so frame 0 of the guide is the music's start (the
   finish step, step 7, then needs no offset): `grid` offset 0 in `tracks.ts`, and in the CLI
@@ -91,7 +91,17 @@ box: -10 2.5 2 2 3.2                               # x z width depth height (met
   (before the street starts), go behind (sideways offset near 0) inside it, and run
   `scripts/camera-boxes.mjs` on every render (below).
 - Path: `walk on path (x,z,height) … corners 0.9` in the first row's action; x right, z towards
-  the front camera; height for a hovering subject. `corners 0.8–0.9` gives smooth curves.
+  the front camera; height for a hovering subject. `corners 0.8–0.9` gives smooth curves, but a
+  corner rounds only as far as its **shorter** neighbouring segment allows (up to half of it): a
+  turn followed by a 2.5 m segment stays a 1 m kink at any `corners`. Make the segments either
+  side of a turn long (the first point after it 9 m on) and put extra points further along.
+- **Speed is one constant along the whole path** (spaced by 3D distance, height included); there
+  is no word for accelerating from rest or slowing to a stop. A travel lock varies speed only by
+  holding at every locked hit (stop-start). So: no `ease in`, no deceleration into the last point;
+  the subject stops dead at the path's end. For a landing, shape the heights so the vertical speed
+  shrinks (drops per metre decreasing: `(7.75,-9,1.4) (7.75,-12,0.9) (7.75,-14.5,0.6)
+  (7.75,-17,0.45) (7.75,-18.5,0.4)`) and let the path end after the clip, so touchdown is soft
+  and no stop is seen.
 - **A turn on a hit**: the path is travelled at one average speed over the action block (the
   travel lock keeps the subject where steady travel would be on each locked hit), so a corner's
   middle lands at block length × (path length to the corner / whole length). Choose the legs so
@@ -160,6 +170,19 @@ rig: distance 8m height 5m fov 30 yaw 45           # the opening framing (frame 
 - A shot or offset eases in over the block's first beat, but a **follow swing** (top → side,
   behind → front) is a spring: a 150–180° swing takes about **2 s**. Give a follow block at least
   2 s plus a settled tail (start the final side block ~3 s before the end).
+- **Smooth by default: no locks.** `lock kick 1 hold` on every camera cell and `lock kick 0.8` on
+  the path make the camera hold and the subject pulse on every kick, which reads as stop-start.
+  Leave the locks out (the moves still start on their hits through the block edges); the owner
+  tunes hit response with Sensitivity in the page. With no lock in the script the page carries
+  none (`camLock` and `charLock` off) and prints none back.
+- Measure smoothness from `camera.json`, not by eye: the camera's heading yaw per frame (rate,
+  and acceleration over 3 frames; skip frames looking within 1 m of straight down), and its speed
+  per frame inside each block (a hold shows as speed near 0 at each hit). Example 1 went from a
+  65°/s peak turn rate and 0 m/s holds to 57.5°/s and no dip with corners 0.9 and no locks.
+- **A zoom from the top under the 8 m ceiling**: `above + push in to 1m even` in a block that
+  starts on a hit. The push shows only once the asked height drops under 8 m (until then the
+  ceiling holds the camera), so ask for a close target (1 m) to make it start near the block's
+  edge; `fast` finishes early and holds, `even` keeps growing the subject through the landing.
 - A follow camera trails wide through a sharp turn, wider the larger its distance: a follow
   block of 9 m starting as the subject turned out of an alley swung into the corner tower for
   5 frames; 6 m cleared it. Keep follow distances short through turns between boxes.
@@ -199,7 +222,7 @@ ffmpeg -v error -y -i out/x/v1/guide.mp4 -vf "select='not(mod(n\,16))',scale=320
 
 The page reads the script into its own state and prints it back, so write the file in the page's form:
 - block edges on half beats (see step 1);
-- every camera cell carries the camera lane's lock (`… lock snare 1 hold`), because the page applies one lock to all;
+- every camera cell carries the camera lane's lock, or none (the page applies one lock to all; Example 1 has none);
 - `shot: -` on camera blocks keeps the carried framing (a preset like `wide` or `top` overrides it, and carries on after). The page prints a top block it made itself as `top | shot: top`, so a following orbit then runs at 1.4 m / 6.5 m / fov 45; write `shot: -` on the top block (the page keeps it) when the next block should come back to the earlier framing;
 - the last row ends at the page's clip beats (step 1), or loading the music moves every edge;
 - `# track: <groove> <bars> bars` names the music, e.g. `# track: laidback 6 bars`; a music file
