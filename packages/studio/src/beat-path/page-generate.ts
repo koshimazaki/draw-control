@@ -10,7 +10,7 @@
  */
 import { exportBundle } from "../export/bundle";
 import { ARENA_THEME, fakeFetch, loadArena, type ArenaKeyElement, type ArenaModule } from "./arena";
-import { clipRefusal, composePrompt, runErrorText, MAX_PRICE, MODELS, type ModelId, type References, type RunError } from "./generate";
+import { clipRefusal, composePrompt, promptWarning, runErrorText, MAX_PRICE, MODELS, type ModelId, type References, type RunError } from "./generate";
 import type { Page } from "./page";
 import { exportRange } from "./recipe-map";
 import { shotRefusal } from "./page-setup";
@@ -26,6 +26,7 @@ import { bindRefs, readableVideo, videoFrame } from "./page-refs";
 import { bindImages } from "./page-image";
 import { applyStep, followStep, playLocal } from "./result-sync";
 import { bindCostDialog } from "./cost-dialog";
+import { bindShotEditor } from "./shot-editor";
 
 const EXPORT = { width: 1280, height: 720 } as const;
 const store = (() => { try { return window.sessionStorage; } catch { return null; } })();
@@ -129,7 +130,9 @@ export function bindGenerate(p: Page) {
 
   // Model choice and the prompt it will get.
   const labelOf = (id: string) => arena?.offeredModels().find(m => m.key === id)?.name ?? MODELS.find(m => m.id === id)?.label ?? id;
+  let shotEditor: ReturnType<typeof bindShotEditor> | null = null;
   function sync() {
+    shotEditor?.refresh();
     // The clip fader: hatched past what this model takes, and a note when the clip is beyond it.
     const reach = MODELS.find(m => m.id === model)!.seconds.max, refusal = clipRefusal(model, p.state.clip);
     setFader($("clipFader"), p.state.clip, reach);
@@ -148,7 +151,9 @@ export function bindGenerate(p: Page) {
   const ask = bindCostDialog($);
   const localNote = () => (fake && !key?.connected ? " Local preview: nothing is sent and nothing is charged." : "");
   const confirmCost = (q: { usd: number; modelName: string; inputs: unknown[] }, signal: AbortSignal) => ask("Generate with this model?",
-    `Up to ${q.usd.toFixed(2)} USD on ${q.modelName} (limit ${MAX_PRICE} USD). It sends the guide video${(q.inputs?.length ?? 0) > 1 ? ", the reference images" : ""} and the prompt from your shot description.${localNote()}`, "Generate", signal);
+    `Up to ${q.usd.toFixed(2)} USD on ${q.modelName} (limit ${MAX_PRICE} USD). It sends the guide video${(q.inputs?.length ?? 0) > 1 ? ", the reference images" : ""} and the prompt from your shot description.${localNote()}${(w => (w ? ` ${w}` : ""))(promptWarning(model, currentPrompt()))}`, "Generate", signal);
+  // The larger prompt editor and the Timed action (shot-editor.ts): Timed writes in the chosen model's time syntax.
+  shotEditor = bindShotEditor(p, { ask, model: () => model, changed: () => sync() });
 
   // One run at a time; while it runs the Generate button stops it. The run belongs to the example it
   // started on: switching examples mid-run files the result there and never shows it on another.
@@ -274,7 +279,7 @@ export function bindGenerate(p: Page) {
   sync();
 
   return {
-    exportGuideInMemory, sync,
+    exportGuideInMemory, sync, get shotEditor() { return shotEditor; },
     /** A new slot: its references, its output (if any). */
     onSlot(slot: string) {
       refUi.sync();

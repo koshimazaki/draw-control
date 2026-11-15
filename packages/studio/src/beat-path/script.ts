@@ -6,7 +6,7 @@
  * page's vocabulary is read to the nearest page word, and `notes` says what changed.
  */
 import { FOV_RANGE, parseRows, parseSettings, type FollowOffset } from "@motion-studio/core";
-import { followWords, parseFollowArgs } from "@motion-studio/core/internal";
+import { escapeLines, followWords, multiLine, parseFollowArgs } from "@motion-studio/core/internal";
 import { EXAMPLE_TRACKS, type ExampleId } from "./tracks";
 
 export type PathPt = { x: number; z: number; y?: number };
@@ -172,7 +172,7 @@ export function toScript(state: BeatPathState): string {
   if (state.scenery !== "scatter" || state.sight === "passes") lines.push(`scenery: ${state.scenery}${state.sight === "passes" ? " sight passes" : ""}`);
   for (const b of state.boxes ?? []) lines.push(`box: ${[b.x, b.z, b.w, b.d, b.h, ...(b.yaw ? [b.yaw] : [])].map(f).join(" ")}`);
   if (state.shot.subject || state.shot.environment || state.shot.action) {
-    for (const k of ["subject", "environment", "action"] as const) if (state.shot[k]) lines.push(`shot ${k}: ${state.shot[k].replace(/[\r\n#]+/g, " ").trim()}`);
+    for (const k of ["subject", "environment", "action"] as const) if (state.shot[k]) lines.push(`shot ${k}: ${escapeLines(multiLine(state.shot[k].replace(/#+/g, " ")))}`);   // a line break prints as `\n` (never a new row)
     lines.push(`shot legend: ${legendFor(state.figure)}`);
   }
   for (let i = 0; i < edges.length - 1; i++) {

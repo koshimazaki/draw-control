@@ -9,11 +9,21 @@
  * The models offered (the embed's model keys); names come from the embed's offeredModels() when it is installed.
  * `seconds`: the whole-second lengths each takes (the embed's spec: duration and its guide-video cap).
  */
+/**
+ * `promptMax`: the longest prompt each takes, characters (Runware's schema; Seedance's own guide says 10,000, below
+ * its schema's 50,000, so the guide's is used). `timed`: the time syntax its prompting guide documents (docs/models.md).
+ */
 export const MODELS = [
-  { id: "kling-4", label: "Kling 4.0", seconds: { min: 3, max: 30 } },
-  { id: "seedance-2.5", label: "Seedance 2.5", seconds: { min: 4, max: 30 } },
-  { id: "h3", label: "MiniMax H3", seconds: { min: 4, max: 15 } },
+  { id: "kling-4", label: "Kling 4.0", seconds: { min: 3, max: 30 }, promptMax: 26_000, timed: "plain" },
+  { id: "seedance-2.5", label: "Seedance 2.5", seconds: { min: 4, max: 30 }, promptMax: 10_000, timed: "brackets" },
+  { id: "h3", label: "MiniMax H3", seconds: { min: 4, max: 15 }, promptMax: 7_000, timed: "plain" },
 ] as const;
+
+/** A warning when the composed prompt is longer than `model` takes (shown in the cost dialog), else null. */
+export function promptWarning(model: ModelId, prompt: string): string | null {
+  const m = MODELS.find(x => x.id === model)!;
+  return prompt.length > m.promptMax ? `The prompt is ${prompt.length} characters; ${m.label} takes up to ${m.promptMax}, so it may be refused or cut: shorten the shot fields.` : null;
+}
 export type ModelId = (typeof MODELS)[number]["id"];
 
 /** Why `model` cannot take a clip of `clip` seconds (with the models that can), or null when it can. */

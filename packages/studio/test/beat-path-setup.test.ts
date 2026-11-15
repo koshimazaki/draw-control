@@ -4,6 +4,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { strToU8, zipSync } from "fflate";
+import { SHOT_LIMITS } from "@motion-studio/core";
 import { EXAMPLES, exampleState, ownState } from "../src/beat-path/examples";
 import { BLANK_STATE, toScript, type BeatPathState } from "../src/beat-path/script";
 import { SETUP_KIND, SETUP_VERSION, buildSetup, readSetup, setupJson } from "../src/beat-path/setup-file";
@@ -149,8 +150,8 @@ describe("bad files never throw", () => {
     expect(r.state.markers).toHaveLength(512);
     expect(r.state.subject).toEqual([{ x: 0, z: 0 }, { x: 5, z: 0, y: 30 }]);
     const s = r.state.shot.subject;
-    expect(s.length).toBeLessThanOrEqual(300);
-    expect(s).not.toMatch(/[<>{}\\\n]|https?:|javascript:/i);
+    expect(s.length).toBeLessThanOrEqual(SHOT_LIMITS.subject);
+    expect(s).not.toMatch(/[<>{}\\]|https?:|javascript:/i);
     expect(r.state.shot.action).not.toMatch(/data:/i);
     expect(r.notes.join(" ")).toMatch(/512/);
     expect(r.notes.join(" ")).toMatch(/shot/);

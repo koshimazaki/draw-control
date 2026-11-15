@@ -20,6 +20,7 @@ import { makeMoveFor, onsetBeats, setMoveFields } from "./move-edits";
 import { addMarker } from "./performance-edits";
 import { DEFAULT_REACTIVE } from "./reactive-config";
 import { RecipeError, validateRecipe, type Recipe, type RootPoint } from "./recipe";
+import { unescapeLines } from "./validate";
 import { travelRange } from "./root-travel";
 import { parseRig, type ScriptRig } from "./script-rig";
 import { ACTION_WORDS, CAMERA_WORDS, accentVocabulary, actionVocabulary, cameraVocabulary } from "./shot-script";
@@ -48,7 +49,7 @@ export function parseSettings(script: string): ScriptSettings {
     const text = raw.replace(/#.*$/, "").trim();
     if (!SETTING.test(text)) return;
     const shotLine = /^shot (subject|environment|action|legend)\s*:\s*(.*)$/i.exec(raw.trim());
-    if (shotLine) { (out.shot ??= {})[shotLine[1].toLowerCase() as "subject"] = shotLine[2].trim(); return; }
+    if (shotLine) { (out.shot ??= {})[shotLine[1].toLowerCase() as "subject"] = unescapeLines(shotLine[2].trim()); return; }   // a `\n` is a line break in the text
     if (/^scenery\s*:/i.test(text)) {
       const m = /^scenery\s*:\s*(none|scatter|street|city)(?:\s+sight\s+(clear|passes))?\s*$/i.exec(text);
       if (!m) throw new RecipeError(`script line ${i + 1}: scenery reads "scenery: city" or "scenery: street sight passes" (none, scatter, street, city; sight clear or passes)`);

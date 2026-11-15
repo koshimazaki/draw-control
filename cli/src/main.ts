@@ -6,7 +6,8 @@
  *       (--slice: where a Draw Control clip starts in a longer track, seconds, snapped to its nearest beat)
  *   apply <recipe.json> <commands.json> [--analysis a.json] [--out next.json]
  *   set <recipe.json> <path> <value> [--out next.json]
- *   describe <recipe.json> [--analysis a.json] [--script]
+ *   describe <recipe.json> [--analysis a.json] [--script | --timed [--style plain|brackets] [--seconds 8]]
+ *       (--timed: the shot as a timed prompt, one line per camera block, the page's Timed button; brackets for Seedance)
  *   script <recipe.json> <script.txt> [--analysis a.json] [--out next.json]
  *       (a page setup file, setup.json, works in place of the script: its script is applied)
  *   commands
@@ -18,7 +19,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { basename } from "node:path";
 import {
-  DEFAULT_RECIPE, GROOVES, PROCEDURAL_KINDS, beatPathBase, encodeWav, grooveTimes, synthDrums, applyCommands, commandHelp, defaultRiggedRecipe, describeRecipe, printScript, validateRecipe, type CommandContext, type MotionCommand, type Recipe,
+  DEFAULT_RECIPE, GROOVES, PROCEDURAL_KINDS, beatPathBase, encodeWav, grooveTimes, synthDrums, applyCommands, commandHelp, defaultRiggedRecipe, describeRecipe, printScript, timedPrompt, TIMED_STYLES, validateRecipe, type TimedStyle, type CommandContext, type MotionCommand, type Recipe,
 } from "../../packages/core/src/index.ts";
 import { sliceStart } from "../../packages/core/src/internal.ts";
 import { decodeAudioFile } from "./audio-file.ts";
@@ -142,9 +143,15 @@ export async function main(argv: string[], out: (s: string) => void = s => conso
         return 0;
       }
       case "describe": {
-        if (!rest[0]) throw new Error("describe <recipe.json> [--analysis a.json] [--script]");
+        if (!rest[0]) throw new Error("describe <recipe.json> [--analysis a.json] [--script | --timed [--style plain|brackets] [--seconds 8]]");
         const r = validateRecipe(readJson(rest[0])), bands = contextFrom(flags).analysis?.bands;
-        out(flags.script ? printScript(r, bands).trimEnd() : describeRecipe(r, bands));
+        if (flags.timed) {
+          const style = (flagStr(flags, "style") ?? "plain") as TimedStyle, sec = flagStr(flags, "seconds");
+          if (!TIMED_STYLES.includes(style)) throw new Error(`--style takes ${TIMED_STYLES.join(" or ")}`);
+          const seconds = sec === undefined ? undefined : Number(sec);
+          if (seconds !== undefined && !(seconds > 0 && seconds <= 3600)) throw new Error("--seconds takes a clip length in seconds");
+          out(timedPrompt(r, { bands, style, ...(seconds !== undefined ? { seconds } : {}) }));
+        } else out(flags.script ? printScript(r, bands).trimEnd() : describeRecipe(r, bands));
         return 0;
       }
       case "script": {

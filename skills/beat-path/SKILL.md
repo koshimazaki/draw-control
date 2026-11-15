@@ -37,6 +37,7 @@ The CLI equivalents are in `docs/agents.md` (`npm run cli -- commands`).
 4. **Camera on the beat.** Camera words: follow behind, follow side, orbit, top, push in, my path. Lock a block to `kick`, `snare`, `hat` or `beat`. For "moves on the snare", cut the Camera lane at each snare and cycle the moves (the page's "Moves on hits"). Too many cuts read as robotic; use the `sensitivity:` line (0–1) to thin the hits first.
 5. **Clip length.** `new_recipe { clip }`, 3 to 30 s. Check the target model's limit in `docs/models.md` before going past 10 s (MiniMax H3 stops at 15 s, video and audio together).
 6. **Read back, then render.** `describe` or `get_script`, check it against the brief, then `render`. Look at frame 0 and the MP4 before proposing a generation.
+7. **Write the timed prompt.** `timed_prompt { write: true }` (with the analysis loaded, so each line names the hit it starts on), or `motion-studio describe shot.json --analysis a.json --timed`: one line per camera block, in seconds. Use `style: "brackets"` for Seedance 2.5. Read it, fix any wording that does not match the brief, and keep it under the action's 2000 characters.
 
 ## Shot description
 

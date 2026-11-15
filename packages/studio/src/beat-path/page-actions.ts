@@ -98,8 +98,11 @@ export function bindActions(p: Page) {
     $("hudLock").textContent = `figure ${s.charLock.lock === "off" ? "free" : s.charLock.lock} · camera ${s.camLock.lock === "off" ? "free" : s.camLock.lock}`;
     for (const k of ["subject", "environment", "action"] as const) {
       const el = input(`shot${k[0].toUpperCase()}${k.slice(1)}`);
-      if (document.activeElement !== el) el.value = s.shot[k];
-      el.title = s.shot[k];   // the whole text on hover when the field cuts it
+      // Several lines do not fit a one-line field: it shows them joined, read-only, and a click opens the editor (shot-editor.ts).
+      const v = s.shot[k], multi = v.includes("\n");
+      if (document.activeElement !== el || multi) el.value = multi ? v.replace(/\n+/g, " / ") : v;
+      el.readOnly = multi; el.classList.toggle("multi", multi);
+      el.title = multi ? `${v}\n\n(several lines: click to edit them in the larger editor)` : v;   // the whole text on hover when the field cuts it
     }
     const pts = p.tool === "subject" ? s.subject : p.tool === "camera" ? s.camera : [];
     const empty = $("mapEmpty");
@@ -333,8 +336,8 @@ export function bindActions(p: Page) {
   // The shot description: three fields, stored in the recipe (recipe.json in the bundle) and the script.
   for (const k of ["subject", "environment", "action"] as const) {
     const el = input(`shot${k[0].toUpperCase()}${k.slice(1)}`);
-    el.oninput = () => p.update({ ...p.state, shot: { ...p.state.shot, [k]: el.value } }, false);
-    el.onchange = () => p.update({ ...p.state, shot: { ...p.state.shot, [k]: el.value } }, true);
+    el.oninput = () => { if (!el.readOnly) p.update({ ...p.state, shot: { ...p.state.shot, [k]: el.value } }, false); };
+    el.onchange = () => { if (!el.readOnly) p.update({ ...p.state, shot: { ...p.state.shot, [k]: el.value } }, true); };
   }
   const script = () => toScript(p.state);
 

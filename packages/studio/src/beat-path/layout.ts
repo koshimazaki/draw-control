@@ -5,6 +5,7 @@
  * reference drops, the model and Generate, and Settings (closed); the music strip and the
  * two lanes along the bottom. The Gallery is below, reached by scrolling.
  */
+import { SHOT_LIMITS } from "@motion-studio/core";
 import { CLIP_SECONDS } from "./script";
 import { faderHTML } from "./ui/fader";
 import { APP_NAME, REPO_URL, LICENCE } from "./name";
@@ -80,11 +81,22 @@ export const LAYOUT = `
         <span class="mono" id="transportTime">0.00 / 8.00 s · beat 0.0</span>
       </div>
     </div>
+    <div class="shot-editor" id="shotEditor" role="dialog" aria-modal="false" aria-labelledby="shotEditorTitle" hidden>
+      <div class="shot-editor-head"><strong id="shotEditorTitle">Shot description</strong>
+        <span class="muted shot-editor-hint">Each field may run over several lines. Timed writes the action as a timeline from the camera blocks and the hits.</span>
+        <button type="button" id="shotTimed" class="btn outline" data-tip="Write the action as a timeline: one line per camera block, in seconds, with the hit each move starts on">${icon("clock")}Timed</button>
+        <button type="button" id="shotCollapse" class="btn ghost icon-btn" aria-label="Close the prompt editor">${icon("chevron-down")}</button></div>
+      <label class="shot-editor-field"><span class="lab">Subject</span><textarea id="edSubject" class="field area" rows="2" maxlength="${SHOT_LIMITS.subject}"></textarea></label>
+      <label class="shot-editor-field"><span class="lab">Environment</span><textarea id="edEnvironment" class="field area" rows="2" maxlength="${SHOT_LIMITS.environment}"></textarea></label>
+      <label class="shot-editor-field grow"><span class="lab">Action</span><textarea id="edAction" class="field area" maxlength="${SHOT_LIMITS.action}"></textarea></label>
+      <p class="shot-editor-foot muted mono" id="shotCount" aria-live="polite"></p>
+    </div>
     <div class="compose">
       <div class="row shot">
-        <input id="shotSubject" class="field" type="text" maxlength="300" placeholder="Subject" aria-label="Subject" />
-        <input id="shotEnvironment" class="field" type="text" maxlength="300" placeholder="Environment" aria-label="Environment" />
-        <input id="shotAction" class="field" type="text" maxlength="300" placeholder="Action" aria-label="Action" />
+        <input id="shotSubject" class="field" type="text" maxlength="${SHOT_LIMITS.subject}" placeholder="Subject" aria-label="Subject" />
+        <input id="shotEnvironment" class="field" type="text" maxlength="${SHOT_LIMITS.environment}" placeholder="Environment" aria-label="Environment" />
+        <input id="shotAction" class="field" type="text" maxlength="${SHOT_LIMITS.action}" placeholder="Action" aria-label="Action" />
+        <button type="button" id="shotExpand" class="btn outline icon-btn tip-end" aria-label="Open the prompt editor" aria-expanded="false" aria-controls="shotEditor" data-tip="A larger editor: longer, multi-line text and a timed action">${icon("chevron-up")}</button>
       </div>
       <div class="row">
         <label class="drop" id="dropCharacter" data-tip="A character sheet the model follows"><input type="file" accept="image/*" id="refCharacter" /><span class="drop-thumb" id="thumbCharacter">${icon("image")}</span><span>Character</span><button type="button" class="drop-clear" id="clearCharacter" hidden aria-label="Clear the character image">${icon("x")}</button></label>

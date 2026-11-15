@@ -51,3 +51,5 @@ export * from "./script-rig";
 export { CAMERA_LANES, LANE_SPECS, inLane, isCameraLane, laneAt, type CameraLane, type LaneSpec } from "./automation";
 export * from "./drum-synth";
 export * from "./follow-words";
+export * from "./timed-prompt";
+export { multiLine, escapeLines, unescapeLines } from "./validate";

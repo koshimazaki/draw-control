@@ -7,6 +7,7 @@ import "./ui/components.css";
 import "./themes/neutral.css";
 import "./themes/runware.css";
 import "./beat-path.css";
+import "./shot-editor.css";
 import { startBeatPath } from "./page";
 import { APP_NAME } from "./name";
 

@@ -30,6 +30,15 @@ describe("motion-studio CLI", () => {
     expect((await run("set", join(dir, "new-glider.out.json"), "camera.startYaw", "45", "--out", yawed)).code).toBe(0);
     expect((await run("describe", yawed, "--script")).out.split("\n")[0]).toBe("rig: yaw 45");
   });
+  it("describe --timed prints the timed prompt (plain, or Seedance's brackets), and refuses a bad style", async () => {
+    const script = join(dir, "timed.txt"), base = join(dir, "timed-base.json"), out = join(dir, "timed.json");
+    writeFileSync(script, "beats 0-5 | action: glide on path (-10,0) (10,0) | camera: follow behind | shot: wide\nbeats 5-17 | action: continue | camera: top | shot: top\n");
+    expect((await run("new", "--character", "glider", "--clip", "8", "--out", base)).code).toBe(0);
+    expect((await run("script", base, script, "--out", out)).code).toBe(0);
+    expect((await run("describe", out, "--timed")).out).toBe("0.0–2.5 s: wide shot; the camera follows from behind as it glides along its path\n2.5–8.0 s, on the beat: top view, looking straight down on it");
+    expect((await run("describe", out, "--timed", "--style", "brackets", "--seconds", "4")).out.split("\n")[1]).toBe("[2.5-4s] on the beat: top view, looking straight down on it");
+    expect((await run("describe", out, "--timed", "--style", "json")).code).not.toBe(0);
+  });
   it("parses flags and values", () => {
     expect(parseArgs(["apply", "r.json", "--out", "x.json", "--grid"])).toEqual({ pos: ["apply", "r.json"], flags: { out: "x.json", grid: true } });
     expect(parseValue("2.5")).toBe(2.5);
