@@ -7,7 +7,7 @@
  */
 import { describe, expect, it } from "vitest";
 import * as THREE from "three";
-import { strFromU8 } from "fflate";
+import { strFromU8, strToU8 } from "fflate";
 import { analyseSamples, buildDrive, planCamera } from "@motion-studio/core";
 import { BUNDLE_FILES, BUNDLE_SCHEMA_VERSION, buildCameraTrack, cameraAtFrame, patternTimes, synthDrums, type CameraPlan } from "@motion-studio/core/internal";
 import { beatPathRecipe, exportRange, type TrackInfo } from "../src/beat-path/recipe-map";
@@ -87,6 +87,15 @@ describe("exportBundle: a snapshot of the view and the rig plan", () => {
     expect(new Set(h.calls.cameras.map(p => p.toArray().join())).size).toBe(1);
     expect(JSON.parse(strFromU8(result.contents[BUNDLE_FILES.meta])).view).toBe("front");
     expect(result.files).not.toContain(BUNDLE_FILES.camera);
+  });
+
+  it("extra files (the page's setup.json) ride in the zip, never over the guide's own, and stay out of bundle.json", async () => {
+    const h = harness({});
+    const result = await exportBundle({ recipe, range, viewport: h.viewport, width: W, height: H, audio: null, drive,
+      extra: { "setup.json": strToU8("{}"), [BUNDLE_FILES.recipe]: strToU8("not the recipe") } }, h.deps);
+    expect(strFromU8(result.contents["setup.json"])).toBe("{}");
+    expect(JSON.parse(strFromU8(result.contents[BUNDLE_FILES.recipe]))).toEqual(JSON.parse(JSON.stringify(recipe)));
+    expect(Object.values(JSON.parse(strFromU8(result.contents[BUNDLE_FILES.manifest])))).not.toContain("setup.json");
   });
 });
 

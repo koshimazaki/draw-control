@@ -70,6 +70,16 @@ describe("motion-studio CLI", () => {
     writeFileSync(join(dir, "fall.txt"), "beats 0-4 | action: fall\n");
     expect((await run("script", rp, join(dir, "fall.txt"))).err).toMatch(/unknown action "fall"/);
   });
+  it("a page setup file (setup.json) works in place of a script: its script is applied", async () => {
+    const a = join(dir, "analysis.json"), r0 = join(dir, "recipe.json"), fromScript = join(dir, "s1.json"), fromSetup = join(dir, "s2.json"), setup = join(dir, "setup.json");
+    const script = new URL("../../examples/scripts/glide-path.txt", import.meta.url).pathname;
+    writeFileSync(setup, JSON.stringify({ kind: "beat-path-setup", version: 1, state: {}, script: readFileSync(script, "utf8") }));
+    expect((await run("script", r0, script, "--analysis", a, "--out", fromScript)).err).toBe("");
+    expect((await run("script", r0, setup, "--analysis", a, "--out", fromSetup)).err).toBe("");
+    expect(readFileSync(fromSetup, "utf8")).toBe(readFileSync(fromScript, "utf8"));
+    writeFileSync(setup, JSON.stringify({ kind: "beat-path-setup", version: 1, state: {} }));
+    expect((await run("script", r0, setup)).err).toMatch(/no script/);
+  });
   it("shot script with path points: the walk path and the camera path in metres, read back", async () => {
     const a = join(dir, "analysis.json"), r0 = join(dir, "recipe.json"), out = join(dir, "glide.json");
     const script = new URL("../../examples/scripts/glide-path.txt", import.meta.url).pathname;

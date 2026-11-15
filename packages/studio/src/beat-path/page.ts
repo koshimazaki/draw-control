@@ -20,6 +20,8 @@ import { exampleState, ownState } from "./examples";
 import { bindGenerate } from "./page-generate";
 import { editStep, endDrag } from "./drag-edit";
 import { musicFor, type Cut } from "./slot-music";
+import { awaitFor, keepSliceIn, matchAwaited, planMusic, restoreAwaited, type Awaited } from "./setup-source";
+import { moveOntoCut, slicedName } from "./track-cut";
 import { movedIndex } from "./lane-cuts";
 import { LaneView, Menu } from "./lanes";
 import { LAYOUT } from "./layout";
@@ -49,6 +51,8 @@ export function startBeatPath(root: HTMLElement) {
   let busy = false, head = 0, dirty = true;
   const past: BeatPathState[] = [], future: BeatPathState[] = [];
   let dragBase: BeatPathState | null = null;
+  /** A setup whose own track is not loaded: loading that file again brings back its slice and markers. Undo, a switch or another load forgets it. */
+  let awaiting: Awaited | null = null, unbuilt: string | null = null;
   const player = new Player();
   const live = () => (track ? drive : undefined);
   const bpm = () => info?.bpm ?? 120;
@@ -110,6 +114,7 @@ export function startBeatPath(root: HTMLElement) {
     const from = redo ? future : past, to = redo ? past : future;
     const s = from.pop();
     if (!s) return;
+    awaiting = null;   // a loaded setup's "load your track again" holds only while its state does (setup-source.ts)
     to.push(structuredClone(state));
     state = s;
     // A selection may point past what the restored state holds: drop it rather than act on the wrong item.
@@ -214,8 +219,9 @@ export function startBeatPath(root: HTMLElement) {
   /** Rebuild the recipe, the camera plan and every view from the state. */
   function rebuild() {
     if (busy) { rebuildAfter = true; return; }
-    try { recipe = beatPathRecipe(state, info, ctx()); }
-    catch (e) { say(`Not applied: ${(e as Error).message}`); return; }
+    // A state whose recipe does not build keeps the last recipe on screen; `unbuilt` says why, and Export and Generate refuse until it builds (page-setup.ts).
+    try { recipe = beatPathRecipe(state, info, ctx()); unbuilt = null; }
+    catch (e) { unbuilt = (e as Error).message.replace(/^Recipe: /, ""); say(`Not applied: ${unbuilt} · the preview shows the last shot that built`); return; }
     const frames = Math.ceil((window1() + 0.2) * recipe.fps) + 1;
     plan = planCamera(recipe, live(), frames);
     viewport.setRig(plan, recipe, live(), frames);
@@ -389,7 +395,7 @@ export function startBeatPath(root: HTMLElement) {
     slot = next;
     const ticket = ++switching;
     setPlaying(false);
-    past.length = 0; future.length = 0; dragBase = null;
+    past.length = 0; future.length = 0; dragBase = null; awaiting = null;
     state = slots.get(next) ?? (next === "own" ? ownState() : exampleState(Number(next)));
     // Nothing selected carries over: a lane block, a path point or a scenery box of the last example.
     selection = null; blocks.selected = -1; menu.hide();
@@ -408,12 +414,52 @@ export function startBeatPath(root: HTMLElement) {
     strip.setScene({ track, start: window0(), end: window1(), beats: [], kicks: [], snares: [], hats: [], added: [], selected: -1, locked: [], muted: [] });
     try {
       const loaded = await loadTrack(file, stage => { strip.message = stage; strip.setScene({ track, start: window0(), end: window1(), beats: [], kicks: [], snares: [], hats: [], added: [], selected: -1, locked: [], muted: [] }); });
-      // A new track starts at its first beat, with no markers of its own (the old ones belong to the old track).
-      state = { ...state, slice: undefined, markers: undefined, muted: [] };
+      // A new track starts at its first beat, with no markers of its own (the old ones belong to the old track),
+      // unless it is the track a loaded setup asked for (setup-source.ts): then the setup's slice and markers come back.
+      const back = matchAwaited(awaiting, file.name, loaded.features.lengthSeconds);
+      state = back ? restoreAwaited(back, state) : { ...state, slice: undefined, markers: undefined, muted: [] };
+      awaiting = null;
       cuts.delete(slot);
-      await useTrack(loaded, "unspecified");
+      await useTrack(loaded, back?.licence ?? "unspecified");
+      if (back) say(`${file.name}: the setup's slice and markers are back`);
     }
     catch (e) { strip.message = ""; rebuild(); say(`Could not read the track: ${(e as Error).message}`); }
+  }
+  /** A setup file (page-setup.ts) in the slot showing: the page one undo step (not the music, planned in setup-source.ts); null when refused. */
+  async function loadSetup(next: BeatPathState, music: TrackInfo | null, guideAudio?: Uint8Array): Promise<{ note?: string; music: boolean } | null> {
+    if (refused()) return null;
+    if (map.busy) map.cancelStroke();
+    endLaneDrags(); setPlaying(false);
+    const ticket = ++switching, { plan, note } = planMusic(next, music, info, !!guideAudio), had = info?.name;
+    if (!update(next)) return null;
+    selection = null; blocks.selected = -1; menu.hide();
+    awaiting = null; cuts.delete(slot);
+    let said = note;
+    if (plan.kind === "example") { await useExampleTrack(plan.id, () => ticket === switching); if (ticket !== switching) return null; }
+    else if (plan.kind === "guide" && music) {
+      try {
+        // The guide's audio is the clip window of the music: a cut, as Slice makes one (beat 0 at its start, same tempo).
+        const cut = await loadTrack(new File([guideAudio as BlobPart], slicedName(music.name, plan.start, plan.start + next.clip)));
+        if (ticket !== switching) return null;
+        const grid = { bpm: music.bpm, offsetSeconds: 0 };
+        state = moveOntoCut(state, plan.start, state.clip);
+        if (state.track) cuts.set(slot, { track: cut, licence: music.licence, grid, from: state.track });
+        await useTrack(cut, music.licence, grid);
+        // A guide audio that cannot be read: the setup stays, on the music that is loaded, its lanes fitted to it.
+      } catch (e) {
+        const kept = keepSliceIn(state, info?.lengthSeconds ?? null);
+        state = fitLanes(kept.state, totalBeats()); rebuild();
+        said = `Could not read the guide's audio (${(e as Error).message}): the music loaded stays${kept.cleared ? ", the slice cleared (it is past that music's end)" : ""}`;
+      }
+    } else if (plan.kind === "keep") { state = fitLanes(state, totalBeats()); rebuild(); }
+    else {
+      if (track) removeTrack(); else { state = fitLanes(state, totalBeats()); rebuild(); }
+      if (plan.kind === "none" && plan.awaiting && music) awaiting = awaitFor(music, next, state);
+    }
+    map.fit();
+    actions.sync();
+    // Did the music change (so undo, which puts back only the page, leaves the new music)?
+    return { ...(said ? { note: said } : {}), music: info?.name !== had };
   }
 
   /** Bound after the page object exists (it needs the page); the rebuild reaches it through here. */
@@ -422,7 +468,7 @@ export function startBeatPath(root: HTMLElement) {
     $, map, menu, viewport, strip, player,
     get state() { return state; }, get recipe() { return recipe; }, get tool() { return tool; }, get view() { return view; },
     get track() { return track; }, get drive() { return live(); }, get info() { return info; }, get busy() { return busy; }, set busy(v: boolean) { if (v && !busy) endLaneDrags(); busy = v; dirty = true; lockShot(v); if (!v && rebuildAfter) { rebuildAfter = false; rebuild(); } },
-    get head() { return head; }, get playing() { return player.playing && !busy; }, get shown() { return shown; }, get slot() { return slot; }, get followSegs() { return followSegs; }, get slice() { return hooks.slice; }, blocks, snapLane, seek, removeTrack, totalBeats, window0, window1, update, undo, rebuild, setPlaying, switchSlot, useFile, useCut, say,
+    get head() { return head; }, /** Why the state's recipe does not build (null: it does). */ get unbuilt() { return unbuilt; }, get playing() { return player.playing && !busy; }, get shown() { return shown; }, get slot() { return slot; }, get followSegs() { return followSegs; }, get slice() { return hooks.slice; }, blocks, snapLane, seek, removeTrack, totalBeats, window0, window1, update, undo, rebuild, setPlaying, switchSlot, useFile, useCut, loadSetup, say,
     setTool(t: Tool) { tool = t; if (pen === "draw") map.startNew(); map.refresh(); actions.sync(); },
     setView(v: View) { view = v; map.refresh(); actions.sync(); },
     get pen() { return pen; },

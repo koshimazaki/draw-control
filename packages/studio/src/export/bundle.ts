@@ -1,7 +1,7 @@
 /**
  * Render the guide bundle frame by frame and zip it:
  * guide.mp4, frame0.png, audio.wav, beats.json, recipe.json, meta.json, bundle.json, and
- * camera.json when the Camera rig view is exported.
+ * camera.json when the Camera rig view is exported; plus any `extra` files (setup.json).
  */
 import { strToU8, zipSync } from "fflate";
 import * as THREE from "three";
@@ -25,6 +25,8 @@ export type ExportOptions = {
   onProgress?: (done: number, total: number) => void;
   /** Stops the render between frames: the export cleans up and throws an `ExportAborted` error. */
   signal?: AbortSignal;
+  /** More files for the zip, beside the guide's (the Beat Path page's setup.json); not in bundle.json, whose schema is the guide's. */
+  extra?: Record<string, Uint8Array>;
 };
 /** The error an aborted export throws (`code: "aborted"`, as a stopped run's). */
 export class ExportAborted extends Error {
@@ -112,6 +114,8 @@ export async function exportBundle(o: ExportOptions, deps: ExportDeps = BROWSER)
   };
   if (plan) files[BUNDLE_FILES.camera] = json(buildCameraTrack(plan, recipe, startFrame, frames, aspect, BUNDLE_SCHEMA_VERSION));
   if (channels && o.audio) files[BUNDLE_FILES.audio] = encodeWav(channels, o.audio.sampleRate, startSeconds, seconds);
+  // Extra files never replace the guide's own.
+  for (const [name, bytes] of Object.entries(o.extra ?? {})) if (!(name in files)) files[name] = bytes;
   // MP4, PNG and WAV gain little from deflate; store them.
   const zip = zipSync(Object.fromEntries(Object.entries(files).map(([k, v]) => [k, [v, { level: k.endsWith(".json") ? 6 : 0 }]])));
   return { zip, frames, mp4Bytes: mp4.bytes.length, audioInVideo: mp4.audioInVideo, codec: mp4.codec, files: Object.keys(files), contents: files };
