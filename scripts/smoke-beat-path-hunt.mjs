@@ -245,7 +245,7 @@ async function smokeLaneInterrupted(page, { fail }) {
   for (let k = 1; k <= 8; k++) await page.mouse.move(a.x + a.width / 2 + dx * k / 8, y);
   const moved = await cameraLane(page);
   await page.focus("#runGenerate"); await page.keyboard.press("Enter");
-  await page.waitForFunction(() => document.getElementById("outputNote").textContent === "Rendering the guide…", null, { timeout: 15_000 }).catch(() => fail("Generate from the keyboard did not start the guide render"));
+  await page.waitForFunction(() => document.getElementById("outputNote")?.textContent === "Rendering the guide…", null, { timeout: 15_000 }).catch(() => fail("Generate from the keyboard did not start the guide render"));
   const during = { lane: await cameraLane(page), moving: await page.evaluate(() => !!document.querySelector("#laneCamera .block.moving, #laneCamera .lane-slot")) };
   await page.mouse.move(a.x + a.width / 2 + dx + 30, y); await page.mouse.up();
   const released = await cameraLane(page);
@@ -290,7 +290,7 @@ async function smokePaidRuns(browser, base, { fail }) {
   const videoTasks = () => page.evaluate(() => (globalThis.__fakeTasks ?? []).filter(t => t.taskType === "videoInference").length);
   const tasks0 = await videoTasks();
   await page.click("#runGenerate");
-  await page.waitForFunction(() => document.getElementById("outputNote").textContent === "Rendering the guide…" && window.__beatPath.busy(), null, { timeout: 30_000 });
+  await page.waitForFunction(() => document.getElementById("outputNote")?.textContent === "Rendering the guide…" && window.__beatPath.busy(), null, { timeout: 30_000 });
   const t0 = Date.now();
   await page.click("#runGenerate");
   const gaveBack = await page.waitForFunction(() => document.getElementById("runGenerate").textContent === "Generate", null, { timeout: 5_000 }).then(() => true, () => false);
@@ -309,7 +309,7 @@ async function smokePaidRuns(browser, base, { fail }) {
   // 1. A switch during the render is refused; the run goes out with Example 1's shot.
   const subject = (await bp(() => window.__beatPath.state())).shot.subject;
   await page.click("#runGenerate");
-  await page.waitForFunction(() => document.getElementById("outputNote").textContent === "Rendering the guide…" && document.getElementById("outputNote").isConnected);
+  await page.waitForFunction(() => document.getElementById("outputNote")?.textContent === "Rendering the guide…" && document.getElementById("outputNote")?.isConnected);
   await ex("1");
   const during = await bp(() => ({ slot: window.__beatPath.slot(), status: document.getElementById("status").textContent, on: document.querySelector('[data-control="example"] button.on')?.dataset.value }));
   console.log(`beat path paid runs: switch during the render: ${JSON.stringify(during)}`);
@@ -330,7 +330,7 @@ async function smokePaidRuns(browser, base, { fail }) {
 
   // 2. Two questions at once: the image's shows first, the video's waits and shows after it.
   await page.click("#runGenerate");
-  await page.waitForFunction(() => document.getElementById("outputNote").textContent === "Rendering the guide…");
+  await page.waitForFunction(() => document.getElementById("outputNote")?.textContent === "Rendering the guide…");
   await page.click("#genCharacter");
   const pop = page.locator(".image-pop");
   await pop.locator(".ip-family").selectOption("ByteDance Seedream"); await pop.locator(".ip-model").selectOption("seedream-5.5");
@@ -338,7 +338,7 @@ async function smokePaidRuns(browser, base, { fail }) {
   await dialogOpen();
   const first = await title();
   // The guide finishes behind the dialog: the video run reaches its own question, which waits.
-  await page.waitForFunction(() => /^estimated/.test(document.getElementById("outputNote").textContent ?? ""), null, { timeout: 120_000 });
+  await page.waitForFunction(() => /^estimated/.test(document.getElementById("outputNote")?.textContent ?? ""), null, { timeout: 120_000 });
   const still = await title();
   await page.click("#costCancel");
   const imageNote = await page.textContent("#status");
