@@ -1,5 +1,5 @@
 /**
- * The subject stays in frame: for every frame of the four Beat Path examples and of stress
+ * The subject stays in frame: for every frame of the four Draw Control examples and of stress
  * recipes (a long path, few kicks, strength 1, each follow rig), the subject's centre,
  * projected through the planned camera at 16:9, stays inside the frame with a margin.
  */

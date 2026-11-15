@@ -1,5 +1,5 @@
 /**
- * Map checks for the Beat Path page, called from smoke-beat-path.mjs:
+ * Map checks for the Draw Control page, called from smoke-beat-path.mjs:
  * - the map's tool row stays visible and clickable after every tool and view switch, after zooming,
  *   after dragging the divider to both extremes, and at 1100 and 1280 px wide;
  * - the map's +/− zoom the map and not the timeline, and the timeline's +/− zoom the timeline;

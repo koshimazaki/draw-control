@@ -8,7 +8,7 @@ import { LAYOUT } from "../src/beat-path/layout";
 
 const ids = (html: string) => [...html.matchAll(/\sid="([^"]+)"/g)].map(m => m[1]);
 
-describe("Beat Path layout", () => {
+describe("Draw Control layout", () => {
   it("declares each id once", () => {
     const all = ids(LAYOUT), seen = new Set<string>(), repeated = new Set<string>();
     for (const id of all) (seen.has(id) ? repeated : seen).add(id);

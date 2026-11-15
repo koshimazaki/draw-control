@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * The static build works with no server behind it: builds Beat Path alone
+ * The static build works with no server behind it: builds Draw Control alone
  * (`npm run build:beat-path`, packages/studio/dist-beat-path/), serves the folder as plain
  * files from a sub-path (/some/sub/path/), opens it in headless Chrome, and fails on any
  * 404 or page error, or if the first example's music does not load. No deploy, no network

@@ -26,7 +26,7 @@ function localMixamo(): Plugin {
 }
 
 /**
- * `--mode beat-path` builds only the Beat Path page, as plain static files with relative
+ * `--mode beat-path` builds only the Draw Control page, as plain static files with relative
  * asset paths, its page renamed to index.html so it is the site root (docs/deploy.md).
  */
 function beatPathAsIndex(outDir: string): Plugin {
@@ -54,7 +54,7 @@ export default defineConfig(({ mode }) => {
     optimizeDeps: { entries: ["index.html", "path.html"] },
     build: {
       target: "es2022", chunkSizeWarningLimit: 1200, outDir, emptyOutDir: true,
-      // The studio (index.html) and Beat Path (path.html); Beat Path alone with --mode beat-path.
+      // The studio (index.html) and Draw Control (path.html); Draw Control alone with --mode beat-path.
       rollupOptions: { input: inputs },
     },
   };

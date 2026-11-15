@@ -1,9 +1,9 @@
 ---
 tags: [design, beat-path, tokens, themes]
-summary: The Beat Path page's small design system (tokens and plain components), its two themes, where every Runware value comes from, and the fixed colour coding of the exported guide.
+summary: The Draw Control page's small design system (tokens and plain components), its two themes, where every Runware value comes from, and the fixed colour coding of the exported guide.
 ---
 
-# Beat Path design system
+# Draw Control design system
 
 Lineage, in three lines:
 - **Structure** from the owner's own UI: the studio's layout habits (side panel of few controls, lanes under the waveform, uppercase small labels) and the earlier composer's lane ideas.
@@ -87,7 +87,7 @@ The `runware` theme now follows **the owner's post draft** (a private blog draft
 | `--control-h` | `32px` | between the draft's 28 px list buttons and 36 px call to action; one screen at 1280×720 | `30px` |
 | fonts | Figtree, JetBrains Mono | the draft's faces (both OFL, Google Fonts) | same |
 
-**Player.** The draft's player is a dark glass circle (black at 50 %, a 1 px white ring at 20 %, a 4 px blur) with a filled rounded-triangle play glyph, bottom left over the frame; its timeline is a 1 px rail with a deep green fill and a 7 px dot; numbers sit in 12 px mono. Beat Path uses exactly that: one slim bar over the bottom of the screens (shown while paused, on hover, on keyboard focus), the same button for the dock and the gallery rows in a quiet outlined form. The big Play overlay is gone; a click on the picture toggles. Glyph shapes after Lucide's play and pause (ISC).
+**Player.** The draft's player is a dark glass circle (black at 50 %, a 1 px white ring at 20 %, a 4 px blur) with a filled rounded-triangle play glyph, bottom left over the frame; its timeline is a 1 px rail with a deep green fill and a 7 px dot; numbers sit in 12 px mono. Draw Control uses exactly that: one slim bar over the bottom of the screens (shown while paused, on hover, on keyboard focus), the same button for the dock and the gallery rows in a quiet outlined form. The big Play overlay is gone; a click on the picture toggles. Glyph shapes after Lucide's play and pause (ISC).
 
 **Hierarchy (superseded by round 7: the accent now marks the selection).** Lime is Generate's alone. Selected segments, toggles, slider thumbs, the playhead, the focus ring, menu ticks, lock chips and the key dot read in text colours (the connected key dot in the rail green). Mono is kept for numbers and beat readouts (HUD, time, lock values, slider values, map distances); typed camera phrases and labels use the sans face. Uppercase labels follow the draft's kicker: 12 px, `.05em`.
 

@@ -1,6 +1,6 @@
-# Beat Path example 1: a flying car along one street, filmed from behind, then from the parallel street through the gaps between the blocks. The figure is a flyer shape.
+# Draw Control example 1: a flying car along one street, filmed from behind, then from the parallel street through the gaps between the blocks. The figure is a flyer shape.
 # track: straight
-# clip: 8 s · figure: flyer · Beat Path
+# clip: 8 s · figure: flyer · Draw Control
 landmarks: on seed 7
 figure: shape flyer body #ff6a13 head #ffb27a
 scenery: city sight passes

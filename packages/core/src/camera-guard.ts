@@ -1,5 +1,5 @@
 /**
- * The framing guard (camera.keepInFrame, on for Beat Path): the camera never loses the
+ * The framing guard (camera.keepInFrame, on for Draw Control): the camera never loses the
  * subject. The rig aims at a smoothed, acceleration-limited follow point; when the subject
  * turns or speeds up faster than that point can follow, or a drawn camera path wanders
  * away, the subject can drift to the frame's edge or out of it. The guard measures where

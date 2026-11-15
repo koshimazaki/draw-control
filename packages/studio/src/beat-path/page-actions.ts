@@ -1,5 +1,5 @@
 /**
- * The Beat Path page's controls: the example switcher, the map tools, the lane menus and
+ * The Draw Control page's controls: the example switcher, the map tools, the lane menus and
  * lock chips, Settings (clip, locks, snap, grid, scenery, figure, download guide), the shot
  * fields, the music strip, and the keyboard (Space plays, Cmd/Ctrl-Z undoes, Shift redoes,
  * Delete removes the selection, Escape cancels a stroke or clears it). Split from page.ts.

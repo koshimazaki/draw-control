@@ -1,6 +1,6 @@
-# Beat Path example: a car on a road with a bend. The glider is the car; the path is the road.
+# Draw Control example: a car on a road with a bend. The glider is the car; the path is the road.
 # prompt: A red sports car drives a coastal road and takes the bend, filmed from behind and then alongside; the orange figure is the car, its white nose is the front, the grey grid is the road.
-# clip: 8 s · figure: glider · Beat Path
+# clip: 8 s · figure: glider · Draw Control
 shot subject: a red sports car
 shot environment: a coastal road with a bend
 shot action: drives along the road and takes the bend, filmed from behind and then alongside

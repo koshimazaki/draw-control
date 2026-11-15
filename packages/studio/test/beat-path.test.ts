@@ -16,7 +16,7 @@ const seg = (r: Recipe, i = 0) => r.camera!.segments[i];
 const frames = (r: Recipe) => Array.from({ length: 193 }, (_, n) => frameAt(r, n, drive).root);
 const cams = (r: Recipe) => planCamera(r, drive, 200).samples.slice(0, 193).map(s => s.position);
 
-describe("Beat Path: the page state is a shot script", () => {
+describe("Draw Control: the page state is a shot script", () => {
   it("every example reads back to the same state and the same script", () => {
     for (let i = 0; i < EXAMPLES.length; i++) {
       const s = exampleState(i), printed = toScript(s);
@@ -55,7 +55,7 @@ describe("Beat Path: the page state is a shot script", () => {
   });
 });
 
-describe("Beat Path: each control's recipe fields", () => {
+describe("Draw Control: each control's recipe fields", () => {
   it("each lane locks on its own: the character on kicks, the camera on snares", () => {
     const r = build(S({ charLock: { lock: "kick", strength: 0.7 }, camLock: { lock: "snare", strength: 0.5, onHit: "hold", advance: false } }));
     expect(r.travelLock).toEqual({ lock: "kick", strength: 0.7 });

@@ -4,7 +4,7 @@
  * renders it so it reads as infinite, and fading with distance. Two looks:
  * - "lines": transparent lines over the background (the studio's look, as the old GridHelpers);
  * - "ground": an opaque floor (dark by default) with lighter lines, fading into the
- *   background colour at the horizon (the Beat Path guide).
+ *   background colour at the horizon (the Draw Control guide).
  * Deterministic: it depends on the camera only (no time), so exports are frame-exact.
  *
  * The grid line function and the distance fade are adapted from the `Grid` shader of

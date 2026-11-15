@@ -1,5 +1,5 @@
 /**
- * The clumsy-user pass for the Beat Path page, called from smoke-beat-path.mjs. Each step is a
+ * The clumsy-user pass for the Draw Control page, called from smoke-beat-path.mjs. Each step is a
  * regression check for a bug found in the round-5 hunt:
  * - rapid example switching while playing lands on the last example with its own music;
  * - a selected scenery box or lane block never carries over to another example (Delete there did nothing wrong);

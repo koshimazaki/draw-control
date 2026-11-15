@@ -289,7 +289,7 @@ export function planCamera(recipe: Recipe, drive?: AudioDrive, frames = 0): Came
     if (position[1] > CAMERA_MAX_HEIGHT + 1e-9) { heightClamped++; position = [position[0], CAMERA_MAX_HEIGHT, position[2]]; ch.height[n] = CAMERA_MAX_HEIGHT; }
     samples[n] = { position, target, fov: fovAt(n), energy: energyAtFrame(energyDrive, n) };
   }
-  // Beat Path: the camera never loses the subject (camera-guard.ts).
+  // Draw Control: the camera never loses the subject (camera-guard.ts).
   if (config.keepInFrame) {
     const subject: Vec3[] = [];
     for (let n = 0; n < total; n++) { const r = rootAt(recipe, frozenBeat(recipe, beatAtSeconds(g, n * dt)), drive); subject.push([r.x, r.y + SUBJECT_CENTRE, r.z]); }

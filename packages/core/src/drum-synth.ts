@@ -21,7 +21,7 @@ export function patternTimes(bpm: number, bars: number, offset = 0.1): DrumPatte
 }
 
 /**
- * Three clearly different example grooves for Beat Path, each locking well:
+ * Three clearly different example grooves for Draw Control, each locking well:
  * - "laidback" (100 BPM): kick on 1, the "and" of 2 and 3, snare on 2 and 4, hats on quarters;
  * - "straight" (120 BPM): the pattern above (kick 1 and 3, snare 2 and 4);
  * - "drive" (140 BPM): kick on every beat, snare on 2 and 4, hats on every eighth.

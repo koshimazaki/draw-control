@@ -462,7 +462,7 @@ export function startApp(root: HTMLElement) {
   requestAnimationFrame(tick);
   window.addEventListener("resize", () => render());
   openSequenceFromUrl();
-  /** `?sequence=<name>` (the Beat Path page's "Full studio" link): load that saved sequence, with the demo track if it names it. */
+  /** `?sequence=<name>` (the Draw Control page's "Full studio" link): load that saved sequence, with the demo track if it names it. */
   function openSequenceFromUrl() {
     const name = new URLSearchParams(location.search).get("sequence");
     const entry = name ? readLibrary(browserStore()).find(e => e.name === name) : undefined;

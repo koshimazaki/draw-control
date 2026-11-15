@@ -1,5 +1,5 @@
 /**
- * Voice → agent → script → page without the page: the same Beat Path shot script gives the
+ * Voice → agent → script → page without the page: the same Draw Control shot script gives the
  * same recipe in the page's code, through the CLI (`new --character glider --clip 8`, then
  * `script`) and through the MCP server (`new_recipe`, then `apply_script`).
  */
@@ -29,7 +29,7 @@ const scriptsDir = new URL("../../examples/scripts/", import.meta.url);
 const examples = readdirSync(scriptsDir).filter(f => f.startsWith("beat-path-"));
 const cli = async (...argv: string[]) => { const err: string[] = []; const code = await main(argv, () => {}, s => err.push(s)); if (code) throw new Error(err.join("\n")); };
 
-describe("Beat Path scripts: page, CLI and MCP agree", () => {
+describe("Draw Control scripts: page, CLI and MCP agree", () => {
   it("has the examples", () => expect(examples.length).toBe(10));
   for (const file of examples) it(file, async () => {
     const text = readFileSync(new URL(file, scriptsDir), "utf8");

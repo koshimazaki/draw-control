@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Smoke step for the Beat Path page (path.html), run by scripts/smoke.mjs and on its own
+ * Smoke step for the Draw Control page (path.html), run by scripts/smoke.mjs and on its own
  * (`node scripts/smoke-beat-path.mjs`, which starts its own dev server):
  * 1. the page opens with the demo track, the first example and lock on kick, and plays after one click;
  * 2. a subject path is drawn with the mouse on the map, lock set to kick, a lane block swapped by its menu;
@@ -29,19 +29,19 @@ export async function smokeBeatPath(browser, base, { fail, OUT, SHOTS }) {
   await page.waitForFunction(() => window.__beatPath?.recipe().audio?.name === "generated-straight-120.wav", null, { timeout: 30_000 })
     .catch(async e => {
       const seen = await page.evaluate(() => ({ probe: !!window.__beatPath, audio: window.__beatPath?.recipe().audio ?? null, status: document.getElementById("status")?.textContent, url: window.location.href })).catch(x => x.message);
-      throw new Error(`Beat Path did not load the demo (${e.message}); page: ${JSON.stringify(seen)}; page errors: ${errors.join(" | ") || "none"}`);
+      throw new Error(`Draw Control did not load the demo (${e.message}); page: ${JSON.stringify(seen)}; page errors: ${errors.join(" | ") || "none"}`);
     });
   const probe = () => page.evaluate(() => ({ recipe: window.__beatPath.recipe(), state: window.__beatPath.state(), playing: window.__beatPath.playing(), head: window.__beatPath.head() }));
   let p = await probe();
   console.log(`beat path: first run ${p.recipe.character.kind}, ${p.recipe.durationBeats} beats, travel lock ${JSON.stringify(p.recipe.travelLock)}, camera ${p.recipe.camera.segments.map(s => s.modes.join("+")).join(" / ")}`);
-  if (p.recipe.character.kind !== "glider" || p.recipe.travelLock?.lock !== "kick") fail("Beat Path did not open on the glider locked to the kicks");
+  if (p.recipe.character.kind !== "glider" || p.recipe.travelLock?.lock !== "kick") fail("Draw Control did not open on the glider locked to the kicks");
   const noScroll = await page.evaluate(() => document.getElementById("editor").offsetHeight <= window.innerHeight + 1 && document.documentElement.scrollWidth <= window.innerWidth + 1);
-  if (!noScroll) fail("the Beat Path editor does not fit one screen at 1280×720");
+  if (!noScroll) fail("the Draw Control editor does not fit one screen at 1280×720");
   // A click on the picture plays (there is no overlay button any more).
   await page.click("#preview", { position: { x: 200, y: 120 } });
   await page.waitForTimeout(1500);
   p = await probe();
-  if (!p.playing || p.head < 0.8) fail(`Beat Path is not playing after one click (head ${p.head})`);
+  if (!p.playing || p.head < 0.8) fail(`Draw Control is not playing after one click (head ${p.head})`);
   await page.screenshot({ path: `${SHOTS}beat-path-playing.png` });
   await page.click("#play");
 
@@ -195,7 +195,7 @@ export async function smokeBeatPath(browser, base, { fail, OUT, SHOTS }) {
     && ajv.validate("guide-bundle.schema.json#/$defs/beats", JSON.parse(strFromU8(zip["beats.json"]))) && ajv.validate("guide-bundle.schema.json#/$defs/camera", JSON.parse(strFromU8(zip["camera.json"])));
   console.log(`beat path export: ${Object.keys(zip).sort().join(", ")}; ${meta.width}x${meta.height} ${meta.frames} frames, ${meta.character.kind}, schema ${meta.schemaVersion} ${ok ? "validates" : `does NOT validate: ${ajv.errorsText()}`}`);
   const exported = JSON.parse(strFromU8(zip["recipe.json"]));
-  if (!ok || meta.frames !== 193 || meta.width !== 1280 || meta.character.kind !== "glider" || meta.schemaVersion !== "0.5.0" || !exported.landmarks?.on || exported.figure?.shape !== "flyer" || !exported.shot?.subject) fail("the Beat Path bundle is wrong");
+  if (!ok || meta.frames !== 193 || meta.width !== 1280 || meta.character.kind !== "glider" || meta.schemaVersion !== "0.5.0" || !exported.landmarks?.on || exported.figure?.shape !== "flyer" || !exported.shot?.subject) fail("the Draw Control bundle is wrong");
   await page.click("#settings summary");
   mkdirSync(`${OUT}beat-path/`, { recursive: true });
   for (const [k, v] of Object.entries(zip)) writeFileSync(`${OUT}beat-path/${k}`, v);
@@ -259,14 +259,14 @@ export async function smokeBeatPath(browser, base, { fail, OUT, SHOTS }) {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.waitForTimeout(300);
   const fits = await page.evaluate(() => document.getElementById("editor").offsetHeight <= window.innerHeight + 1);
-  if (!fits) fail("the Beat Path editor does not fit one screen at 1440×900");
+  if (!fits) fail("the Draw Control editor does not fit one screen at 1440×900");
   await page.screenshot({ path: `${SHOTS}beat-path-runware-1440.png` });
   await page.evaluate(() => document.getElementById("gallery").scrollIntoView());
   await page.waitForFunction(() => document.querySelectorAll("#gallerySlot .gallery-row video").length >= 3, null, { timeout: 120_000 }).catch(() => fail("the gallery rows did not render their guides"));
   await page.locator("#gallery").screenshot({ path: `${SHOTS}beat-path-gallery-rows.png` });
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({ path: `${SHOTS}beat-path-runware-full.png`, fullPage: true });
-  if (errors.length) fail(`Beat Path page errors: ${errors.join(" | ")}`);
+  if (errors.length) fail(`Draw Control page errors: ${errors.join(" | ")}`);
   await page.close();
   await smokeBeatPathMap(browser, base, { fail, SHOTS });
   await smokeBeatPathHunt(browser, base, { fail });

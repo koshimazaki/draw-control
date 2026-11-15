@@ -1,5 +1,5 @@
 /**
- * Entry of the Beat Path page (path.html). Theme: neutral by default; `?theme=runware`
+ * Entry of the Draw Control page (path.html). Theme: neutral by default; `?theme=runware`
  * switches to the Runware look (themes/runware.css, values and sources in docs/design.md),
  * which also loads its open fonts (Figtree, JetBrains Mono) from Google Fonts.
  */

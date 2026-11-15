@@ -1,5 +1,5 @@
 /**
- * The Beat Path page: draw a path, add music, and the movement and the camera lock to the
+ * The Draw Control page: draw a path, add music, and the movement and the camera lock to the
  * beat; export a guide clip. A thin surface over the core (public entry) and the studio's
  * viewport, audio player and bundle export. The page state is a shot script (script.ts):
  * every edit changes the state, `beatPathRecipe` applies its script, and the preview, map,
