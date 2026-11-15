@@ -24,7 +24,7 @@
   /* the accent on whatever is selected: fills (primary, a selected segment, a toggle on), and accent text with an outline (a selected item) */
   --accent: #afff9f; --accent-hover: #c4ffb8; --accent-ink: #afff9f; --on-accent: #141414; --ring: #afff9f;
   --sel-bg: color-mix(in oklab, #afff9f 8%, #1f1f1f); --sel-glow: rgb(175 255 159 / .2);
-  /* selection drawn on the light paper map: a deep green (5.9:1 on #f2f2f2) */
+  /* selection drawn on the light grey map: a deep green (4.8:1 on #dcdde0) */
   --map-select: #2f6b23;
   --track: #4a4a4a; --thumb: #f2f2f2;
   /* the draft's rail: a 1 px line, its deep green fill (#345c2d, edged #4f8a44), a small dot */
@@ -35,7 +35,8 @@
   /* the path colours: light on the dark page, deep on the paper map */
   --subject: oklch(80% .13 45); --camera: oklch(80% .11 235); --kick: oklch(76% .15 20); --snare: oklch(76% .13 300); --hat: oklch(80% .1 185); --station: oklch(76% .15 20);
   --map-subject: oklch(55% .15 45); --map-camera: oklch(50% .13 245); --map-station: oklch(52% .16 20);
-  --map-bg: #f2f2f2; --map-minor: #e4e4e4; --map-major: #cfcfcf; --map-axis: #9a9a9a; --map-text: #5c5c5c;
+  /* light grey, not white: the sheet reads apart from the page without glaring (owner, 15 November) */
+  --map-bg: #dcdde0; --map-minor: #cfd0d4; --map-major: #b9bbc0; --map-axis: #8a8d93; --map-text: #4f5257;
   --wave: #6b6b6b; --wave-bg: #1c1c1c; --beat-line: #292929; --bar-line: #454545; --playhead: #f2f2f2; --played: rgb(242 242 242 / .06);
 }
 /* The empty-map card sits on the light paper: give it the paper's look. */

@@ -106,7 +106,7 @@ The `runware` theme now follows **the owner's post draft** (a private blog draft
 | `themes/runware.css` | `?theme=runware`: dark, the owner's post draft's tokens (above), lime for Generate only, Figtree. Loads Figtree and JetBrains Mono from Google Fonts only in this theme. |
 | `beat-path.css` | The page layout; tokens and components only. |
 
-Switch: open `path.html?theme=runware`. The parameter sets `data-theme="runware"` on `<html>`; both theme files are bundled, the neutral one applies otherwise. The Runware theme adds the footer-style line "Built on Runware · unofficial demo" in the header; there is no Runware logo, wordmark or favicon anywhere.
+Switch: since 15 November the Runware theme is the default (`data-theme="runware"` on `<html>`), because the page is a demo for Runware; `path.html?theme=neutral` gives the neutral palette. Both theme files are bundled. The map sheet is light grey (`#dcdde0`, owner's call: not white), so it reads apart from the dark page without glare. The Runware theme adds the footer-style line "Built on Runware · unofficial demo" in the header; there is no Runware logo, wordmark or favicon anywhere.
 
 ## Runware dark theme (13 November): values and sources (partly superseded by round 5 above)
 
