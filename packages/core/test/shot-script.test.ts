@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  DEFAULT_CAMERA, DEFAULT_RECIPE, RIGGED_CHARACTER, applyMotionCommand, applyScript, beatAtSeconds, printScript, validateRecipe,
+  DEFAULT_CAMERA, DEFAULT_RECIPE, RIGGED_CHARACTER, applyMotionCommand, applyScript, beatAtSeconds, describeRecipe, moveMarker, printScript, validateRecipe,
   type BandAnalysis, type Recipe,
 } from "../src/internal";
 
@@ -68,7 +68,20 @@ describe("shot script", () => {
     expect(() => applyScript(base(), { script: "beats 0-4 | action: run | camera: swoop" })).toThrow(/unknown camera move "swoop".*orbit/);
     expect(() => applyScript(base(), { script: "beats 0-4 | action: run | camera: orbit | shot: extreme" })).toThrow(/wide, medium, close, low, top/);
     expect(() => applyScript(base(), { script: "beats 0-2 | action: jump @kick 5" }, { bands })).toThrow(/have 2 kicks/);
-    expect(() => applyScript(base(), { script: "beats 0-2 | action: jump @kick 1" })).toThrow(/analyse a track first/);
+    // No kick to land on (no track analysed): the accent lands on its row's start, as a camera start with hits does.
+    expect(applyScript(base(), { script: "beats 2-4 | action: jump @kick 1" }).reactive!.markers!.map(m => [m.accent, m.fellBack])).toEqual([["jump", "@kick 1"]]);
+    // A mistyped index on a row with no such hit falls back too, and describe says which anchor it asked for.
+    const typo = applyScript(base(), { script: "beats 0-2 | action: rest\nbeats 2-4 | action: jump @hat 5" }, { bands });
+    expect(describeRecipe(typo, bands)).toMatch(/\(@hat 5: no such hit in its row, on the row's start\)/);
+    expect(moveMarker(typo, undefined, 0, 1).reactive!.markers![0].fellBack).toBeUndefined();
+    // The marker tagged is the one that fell back, not another accent at the same time.
+    const two = applyScript(base(), { script: "beats 0-2 | action: rest, jump @beat 2\nbeats 2-4 | action: jump @hat 1" }, { bands }).reactive!.markers!;
+    expect(two.map(m => m.fellBack)).toEqual([undefined, "@hat 1"]);
+    // An index the grammar takes but no row can count to is refused on its line, not inside the recipe.
+    for (const n of ["1000", "1.5", "0"]) expect(() => applyScript(base(), { script: `beats 0-2 | action: jump @kick ${n}` }, { bands })).toThrow(new RegExp(`script line 1: @kick ${n.replace(".", "\\.")}: count from 1 to 64`));
+    expect(() => applyScript(base(), { script: "beats 0-2 | camera: orbit @kick 65" }, { bands })).toThrow(/count from 1 to 64/);
+    expect(() => validateRecipe({ ...typo, reactive: { ...typo.reactive!, markers: [{ ...typo.reactive!.markers![0], fellBack: "@kick" }] } })).toThrow(/fellBack/);
+    expect(() => applyScript(base(), { script: "beats 0-2 | camera: top\nbeats 2-4 | camera: orbit @kick 1" })).toThrow(/analyse a track first/);
   });
 });
 

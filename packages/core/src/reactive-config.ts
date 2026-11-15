@@ -28,6 +28,8 @@ export type HitMarker = {
    * landing) and holds the impact frame up to 3 frames before following through.
    */
   impact?: number;
+  /** The script's anchor ("@kick 5") when its row held no such hit, so the marker landed on the row's start (applyScript). */
+  fellBack?: string;
 };
 export type ReactiveConfig = {
   /** Whole number; the same seed gives the same performance. */
@@ -104,7 +106,7 @@ export function validateReactive(input: unknown): ReactiveConfig {
     out.markers = (input.markers as unknown[]).map((m, i) => {
       const where = `reactive.markers[${i}]`;
       if (!isObject(m)) return fail(`${where} must be an object`);
-      only(m, ["seconds", "accent", "source", "phases", "skip", "hold", "impact"], where);
+      only(m, ["seconds", "accent", "source", "phases", "skip", "hold", "impact", "fellBack"], where);
       const seconds = num(m.seconds, 0, 3600, `${where}.seconds`);
       if (seconds < last) fail(`${where}.seconds must not be before the marker before it`);
       last = seconds;
@@ -123,6 +125,10 @@ export function validateReactive(input: unknown): ReactiveConfig {
         if (!marker.phases.includes(0)) fail(`${where}.phases must keep the key frame at 0`);
       }
       if (m.impact !== undefined) { const v = num(m.impact, 0, 1, `${where}.impact`); if (v > 0) marker.impact = v; }
+      if (m.fellBack !== undefined) {
+        if (typeof m.fellBack !== "string" || !/^@(kick|snare|hat) \d{1,3}$/.test(m.fellBack)) fail(`${where}.fellBack must read like "@kick 1"`);
+        marker.fellBack = m.fellBack as string;
+      }
       for (const key of ["skip", "hold"] as const) {
         const v = m[key];
         if (v === undefined) continue;

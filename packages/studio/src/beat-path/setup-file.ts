@@ -17,7 +17,7 @@
 import { CAMERA_MAX_HEIGHT, FOLLOW_LIMITS, FOV_RANGE, RIG_LIMITS, clipBeats, type CommandContext, type FollowOffset } from "@motion-studio/core";
 import { beatPathRecipe, type TrackInfo } from "./recipe-map";
 import {
-  BLANK_STATE, CAMERA_WORDS, CHARACTER_WORDS, HIT_CHOICES, LOCK_CHOICES, clampClip, fitLanes, toScript,
+  BLANK_STATE, CAMERA_WORDS, CHARACTER_WORDS, HIT_CHOICES, LOCK_CHOICES, clampClip, fitLanes, hopOffset, toScript,
   type BeatPathState, type Block, type PathPt,
 } from "./script";
 import { RETIRED_TRACKS, TRACKS, type TrackId } from "./tracks";
@@ -143,6 +143,8 @@ export function readState(s: Rec, notes: string[]): BeatPathState {
     if (lane) {
       (out as Rec)[key] = lane.list;
       if (lane.dropped) notes.push(`${key === "character" ? "character" : "camera"} lane: ${lane.dropped} unreadable blocks dropped`);
+      if (lane.hops?.clamped) notes.push(`character lane: ${lane.hops.clamped} hop${lane.hops.clamped > 1 ? "s" : ""} on a beat outside the block moved inside it`);
+      if (lane.hops?.dropped) notes.push(`character lane: ${lane.hops.dropped} unreadable hop anchor${lane.hops.dropped > 1 ? "s" : ""} dropped (the hop lands on the first kick)`);
       if (lane.capped) notes.push(`camera lane: ${lane.capped} blocks past the rig's ${LIMIT.cameraBlocks} dropped${lane.phrases ? `, with ${lane.phrases} typed camera direction${lane.phrases > 1 ? "s" : ""}` : ""}; the last block kept runs to the end`);
     }
     else drop(`${key === "character" ? "character" : "camera"} lane`);
@@ -244,8 +246,9 @@ function points(v: unknown, camera: boolean): { list: PathPt[]; cut?: string } |
 }
 
 /** A lane: readable blocks in order, edges joined (each block starts where the last ends, the first at 0). */
-function blocks(v: unknown, words: readonly string[], camera: boolean): { list: Block<string>[]; dropped: number; capped?: number; phrases?: number } | null {
+function blocks(v: unknown, words: readonly string[], camera: boolean): { list: Block<string>[]; dropped: number; capped?: number; phrases?: number; hops?: { clamped: number; dropped: number } } | null {
   if (!Array.isArray(v)) return null;
+  const hopNotes = { clamped: 0, dropped: 0 };
   const list = v.slice(0, LIMIT.blocks).flatMap(b => {
     if (!isRec(b)) return [];
     const from = num(b.from), to = num(b.to), word = pick(b.word, words);
@@ -256,11 +259,19 @@ function blocks(v: unknown, words: readonly string[], camera: boolean): { list: 
     const fov = num(b.fov);
     if (camera && (word === "behind" || word === "side") && fov !== undefined) block.fov = clamp(fov, FOV_RANGE[0], FOV_RANGE[1]);
     if (camera && b.shot === "-") block.shot = "-";
+    if (!camera && word === "hop" && b.at !== undefined) {
+      // As fromScript reads it: a beat offset is kept inside the block (hopOffset), a hit index is 1–64; anything else is dropped.
+      const n = isRec(b.at) ? num(b.at.n) : undefined, band = isRec(b.at) ? b.at.band : undefined;
+      if (n !== undefined && band === "beat") block.at = { band, n };   // held inside the block once the edges are joined (below)
+      else if (n !== undefined && (band === "kick" || band === "snare" || band === "hat") && Number.isInteger(n) && n >= 1 && n <= 64) block.at = { band, n };
+      else hopNotes.dropped++;
+    }
     return [block];
   }).sort((a, b) => a.from - b.from);
   if (!list.length) return null;
   list[0].from = 0;
   for (let i = 1; i < list.length; i++) { list[i].from = list[i - 1].to; if (list[i].to <= list[i].from) list[i].to = list[i].from + 1; }
+  for (const b of list) if (b.at?.band === "beat") { const n = hopOffset(b.at.n, b.to - b.from); if (n !== b.at.n) { hopNotes.clamped++; b.at = { band: "beat", n }; } }
   const read = list.length;
   // The camera rig holds at most 32 ranges (camera.ts): the 32nd block runs on to the lane's end.
   let phrases = 0;
@@ -269,7 +280,7 @@ function blocks(v: unknown, words: readonly string[], camera: boolean): { list: 
     phrases = list.slice(LIMIT.cameraBlocks).filter(b => b.phrase).length;
     list.length = LIMIT.cameraBlocks; list[list.length - 1].to = end;
   }
-  return { list, dropped: v.length - read, ...(read > list.length ? { capped: read - list.length, phrases } : {}) };
+  return { list, dropped: v.length - read, ...(read > list.length ? { capped: read - list.length, phrases } : {}), ...(hopNotes.clamped || hopNotes.dropped ? { hops: hopNotes } : {}) };
 }
 
 function follow(f: Rec): FollowOffset | undefined {

@@ -36,7 +36,9 @@ export function describeRecipe(r: Recipe, bands?: BandAnalysis): string {
   const rx = r.reactive;
   if (rx) {
     out.push(`Reactive layer: on (energy drive ${rx.drive ?? 1}, amplitude ${rx.amplitude}, tempo ${rx.speed}, humanise ${rx.humanise}, accents ${rx.accents.join(", ") || "none"} on ${rx.accentOn}, seed ${rx.seed}${rx.sync ? `, per-bone sync head ${rx.sync.head} shoulders ${rx.sync.shoulders} arms ${rx.sync.arms} hips ${rx.sync.hips}` : ""}).`);
-    if (rx.markers) out.push(`Hit markers (${rx.markers.length}, edited): ${rx.markers.slice(0, 24).map(m => `${m.accent}@${f2(beatAtSeconds(g, m.seconds))}${m.impact ? ` impact ${m.impact}` : ""}`).join(", ")}${rx.markers.length > 24 ? ", …" : ""} (beats).`);
+    // An accent whose row held no hit of its anchor's band landed on the row's start (applyScript): say so, with the anchor asked for.
+    const fell = (m: { fellBack?: string }) => m.fellBack ? ` (${m.fellBack}: no such hit in its row, on the row's start)` : "";
+    if (rx.markers) out.push(`Hit markers (${rx.markers.length}, edited): ${rx.markers.slice(0, 24).map(m => `${m.accent}@${f2(beatAtSeconds(g, m.seconds))}${m.impact ? ` impact ${m.impact}` : ""}${fell(m)}`).join(", ")}${rx.markers.length > 24 ? ", …" : ""} (beats).`);
     else out.push("Hit markers: detected from the music (none edited).");
   } else out.push("Reactive layer: off.");
   if (r.steps) out.push(`Amplitude per step: 1/${r.steps.division} lane, ${r.steps.amplitude.length} steps, min ${f2(Math.min(...r.steps.amplitude))} max ${f2(Math.max(...r.steps.amplitude))}.`);

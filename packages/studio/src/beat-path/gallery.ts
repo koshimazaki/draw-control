@@ -8,7 +8,7 @@
  * loads it. Runs added by the visitor form an extra row, "Your runs". Never empty: paths and
  * guides show before any model clip exists.
  */
-import { analyseSamples, buildDrive, frameAt, placeLandmarks, planCamera, secondsAtBeat, GROOVES } from "@motion-studio/core";
+import { analyseSamples, buildDrive, clipBeats, frameAt, placeLandmarks, planCamera, secondsAtBeat, GROOVES } from "@motion-studio/core";
 import { createGlider } from "../characters/glider";
 import { exportBundle } from "../export/bundle";
 import { GRID_LOOKS } from "../ground-grid";
@@ -17,7 +17,7 @@ import { EXAMPLES, exampleState } from "./examples";
 import { exampleMusic, musicIdentity } from "./example-music";
 import { composePrompt, MODELS } from "./generate";
 import { beatPathRecipe, exportRange, type TrackInfo } from "./recipe-map";
-import { legendFor } from "./script";
+import { fitLanes, legendFor } from "./script";
 import { TRACKS } from "./tracks";
 import { PLAY_GLYPH } from "./ui/glyph";
 import { icon } from "./ui/icons";
@@ -33,13 +33,15 @@ type Media = { guide: string; audio: string } | null;
 const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls = "", text = "") => { const e = document.createElement(tag); if (cls) e.className = cls; if (text) e.textContent = text; return e; };
 
 /** An example's recipe on its own music (its file or the synth groove, analysed here, as the page does). */
-async function exampleRecipe(i: number) {
-  const s = exampleState(i), id = EXAMPLES[i].id, t = TRACKS[id], music = await exampleMusic(id);
+export async function exampleRecipe(i: number) {
+  const id = EXAMPLES[i].id, t = TRACKS[id], music = await exampleMusic(id);
   const f = analyseSamples(music.channels, music.sampleRate);
   const drive = buildDrive(f, 24, Math.ceil(f.lengthSeconds * 24) + 1);
   // The file's grid only with the file: the fallback groove goes out under its own name and its own tempo, as in the editor.
   const grid = music.fromFile ? t.grid : undefined, named = musicIdentity(id, music.fromFile);
   const info: TrackInfo = { name: named.name, licence: named.licence, bpm: grid?.bpm ?? f.estimatedBpm ?? GROOVES[t.groove].bpm, offsetSeconds: grid?.offsetSeconds ?? f.estimatedOffsetSeconds, lengthSeconds: f.lengthSeconds };
+  // The lanes fit the clip at this tempo, as the editor fits them on loading a track (on the fallback groove's tempo, more beats).
+  const base = exampleState(i), s = fitLanes(base, clipBeats(base.clip, info.bpm));
   return { s, recipe: beatPathRecipe(s, info, { drive, bands: drive.bands }), drive, music };
 }
 

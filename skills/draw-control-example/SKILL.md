@@ -208,8 +208,10 @@ rig: distance 8m height 5m fov 30 yaw 45           # the opening framing (frame 
   every block. Instead: a one-beat block of the same view with a closer offset starting on the
   half beat at the kick (`beats 6-7 | camera: three-quarter distance 4.5m height 3m …`), then the
   original offset again (`beats 7-8 | … distance 7m height 5m …`). Offsets ease over a block's
-  first beat, so it zooms in from the kick and eases back out; in `camera.json` the distance dips
-  once (Example 1: 8.06 → 4.92 → 8.06 m over frames 81–100) and nothing else changes.
+  first beat, so it zooms in from the kick and eases back out. A closer view usually sits lower
+  too: Example 1's accent takes distance 7 → 4.5 m and height 5 → 3 m, so in `camera.json` the
+  distance dips once (8.06 → 4.92 → 8.06 m over frames 81–100) and the camera drops 2 m and comes
+  back (8 → 6 → 8 m); the view, angle and fov stay. Keep the height if only the distance should move.
 - Measure smoothness from `camera.json`, not by eye: the camera's heading yaw per frame (rate,
   and acceleration over 3 frames; skip frames looking within 1 m of straight down), and its speed
   per frame inside each block (a hold shows as speed near 0 at each hit). Example 1 went from a
