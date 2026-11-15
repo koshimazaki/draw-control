@@ -21,6 +21,7 @@ import { addMarker } from "./performance-edits";
 import { DEFAULT_REACTIVE } from "./reactive-config";
 import { RecipeError, validateRecipe, type Recipe, type RootPoint } from "./recipe";
 import { travelRange } from "./root-travel";
+import { parseRig, type ScriptRig } from "./script-rig";
 import { ACTION_WORDS, CAMERA_WORDS, accentVocabulary, actionVocabulary, cameraVocabulary } from "./shot-script";
 
 type Lock = { lock: LockTarget; strength?: number };
@@ -36,11 +37,11 @@ const number = (row: Row, t: string, what: string) => {
 };
 
 /** A settings line: `landmarks: on seed 7` or `landmarks: off` (not a row). */
-const SETTING = /^(landmarks|muted|sensitivity|markers|slice|figure|scenery|box|shot (subject|environment|action|legend))\s*:/i;
+const SETTING = /^(rig|landmarks|muted|sensitivity|markers|slice|figure|scenery|box|shot (subject|environment|action|legend))\s*:/i;
 /** The words for added hits in a "markers:" line, and their bands. */
 const MARKER_WORDS = { kick: "low", snare: "mid", hat: "high" } as const;
 /** The script's settings lines; a script without one leaves the setting as it was. */
-export type ScriptSettings = { slice?: number; markers?: { band: "low" | "mid" | "high"; seconds: number }[]; boxes?: { x: number; z: number; w: number; d: number; h: number; yaw?: number }[]; sight?: "clear" | "passes"; landmarks?: { on: boolean; seed?: number }; muted?: number[]; sensitivity?: number; figure?: { shape?: "car" | "flyer" | "runner"; body: string; head: string }; scenery?: "none" | "scatter" | "street" | "city"; shot?: Partial<Record<"subject" | "environment" | "action" | "legend", string>> };
+export type ScriptSettings = { rig?: ScriptRig; slice?: number; markers?: { band: "low" | "mid" | "high"; seconds: number }[]; boxes?: { x: number; z: number; w: number; d: number; h: number; yaw?: number }[]; sight?: "clear" | "passes"; landmarks?: { on: boolean; seed?: number }; muted?: number[]; sensitivity?: number; figure?: { shape?: "car" | "flyer" | "runner"; body: string; head: string }; scenery?: "none" | "scatter" | "street" | "city"; shot?: Partial<Record<"subject" | "environment" | "action" | "legend", string>> };
 export function parseSettings(script: string): ScriptSettings {
   const out: ScriptSettings = {};
   script.split(/\r?\n/).forEach((raw, i) => {
@@ -55,6 +56,7 @@ export function parseSettings(script: string): ScriptSettings {
       if (m[2]) out.sight = m[2].toLowerCase() as "passes";
       return;
     }
+    if (/^rig\s*:/i.test(text)) { out.rig = { ...out.rig, ...parseRig(text.replace(/^rig\s*:/i, ""), i + 1) }; return; }
     if (/^box\s*:/i.test(text)) {
       const v = text.replace(/^box\s*:/i, "").trim().split(/[\s,]+/).map(Number);
       if ((v.length !== 5 && v.length !== 6) || v.some(x => !Number.isFinite(x))) throw new RecipeError(`script line ${i + 1}: a box reads "box: x z width depth height [yaw]" in metres`);
@@ -340,6 +342,7 @@ export function applyScript(recipe: Recipe, args: { script: string }, ctx: { ban
   if (settings.sensitivity !== undefined) r = validateRecipe({ ...r, hitSensitivity: settings.sensitivity });
   if (settings.markers) r = validateRecipe({ ...r, addedHits: settings.markers });
   if (settings.figure) r = validateRecipe({ ...r, figure: settings.figure });
+  if (settings.rig) r = validateRecipe({ ...r, camera: { ...(r.camera ?? DEFAULT_CAMERA), ...settings.rig } });
   if (settings.scenery) r = validateRecipe({ ...r, scenery: settings.scenery, ...(settings.sight ? { scenerySight: settings.sight } : {}) });
   if (settings.boxes) r = validateRecipe({ ...r, sceneryBoxes: settings.boxes });
   if (settings.shot) r = validateRecipe({ ...r, shot: { subject: "", environment: "", action: "", legend: "", ...r.shot, ...settings.shot } });
