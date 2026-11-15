@@ -31,6 +31,7 @@ const stateWord = (e: RunEntry) => e.status === "done" ? "done" : e.status === "
 
 export function bindHistory(d: Deps) {
   const button = d.$("runsButton"), pop = d.$("runsPop"), list = d.$("runsList"), count = d.$("runsCount");
+  const shown = new Map<string, string>();
   const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls = "", text = "") => { const n = document.createElement(tag); if (cls) n.className = cls; if (text) n.textContent = text; return n; };
 
   async function check(e: RunEntry, quiet = false) {
@@ -65,7 +66,12 @@ export function bindHistory(d: Deps) {
       if (r.status === "done" && reachable) {
         if (r.kind === "video") {
           const show = el("button", "link-act", "Show"); show.type = "button";
-          show.onclick = async () => { const b = await savedBlob(r); d.show(r, b ? URL.createObjectURL(b) : r.url!); pop.hidden = true; };
+          // One link per run for the browser's copy, made on the first Show and reused after (not one per click).
+          show.onclick = async () => {
+            let url = shown.get(r.taskUUID);
+            if (!url) { const b = await savedBlob(r); if (b) { url = URL.createObjectURL(b); shown.set(r.taskUUID, url); } }
+            d.show(r, url ?? r.url!); pop.hidden = true;
+          };
           foot.append(show);
         }
         const get = el("button", "link-act", "Download"); get.type = "button";

@@ -185,6 +185,8 @@ export function bindImages(d: Deps) {
       let image: Blob | string = r.imageURL;
       // The same download as the run log's kept copy (result-fetch.ts).
       try { image = await results.get(r.imageURL); } catch { /* remote and not readable here: keep the URL */ }
+      // The local stand-in's link is read now (the drop and the gallery make their own): released. Kept when it is what shows.
+      if (fakeImage && typeof image !== "string") URL.revokeObjectURL(fakeImage);
       d.store.set(slot, kind, image, { kind: "generated", model: m.name, prompt: words });
       d.runs.push({ slot, model: m.key, modelName: m.name, url: typeof image === "string" ? image : URL.createObjectURL(image), prompt: words, kind: "image", costUsd: r.costUsd, for: kind, blob: typeof image === "string" ? null : image });
       d.renderGallery();

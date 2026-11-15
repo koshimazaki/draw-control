@@ -178,7 +178,13 @@ export function bindGenerate(p: Page) {
       p.busy = true;
       const bundle = await exportGuideInMemory((d, t) => { fill.style.width = `${Math.round(d / t * 40)}%`; }).finally(() => { p.busy = false; });
       if (abort.signal.aborted) throw Object.assign(new Error("Stopped. Nothing was submitted."), { code: "aborted" });
-      fakeResult = URL.createObjectURL(bundle.files["guide.mp4"]);
+      // The local preview's "result" is the guide itself: one link per run, and the last one released
+      // unless an output pane or the gallery still shows it.
+      if (fake && !key?.connected) {
+        const before = fakeResult;
+        fakeResult = URL.createObjectURL(bundle.files["guide.mp4"]);
+        if (before && ![...outputs.values()].some(o => o.url === before) && !runs.some(r => r.url === before)) URL.revokeObjectURL(before);
+      }
       const r = bundle.references;
       const result = await arena.generateFromGuide({
         guide: bundle.files, model: runModel, shot: runShot, signal: abort.signal, references: { character: r.character, environment: r.environment }, maxPrice: MAX_PRICE,
