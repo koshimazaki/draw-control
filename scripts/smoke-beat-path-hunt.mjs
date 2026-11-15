@@ -121,6 +121,87 @@ export async function smokeBeatPathHunt(browser, base, { fail }) {
   if (!noTrack.playing || noTrack.head < 0.2) fail(`no-track mode does not play (${JSON.stringify(noTrack)})`);
 
   if (errors.length) fail(`clumsy pass logged: ${errors.join(" | ")}`);
-  console.log("beat path hunt: switching, selections, field keys, undo, generate (cancel, stop, twice, mid-switch), gallery, no track checked");
+  console.log("beat path hunt: switching, selections, field keys, undo, generate (cancel, stop, twice, mid-switch), gallery, no track, paid-run safety checked");
+  await page.close();
+  await smokePaidRuns(browser, base, { fail });
+}
+
+/**
+ * Paid-run safety, with the fake provider:
+ * - a switch during "Rendering the guide…" is refused, and the run completes on the example it started on;
+ * - the image panel's question while the video guide renders waits its turn: OK answers the question on screen;
+ * - switching away from the running job and back shows its progress again; Stop ends a question still waiting.
+ */
+async function smokePaidRuns(browser, base, { fail }) {
+  // A page of its own: each guide render makes a WebGL context, and the pass above has made many.
+  const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+  const errors = [];
+  page.on("pageerror", e => errors.push(e.message));
+  page.on("console", m => { if (m.type() === "error" || m.type() === "warning") errors.push(`${m.type()}: ${m.text()}`); });
+  await page.goto(`${base}/path.html`);
+  await page.waitForFunction(() => window.__beatPath?.recipe().audio && document.querySelector("#keySlot arena-key"), null, { timeout: 60_000 });
+  const bp = fn => page.evaluate(fn);
+  const ex = slot => page.click(`[data-control="example"] [data-value="${slot}"]`);
+  const title = () => page.textContent("#costTitle");
+  const dialogOpen = () => page.waitForSelector("#costDialog:not([hidden])", { timeout: 120_000 });
+  const idle = () => page.waitForFunction(() => document.getElementById("runGenerate").textContent === "Generate", null, { timeout: 120_000 });
+  // A page control while the dialog covers the page: clicked as a script would.
+  const press = sel => page.evaluate(s => document.querySelector(s).click(), sel);
+  await ex("0");
+  await page.waitForFunction(() => window.__beatPath.slot() === "0", null, { timeout: 30_000 });
+
+  // 1. A switch during the render is refused; the run goes out with Example 1's shot.
+  const subject = (await bp(() => window.__beatPath.state())).shot.subject;
+  await page.click("#runGenerate");
+  await page.waitForFunction(() => document.getElementById("outputNote").textContent === "Rendering the guide…" && document.getElementById("outputNote").isConnected);
+  await ex("1");
+  const during = await bp(() => ({ slot: window.__beatPath.slot(), status: document.getElementById("status").textContent, on: document.querySelector('[data-control="example"] button.on')?.dataset.value }));
+  console.log(`beat path paid runs: switch during the render: ${JSON.stringify(during)}`);
+  if (during.slot !== "0" || during.on !== "0" || !/guide is rendering/.test(during.status ?? "")) fail(`a switch during the guide render was not refused: ${JSON.stringify(during)}`);
+  await dialogOpen(); await page.click("#costOk"); await idle();
+  const sent = await page.evaluate(() => (globalThis.__fakeTasks ?? []).filter(t => t.taskType === "videoInference").at(-1)?.positivePrompt ?? "");
+  const shown = await bp(() => ({ slot: window.__beatPath.slot(), player: !!document.querySelector("#generateSlot arena-player") }));
+  const words = subject.toLowerCase().match(/[a-z]{5,}/g) ?? [];
+  if (shown.slot !== "0" || !shown.player || !words.length || !words.every(w => sent.toLowerCase().includes(w))) fail(`the run did not complete on Example 1 with its shot (slot ${shown.slot}, prompt "${sent}", subject "${subject}")`);
+
+  // 2. Two questions at once: the image's shows first, the video's waits and shows after it.
+  await page.click("#runGenerate");
+  await page.waitForFunction(() => document.getElementById("outputNote").textContent === "Rendering the guide…");
+  await page.click("#genCharacter");
+  const pop = page.locator(".image-pop");
+  await pop.locator(".ip-family").selectOption("ByteDance Seedream"); await pop.locator(".ip-model").selectOption("seedream-5.5");
+  await pop.locator(".ip-run").click();
+  await dialogOpen();
+  const first = await title();
+  // The guide finishes behind the dialog: the video run reaches its own question, which waits.
+  await page.waitForFunction(() => /^estimated/.test(document.getElementById("outputNote").textContent ?? ""), null, { timeout: 120_000 });
+  const still = await title();
+  await page.click("#costCancel");
+  const imageNote = await page.textContent("#status");
+  await page.waitForFunction(() => document.getElementById("costTitle").textContent === "Generate with this model?" && !document.getElementById("costDialog").hidden, null, { timeout: 10_000 })
+    .catch(() => fail("the video run's question did not show after the image's was answered"));
+  console.log(`beat path paid runs: questions in turn: "${first}", still "${still}" after the guide, then "${await title()}"; status: ${imageNote}`);
+  if (first !== "Generate this image?" || still !== first) fail(`the second question overwrote the first (${first} → ${still})`);
+  if (!/Cancelled/.test(imageNote ?? "")) fail(`Cancel did not answer the image's question: ${imageNote}`);
+  await page.click("#costOk"); await idle();
+  if (!(await page.evaluate(() => !!document.querySelector("#generateSlot arena-player")))) fail("the video run did not finish after its question");
+  await page.keyboard.press("Escape");
+
+  // 3. Away from the running job and back: its progress shows again. Stop ends its question.
+  await page.click("#runGenerate");
+  await dialogOpen();
+  await press('[data-control="example"] [data-value="1"]');
+  await page.waitForFunction(() => window.__beatPath.slot() === "1", null, { timeout: 30_000 });
+  const away = await page.evaluate(() => !document.getElementById("screenOutput").hidden && !!document.querySelector("#generateSlot #genProgress"));
+  await press('[data-control="example"] [data-value="0"]');
+  await page.waitForFunction(() => window.__beatPath.slot() === "0", null, { timeout: 30_000 });
+  const back = await page.evaluate(() => { const b = document.querySelector("#generateSlot #genProgress"); return { bar: !!b && !b.hidden, note: document.querySelector("#generateSlot #outputNote")?.textContent ?? null }; });
+  console.log(`beat path paid runs: progress away ${away}, back ${JSON.stringify(back)}`);
+  if (away || !back.bar || !back.note) fail(`the running job's progress was not shown again on its example (away ${away}, back ${JSON.stringify(back)})`);
+  await press("#runGenerate");
+  await idle().catch(() => fail("Stop did not end a run waiting on its question"));
+  if (!(await page.evaluate(() => document.getElementById("costDialog").hidden))) fail("Stop left the run's question on screen");
+  if (errors.length) fail(`paid-run pass logged: ${errors.join(" | ")}`);
+  console.log("beat path paid runs: render lock, question queue, progress on return, Stop on a waiting question checked");
   await page.close();
 }

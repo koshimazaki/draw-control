@@ -14,13 +14,15 @@ import { blocker, chooseFamily, composeInput, imageCostText, initialState, model
 import { sourceLabel, type RefKind, type RefSource, type RefStore } from "./ref-store";
 import type { ArenaKeyElement, ArenaModule, CostQuestion, ImageFamilyInfo } from "./arena";
 import type { Run } from "./gallery";
-import { ERROR_MESSAGES } from "./generate";
+import { runErrorText, type RunError } from "./generate";
+import { results } from "./result-fetch";
 
 type Deps = {
   $: <T extends HTMLElement = HTMLElement>(id: string) => T;
   slot(): string; shot(): { subject: string; environment: string };
   arena(): ArenaModule | null; key(): ArenaKeyElement | null; fake: boolean;
-  ask(title: string, text: string, ok?: string): Promise<boolean>;
+  /** The page's cost dialog (cost-dialog.ts): one question at a time; `signal` ends a waiting or shown question as false. */
+  ask(title: string, text: string, ok?: string, signal?: AbortSignal): Promise<boolean>;
   store: RefStore; runs: Run[]; renderGallery(): void;
   fakeFetch(image: () => string): unknown;
   /** The fetch for a run, wrapped so the run log keeps its task id (the fake one in the local preview). */
@@ -163,16 +165,17 @@ export function bindImages(d: Deps) {
     if (needsUnpriced(m) && !(await d.ask("No published price limit", unpricedNotice(m), "Continue"))) { d.say("Nothing sent"); return; }
     const local = !d.key()?.connected && d.fake, slot = d.slot(), kind = s.kind, words = s.prompt.trim();
     running = new AbortController();
+    const signal = running.signal;
     runLabel.textContent = "Stop"; note.textContent = "Starting…"; spin.start();
     try {
       const fakeImage = local ? await placeholder(kind, m.name) : "";
       const r = await arena.generateImage({
-        model: m.key, prompt: words, references: refList(), maxPrice: IMAGE_MAX_PRICE, signal: running.signal,
+        model: m.key, prompt: words, references: refList(), maxPrice: IMAGE_MAX_PRICE, signal,
         ...(sizeFor(m).size ? { size: sizeFor(m).size } : {}),
         ...(m.accepts.quality ? { quality: qualityValue } : {}),
         ...(needsUnpriced(m) ? { allowUnpriced: true } : {}),
         key: d.key()?.connected ? d.key() : "local-preview-key-0000000000000000",
-        confirm: (cq: CostQuestion) => d.ask("Generate this image?", imageCostText(cq, local ? " Local preview: nothing is sent and nothing is charged." : "")),
+        confirm: (cq: CostQuestion) => d.ask("Generate this image?", imageCostText(cq, local ? " Local preview: nothing is sent and nothing is charged." : ""), "Generate", signal),
         onProgress: (g: { message: string }) => { note.textContent = g.message; },
         fetch: d.logged(local ? d.fakeFetch(() => fakeImage) : null, m.name, local),
         ...(local ? { poll: { initialDelayMs: 100, intervalMs: 100, maxIntervalMs: 200 } } : {}),
@@ -180,7 +183,10 @@ export function bindImages(d: Deps) {
       // The image as a Blob for the store; if the browser may not fetch it (CORS), keep its URL: an image model takes
       // a URL reference, a video model (Blobs only) then does not get it, and the status line says so.
       let image: Blob | string = r.imageURL;
-      try { const res = await fetch(r.imageURL); if (res.ok) image = await res.blob(); } catch { /* remote and not readable here: keep the URL */ }
+      // The same download as the run log's kept copy (result-fetch.ts).
+      try { image = await results.get(r.imageURL); } catch { /* remote and not readable here: keep the URL */ }
+      // The local stand-in's link is read now (the drop and the gallery make their own): released. Kept when it is what shows.
+      if (fakeImage && typeof image !== "string") URL.revokeObjectURL(fakeImage);
       d.store.set(slot, kind, image, { kind: "generated", model: m.name, prompt: words });
       d.runs.push({ slot, model: m.key, modelName: m.name, url: typeof image === "string" ? image : URL.createObjectURL(image), prompt: words, kind: "image", costUsd: r.costUsd, for: kind, blob: typeof image === "string" ? null : image });
       d.renderGallery();
@@ -188,9 +194,8 @@ export function bindImages(d: Deps) {
       if (d.key()?.connected) void d.key()!.refreshBalance?.();
       running = null; spin.stop(); close();
     } catch (e) {
-      const err = e as { code?: string; message: string };
-      const plain = err.code === "over-price" ? `The estimate is above the ${IMAGE_MAX_PRICE.toFixed(2)} USD limit for an image, so nothing was sent.` : err.code ? ERROR_MESSAGES[err.code] ?? err.message : err.message;
-      note.textContent = err.code === "refused" || err.code === "provider" ? `${plain}: ${err.message}` : plain;
+      // Stopped or timed out after the task was submitted: it may still be billed and lands in Runs (generate.ts).
+      note.textContent = runErrorText(e as RunError, { "over-price": `The estimate is above the ${IMAGE_MAX_PRICE.toFixed(2)} USD limit for an image, so nothing was sent.` });
       d.say(note.textContent);
     } finally {
       running = null; runLabel.textContent = "Generate"; spin.stop(); render();
