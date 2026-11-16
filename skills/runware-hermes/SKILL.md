@@ -42,6 +42,7 @@ Every model in the profile, with its price per 1M tokens, input / output, from i
 | `openai:gpt@6-sol` | GPT-6 Sol | 2 / 10 up to 272K; 4 / 15 above | compatible |
 | `openai:gpt@6.1-terra` | GPT-6.1 Terra | 1 / 5 up to 272K; 2 / 7.50 above | compatible |
 | `openai:gpt@6-luna` | GPT-6 Luna, the cheapest in the profile | 0.10 / 0.50 up to 272K; 0.20 / 0.75 above | compatible |
+| `alibaba:qwen@4-max` | Qwen4-Max (read 16 Nov 2026; cached input 0.075, cache write 1.875) | 1.50 / 4.50 | compatible |
 | `zai:glm@5.3` | GLM-5.3 | 1.20 / 4.00 | compatible |
 | `zai:glm@5.3-flash` | GLM-5.3 Flash | 0.15 / 0.50 | compatible |
 | `zai:glm@5.2` | GLM-5.2 | 0.80 / 2.55 | compatible |

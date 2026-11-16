@@ -54,17 +54,19 @@ describe("npm run hermes:setup: the installed config", () => {
     expect(linux).toBe(fillPaths(repoConfig, "/usr/bin/node", "/src/dc"));
     expect(keyCmdLines(linux)).toHaveLength(0);
   });
-  it("puts the GPT models on the Responses transport and the rest on chat completions", () => {
+  // The models Runware serves on /v1/responses (runware.ai/docs/platform/openai, 16 Nov 2026).
+  const onResponses = (model: string) => model.startsWith("openai:gpt@") && model !== "openai:gpt@5.4-pro" || model === "alibaba:qwen@4-max";
+  it("puts the models Runware serves on /v1/responses on the Responses transport, the rest on chat completions", () => {
     const block = (name: string) => repoConfig.split(/\n {2}(?=\S)/).find((b) => b.startsWith(`${name}:`)) ?? "";
     expect(block("runware")).toMatch(/transport: codex_responses/);
     expect(block("runware-chat")).toMatch(/transport: chat_completions/);
-    for (const [, model] of block("runware").matchAll(/^ {6}([^\s:]+:[^\s]+): \{\}$/gm)) expect(model).toMatch(/^openai:gpt@/);
-    expect(block("runware-chat")).not.toMatch(/openai:gpt@6/);
+    for (const [, model] of block("runware").matchAll(/^ {6}([^\s:]+:[^\s]+): \{\}$/gm)) expect(onResponses(model)).toBe(true);
+    for (const [, model] of block("runware-chat").matchAll(/^ {6}([^\s:]+:[^\s]+): \{\}$/gm)) expect(onResponses(model)).toBe(false);
   });
   it("routes every short name through a named provider, so a switch keeps its transport and key", () => {
     const aliases = [...repoConfig.matchAll(/^ {2}(\w+): \{ model: "([^"]+)", provider: ([\w-]+) \}$/gm)];
     expect(aliases.length).toBe(repoConfig.split("model_aliases:")[1].split("mcp_servers:")[0].split("\n").filter((l) => /^ {2}\w/.test(l)).length);
-    for (const [, , model, provider] of aliases) expect(provider).toBe(model.startsWith("openai:gpt@") ? "runware" : "runware-chat");
+    for (const [, , model, provider] of aliases) expect(provider).toBe(onResponses(model) ? "runware" : "runware-chat");
   });
 });
 
