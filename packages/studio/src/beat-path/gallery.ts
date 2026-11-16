@@ -33,7 +33,15 @@ type Media = { guide: string; audio: string } | null;
 const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls = "", text = "") => { const e = document.createElement(tag); if (cls) e.className = cls; if (text) e.textContent = text; return e; };
 
 /** An example's recipe on its own music (its file or the synth groove, analysed here, as the page does). */
-export async function exampleRecipe(i: number) {
+export function exampleRecipe(i: number) {
+  // Worked out once per example (its script and its music never change): every Gallery redraw asks for it,
+  // and analysing the track again each time made a redraw heavy. A failure is not kept, so it is tried again.
+  let made = recipes.get(i);
+  if (!made) { made = buildExampleRecipe(i); recipes.set(i, made); made.catch(() => recipes.delete(i)); }
+  return made;
+}
+const recipes = new Map<number, ReturnType<typeof buildExampleRecipe>>();
+async function buildExampleRecipe(i: number) {
   const id = EXAMPLES[i].id, t = TRACKS[id], music = await exampleMusic(id);
   const f = analyseSamples(music.channels, music.sampleRate);
   const drive = buildDrive(f, 24, Math.ceil(f.lengthSeconds * 24) + 1);
@@ -236,15 +244,21 @@ export function bindGallery(opts: {
   /** Each render is a generation; a row's player stops once a newer render has replaced it. */
   let generation = 0;
   const live = () => { const mine = generation; return () => mine === generation; };
+  /** Let a video go now (its stream and its decoder), not whenever the collector reaches it: a redraw replaces every row. */
+  const release = (v: HTMLVideoElement) => { v.pause(); v.removeAttribute("src"); v.load(); };
   function render() {
     generation++;
     for (const io of watching) io.disconnect();
     watching.clear();
+    for (const v of opts.root.querySelectorAll("video")) release(v);
     // Each example's row, then a row for each other subject its guide was published with.
     const rows = EXAMPLES.flatMap((e, i) => [exampleRow(i), ...subjectRows(published, e.id).map(v => exampleRow(i, v))]), own = runsRow();
     opts.root.replaceChildren(...rows, ...(own ? [own] : []));
   }
   render();
+  // Redraws asked for in a burst (a run added, images set one after another) become one.
+  let due = 0;
+  const schedule = () => { if (!due) due = window.setTimeout(() => { due = 0; render(); }, 120); };
   void loadPublishedAll({ examples: EXAMPLES.map(e => e.id), models: MODELS.map(m => m.id) }, document.baseURI).then(all => { if (all.clips.length || Object.keys(all.refs).length) { published = all.clips; publishedRefs = all.refs; render(); } opts.onPublished?.(all); });
-  return { render };
+  return { render: schedule };
 }

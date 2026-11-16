@@ -99,6 +99,9 @@ export function bindGenerate(p: Page) {
   function showResult(url: string | null, from?: { label: string; prompt: string }) {
     setOutputPane(!!url);
     stopLoading?.();
+    // The clip on show is let go now (its stream and its decoder): the pane gets a new player each time.
+    const old = resultVideo();
+    if (old) { old.pause(); old.removeAttribute("src"); old.load(); }
     shown = url;
     $("addToGallery").hidden = !url || !arena || !!from;
     // No clip for this example and model: the pane goes, and the clip it held is let go (it would play on unseen).
@@ -153,7 +156,9 @@ export function bindGenerate(p: Page) {
   requestAnimationFrame(follow);
 
   // References: per example, never in the recipe or the script (ref-store.ts, page-refs.ts). Any image in the page can become one.
-  const refUi = bindRefs(p, refStore, () => { sync(); renderGallery(); });
+  // A published image the page itself puts in a drop changes nothing in the Gallery (its rows show the list's images): no redraw for it.
+  let placing = false;
+  const refUi = bindRefs(p, refStore, () => { sync(); if (!placing) renderGallery(); });
   const head = () => Math.max(0, p.head - p.window0());
   refUi.attach($("screenPreview"), async () => { const blob = await p.viewport.grabFrame(); return blob ? { blob, source: { kind: "frame", of: "preview", seconds: head() } } : null; }, "this frame of the preview");
   refUi.attach($("screenOutput"), async () => {
@@ -343,7 +348,8 @@ export function bindGenerate(p: Page) {
       void fetch(url).then(r => (r.ok ? r.blob() : null)).then(b => {
         // Still the image asked for (the model may have changed while it loaded), and still the page's to set.
         if (!b || !b.type.startsWith("image/") || wanted.get(key) !== url || !mine(key, kind)) return;
-        placed.set(key, { url, ref: refStore.set(slot, kind, b, { kind: "gallery", label: `published with Example ${Number(slot) + 1}` }) });
+        placing = true;
+        try { placed.set(key, { url, ref: refStore.set(slot, kind, b, { kind: "gallery", label: `published with Example ${Number(slot) + 1}` }) }); } finally { placing = false; }
       }).catch(() => { /* no image: the drop stays as it is */ });
     }
   }
