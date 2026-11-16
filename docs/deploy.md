@@ -77,7 +77,18 @@ The list can also name the reference images an example was made with. They load 
 }
 ```
 
-Reference images are added by hand: put the file in `packages/studio/public/published/` (same origin, so the page can read it) and name it in `index.json`. `npm run publish:clip` keeps them when it writes a clip.
+**One guide, another subject.** A model's entry can be a list of clips. A clip with a `subject` (and, if you like, its own `refs` and its three `shot` lines) gets its own row in the Gallery, under the example's row: the same path and guide, with that subject's images, shot description and clip. In the editor, choosing the model again moves to its next published clip, and a subject row's "Load into the editor" opens the example with that clip beside the preview.
+
+```json
+"seedance-2.5": [
+  { "url": "https://…/skater.mp4", "prompt": "", "subject": "skater", "refs": { "character": "published/skater-character.jpg" }, "shot": { "subject": "…", "environment": "…", "action": "…" } },
+  { "url": "https://…/forklift.mp4", "prompt": "", "subject": "forklift" }
+]
+```
+
+While a clip loads, the pane beside the preview shows the page's spinner and "Loading the clip…".
+
+Reference images are added by hand: name each one in `index.json`, as a link (the shipped ones sit on Cloudflare R2) or as a file in `packages/studio/public/published/`. The page reads an image as a file to put it in a drop, so a link on another origin must allow cross-site reads (on R2: a CORS rule for `GET` on the bucket); without it the image still shows in the Gallery and the drop stays empty. `npm run publish:clip` keeps the images when it writes a clip.
 
 ## Your own music
 

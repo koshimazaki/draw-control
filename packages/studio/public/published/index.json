@@ -24,25 +24,48 @@
         "prompt": "",
         "seconds": 12
       },
-      "seedance-2.5": {
-        "url": "https://pub-a43ab278435c48f28b76e8ecc0307ccd.r2.dev/467386d7.mp4",
-        "prompt": "",
-        "seconds": 11,
-        "refs": {
-          "character": "published/skater-character.jpg",
-          "environment": "published/skater-environment.jpg"
+      "seedance-2.5": [
+        {
+          "url": "https://pub-a43ab278435c48f28b76e8ecc0307ccd.r2.dev/467386d7.mp4",
+          "prompt": "",
+          "seconds": 11,
+          "refs": {
+            "character": "https://pub-a43ab278435c48f28b76e8ecc0307ccd.r2.dev/draw-control/skater-character.jpg",
+            "environment": "https://pub-a43ab278435c48f28b76e8ecc0307ccd.r2.dev/draw-control/skater-environment.jpg"
+          },
+          "subject": "skater",
+          "shot": {
+            "subject": "an anime-style skateboarder in a loose hoodie and sneakers, drawn with clean outlines and flat colours (the orange figure; white marks the chest)",
+            "environment": "an anime city street in the afternoon, shops and cafés along the pavement, cel-shaded, soft sky",
+            "action": "close on the skateboard's wheels and deck as they push along, then alongside them as they pass behind the shopfronts and show through the gaps, an ollie in a gap, then a high view of the whole street"
+          }
+        },
+        {
+          "url": "https://pub-a43ab278435c48f28b76e8ecc0307ccd.r2.dev/cba0b6ba.mp4",
+          "prompt": "",
+          "seconds": 12,
+          "subject": "forklift",
+          "refs": {
+            "character": "https://pub-a43ab278435c48f28b76e8ecc0307ccd.r2.dev/draw-control/forklift-character.jpg",
+            "environment": "https://pub-a43ab278435c48f28b76e8ecc0307ccd.r2.dev/draw-control/forklift-environment.jpg"
+          },
+          "shot": {
+            "subject": "an industrial forklift carrying a pallet, yellow and black (the orange figure; white marks its front)",
+            "environment": "a car factory floor, the grey blocks are its steel pillars and machines, car bodies on the line, robot arms, overhead lights",
+            "action": "close on its front wheel as it drives along, then alongside it as it passes behind the factory pillars and between the stations, a bump over a floor plate in a gap, then a high view of the whole factory floor"
+          }
         }
-      }
+      ]
     }
   },
   "refs": {
     "flyer": {
-      "character": "published/flyer-character.jpg",
-      "environment": "published/flyer-environment.jpg"
+      "character": "https://pub-a43ab278435c48f28b76e8ecc0307ccd.r2.dev/draw-control/flyer-character.jpg",
+      "environment": "https://pub-a43ab278435c48f28b76e8ecc0307ccd.r2.dev/draw-control/flyer-environment.jpg"
     },
     "runner": {
-      "character": "published/runner-character.jpg",
-      "environment": "published/runner-environment.jpg"
+      "character": "https://pub-a43ab278435c48f28b76e8ecc0307ccd.r2.dev/draw-control/runner-character.jpg",
+      "environment": "https://pub-a43ab278435c48f28b76e8ecc0307ccd.r2.dev/draw-control/runner-environment.jpg"
     }
   }
 }

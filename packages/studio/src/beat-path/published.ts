@@ -15,17 +15,25 @@
  *
  * The page loads them into that example's Character and Environment drops when it opens. A clip
  * made with other images names its own under "refs" in its entry: they show while its model is chosen.
+ * A model's entry may be a list of clips. A clip with a "subject" (one guide, another subject) gets
+ * its own row in the Gallery, with its images and its "shot" lines, and choosing its model again in
+ * the editor moves to the next clip.
  * No runtime imports: scripts/publish-clip.mjs runs this file on Node as it is.
  */
 
 /** Where the list sits, relative to the page. */
 export const PUBLISHED_INDEX = "published/index.json";
 
-export type PublishedClip = { url: string; prompt: string; costUsd?: number; seconds?: number; refs?: PublishedRefs };
+/** The three lines of a shot description (a subject's own, for a clip made with another subject on the same guide). */
+export type PublishedShot = { subject: string; environment: string; action: string };
+export type PublishedClip = { url: string; prompt: string; costUsd?: number; seconds?: number; refs?: PublishedRefs; subject?: string; shot?: PublishedShot };
 /** The reference images an example was made with: urls, read like a clip's. */
 export type PublishedRefs = { character?: string; environment?: string };
 export const REF_KINDS = ["character", "environment"] as const;
-export type PublishedIndex = { version: 1; clips: Record<string, Record<string, PublishedClip>>; refs?: Record<string, PublishedRefs> };
+export type PublishedIndex = { version: 1; clips: Record<string, Record<string, PublishedClip | PublishedClip[]>>; refs?: Record<string, PublishedRefs> };
+/** A model's entry as a list: one clip, or several (one guide carried by several subjects, each named by `subject`). */
+export const clipList = (entry: unknown): unknown[] => (Array.isArray(entry) ? entry : [entry]);
+const MAX_SUBJECT = 40, MAX_SHOT_LINE = 2000;
 /** Everything the list holds that the page can use. */
 export type Published = { clips: PublishedRun[]; refs: Record<string, PublishedRefs> };
 /** One usable entry, its url resolved against the page. */
@@ -62,6 +70,12 @@ export function checkClip(raw: unknown, base: string): PublishedClip | null {
   }
   const refs = checkRefs(raw.refs, base);
   if (refs) clip.refs = refs;
+  if (typeof raw.subject === "string" && raw.subject.trim()) clip.subject = raw.subject.trim().slice(0, MAX_SUBJECT);
+  if (isRecord(raw.shot)) {
+    const line = (k: string) => (typeof (raw.shot as Record<string, unknown>)[k] === "string" ? ((raw.shot as Record<string, unknown>)[k] as string).trim().slice(0, MAX_SHOT_LINE) : "");
+    const shot = { subject: line("subject"), environment: line("environment"), action: line("action") };
+    if (shot.subject || shot.environment || shot.action) clip.shot = shot;
+  }
   return clip;
 }
 
@@ -81,8 +95,10 @@ export function parsePublished(raw: unknown, ids: KnownIds, base: string): Publi
     if (!ids.examples.includes(example) || !isRecord(byModel)) continue;
     for (const [model, entry] of Object.entries(byModel)) {
       if (!ids.models.includes(model)) continue;
-      const clip = checkClip(entry, base);
-      if (clip) out.push({ ...clip, example, model });
+      for (const one of clipList(entry)) {
+        const clip = checkClip(one, base);
+        if (clip) out.push({ ...clip, example, model });
+      }
     }
   }
   return out;
@@ -100,10 +116,27 @@ export function parseRefs(raw: unknown, ids: KnownIds, base: string): Record<str
   return out;
 }
 
-/** The reference images to show for an example and the chosen model: the example's, with that model's clip's own over them. */
-export function refsFor(all: Published, example: string, model: string): PublishedRefs {
-  return { ...all.refs[example], ...all.clips.find(c => c.example === example && c.model === model)?.refs };
+/** The reference images to show for an example and the published clip on show: the example's, with the clip's own over them. */
+export function refsFor(all: Published, example: string, clip: PublishedClip | undefined): PublishedRefs {
+  return { ...all.refs[example], ...clip?.refs };
 }
+
+/** An example's clips that share its own subject (no `subject`): its row in the Gallery. */
+export const mainClips = (clips: readonly PublishedRun[], example: string): PublishedRun[] => clips.filter(c => c.example === example && !c.subject);
+/** An example's other subjects, in the list's order, each with its clips: a Gallery row each. */
+export function subjectRows(clips: readonly PublishedRun[], example: string): { subject: string; clips: PublishedRun[] }[] {
+  const rows: { subject: string; clips: PublishedRun[] }[] = [];
+  for (const c of clips) {
+    if (c.example !== example || !c.subject) continue;
+    const row = rows.find(r => r.subject === c.subject);
+    if (row) row.clips.push(c); else rows.push({ subject: c.subject, clips: [c] });
+  }
+  return rows;
+}
+/** A model's published clips for an example, in the list's order. */
+export const clipsFor = (clips: readonly PublishedRun[], example: string, model: string): PublishedRun[] => clips.filter(c => c.example === example && c.model === model);
+/** The clip on show from a model's list: the `turn`-th, going round (click the model again for the next). */
+export const pickClip = (list: readonly PublishedRun[], turn: number): PublishedRun | undefined => (list.length ? list[((turn % list.length) + list.length) % list.length] : undefined);
 
 /** Fetch and read the list: its clips and its reference images. Any failure (no file, not JSON, wrong shape) is an empty list. */
 export async function loadPublishedAll(ids: KnownIds, base: string, fetcher: typeof fetch = (...a) => globalThis.fetch(...a)): Promise<Published> {
