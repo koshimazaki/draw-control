@@ -223,7 +223,8 @@ export class Viewport {
     if (this.camera !== this.orbitCam) setAspect(this.orbitCam, w / h);
     this.redraw();
   }
-  dispose() { this.observer.disconnect(); this.controls.dispose(); this.renderer.dispose(); }
+  // The graphics context is given back now: a browser keeps only so many per page and drops the oldest (the editor's preview) past that.
+  dispose() { this.observer.disconnect(); this.controls.dispose(); this.renderer.dispose(); this.renderer.forceContextLoss(); }
 }
 
 export function makeRenderer(canvas: HTMLCanvasElement): THREE.WebGLRenderer {
