@@ -1,30 +1,46 @@
 # Draw Control on Runware. `npm run hermes:setup` installs this profile and fills in the quoted
 # Node and checkout placeholders below with this machine's paths.
-# The key is read from RUNWARE_API_KEY in the environment, never stored here. `npm run hermes`
-# fills that variable from the macOS Keychain item runware-api-key when it is unset. Hermes, both
-# MCP servers and every terminal command the agent runs inherit it.
-# No spend limit covers the chat model itself (providers.runware below): its tokens are billed by
+# The key is never stored here. Both providers below name it as key_env: RUNWARE_API_KEY, which
+# Hermes reads from the process environment or, for a turn the Hermes gateway runs, from this
+# profile's own .env. On macOS, setup also adds a key_cmd line under each provider that reads the
+# Keychain item runware-api-key, or prints RUNWARE_API_KEY when there is no such item. Hermes runs a
+# key_cmd before key_env and never falls back to key_env, so setup writes it only on macOS, where
+# /usr/bin/security exists. Keys per platform: docs/hermes.md.
+# No spend limit covers the chat model itself (the two providers below): its tokens are billed by
 # Runware with no cap in this file. The only spend guard is on the runware MCP server, further down.
 model:
   default: openai:gpt@6.1-sol
   provider: custom:runware
+# One Runware endpoint, two wire formats. Runware serves the OpenAI GPT models (and Qwen4-Max) on
+# /v1/responses, and its other models on /v1/chat/completions only (runware.ai/docs/platform/openai,
+# read 16 Nov 2026). GPT-6.1 Sol refuses function tools with reasoning on chat/completions, so the
+# GPT family needs codex_responses (the Responses API); everything else stays on chat_completions.
+# Every live Runware text model with tool calling (catalog index, 14 Nov 2026), then the newer
+# "compatible-only" ones documented on their model pages; every ID checked against its public page on
+# 15 Nov 2026. Switch with a short name below, or /model <AIR>; prices are in skills/runware-hermes.
 providers:
   runware:
     name: Runware
     api: https://api.runware.ai/v1
     key_env: RUNWARE_API_KEY
-    transport: chat_completions
+    transport: codex_responses
     default_model: openai:gpt@6.1-sol
-    # Every live Runware text model with tool calling (catalog index, 14 Nov 2026), then the newer
-    # "compatible-only" ones documented on their model pages (GPT-6 Sol/Astra/Terra/Luna, GLM-5.2/5.3,
-    # Kimi, DeepSeek V4); every ID checked against its public page on 15 Nov 2026.
-    # Switch with /model custom:runware:<AIR>; prices are in skills/runware-hermes.
     models:
       openai:gpt@6.1-sol: {}
       openai:gpt@6-astra: {}
       openai:gpt@6-sol: {}
       openai:gpt@6.1-terra: {}
       openai:gpt@6-luna: {}
+      openai:gpt@5.4-mini: {}
+      openai:gpt@5.4: {}
+      openai:gpt@5.5: {}
+  runware-chat:
+    name: Runware (chat)
+    api: https://api.runware.ai/v1
+    key_env: RUNWARE_API_KEY
+    transport: chat_completions
+    default_model: zai:glm@5.3
+    models:
       zai:glm@5.3: {}
       zai:glm@5.3-flash: {}
       zai:glm@5.2: {}
@@ -32,9 +48,7 @@ providers:
       moonshotai:kimi@k3: {}
       deepseek:v4@pro: {}
       deepseek:v4.1@flash: {}
-      openai:gpt@5.4-mini: {}
-      openai:gpt@5.4: {}
-      openai:gpt@5.5: {}
+      # Not on Runware's /v1/responses list, so it stays here; it may refuse tools with reasoning.
       openai:gpt@5.4-pro: {}
       anthropic:claude@haiku-4.5: {}
       anthropic:claude@sonnet-4.6: {}
@@ -50,18 +64,20 @@ providers:
       minimax:m3@0: {}
 # Short names: `/model astra` in a chat, `/model astra --once` for one turn,
 # `hermes -p beat-path -m astra` at launch. `npm run review -- --model astra` takes the same names.
+# Each names its provider, so a switch keeps that provider's transport and key (an alias written as
+# `provider: custom` with a base_url falls back to chat_completions, Hermes v0.23.1).
 model_aliases:
-  sol: { model: "openai:gpt@6.1-sol", provider: custom, base_url: "https://api.runware.ai/v1", key_env: RUNWARE_API_KEY }
-  astra: { model: "openai:gpt@6-astra", provider: custom, base_url: "https://api.runware.ai/v1", key_env: RUNWARE_API_KEY }
-  terra: { model: "openai:gpt@6.1-terra", provider: custom, base_url: "https://api.runware.ai/v1", key_env: RUNWARE_API_KEY }
-  luna: { model: "openai:gpt@6-luna", provider: custom, base_url: "https://api.runware.ai/v1", key_env: RUNWARE_API_KEY }
-  glm: { model: "zai:glm@5.3", provider: custom, base_url: "https://api.runware.ai/v1", key_env: RUNWARE_API_KEY }
-  kimi: { model: "moonshotai:kimi@k3.1-pro", provider: custom, base_url: "https://api.runware.ai/v1", key_env: RUNWARE_API_KEY }
-  deepseek: { model: "deepseek:v4@pro", provider: custom, base_url: "https://api.runware.ai/v1", key_env: RUNWARE_API_KEY }
-  opus: { model: "anthropic:claude@opus-4.8", provider: custom, base_url: "https://api.runware.ai/v1", key_env: RUNWARE_API_KEY }
-  gemini: { model: "google:gemini@3.1-pro", provider: custom, base_url: "https://api.runware.ai/v1", key_env: RUNWARE_API_KEY }
-  grok: { model: "xai:grok@4.3", provider: custom, base_url: "https://api.runware.ai/v1", key_env: RUNWARE_API_KEY }
-  mini: { model: "openai:gpt@5.4-mini", provider: custom, base_url: "https://api.runware.ai/v1", key_env: RUNWARE_API_KEY }
+  sol: { model: "openai:gpt@6.1-sol", provider: runware }
+  astra: { model: "openai:gpt@6-astra", provider: runware }
+  terra: { model: "openai:gpt@6.1-terra", provider: runware }
+  luna: { model: "openai:gpt@6-luna", provider: runware }
+  mini: { model: "openai:gpt@5.4-mini", provider: runware }
+  glm: { model: "zai:glm@5.3", provider: runware-chat }
+  kimi: { model: "moonshotai:kimi@k3.1-pro", provider: runware-chat }
+  deepseek: { model: "deepseek:v4@pro", provider: runware-chat }
+  opus: { model: "anthropic:claude@opus-4.8", provider: runware-chat }
+  gemini: { model: "google:gemini@3.1-pro", provider: runware-chat }
+  grok: { model: "xai:grok@4.3", provider: runware-chat }
 mcp_servers:
   # Draw Control itself: shot scripts, describe, render (all local and free).
   motion-studio:

@@ -2,7 +2,7 @@
 name: runware-hermes
 description: Run Hermes on Runware - text models, images and video from one key.
 license: MIT
-compatibility: Hermes Agent >= 0.21.4; a Runware API key in RUNWARE_API_KEY (or, through npm run hermes, the macOS Keychain item runware-api-key)
+compatibility: Hermes Agent >= 0.21.4; a Runware API key in RUNWARE_API_KEY or the profile's .env (on macOS, the Keychain item runware-api-key)
 metadata:
   repo: motion-studio
   version: 0.1.0
@@ -14,11 +14,15 @@ One Runware key covers both halves of an agent: Runware serves the chat model He
 
 ## The model provider
 
-Runware's chat endpoint is `https://api.runware.ai/v1/chat/completions`, with the key as a Bearer token. Model names are Runware AIR IDs, not OpenAI names. In `config.yaml`:
+Runware's OpenAI-compatible endpoint is `https://api.runware.ai/v1`, with the key as a Bearer token. Model names are Runware AIR IDs, not OpenAI names. It has two wire formats: `/v1/responses` serves the OpenAI GPT models (and Qwen4-Max), and `/v1/chat/completions` serves every model. GPT-6.1 Sol refuses tools with reasoning on chat completions, so the profile has two providers on the one endpoint:
 
 ```yaml
 providers:
-  runware:
+  runware:                  # the GPT models
+    api: https://api.runware.ai/v1
+    key_env: RUNWARE_API_KEY
+    transport: codex_responses
+  runware-chat:             # every other model
     api: https://api.runware.ai/v1
     key_env: RUNWARE_API_KEY
     transport: chat_completions
@@ -26,6 +30,8 @@ model:
   default: openai:gpt@6.1-sol
   provider: custom:runware
 ```
+
+On macOS, setup adds a `key_cmd` under both that reads the Keychain item `runware-api-key`, because the Hermes gateway runs turns without the shell's environment. On Linux and Windows the key goes in the profile's `.env` (see `docs/hermes.md`).
 
 Every model in the profile, with its price per 1M tokens, input / output, from its public page (`runware.ai/docs/models/<id>`, read 15 Nov 2026). "Index" models are in the catalog index (`runware.ai/docs/models/index.json`) with a `tools` parameter in their schema; "compatible" models have status `compatible-only`: a page with the OpenAI-compatible chat endpoint (what Hermes uses), no entry in the index, and none of them tried from here yet. Where a page lists two rates, both are shown: the lower one applies up to the context length named.
 
@@ -62,7 +68,7 @@ Every model in the profile, with its price per 1M tokens, input / output, from i
 
 For a code review by a second model, see [`runware-review`](../runware-review/SKILL.md).
 
-Switch inside a chat with `/model <short name>` or `/model custom:runware:<AIR>`. The catalog changes: GPT-5 Nano, GPT-5 Mini and MiniMax M2.7 are already marked deprecated, so check the index before pinning a new one. A schema listing `tools` is not proof that a model calls tools well: try a small task first and say which model did the work.
+Switch inside a chat with `/model <short name>`, or `/model <AIR> --provider runware` for a GPT model and `--provider runware-chat` for any other. The catalog changes: GPT-5 Nano, GPT-5 Mini and MiniMax M2.7 are already marked deprecated, so check the index before pinning a new one. A schema listing `tools` is not proof that a model calls tools well: try a small task first and say which model did the work.
 
 **The chat model is billed per token with no limit in this profile.** Nothing asks before a turn and the MCP spend limit below does not count it, so prefer a cheaper model for long sessions.
 

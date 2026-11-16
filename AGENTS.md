@@ -29,7 +29,7 @@ Skills follow the open Agent Skills format (`SKILL.md` with `name` and `descript
 - **Work in a git worktree.** The owner's `npm run dev` reloads the page on any file change, and a reload loses a generation in progress.
 - **Checks before and after:** `npm run check` (typecheck, lint, tests) and `node scripts/smoke-beat-path.mjs`.
 - **Keep files near 500 lines.** Extract a helper rather than grow one file.
-- **Keys and secrets** stay in the environment (`RUNWARE_API_KEY`), the macOS Keychain (item `runware-api-key`, read by `npm run hermes` and `npm run review` when the variable is unset) or the page's key panel: never in a file, a log or a commit. In Hermes the key is in the terminal tool's environment, so any command run there can use it.
+- **Keys and secrets** stay in the environment (`RUNWARE_API_KEY`), the macOS Keychain (item `runware-api-key`, read by `npm run hermes` and `npm run review` when the variable is unset, and by the Hermes profile's `key_cmd`) or the page's key panel: never in a repository file, a log or a commit. On Linux and Windows the Hermes gateway reads it from the profile's own `.env` in the Hermes home ([docs/hermes.md](docs/hermes.md#set-up)). In Hermes the key is in the terminal tool's environment, so any command run there can use it.
 
 ## Map
 
