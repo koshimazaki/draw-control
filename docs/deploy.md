@@ -59,6 +59,37 @@ npm run publish:clip -- car h3 https://clips.example.com/car-h3.mp4 --prompt "�
 
 The script refuses unknown example or model ids and only ever writes inside `public/published/`. It takes `.mp4` and `.webm` only (what every browser plays) and keeps one file per tile: publishing a tile again under another extension, or as a URL, removes the old copy. Cloudflare Pages refuses the whole deployment when any file is over 25 MiB, so the script refuses a larger local file before copying it: host that one on R2 and publish its URL instead (`--force` copies it anyway). Published clips stream from their link; they are not downloaded whole when the page opens. Commit `index.json` and any copied clip (`*.mp4` is allowed in that folder only). Run `npm run static-check` after adding a local clip: a listed file that is missing fails it.
 
+### In the editor, and reference images
+
+The same list fills the editor. When an example opens, the published clip for the chosen model shows beside the guide preview, and choosing another model shows that model's clip; the visitor's own result for a model takes its place. An example with no clip for the chosen model shows the preview alone.
+
+The list can also name the reference images an example was made with. They load into the example's Character and Environment drops when the page opens, show in its Gallery row, and go out with a run like any reference. A visitor's own image is never replaced, and a published one they clear stays cleared. A clip made with other images names its own under `refs` in its entry; they show while its model is chosen.
+
+```json
+{
+  "version": 1,
+  "refs": { "runner": { "character": "published/runner-character.jpg", "environment": "published/runner-environment.jpg" } },
+  "clips": {
+    "runner": {
+      "seedance-2.5": { "url": "https://…/skater.mp4", "prompt": "", "refs": { "character": "published/skater-character.jpg", "environment": "published/skater-environment.jpg" } }
+    }
+  }
+}
+```
+
+**One guide, another subject.** A model's entry can be a list of clips. A clip with a `subject` (and, if you like, its own `refs` and its three `shot` lines) gets its own row in the Gallery, under the example's row: the same path and guide, with that subject's images, shot description and clip. In the editor, choosing the model again moves to its next published clip, and a subject row's "Load into the editor" opens the example with that clip beside the preview.
+
+```json
+"seedance-2.5": [
+  { "url": "https://…/skater.mp4", "prompt": "", "subject": "skater", "refs": { "character": "published/skater-character.jpg" }, "shot": { "subject": "…", "environment": "…", "action": "…" } },
+  { "url": "https://…/forklift.mp4", "prompt": "", "subject": "forklift" }
+]
+```
+
+While a clip loads, the pane beside the preview shows the page's spinner and "Loading the clip…".
+
+Reference images are added by hand: name each one in `index.json`, as a link (the shipped ones sit on Cloudflare R2) or as a file in `packages/studio/public/published/`. The page reads an image as a file to put it in a drop, so a link on another origin must allow cross-site reads (on R2: a CORS rule for `GET` on the bucket); without it the image still shows in the Gallery and the drop stays empty. `npm run publish:clip` keeps the images when it writes a clip.
+
 ## Your own music
 
 Put files in `packages/studio/public/tracks/` and set `file` for the example in `packages/studio/src/beat-path/tracks.ts`; they are copied into the build as they are. Example 1 does this with the owner's loop (`neon-rain-loop.mp3`, 540 KB at 320 kbps): keep such a file compressed (MP3 or OGG).

@@ -24,7 +24,7 @@ import { icon } from "./ui/icons";
 import type { Ref } from "./ref-store";
 import { readableVideo, videoFrame, type RefGetter } from "./page-refs";
 import { applyStep, followStep, playLocal } from "./result-sync";
-import { loadPublished, tileClip, type PublishedRun } from "./published";
+import { loadPublishedAll, mainClips, refsFor, subjectRows, tileClip, type Published, type PublishedRun } from "./published";
 
 /** A run added to the gallery: a clip (video), or a still made for a reference (image, with its cost and the drop it was for). */
 export type Run = { slot: string; model: string; modelName: string; url: string; prompt: string; kind?: "video" | "image"; costUsd?: number | null; for?: "character" | "environment"; blob?: Blob | null };
@@ -120,9 +120,13 @@ const video = (src: string) => { const v = el("video"); v.muted = true; v.playsI
 const streamed = (src: string) => { const v = el("video"); v.muted = true; v.playsInline = true; v.loop = true; v.preload = "metadata"; v.src = src; return v; };
 
 export function bindGallery(opts: {
-  root: HTMLElement; load(slot: string): void; refs(slot: string): { character?: Ref; environment?: Ref } | undefined; runs(): Run[];
+  root: HTMLElement;
+  /** Open an example in the editor; `show`: with this model chosen and this subject's published clip beside the preview. */
+  load(slot: string, show?: { model: string; subject: string }): void; refs(slot: string): { character?: Ref; environment?: Ref } | undefined; runs(): Run[];
   /** Give an image's box the "Use as reference" control (page-refs.ts). */
   attach?(host: HTMLElement, get: RefGetter, what: string): void;
+  /** The published list, once it has loaded (its clips also fill the editor's output pane, its images the drops). */
+  onPublished?(all: Published): void;
 }) {
   /** A video tile's current frame as a reference (the page's own blob URLs only). */
   const frameOf = (v: HTMLVideoElement, of: "guide" | "result"): RefGetter => async () => {
@@ -134,7 +138,12 @@ export function bindGallery(opts: {
   const guideBox = (src: string) => { const v = video(src); return box(v, frameOf(v, "guide"), "this frame of the guide"); };
   const runBox = (src: string, stream = false) => { const v = stream ? streamed(src) : video(src); return box(v, frameOf(v, "result"), "this frame of the clip"); };
   /** Clips published with the build (published.ts), shown until the visitor makes their own; filled in once the list loads. */
-  let published: PublishedRun[] = [];
+  let published: PublishedRun[] = [], publishedRefs: Published["refs"] = {};
+  /** A reference image the page itself put in a drop from the published list (page-generate.ts): not the visitor's own. */
+  const fromList = (ref: Ref) => ref.source.kind === "gallery" && ref.source.label.startsWith("published with");
+  /** A published image in a box: it shows from its link, and "Use as reference" reads it as a file. */
+  const publishedImage = (url: string, label: string, what: string) => box(Object.assign(el("img"), { src: url, alt: label, loading: "lazy" as const }),
+    async () => { try { const r = await fetch(url); return r.ok ? { blob: await r.blob(), source: { kind: "gallery" as const, label } } : null; } catch { return null; } }, what);
   /** A model's tile: the visitor's run, else the published clip (back to "No clip yet" if it fails to load), else "No clip yet". */
   const modelTile = (label: string, pick: ReturnType<typeof tileClip<Run>>) => {
     if (!pick) return tile(label, "No clip yet");
@@ -157,28 +166,37 @@ export function bindGallery(opts: {
     return j;
   };
 
-  function exampleRow(i: number): HTMLElement {
+  /**
+   * An example's row: its path, guide, references, shot and a clip per model. `variant`: the same guide carried by
+   * another subject (published.ts): its own images and shot lines, and the published clips made with them.
+   */
+  function exampleRow(i: number, variant?: { subject: string; clips: PublishedRun[] }): HTMLElement {
     const ex = EXAMPLES[i], s = exampleState(i), row = el("article", "gallery-row panel"), t = TRACKS[ex.id];
     const head = el("header", "row-head"), player = rowPlayer(row, media.get(i)?.audio ?? null, live());
-    const open = el("button", "link-act", "Load into the editor"); open.type = "button"; open.insertAdjacentHTML("beforeend", icon("arrow-right")); open.onclick = () => { opts.load(String(i)); window.scrollTo({ top: 0 }); };
-    const badge = el("span", "badge", s.figure.shape);
-    head.append(player.button, el("h3", "", `Example ${i + 1}: ${ex.label}`), badge, el("span", "muted", t.name), open);
+    const open = el("button", "link-act", "Load into the editor"); open.type = "button"; open.insertAdjacentHTML("beforeend", icon("arrow-right"));
+    open.onclick = () => { opts.load(String(i), variant ? { model: variant.clips[0].model, subject: variant.subject } : undefined); window.scrollTo({ top: 0 }); };
+    const badge = el("span", "badge", variant ? variant.subject : s.figure.shape);
+    head.append(player.button, el("h3", "", `Example ${i + 1}: ${ex.label}${variant ? ` · ${variant.subject}` : ""}`), badge, el("span", "muted", t.name), open);
     const strip = el("div", "row-strip");
     strip.append(tile("Path", thumbnail(i)));
     const guide = tile("Guide", media.get(i) ? guideBox(media.get(i)!.guide) : "Rendering the guide…");
     strip.append(guide);
-    const r = opts.refs(String(i));
+    const r = opts.refs(String(i)), listed = refsFor({ clips: published, refs: publishedRefs }, ex.id, variant?.clips[0]);
     for (const [k, label] of [["character", "Character"], ["environment", "Environment"]] as const) {
-      // The reference's own URL (the store releases it when the image is replaced or cleared).
-      const ref = r?.[k], img = ref ? box(Object.assign(el("img"), { src: ref.url, alt: label }), async () => ({ blob: ref.blob ?? ref.url, source: { kind: "gallery", label: `Example ${i + 1}, ${label.toLowerCase()}` } }), `this ${label.toLowerCase()} image`) : null;
+      // The visitor's own image on the example's row (the store releases its URL when it is replaced or cleared); else the published one.
+      const ref = variant || (r?.[k] && fromList(r[k])) ? undefined : r?.[k], where = `Example ${i + 1}${variant ? ` (${variant.subject})` : ""}, ${label.toLowerCase()}`;
+      const img = ref ? box(Object.assign(el("img"), { src: ref.url, alt: label }), async () => ({ blob: ref.blob ?? ref.url, source: { kind: "gallery", label: where } }), `this ${label.toLowerCase()} image`)
+        : listed[k] ? publishedImage(listed[k], where, `this ${label.toLowerCase()} image`) : null;
       strip.append(tile(label, img ?? "No image"));
     }
+    const shot = variant?.clips[0].shot ?? s.shot;
     const text = el("div", "row-text clamp");
-    text.append(el("p", "", [s.shot.subject, s.shot.environment, s.shot.action].join(" · ")), el("p", "muted", composePrompt(s.shot, legendFor(s.figure))));
+    text.append(el("p", "", [shot.subject, shot.environment, shot.action].filter(Boolean).join(" · ")), el("p", "muted", composePrompt({ ...s.shot, ...shot }, legendFor(s.figure))));
     text.title = "Click to expand"; text.onclick = () => text.classList.toggle("clamp");
     strip.append(tile("Shot", text));
-    const runs = opts.runs().filter(x => x.slot === String(i));
-    for (const m of MODELS) strip.append(modelTile(m.label, tileClip(runs.find(x => x.model === m.id), published.find(p => p.example === ex.id && p.model === m.id))));
+    // The example's own row: the visitor's run for a model, else its published clip. A subject's row: the clips published for it.
+    const runs = variant ? [] : opts.runs().filter(x => x.slot === String(i)), pubs = variant ? variant.clips : mainClips(published, ex.id);
+    for (const m of MODELS) strip.append(modelTile(m.label, tileClip(runs.find(x => x.model === m.id), pubs.find(x => x.model === m.id))));
     row.append(head, strip, player.scrub);
     if (!media.has(i)) {
       // Render the guide when the row first comes into view, one row at a time.
@@ -222,10 +240,11 @@ export function bindGallery(opts: {
     generation++;
     for (const io of watching) io.disconnect();
     watching.clear();
-    const rows = EXAMPLES.map((_, i) => exampleRow(i)), own = runsRow();
+    // Each example's row, then a row for each other subject its guide was published with.
+    const rows = EXAMPLES.flatMap((e, i) => [exampleRow(i), ...subjectRows(published, e.id).map(v => exampleRow(i, v))]), own = runsRow();
     opts.root.replaceChildren(...rows, ...(own ? [own] : []));
   }
   render();
-  void loadPublished({ examples: EXAMPLES.map(e => e.id), models: MODELS.map(m => m.id) }, document.baseURI).then(list => { if (list.length) { published = list; render(); } });
+  void loadPublishedAll({ examples: EXAMPLES.map(e => e.id), models: MODELS.map(m => m.id) }, document.baseURI).then(all => { if (all.clips.length || Object.keys(all.refs).length) { published = all.clips; publishedRefs = all.refs; render(); } opts.onPublished?.(all); });
   return { render };
 }

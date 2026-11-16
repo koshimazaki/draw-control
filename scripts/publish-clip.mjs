@@ -13,7 +13,7 @@ import { extname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { MODELS } from "../packages/studio/src/beat-path/generate.ts";
 import { EXAMPLE_IDS } from "../packages/studio/src/beat-path/tracks.ts";
-import { checkClip, emptyIndex, isRecord, withClip } from "../packages/studio/src/beat-path/published.ts";
+import { checkClip, clipList, emptyIndex, isRecord, withClip } from "../packages/studio/src/beat-path/published.ts";
 
 const PAGES_LIMIT = 25 * 1024 * 1024;
 const VIDEO_EXT = new Set([".mp4", ".webm"]);
@@ -64,7 +64,7 @@ if (existsSync(indexFile)) {
   const bad = Object.keys(raw.clips).filter(k => !isRecord(raw.clips[k]));
   if (bad.length) fail(`${indexFile} has clips that are not objects (${bad.join(", ")}); fix or remove it first`);
   // Every existing entry must pass the page's own check, or it would be written back and never shown.
-  const unusable = Object.entries(raw.clips).flatMap(([e, byModel]) => Object.entries(byModel).filter(([, c]) => !checkClip(c, "https://example.invalid/")).map(([m]) => `${e}/${m}`));
+  const unusable = Object.entries(raw.clips).flatMap(([e, byModel]) => Object.entries(byModel).filter(([, c]) => clipList(c).some(one => !checkClip(one, "https://example.invalid/"))).map(([m]) => `${e}/${m}`));
   if (unusable.length) fail(`${indexFile} has entries the page would not show (${unusable.join(", ")}); fix or remove it first`);
   index = raw;
   // Entries under an id the page no longer shows (car and drone left with Examples 3 and 4, 15 Nov 2026) are kept, never

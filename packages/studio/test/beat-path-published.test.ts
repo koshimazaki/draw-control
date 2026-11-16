@@ -13,7 +13,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { EXAMPLES } from "../src/beat-path/examples";
 import { MODELS } from "../src/beat-path/generate";
 import { EXAMPLE_IDS } from "../src/beat-path/tracks";
-import { checkClip, isRecord, loadPublished, parsePublished, resolveClipUrl, tileClip, withClip, emptyIndex } from "../src/beat-path/published";
+import { checkClip, clipList, clipsFor, isRecord, loadPublished, mainClips, subjectRows, loadPublishedAll, paneClip, parsePublished, pickClip, parseRefs, refsFor, resolveClipUrl, tileClip, withClip, emptyIndex } from "../src/beat-path/published";
 
 const ids = { examples: EXAMPLES.map(e => e.id), models: MODELS.map(m => m.id) };
 const PAGE = "https://demo.example/some/sub/path/index.html";
@@ -58,9 +58,9 @@ describe("Published clips: reading the list", () => {
     // Named per key first, so a bad entry fails with a readable diff rather than a TypeError or a bare count.
     const notObjects = Object.entries(shipped.clips as Record<string, unknown>).filter(([, v]) => !isRecord(v)).map(([k]) => k);
     expect(notObjects).toEqual([]);
-    const unusable = Object.entries(shipped.clips as Record<string, Record<string, unknown>>).flatMap(([e, byModel]) => Object.entries(byModel).filter(([, c]) => !checkClip(c, PAGE)).map(([m]) => `${e}/${m}`));
+    const unusable = Object.entries(shipped.clips as Record<string, Record<string, unknown>>).flatMap(([e, byModel]) => Object.entries(byModel).filter(([, c]) => clipList(c).some(one => !checkClip(one, PAGE))).map(([m]) => `${e}/${m}`));
     expect(unusable).toEqual([]);
-    const committed = Object.values(shipped.clips as Record<string, object>).flatMap(o => Object.keys(o)).length;
+    const committed = Object.values(shipped.clips as Record<string, object>).flatMap(o => Object.values(o).flatMap(c => clipList(c))).length;
     expect(parsePublished(shipped, ids, PAGE)).toHaveLength(committed);
   });
 });
@@ -83,6 +83,87 @@ describe("Published clips: which clip a model tile shows", () => {
       const broken = { version: 1, clips: { flyer: prev, runner: { h3: clip } } } as unknown as Parameters<typeof withClip>[0];
       expect(withClip(broken, "flyer", "h3", clip).clips).toEqual({ flyer: { h3: clip }, runner: { h3: clip } });
     }
+  });
+});
+
+describe("Published clips: the clip beside the preview and the reference images", () => {
+  const BASE = "https://demo.example/some/sub/path/";
+  const pub = { example: "flyer", model: "kling-4", url: "https://r2.example/p.mp4", prompt: "" };
+  it("the pane shows the visitor's result for the chosen model, else that model's published clip, else their result, else nothing", () => {
+    const own = { url: "blob:own" };
+    expect(paneClip(own, true, pub)).toEqual({ kind: "own", run: own });
+    expect(paneClip(own, false, pub)).toEqual({ kind: "published", run: pub });
+    expect(paneClip(undefined, false, pub)).toEqual({ kind: "published", run: pub });
+    expect(paneClip(own, false, undefined)).toEqual({ kind: "own", run: own });
+    expect(paneClip(undefined, false, undefined)).toBeNull();
+  });
+  it("reads an example's reference images, known examples only, and drops a link the page would not load", () => {
+    const refs = parseRefs({ version: 1, clips: {}, refs: {
+      flyer: { character: "published/flyer-character.jpg", environment: "https://r2.example/city.jpg", extra: "x.jpg" },
+      runner: { character: "javascript:alert(1)", environment: "data:image/png;base64,AA" },
+      ghost: { character: "g.jpg" },
+    } }, ids, PAGE);
+    expect(refs).toEqual({ flyer: { character: `${BASE}published/flyer-character.jpg`, environment: "https://r2.example/city.jpg" } });
+    expect(parseRefs({ version: 1, clips: {} }, ids, PAGE)).toEqual({});
+    expect(parseRefs({ version: 1, clips: {}, refs: "no" }, ids, PAGE)).toEqual({});
+  });
+  it("a clip may carry its own reference images, and they win over the example's while its model is chosen", () => {
+    const raw = { version: 1, refs: { runner: { character: "published/runner-character.jpg", environment: "published/runner-environment.jpg" } }, clips: { runner: {
+      "kling-4": { url: "k.mp4", prompt: "" },
+      "seedance-2.5": { url: "s.mp4", prompt: "", refs: { character: "published/skater-character.jpg", environment: "ftp://nope/x.jpg" } },
+    } } };
+    const all = { clips: parsePublished(raw, ids, PAGE), refs: parseRefs(raw, ids, PAGE) };
+    expect(all.clips.find(c => c.model === "kling-4")!.refs).toBeUndefined();
+    const of = (m: string) => all.clips.find(c => c.model === m);
+    expect(refsFor(all, "runner", of("kling-4"))).toEqual({ character: `${BASE}published/runner-character.jpg`, environment: `${BASE}published/runner-environment.jpg` });
+    expect(refsFor(all, "runner", of("seedance-2.5"))).toEqual({ character: `${BASE}published/skater-character.jpg`, environment: `${BASE}published/runner-environment.jpg` });
+    expect(refsFor(all, "flyer", undefined)).toEqual({});
+  });
+  it("loads clips and reference images in one read, and a failed read is an empty list", async () => {
+    const body = { version: 1, clips: { flyer: { h3: { url: "h.mp4", prompt: "" } } }, refs: { flyer: { character: "c.jpg" } } };
+    const ok = (async () => ({ ok: true, json: async () => body })) as unknown as typeof fetch;
+    expect(await loadPublishedAll(ids, PAGE, ok)).toEqual({ clips: [{ example: "flyer", model: "h3", url: `${BASE}h.mp4`, prompt: "" }], refs: { flyer: { character: `${BASE}c.jpg` } } });
+    expect(await loadPublished(ids, PAGE, ok)).toHaveLength(1);
+    const down = (async () => { throw new Error("offline"); }) as unknown as typeof fetch;
+    expect(await loadPublishedAll(ids, PAGE, down)).toEqual({ clips: [], refs: {} });
+  });
+  it("a model may hold several clips, each with a subject: all are read, in order, and choosing the model again goes round them", () => {
+    const list = parsePublished({ version: 1, clips: { runner: { "seedance-2.5": [
+      { url: "skater.mp4", prompt: "", subject: " skater " }, { url: "javascript:alert(1)", subject: "bad" }, { url: "forklift.mp4", prompt: "", subject: "forklift" },
+    ], "kling-4": { url: "runner.mp4", prompt: "", subject: 7 } } } }, ids, PAGE);
+    const seedance = clipsFor(list, "runner", "seedance-2.5");
+    expect(seedance.map(c => c.subject)).toEqual(["skater", "forklift"]);
+    expect(clipsFor(list, "runner", "kling-4")[0].subject).toBeUndefined();
+    expect([0, 1, 2, 3].map(t => pickClip(seedance, t)!.subject)).toEqual(["skater", "forklift", "skater", "forklift"]);
+    expect(pickClip([], 3)).toBeUndefined();
+    expect(clipsFor(list, "flyer", "h3")).toEqual([]);
+  });
+  it("a clip with a subject is a Gallery row of its own, with its shot lines; the others stay on the example's row", () => {
+    const list = parsePublished({ version: 1, clips: { runner: {
+      "kling-4": { url: "runner.mp4", prompt: "" },
+      "seedance-2.5": [
+        { url: "skater.mp4", prompt: "", subject: "skater", shot: { subject: " a skater ", environment: "a street", action: 3, extra: "x" } },
+        { url: "forklift.mp4", prompt: "", subject: "forklift", shot: "not lines" },
+      ],
+      h3: { url: "skater-h3.mp4", prompt: "", subject: "skater", shot: {} },
+    } } }, ids, PAGE);
+    expect(mainClips(list, "runner").map(c => c.model)).toEqual(["kling-4"]);
+    expect(subjectRows(list, "runner").map(r => [r.subject, r.clips.map(c => c.model)])).toEqual([["skater", ["seedance-2.5", "h3"]], ["forklift", ["seedance-2.5"]]]);
+    expect(subjectRows(list, "flyer")).toEqual([]);
+    expect(list.find(c => c.subject === "skater")!.shot).toEqual({ subject: "a skater", environment: "a street", action: "" });
+    expect(list.find(c => c.subject === "forklift")!.shot).toBeUndefined();
+    expect(list.find(c => c.model === "h3")!.shot).toBeUndefined();
+  });
+  it("setting a clip keeps the list's reference images", () => {
+    const withRefs = { ...emptyIndex(), refs: { flyer: { character: "published/flyer-character.jpg" } } };
+    expect(withClip(withRefs, "flyer", "h3", { url: "a.mp4", prompt: "" }).refs).toEqual(withRefs.refs);
+  });
+  it("every reference image the shipped list names is a file in public/published/", () => {
+    const dir = fileURLToPath(new URL("../public/published/", import.meta.url));
+    const shipped = JSON.parse(readFileSync(join(dir, "index.json"), "utf8")) as { refs?: Record<string, Record<string, string>>; clips: Record<string, Record<string, { refs?: Record<string, string> }>> };
+    const named = [...Object.values(shipped.refs ?? {}), ...Object.values(shipped.clips).flatMap(m => Object.values(m).map(c => c.refs ?? {}))].flatMap(r => Object.values(r));
+    const missing = named.filter(u => !/^https?:/.test(u) && !existsSync(join(dir, "..", u)));
+    expect(missing).toEqual([]);
   });
 });
 

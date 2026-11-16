@@ -1,4 +1,71 @@
 {
   "version": 1,
-  "clips": {}
+  "clips": {
+    "flyer": {
+      "kling-4": {
+        "url": "https://pub-a43ab278435c48f28b76e8ecc0307ccd.r2.dev/224d7eae.mp4",
+        "prompt": "an unbranded flying car, sleek and low (the orange figure; white marks its nose), a futuristic city at night, neon signs on tall towers, light rain on empty streets, it flies down the avenue, turns left into a narrow gap between the towers and comes down to land between the buildings",
+        "seconds": 14
+      },
+      "seedance-2.5": {
+        "url": "https://pub-a43ab278435c48f28b76e8ecc0307ccd.r2.dev/febe9cb1.mp4",
+        "prompt": "an unbranded flying car, sleek and low (the orange figure; white marks its nose), a futuristic city at night, neon signs on tall towers, light rain on empty streets, it flies down the avenue, turns left into a narrow gap between the towers and comes down to land between the buildings",
+        "seconds": 14
+      },
+      "h3": {
+        "url": "https://pub-a43ab278435c48f28b76e8ecc0307ccd.r2.dev/ecc3166d.mp4",
+        "prompt": "an unbranded flying car, sleek and low (the orange figure; white marks its nose), a futuristic city at night, neon signs on tall towers, light rain on empty streets, it flies down the avenue, turns left into a narrow gap between the towers and comes down to land between the buildings",
+        "seconds": 14
+      }
+    },
+    "runner": {
+      "kling-4": {
+        "url": "https://pub-a43ab278435c48f28b76e8ecc0307ccd.r2.dev/316c556f.mp4",
+        "prompt": "",
+        "seconds": 12
+      },
+      "seedance-2.5": [
+        {
+          "url": "https://pub-a43ab278435c48f28b76e8ecc0307ccd.r2.dev/467386d7.mp4",
+          "prompt": "",
+          "seconds": 11,
+          "refs": {
+            "character": "https://pub-a43ab278435c48f28b76e8ecc0307ccd.r2.dev/draw-control/skater-character.jpg",
+            "environment": "https://pub-a43ab278435c48f28b76e8ecc0307ccd.r2.dev/draw-control/skater-environment.jpg"
+          },
+          "subject": "skater",
+          "shot": {
+            "subject": "an anime-style skateboarder in a loose hoodie and sneakers, drawn with clean outlines and flat colours (the orange figure; white marks the chest)",
+            "environment": "an anime city street in the afternoon, shops and cafés along the pavement, cel-shaded, soft sky",
+            "action": "close on the skateboard's wheels and deck as they push along, then alongside them as they pass behind the shopfronts and show through the gaps, an ollie in a gap, then a high view of the whole street"
+          }
+        },
+        {
+          "url": "https://pub-a43ab278435c48f28b76e8ecc0307ccd.r2.dev/cba0b6ba.mp4",
+          "prompt": "",
+          "seconds": 12,
+          "subject": "forklift",
+          "refs": {
+            "character": "https://pub-a43ab278435c48f28b76e8ecc0307ccd.r2.dev/draw-control/forklift-character.jpg",
+            "environment": "https://pub-a43ab278435c48f28b76e8ecc0307ccd.r2.dev/draw-control/forklift-environment.jpg"
+          },
+          "shot": {
+            "subject": "an industrial forklift carrying a pallet, yellow and black (the orange figure; white marks its front)",
+            "environment": "a car factory floor, the grey blocks are its steel pillars and machines, car bodies on the line, robot arms, overhead lights",
+            "action": "close on its front wheel as it drives along, then alongside it as it passes behind the factory pillars and between the stations, a bump over a floor plate in a gap, then a high view of the whole factory floor"
+          }
+        }
+      ]
+    }
+  },
+  "refs": {
+    "flyer": {
+      "character": "https://pub-a43ab278435c48f28b76e8ecc0307ccd.r2.dev/draw-control/flyer-character.jpg",
+      "environment": "https://pub-a43ab278435c48f28b76e8ecc0307ccd.r2.dev/draw-control/flyer-environment.jpg"
+    },
+    "runner": {
+      "character": "https://pub-a43ab278435c48f28b76e8ecc0307ccd.r2.dev/draw-control/runner-character.jpg",
+      "environment": "https://pub-a43ab278435c48f28b76e8ecc0307ccd.r2.dev/draw-control/runner-environment.jpg"
+    }
+  }
 }
