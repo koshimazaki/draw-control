@@ -1,4 +1,48 @@
 {
   "version": 1,
-  "clips": {}
+  "clips": {
+    "flyer": {
+      "kling-4": {
+        "url": "https://pub-a43ab278435c48f28b76e8ecc0307ccd.r2.dev/224d7eae.mp4",
+        "prompt": "an unbranded flying car, sleek and low (the orange figure; white marks its nose), a futuristic city at night, neon signs on tall towers, light rain on empty streets, it flies down the avenue, turns left into a narrow gap between the towers and comes down to land between the buildings",
+        "seconds": 14
+      },
+      "seedance-2.5": {
+        "url": "https://pub-a43ab278435c48f28b76e8ecc0307ccd.r2.dev/febe9cb1.mp4",
+        "prompt": "an unbranded flying car, sleek and low (the orange figure; white marks its nose), a futuristic city at night, neon signs on tall towers, light rain on empty streets, it flies down the avenue, turns left into a narrow gap between the towers and comes down to land between the buildings",
+        "seconds": 14
+      },
+      "h3": {
+        "url": "https://pub-a43ab278435c48f28b76e8ecc0307ccd.r2.dev/ecc3166d.mp4",
+        "prompt": "an unbranded flying car, sleek and low (the orange figure; white marks its nose), a futuristic city at night, neon signs on tall towers, light rain on empty streets, it flies down the avenue, turns left into a narrow gap between the towers and comes down to land between the buildings",
+        "seconds": 14
+      }
+    },
+    "runner": {
+      "kling-4": {
+        "url": "https://pub-a43ab278435c48f28b76e8ecc0307ccd.r2.dev/316c556f.mp4",
+        "prompt": "",
+        "seconds": 12
+      },
+      "seedance-2.5": {
+        "url": "https://pub-a43ab278435c48f28b76e8ecc0307ccd.r2.dev/467386d7.mp4",
+        "prompt": "",
+        "seconds": 11,
+        "refs": {
+          "character": "published/skater-character.jpg",
+          "environment": "published/skater-environment.jpg"
+        }
+      }
+    }
+  },
+  "refs": {
+    "flyer": {
+      "character": "published/flyer-character.jpg",
+      "environment": "published/flyer-environment.jpg"
+    },
+    "runner": {
+      "character": "published/runner-character.jpg",
+      "environment": "published/runner-environment.jpg"
+    }
+  }
 }

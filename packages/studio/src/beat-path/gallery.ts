@@ -24,7 +24,7 @@ import { icon } from "./ui/icons";
 import type { Ref } from "./ref-store";
 import { readableVideo, videoFrame, type RefGetter } from "./page-refs";
 import { applyStep, followStep, playLocal } from "./result-sync";
-import { loadPublished, tileClip, type PublishedRun } from "./published";
+import { loadPublishedAll, tileClip, type Published, type PublishedRun } from "./published";
 
 /** A run added to the gallery: a clip (video), or a still made for a reference (image, with its cost and the drop it was for). */
 export type Run = { slot: string; model: string; modelName: string; url: string; prompt: string; kind?: "video" | "image"; costUsd?: number | null; for?: "character" | "environment"; blob?: Blob | null };
@@ -123,6 +123,8 @@ export function bindGallery(opts: {
   root: HTMLElement; load(slot: string): void; refs(slot: string): { character?: Ref; environment?: Ref } | undefined; runs(): Run[];
   /** Give an image's box the "Use as reference" control (page-refs.ts). */
   attach?(host: HTMLElement, get: RefGetter, what: string): void;
+  /** The published list, once it has loaded (its clips also fill the editor's output pane, its images the drops). */
+  onPublished?(all: Published): void;
 }) {
   /** A video tile's current frame as a reference (the page's own blob URLs only). */
   const frameOf = (v: HTMLVideoElement, of: "guide" | "result"): RefGetter => async () => {
@@ -226,6 +228,6 @@ export function bindGallery(opts: {
     opts.root.replaceChildren(...rows, ...(own ? [own] : []));
   }
   render();
-  void loadPublished({ examples: EXAMPLES.map(e => e.id), models: MODELS.map(m => m.id) }, document.baseURI).then(list => { if (list.length) { published = list; render(); } });
+  void loadPublishedAll({ examples: EXAMPLES.map(e => e.id), models: MODELS.map(m => m.id) }, document.baseURI).then(all => { if (all.clips.length) { published = all.clips; render(); } opts.onPublished?.(all); });
   return { render };
 }

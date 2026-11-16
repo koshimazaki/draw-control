@@ -21,13 +21,14 @@ import { bindHistory } from "./page-history";
 import { textSpinner } from "./ui/spinner";
 import { bindGallery, type Run } from "./gallery";
 import { captureDrag } from "./drag";
-import { RefStore } from "./ref-store";
+import { RefStore, type Ref } from "./ref-store";
 import { bindRefs, readableVideo, videoFrame } from "./page-refs";
 import { bindImages } from "./page-image";
 import { applyStep, followStep, playLocal } from "./result-sync";
 import { bindCostDialog } from "./cost-dialog";
 import { bindShotEditor } from "./shot-editor";
-import { SLOT_GONE, pageSlot } from "./examples";
+import { EXAMPLES, SLOT_GONE, pageSlot } from "./examples";
+import { paneClip, refsFor, REF_KINDS, type Published, type PublishedRun } from "./published";
 
 const EXPORT = { width: 1280, height: 720 } as const;
 const store = (() => { try { return window.sessionStorage; } catch { return null; } })();
@@ -44,6 +45,12 @@ export function bindGenerate(p: Page) {
     loggingFetch(inner ?? ((u, i) => globalThis.fetch(u, i as RequestInit) as ReturnType<Fetch>), runLog, () => ({ slot, model: name, ...(local ? { local: true } : {}) }));
   let model: ModelId = MODELS[0].id, swapped = false, arena: ArenaModule | null = null, key: ArenaKeyElement | null = null;
   let player: Player | null = null, fakeResult = "";
+  /** Clips published with the build (published.ts): one shows beside the preview until the visitor makes their own. */
+  let published: PublishedRun[] = [], publishedRefs: Published["refs"] = {};
+  /** The published reference images this page put in the drops (slot and kind → the link and the stored image), and the link asked for last. */
+  const placed = new Map<string, { url: string; ref: Ref }>(), wanted = new Map<string, string>();
+  /** The link the output pane shows now (null: none, or a run's progress). */
+  let shown: string | null = null;
   const fake = import.meta.env.DEV || new URLSearchParams(location.search).has("fake");
   const style = document.createElement("style");
   style.textContent = ARENA_THEME;
@@ -75,12 +82,15 @@ export function bindGenerate(p: Page) {
   const setSplit = (f: number) => { screens.style.setProperty("--split", String(Math.max(0.2, Math.min(0.8, f)))); try { store?.setItem("beatPath.split", String(f)); } catch { /* storage off */ } };
   setSplit(Number(store?.getItem("beatPath.split") ?? 0.5) || 0.5);
   function setOutputPane(on: boolean) { $("screenOutput").hidden = !on; $("divider").hidden = !on; screens.classList.toggle("split", on); }
-  function showResult(url: string | null) {
+  /** `from`: a published clip (its model's name and the prompt), streamed from its link; absent for the visitor's own result. */
+  function showResult(url: string | null, from?: { label: string; prompt: string }) {
     setOutputPane(!!url);
-    $("addToGallery").hidden = !url || !arena;
-    if (!url) return;
+    shown = url;
+    $("addToGallery").hidden = !url || !arena || !!from;
+    // No clip for this example and model: the pane goes, and the clip it held is let go (it would play on unseen).
+    if (!url) { $("generateSlot").replaceChildren(); player = null; return; }
     player = document.createElement(arena ? "arena-player" : "video") as Player;
-    if (arena) { player.setAttribute("controls", "none"); player.setAttribute("label", "Output"); }
+    if (arena) { player.setAttribute("controls", "none"); player.setAttribute("label", from ? `${from.label} · published` : "Output"); }
     else Object.assign(player, { muted: true, playsInline: true });
     player.className = "output-video";
     // No src on the player itself: it would stream the provider's link beside the copy (a second download).
@@ -91,10 +101,23 @@ export function bindGenerate(p: Page) {
     const v = resultVideo();
     refUi.showControl($("screenOutput"), readableVideo(url));
     if (!v) return;
+    // A published clip streams from its link, as in the Gallery: it is never downloaded whole before it shows.
+    if (from) { if (from.prompt) player.title = from.prompt; v.muted = true; v.playsInline = true; v.preload = "auto"; v.src = url; return; }
     // While the copy downloads the video has no source (a black box): a short note says so until it does.
     const wait = /^https?:/i.test(url) ? Object.assign(document.createElement("p"), { className: "output-loading muted", textContent: "Loading the clip…" }) : null;
     if (wait) $("generateSlot").append(wait);
     void playLocal(v, url).then(src => { if (resultVideo() === v) refUi.showControl($("screenOutput"), readableVideo(src)); }).finally(() => wait?.remove());
+  }
+  /** The example a slot shows (null on Your own). */
+  const exampleOf = (slot: string) => (/^\d+$/.test(slot) ? EXAMPLES[Number(slot)]?.id ?? null : null);
+  /** The output pane for a slot and the chosen model: the visitor's result, else that model's published clip (published.ts). */
+  function showFor(slot: string) {
+    const own = outputs.get(slot), example = exampleOf(slot);
+    const pick = paneClip(own, !!own && (own.model === model || own.model === labelOf(model)), example ? published.find(x => x.example === example && x.model === model) : undefined);
+    if ((pick?.run.url ?? null) === shown && $("screenOutput").hidden === !pick) return;
+    if (!pick) showResult(null);
+    else if (pick.kind === "own") showResult(pick.run.url);
+    else showResult(pick.run.url, { label: labelOf(pick.run.model), prompt: pick.run.prompt });
   }
   const divider = $("divider");
   divider.addEventListener("pointerdown", e => {
@@ -145,7 +168,8 @@ export function bindGenerate(p: Page) {
   }
   document.querySelector('[data-control="model"]')!.addEventListener("click", e => {
     const v = (e.target as HTMLElement).closest("button")?.dataset.value as ModelId | undefined;
-    if (v) { model = v; sync(); }
+    // Another model: its clip beside the preview (a run in progress on this example keeps its note and bar).
+    if (v) { model = v; sync(); if (!(running && runSlot === p.slot)) showFor(p.slot); applyRefs(p.slot); }
   });
 
   /** The page's own cost dialog (video, images, the no-bound notice): one question at a time, true only on OK (cost-dialog.ts). */
@@ -165,7 +189,7 @@ export function bindGenerate(p: Page) {
   noteRow.className = "note-row"; noteRow.append(spin.el, note);
   const runButton = $<HTMLButtonElement>("runGenerate");
   /** The running job's note and progress bar in the output pane (its example showing again after a switch puts them back). */
-  const showProgress = () => { setOutputPane(true); $("addToGallery").hidden = true; bar.hidden = false; $("generateSlot").replaceChildren(noteRow, bar); };
+  const showProgress = () => { setOutputPane(true); shown = null; $("addToGallery").hidden = true; bar.hidden = false; $("generateSlot").replaceChildren(noteRow, bar); };
   const setRunning = (c: AbortController | null, slot: string | null = null) => { running = c; runSlot = c ? slot : null; runButton.querySelector(".btn-label")!.textContent = c ? "Stop" : "Generate"; runButton.classList.toggle("running", !!c); };
   runButton.onclick = async () => {
     if (running) { running.abort(); p.say("Stopping…"); return; }
@@ -238,7 +262,7 @@ export function bindGenerate(p: Page) {
   /** A link the page still shows: an example's output pane, or the gallery. */
   const inUse = (url: string) => [...outputs.values()].some(o => o.url === url) || runs.some(r => r.url === url);
   const gallery = bindGallery({ root: $("gallerySlot"), load: slot => void p.switchSlot(slot), refs: slot => ({ character: refStore.get(slot, "character"), environment: refStore.get(slot, "environment") }), runs: () => runs,
-    attach: (host, get, what) => refUi.attach(host, get, what) });
+    attach: (host, get, what) => refUi.attach(host, get, what), onPublished: all => takePublished(all) });
   // Reference images made with an image model, from the Generate buttons beside the drops (page-image.ts).
   bindImages({
     $, slot: () => p.slot, shot: () => p.state.shot, arena: () => arena, key: () => key, fake, ask, store: refStore, runs, renderGallery: () => renderGallery(),
@@ -258,6 +282,36 @@ export function bindGenerate(p: Page) {
     },
   });
   const renderGallery = () => gallery.render();
+  /**
+   * The published list has loaded: this example's clip for the chosen model shows beside the preview, and each
+   * example's published reference images go into its Character and Environment drops (kept when the visitor
+   * already put an image there; an image that cannot be fetched is left out).
+   */
+  function takePublished(all: Published) {
+    published = all.clips; publishedRefs = all.refs;
+    if (!(running && runSlot === p.slot)) showFor(p.slot);
+    EXAMPLES.forEach((_, i) => applyRefs(String(i)));
+  }
+  /**
+   * An example's published reference images for the chosen model, in its drops. The visitor's own image is
+   * never replaced, and a published one they cleared or replaced is not put back.
+   */
+  function applyRefs(slot: string) {
+    const example = exampleOf(slot);
+    if (!example) return;
+    const want = refsFor({ clips: published, refs: publishedRefs }, example, model);
+    const mine = (key: string, kind: (typeof REF_KINDS)[number]) => { const was = placed.get(key), now = refStore.get(slot, kind); return was ? now === was.ref : !now; };
+    for (const kind of REF_KINDS) {
+      const key = `${slot}:${kind}`, url = want[kind];
+      if (!url || wanted.get(key) === url || !mine(key, kind)) continue;
+      wanted.set(key, url);
+      void fetch(url).then(r => (r.ok ? r.blob() : null)).then(b => {
+        // Still the image asked for (the model may have changed while it loaded), and still the page's to set.
+        if (!b || !b.type.startsWith("image/") || wanted.get(key) !== url || !mine(key, kind)) return;
+        placed.set(key, { url, ref: refStore.set(slot, kind, b, { kind: "gallery", label: `published with Example ${Number(slot) + 1}` }) });
+      }).catch(() => { /* no image: the drop stays as it is */ });
+    }
+  }
 
   // The embed: the key panel in the header, the model names, the gallery element.
   void loadArena().then(m => {
@@ -288,7 +342,8 @@ export function bindGenerate(p: Page) {
       refUi.sync();
       // A run in progress on another example keeps going; this example shows its own output (or none),
       // or, when the running job is this example's, its note and progress bar again.
-      if (running && runSlot === slot) showProgress(); else showResult(outputs.get(slot)?.url ?? null);
+      if (running && runSlot === slot) showProgress(); else showFor(slot);
+      applyRefs(slot);
       sync();
     },
   };
