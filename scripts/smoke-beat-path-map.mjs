@@ -1,7 +1,8 @@
 /**
  * Map checks for the Draw Control page, called from smoke-beat-path.mjs:
  * - the map's tool row stays visible and clickable after every tool and view switch, after zooming,
- *   after dragging the divider to both extremes, and at 1100 and 1280 px wide;
+ *   after dragging the divider to both extremes, and at 1100 and 1280 px wide; the canvas is never wider than its pane
+ *   and no map control is cut off at the pane's edge (a published clip beside the preview leaves the map at its minimum);
  * - the map's +/− zoom the map and not the timeline, and the timeline's +/− zoom the timeline;
  * - Camera → Draw new → drag draws the camera path on every example and on Your own, a block flies it,
  *   and a second stroke draws again (the pen stays armed);
@@ -22,6 +23,13 @@ export const toolbarReachable = page => page.evaluate(sel => {
   });
   return { count: all.length, bad: bad.map(b => b.textContent.trim()) };
 }, TOOL_BUTTONS);
+
+/** The map's canvas is as wide as its pane at most, and every visible control in the pane (tool row, footer) lies inside it. */
+export const mapPaneFits = page => page.evaluate(() => {
+  const pane = document.querySelector(".map-pane"), pr = pane.getBoundingClientRect(), canvas = document.getElementById("map").getBoundingClientRect();
+  const cut = [...pane.querySelectorAll("button, input, label, select")].filter(e => { const r = e.getBoundingClientRect(); return r.width > 0 && (r.left < pr.left - 0.5 || r.right > pr.right + 0.5); });
+  return { pane: Math.round(pane.clientWidth), canvas: Math.round(canvas.width), scrolled: pane.scrollLeft, cut: cut.map(e => e.id || e.textContent.trim()) };
+});
 
 async function stroke(page, from, to) {
   const at = q => page.evaluate(q => window.__beatPath.mapPoint(q), q);
@@ -45,6 +53,8 @@ export async function smokeBeatPathMap(browser, base, { fail, SHOTS }) {
     const check = async label => {
       const r = await toolbarReachable(page);
       if (r.count < 7 || r.bad.length) fail(`at ${width} px the map tool row is not clickable ${label} (${r.count} buttons; blocked: ${r.bad.join(", ") || "none"})`);
+      const f = await mapPaneFits(page);
+      if (f.canvas > f.pane + 1 || f.scrolled || f.cut.length) fail(`at ${width} px the map does not fit its pane ${label} (canvas ${f.canvas} px in a ${f.pane} px pane, scrolled ${f.scrolled} px; cut off: ${f.cut.join(", ") || "none"})`);
     };
     await check("on load");
     for (const [control, value] of [["tool", "camera"], ["view", "side"], ["tool", "blocks"], ["view", "top"], ["tool", "subject"], ["pen", "draw"], ["tool", "camera"], ["pen", "edit"]]) {

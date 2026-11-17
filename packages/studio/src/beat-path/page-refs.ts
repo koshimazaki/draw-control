@@ -44,6 +44,27 @@ export async function videoFrame(video: HTMLVideoElement): Promise<Blob | null> 
 }
 /** A video the page may read frames from: its own blob URLs and same-origin files. A remote result (another origin, no CORS) would taint the canvas. */
 export const readableVideo = (src: string) => src.startsWith("blob:") || new URL(src, location.href).origin === location.origin;
+/**
+ * A frame of a clip on another origin at `seconds` (a published clip in the Gallery), read from a second copy of it
+ * opened in CORS mode: the clip on show plays without CORS, so a host without it still plays it. Null when the host
+ * does not allow cross-site reads (the copy fails to load) or the frame does not arrive in time.
+ */
+export async function corsVideoFrame(src: string, seconds: number): Promise<Blob | null> {
+  const v = Object.assign(document.createElement("video"), { crossOrigin: "anonymous", muted: true, playsInline: true, preload: "auto" });
+  const settle = (ok: string, ms: number) => new Promise<boolean>(r => {
+    const t = setTimeout(() => r(false), ms);
+    v.addEventListener(ok, () => { clearTimeout(t); r(true); }, { once: true });
+    v.addEventListener("error", () => { clearTimeout(t); r(false); }, { once: true });
+  });
+  try {
+    const loaded = settle("loadeddata", 10_000);
+    v.src = src;
+    if (!(await loaded)) return null;
+    if (seconds > 0 && Number.isFinite(v.duration)) { const seeked = settle("seeked", 5_000); v.currentTime = Math.min(seconds, v.duration); if (!(await seeked)) return null; }
+    return await videoFrame(v);
+  } catch { return null; }
+  finally { v.removeAttribute("src"); v.load(); }
+}
 
 export function bindRefs(p: Page, store: RefStore, changed: () => void) {
   const { $ } = p;

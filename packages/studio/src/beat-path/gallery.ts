@@ -22,7 +22,7 @@ import { TRACKS } from "./tracks";
 import { PLAY_GLYPH } from "./ui/glyph";
 import { icon } from "./ui/icons";
 import type { Ref } from "./ref-store";
-import { readableVideo, videoFrame, type RefGetter } from "./page-refs";
+import { corsVideoFrame, readableVideo, videoFrame, type RefGetter } from "./page-refs";
 import { applyStep, followStep, playLocal } from "./result-sync";
 import { loadPublishedAll, mainClips, refsFor, subjectRows, tileClip, type Published, type PublishedRun } from "./published";
 
@@ -136,9 +136,10 @@ export function bindGallery(opts: {
   /** The published list, once it has loaded (its clips also fill the editor's output pane, its images the drops). */
   onPublished?(all: Published): void;
 }) {
-  /** A video tile's current frame as a reference (the page's own blob URLs only). */
+  /** A video tile's current frame as a reference: the page's own blob URLs, and a published clip read through CORS. */
   const frameOf = (v: HTMLVideoElement, of: "guide" | "result"): RefGetter => async () => {
-    const blob = readableVideo(v.currentSrc || v.src) ? await videoFrame(v) : null;
+    const src = v.currentSrc || v.src;
+    const blob = readableVideo(src) ? await videoFrame(v) : /^https?:/i.test(src) ? await corsVideoFrame(src, v.currentTime) : null;
     return blob ? { blob, source: { kind: "frame", of, seconds: v.currentTime } } : null;
   };
   /** An image or video in a box that carries the "Use as reference" control. */

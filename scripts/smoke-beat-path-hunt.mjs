@@ -376,7 +376,9 @@ async function smokePaidRuns(browser, base, { fail }) {
   await page.waitForTimeout(100);
   const away = await page.evaluate(() => !document.getElementById("screenOutput").hidden && !!document.querySelector("#generateSlot #genProgress"));
   await press('[data-control="example"] [data-value="0"]');
-  await page.waitForFunction(() => window.__beatPath.slot() === "0", null, { timeout: 30_000 });
+  // The slot changes at once, the output pane only after Example 1's music has loaded (as above): wait for that music,
+  // or the pane read is still Example 2's (its published clip).
+  await page.waitForFunction(() => window.__beatPath.slot() === "0" && window.__beatPath.trackName() === "neon-rain-loop.mp3", null, { timeout: 30_000 });
   const back = await page.evaluate(() => { const b = document.querySelector("#generateSlot #genProgress"); return { bar: !!b && !b.hidden, note: document.querySelector("#generateSlot #outputNote")?.textContent ?? null }; });
   console.log(`draw control paid runs: progress away ${away}, back ${JSON.stringify(back)}`);
   if (away || !back.bar || !back.note) fail(`the running job's progress was not shown again on its example (away ${away}, back ${JSON.stringify(back)})`);
