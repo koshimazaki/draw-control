@@ -7,6 +7,8 @@
  *    blocks between hide the subject within the caps;
  * any console error or warning fails the run.
  */
+import { mapPaneFits } from "./smoke-beat-path-map.mjs";
+
 export async function smokeBeatPathFollow(browser, base, { fail, SHOTS }) {
   const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
   const errors = [];
@@ -35,6 +37,9 @@ export async function smokeBeatPathFollow(browser, base, { fail, SHOTS }) {
   if (!(after.follow?.distance > was * 1.3)) fail(`dragging the follow line out did not raise its distance (${JSON.stringify(after.follow)}, was ${was.toFixed(1)} m)`);
   if (!/distance \d/.test(await page.evaluate(() => window.__beatPath.script()))) fail("the follow offset is not in the shot script");
   if (await page.locator("#followRow").isHidden()) fail("the follow fields are hidden for a follow block under the playhead");
+  // With the follow fields in the footer (its widest), the map at its minimum width still fits its pane.
+  const fits = await mapPaneFits(page);
+  if (fits.canvas > fits.pane + 1 || fits.scrolled || fits.cut.length) fail(`with the follow fields the map does not fit its pane (canvas ${fits.canvas} px in a ${fits.pane} px pane, scrolled ${fits.scrolled} px; cut off: ${fits.cut.join(", ") || "none"})`);
   await page.locator("#map").focus(); await page.keyboard.press("ControlOrMeta+z");
   if (JSON.stringify((await lane())[seg.block]) !== JSON.stringify(before)) fail("undo did not take the follow drag back in one step");
 

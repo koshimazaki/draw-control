@@ -88,7 +88,7 @@ The list can also name the reference images an example was made with. They load 
 
 While a clip loads, the pane beside the preview shows the page's spinner and "Loading the clip…".
 
-Reference images are added by hand: name each one in `index.json`, as a link (the shipped ones sit on Cloudflare R2) or as a file in `packages/studio/public/published/`. The page reads an image as a file to put it in a drop, so a link on another origin must allow cross-site reads (on R2: a CORS rule for `GET` on the bucket); without it the image still shows in the Gallery and the drop stays empty. `npm run publish:clip` keeps the images when it writes a clip.
+Reference images are added by hand: name each one in `index.json`, as a link (the shipped ones sit on Cloudflare R2) or as a file in `packages/studio/public/published/`. The page reads an image as a file to put it in a drop, so a link on another origin must allow cross-site reads (on R2: a CORS rule for `GET` on the bucket); without it the image still shows in the Gallery and the drop stays empty. The same rule lets a visitor use a frame of a published clip as a reference (the Gallery's "Use as reference", or a drag onto a drop): the page reads that frame from a second copy of the clip opened in CORS mode, and without the rule it says the image cannot be read. `npm run publish:clip` keeps the images when it writes a clip.
 
 ## Your own music
 

@@ -36,7 +36,9 @@ h1 { margin: 0; font-size: var(--text-lg); font-weight: var(--weight-semibold); 
 
 .stage { --map-min: 500px; display: grid; grid-template-columns: minmax(var(--map-min), 1fr) auto; gap: var(--gap); padding: var(--gap) var(--pad) 0; min-height: 0; }
 /* The map pane: its toolbar and its footer are real rows around the canvas, so they never sit over it or vanish when it narrows. */
-.map-pane { position: relative; min-height: 0; overflow: hidden; background: var(--map-bg); display: grid; grid-template-rows: auto minmax(0, 1fr) auto; }
+/* One column as wide as the pane: an auto column grew to the footer's widest content, so at the 500 px minimum the canvas
+   ran past the pane's edge (its right end and the footer's last controls clipped) and changed width with the footer's contents. */
+.map-pane { position: relative; min-height: 0; overflow: hidden; background: var(--map-bg); display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr) auto; }
 .map-bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2); padding: var(--s-2); background: var(--surface); }
 .map-bar.map-tools { border-bottom: 1px solid var(--border); }
 /* The tool row stays one line from 1280 px: a little less side padding per segment (the hit height is unchanged). */
@@ -271,11 +273,20 @@ select:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
 .scrub::-moz-range-thumb { width: 7px; height: 7px; border: 0; border-radius: 50%; background: var(--rail-dot); }
 .scrub:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; border-radius: 2px; }
 .row-scrub { width: 100%; }
-/* A narrow map (with a result beside the preview) drops the hint and the slider's word, never a control. */
+/* A narrow map (with a result beside the preview) drops the hint and the slider's word, never a control. At full size the
+   footer needs up to about 620 px (a drawn camera path's Corners, Smooth, Whole clip and Clear), and the map can be as
+   narrow as --map-min (500 px), so this starts at 660 px (room for other fonts); the gaps, the buttons' side padding and
+   the follow fields tighten too, so the footer at its widest still fits at 500 px. */
 .map-pane { container-type: inline-size; }
-@container (max-width: 480px) { .map-foot .map-hint { display: none; } .map-foot .slider > span { display: none; } .map-foot .slider input[type="range"] { width: 90px; } }
-/* A map under 600 px keeps the follow fields and drops their words (each field names itself on hover and to a screen reader). */
-@container (max-width: 600px) { .follow-row .pick > .word { display: none; } }
+@container (max-width: 660px) {
+  .map-foot .map-hint { display: none; } .map-foot .slider > span { display: none; } .map-foot .slider input[type="range"] { width: 80px; }
+  .map-foot, .map-foot .map-tools.end, .map-foot .slider, .follow-row { gap: var(--s-1); }
+  .map-foot .map-tools.end > .btn { padding: 0 var(--s-2); }
+  .follow-row .seg button { padding: 0 var(--s-2); } .follow-row .field.num { width: 58px; }
+}
+/* A map under 700 px keeps the follow fields and drops their words (each field names itself on hover and to a screen
+   reader): with their words the footer needs about 640 px. */
+@container (max-width: 700px) { .follow-row .pick > .word { display: none; } }
 /* Generate a reference image (page-image.ts): a small secondary button beside each drop and a popover above it. */
 .gen-ref { width: var(--control-h); padding: 0; flex: none; }
 .gen-ref .icon { margin: 0; }
